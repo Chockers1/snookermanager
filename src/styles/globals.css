@@ -45,6 +45,57 @@ select {
   font: inherit;
 }
 
+@layer components {
+  .card {
+    @apply rounded-lg border border-border bg-surface;
+  }
+
+  .card-header {
+    @apply flex items-center justify-between border-b border-border px-4 py-3;
+  }
+
+  .card-body {
+    @apply p-4;
+  }
+
+  .btn-primary {
+    @apply flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 font-medium text-white transition-colors hover:bg-green-700;
+  }
+
+  .btn-secondary {
+    @apply flex items-center gap-2 rounded-lg border border-border bg-surface-light px-4 py-2 font-medium text-white transition-colors hover:bg-border;
+  }
+
+  .metric-label {
+    @apply text-[10px] font-semibold uppercase tracking-wider text-gray-500;
+  }
+
+  .metric-value {
+    @apply text-xl font-bold text-white;
+  }
+
+  .progress-bar {
+    @apply h-2 overflow-hidden rounded-full bg-gray-700/50;
+  }
+
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-500;
+  }
+
+  .tab-active {
+    @apply border-b-2 border-green-400 font-medium text-green-400;
+  }
+
+  .tab-inactive {
+    @apply border-b-2 border-transparent text-gray-400 hover:text-white;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #1e2d3d transparent;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

@@ -15,13 +15,20 @@ import type {
   DrillLibraryGroup,
   EquipmentImpactCard,
   InboxMessage,
+  PlayerAttributes,
   RankingRow,
   RecoveryActionCard,
   TrainingPlannerDay,
   TrainingPlannerSummary,
   TrainingSlot,
+  Tournament,
 } from '../types/game'
-import { calculateTechnicalAverage } from './calculations'
+import {
+  calculateOverallRating,
+  calculatePotentialRating,
+  calculateTechnicalAverage,
+} from './calculations'
+import { getRoundDifficultyBonus } from './matchOutcomeModel'
 import { summarizeTrainingPlan } from './trainingPlan'
 
 function clamp(value: number, min: number, max: number) {
@@ -31,6 +38,36 @@ function clamp(value: number, min: number, max: number) {
 function average(values: number[]) {
   if (values.length === 0) return 0
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+}
+
+const PREVIEW_RANK_BASELINES: Partial<Record<string, { technical: number; mental: number; physical: number }>> = {
+  Youth: { technical: 57, mental: 54, physical: 58 },
+  Amateur: { technical: 63, mental: 60, physical: 61 },
+  'Q Tour': { technical: 69, mental: 66, physical: 65 },
+  'Rookie Pro': { technical: 74, mental: 70, physical: 68 },
+  'Top 64': { technical: 79, mental: 75, physical: 71 },
+  'Top 32': { technical: 83, mental: 79, physical: 73 },
+  'Top 16': { technical: 88, mental: 84, physical: 76 },
+  'Top 4': { technical: 91, mental: 87, physical: 79 },
+  'World Champion': { technical: 94, mental: 91, physical: 82 },
+  'Veteran Min Support': { technical: 80, mental: 76, physical: 67 },
+}
+
+const PREVIEW_OPPONENT_ARCHETYPES = ['Serial Scorer', 'Tactical Grinder', 'Counter Puncher', 'Tempo Disruptor'] as const
+
+function hashStringToNumber(value: string) {
+  let hash = 0
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) % 2147483647
+  }
+
+  return Math.abs(hash)
+}
+
+function getPreviewOpponentArchetype(opponentName: string, opponentRank: number) {
+  const seed = hashStringToNumber(`${opponentName}-${opponentRank}`)
+  return PREVIEW_OPPONENT_ARCHETYPES[seed % PREVIEW_OPPONENT_ARCHETYPES.length]
 }
 
 function getCanonicalHistoryTotals(state: GameState) {
@@ -54,9 +91,158 @@ function getCanonicalHistoryTotals(state: GameState) {
 function getActiveTournament(state: GameState) {
   return (
     state.tournaments.find((item) => item.status === 'Entered') ??
-    state.tournaments.find((item) => item.status === 'Available' || item.status === 'High Cost') ??
+    state.tournaments.find((item) => item.status === 'Booked' || item.status === 'Available' || item.status === 'High Cost') ??
     state.tournaments[0]
   )
+}
+
+function getPreviewTournamentClass(tournament: Tournament | undefined) {
+  if (!tournament) return 'amateur'
+
+  const name = tournament.name.toLowerCase()
+  const rankingType = tournament.rankingType ?? 'None'
+
+  if (rankingType === 'Youth' || tournament.type === 'Junior' || /under-|youth|junior/.test(name)) return 'youth'
+  if (rankingType === 'Amateur' || tournament.type === 'Amateur') return 'amateur'
+  if (tournament.type === 'Q Tour') return 'qTour'
+  if (tournament.type === 'Q School') return 'qSchool'
+  if (tournament.type === 'Senior') return 'senior'
+  if (tournament.type === 'Exhibition') return 'exhibition'
+  if (tournament.type === 'Invitational') return 'eliteInvitational'
+  if (tournament.type === 'Major' && /world championship/.test(name)) return name.includes('qualif') ? 'worldChampionshipQualifying' : 'worldChampionshipMain'
+  if (tournament.type === 'Professional Tour') return 'rookieQualifier'
+  return rankingType === 'World Ranking' || tournament.type === 'Ranking' || tournament.type === 'Major' ? 'top64' : 'amateur'
+}
+
+function getPreviewRankBand(opponentRank: number, tournamentClass: string) {
+  if (tournamentClass === 'youth') return 'Youth'
+  if (tournamentClass === 'amateur') return 'Amateur'
+  if (tournamentClass === 'qTour' || tournamentClass === 'qSchool') return 'Q Tour'
+  if (tournamentClass === 'senior' || tournamentClass === 'exhibition') return 'Veteran Min Support'
+  if (opponentRank <= 1) return 'World Champion'
+  if (opponentRank <= 4) return 'Top 4'
+  if (opponentRank <= 16) return 'Top 16'
+  if (opponentRank <= 32) return 'Top 32'
+  if (opponentRank <= 64) return 'Top 64'
+  if (opponentRank <= 80) return 'Rookie Pro'
+  if (opponentRank <= 96) return 'Q Tour'
+  if (opponentRank <= 128) return 'Amateur'
+  return 'Youth'
+}
+
+function getPreviewOpponentBaseStrength(tournamentClass: string) {
+  if (tournamentClass === 'youth') return 48
+  if (tournamentClass === 'amateur') return 56
+  if (tournamentClass === 'qTour') return 64
+  if (tournamentClass === 'qSchool') return 69
+  if (tournamentClass === 'senior') return 54
+  if (tournamentClass === 'exhibition') return 58
+  if (tournamentClass === 'eliteInvitational') return 78
+  if (tournamentClass === 'worldChampionshipMain') return 80
+  if (tournamentClass === 'worldChampionshipQualifying') return 74
+  if (tournamentClass === 'rookieQualifier') return 71
+  return 68
+}
+
+function getPreviewRankingWeight(tournamentClass: string) {
+  if (tournamentClass === 'youth') return 0.18
+  if (tournamentClass === 'amateur') return 0.22
+  if (tournamentClass === 'qTour') return 0.28
+  if (tournamentClass === 'qSchool') return 0.3
+  if (tournamentClass === 'senior' || tournamentClass === 'exhibition') return 0.16
+  if (tournamentClass === 'eliteInvitational' || tournamentClass === 'worldChampionshipMain') return 0.38
+  return 0.32
+}
+
+function getPreviewOpponentRatingSnapshot(
+  opponentName: string,
+  opponentRank: number,
+  round: string | null,
+  tournament: Tournament | undefined,
+  opponentAge?: number,
+) {
+  const tournamentClass = getPreviewTournamentClass(tournament)
+  const opponentStrength = clamp(
+    getPreviewOpponentBaseStrength(tournamentClass)
+      + (100 - opponentRank) * getPreviewRankingWeight(tournamentClass)
+      + getRoundDifficultyBonus(round ?? 'Last 16', tournamentClass),
+    44,
+    97,
+  )
+  const sourceRankBand = getPreviewRankBand(opponentRank, tournamentClass)
+  const baseline = PREVIEW_RANK_BASELINES[sourceRankBand]
+  const eliteFactor = clamp(Math.round((100 - opponentRank) * 0.45), 6, 44)
+  const technicalAverage = baseline
+    ? clamp(baseline.technical + Math.round((opponentStrength - baseline.technical) * 0.25), 42, 94)
+    : clamp(Math.round(opponentStrength + eliteFactor * 0.16), 42, 94)
+  const mentalAverage = baseline
+    ? clamp(baseline.mental + Math.round((opponentStrength - baseline.mental) * 0.18), 40, 93)
+    : clamp(Math.round(opponentStrength - 2 + eliteFactor * 0.12), 40, 93)
+  const physicalAverage = baseline
+    ? clamp(baseline.physical + Math.round((opponentStrength - baseline.physical) * 0.12), 38, 90)
+    : clamp(Math.round(opponentStrength - 5 + eliteFactor * 0.08), 38, 90)
+  const archetype = getPreviewOpponentArchetype(opponentName, opponentRank)
+  const attributes: PlayerAttributes = {
+    technical: {
+      'Long Potting': technicalAverage,
+      'Break Building': clamp(technicalAverage + 2, 1, 99),
+      'Cue Ball Control': clamp(technicalAverage - 1, 1, 99),
+      'Safety Play': clamp(technicalAverage, 1, 99),
+      Consistency: clamp(technicalAverage - 2, 1, 99),
+    },
+    mental: {
+      Focus: mentalAverage,
+      Composure: clamp(mentalAverage - 1, 1, 99),
+      'Big Match Nerve': clamp(mentalAverage + 1, 1, 99),
+      Resilience: clamp(mentalAverage - 1, 1, 99),
+      Professionalism: clamp(mentalAverage, 1, 99),
+    },
+    physical: {
+      Stamina: physicalAverage,
+      'Recovery Rate': clamp(physicalAverage - 2, 1, 99),
+      Balance: clamp(physicalAverage - 1, 1, 99),
+      'Hand Steadiness': clamp(physicalAverage - 1, 1, 99),
+      'Shoulder Health': clamp(physicalAverage - 2, 1, 99),
+    },
+  }
+
+  if (archetype === 'Serial Scorer') {
+    attributes.technical['Long Potting'] = clamp(attributes.technical['Long Potting'] + 7, 1, 99)
+    attributes.technical['Break Building'] = clamp(attributes.technical['Break Building'] + 9, 1, 99)
+    attributes.technical['Cue Ball Control'] = clamp(attributes.technical['Cue Ball Control'] + 4, 1, 99)
+    attributes.technical['Safety Play'] = clamp(attributes.technical['Safety Play'] - 5, 1, 99)
+  } else if (archetype === 'Tactical Grinder') {
+    attributes.technical['Safety Play'] = clamp(attributes.technical['Safety Play'] + 9, 1, 99)
+    attributes.mental.Focus = clamp(attributes.mental.Focus + 6, 1, 99)
+    attributes.mental.Composure = clamp(attributes.mental.Composure + 5, 1, 99)
+    attributes.technical['Break Building'] = clamp(attributes.technical['Break Building'] - 6, 1, 99)
+  } else if (archetype === 'Counter Puncher') {
+    attributes.technical['Cue Ball Control'] = clamp(attributes.technical['Cue Ball Control'] + 6, 1, 99)
+    attributes.technical.Consistency = clamp(attributes.technical.Consistency + 7, 1, 99)
+    attributes.mental.Focus = clamp(attributes.mental.Focus + 5, 1, 99)
+    attributes.technical['Break Building'] = clamp(attributes.technical['Break Building'] - 2, 1, 99)
+  } else {
+    attributes.technical['Safety Play'] = clamp(attributes.technical['Safety Play'] + 5, 1, 99)
+    attributes.physical['Hand Steadiness'] = clamp(attributes.physical['Hand Steadiness'] + 5, 1, 99)
+    attributes.mental.Focus = clamp(attributes.mental.Focus + 4, 1, 99)
+    attributes.technical['Long Potting'] = clamp(attributes.technical['Long Potting'] - 2, 1, 99)
+  }
+
+  const overall = calculateOverallRating({ attributes })
+
+  return {
+    attributes,
+    archetype,
+    technicalAverage: average(Object.values(attributes.technical)),
+    mentalAverage: average(Object.values(attributes.mental)),
+    physicalAverage: average(Object.values(attributes.physical)),
+    overall,
+    potential: calculatePotentialRating({
+      attributes,
+      age: opponentAge,
+      overallRating: overall,
+    }),
+  }
 }
 
 function getActiveDraw(state: GameState) {
@@ -394,9 +580,14 @@ export function buildMatchPreviewData(state: GameState) {
   const wins = h2hMatches.filter((match) => match.result === 'Won').length
   const losses = h2hMatches.filter((match) => match.result === 'Lost').length
   const totalMeetings = h2hMatches.length
+  const eventRounds = state.tournamentProgress.tournamentId === activeTournament?.id ? state.tournamentProgress.completedRounds : []
+  const eventWins = eventRounds.filter((round) => round.result === 'Won').length
+  const eventLosses = eventRounds.filter((round) => round.result === 'Lost').length
+  const eventFrameDifferential = eventRounds.reduce((sum, round) => sum + (round.playerFrames - round.opponentFrames), 0)
   const travelBooking = activeTournament ? state.travel.bookings[activeTournament.id] : undefined
   const travelOption = travelOptionCatalog.find((option) => option.id === travelBooking?.travelOptionId) ?? travelOptionCatalog[0]
   const hotelOption = hotelOptionCatalog.find((option) => option.id === travelBooking?.hotelOptionId) ?? hotelOptionCatalog[0]
+  const opponentProfile = state.worldPlayers.find((record) => record.playerName === nextOpponent?.playerName)
   const strengths = [
     { label: 'Break Building', value: state.attributes.technical['Break Building'] },
     { label: 'Cue Ball Control', value: state.attributes.technical['Cue Ball Control'] },
@@ -444,11 +635,91 @@ export function buildMatchPreviewData(state: GameState) {
       result: row.ranking < (nextOpponent?.ranking ?? row.ranking + 1) ? 'W' : 'L',
       score: row.ranking < (nextOpponent?.ranking ?? row.ranking + 1) ? '4-2' : '2-4',
     }))
+  const playerOverall = calculateOverallRating({
+    attributes: state.attributes,
+    personalityTraits: state.player.personalityTraits,
+    playingStyle: state.player.playingStyle,
+  })
+  const playerPotential = calculatePotentialRating({
+    attributes: state.attributes,
+    personalityTraits: state.player.personalityTraits,
+    age: state.player.age,
+    playingStyle: state.player.playingStyle,
+    personalityType: state.player.personalityType,
+    overallRating: playerOverall,
+  })
+  const opponentRatings = nextOpponent
+    ? getPreviewOpponentRatingSnapshot(nextOpponent.playerName, nextOpponent.ranking, activeRound, activeTournament, opponentProfile?.age)
+    : null
+  const matchAttributeComparison = [
+    {
+      label: 'Attack',
+      player: average([state.attributes.technical['Long Potting'], state.attributes.technical['Break Building'], state.attributes.technical['Cue Ball Control']]),
+      opponent: opponentRatings ? average([opponentRatings.attributes.technical['Long Potting'], opponentRatings.attributes.technical['Break Building'], opponentRatings.attributes.technical['Cue Ball Control']]) : null,
+    },
+    {
+      label: 'Tactical',
+      player: average([state.attributes.technical['Safety Play'], state.attributes.mental.Focus, state.attributes.mental.Composure]),
+      opponent: opponentRatings ? average([opponentRatings.attributes.technical['Safety Play'], opponentRatings.attributes.mental.Focus, opponentRatings.attributes.mental.Composure]) : null,
+    },
+    {
+      label: 'Clutch',
+      player: average([state.attributes.mental.Composure, state.attributes.mental['Big Match Nerve'], state.attributes.physical['Hand Steadiness']]),
+      opponent: opponentRatings ? average([opponentRatings.attributes.mental.Composure, opponentRatings.attributes.mental['Big Match Nerve'], opponentRatings.attributes.physical['Hand Steadiness']]) : null,
+    },
+    {
+      label: 'Endurance',
+      player: average([state.attributes.physical.Stamina, 100 - state.player.fatigue]),
+      opponent: opponentRatings ? average([opponentRatings.attributes.physical.Stamina, 82]) : null,
+    },
+  ].map((item) => ({
+    ...item,
+    edge: item.opponent == null ? null : item.player - item.opponent,
+  }))
+  const attributeComparison = [
+    {
+      label: 'Long Potting',
+      player: state.attributes.technical['Long Potting'],
+      opponent: opponentRatings?.attributes.technical['Long Potting'] ?? null,
+    },
+    {
+      label: 'Break Building',
+      player: state.attributes.technical['Break Building'],
+      opponent: opponentRatings?.attributes.technical['Break Building'] ?? null,
+    },
+    {
+      label: 'Cue Ball Control',
+      player: state.attributes.technical['Cue Ball Control'],
+      opponent: opponentRatings?.attributes.technical['Cue Ball Control'] ?? null,
+    },
+    {
+      label: 'Safety Play',
+      player: state.attributes.technical['Safety Play'],
+      opponent: opponentRatings?.attributes.technical['Safety Play'] ?? null,
+    },
+    {
+      label: 'Composure',
+      player: state.attributes.mental.Composure,
+      opponent: opponentRatings?.attributes.mental.Composure ?? null,
+    },
+    {
+      label: 'Big Match Nerve',
+      player: state.attributes.mental['Big Match Nerve'],
+      opponent: opponentRatings?.attributes.mental['Big Match Nerve'] ?? null,
+    },
+  ].map((item) => ({
+    ...item,
+    edge: item.opponent == null ? null : item.player - item.opponent,
+  }))
 
   return {
     activeTournament,
     activeRound,
     nextOpponent,
+    playerOverall,
+    playerPotential,
+    opponentOverall: opponentRatings?.overall ?? null,
+    opponentPotential: opponentRatings?.potential ?? null,
     currentCue,
     currentCueState,
     currentChalk,
@@ -457,6 +728,10 @@ export function buildMatchPreviewData(state: GameState) {
     totalMeetings,
     wins,
     losses,
+    eventMatchesPlayed: eventRounds.length,
+    eventWins,
+    eventLosses,
+    eventFrameDifferential,
     lastMeeting: h2hMatches[0]?.playedOn ?? 'No recorded meeting yet',
     frameDifferential: h2hMatches.reduce((sum, match) => sum + (match.playerFrames - match.opponentFrames), 0),
     scoutNotes: `${nextOpponent?.playerName ?? 'The next opponent'} sits near your current ranking band. Travel planning is ${travelBooking ? 'booked' : 'not yet booked'}, and your readiness profile is shaped by ${hotelOption.name.toLowerCase()} plus ${travelOption.name.toLowerCase()}.`,
@@ -464,6 +739,8 @@ export function buildMatchPreviewData(state: GameState) {
     tacticalPlan,
     strengths,
     weaknesses,
+    matchAttributeComparison,
+    attributeComparison,
     cueFamiliarity: currentCueState?.familiarity ?? currentCue?.familiarity ?? 50,
     mentalOutlook: state.player.fatigue >= 60 ? 'Fatigue is the main risk. Simplicity and shorter bursts of concentration matter more than forcing heavy scoring.' : 'The profile is stable enough to attack when chances appear, provided you keep the routine simple in the opening frames.',
     recentPlayerResults,

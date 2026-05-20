@@ -1,39 +1,17 @@
 import { useNavigate } from 'react-router-dom'
-import { Activity, Award, LineChart as LineChartIcon, Medal, Trophy, Wallet } from 'lucide-react'
-import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { PageHeader } from '../components/layout/PageHeader'
-import { ActionButton } from '../components/ui/ActionButton'
-import { CircularMeter } from '../components/ui/CircularMeter'
-import { DataTable, type DataTableColumn } from '../components/ui/DataTable'
-import { MetricCard } from '../components/ui/MetricCard'
+import { Award, LineChart as LineChartIcon, Medal, Target, Trophy, Wallet } from 'lucide-react'
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { SectionCard } from '../components/ui/SectionCard'
 import { useGame } from '../context/GameStateContext'
 import type { LegacyFinalRow } from '../types/game'
 import { formatMoney } from '../utils/formatters'
 
-const finalColumns: DataTableColumn<LegacyFinalRow>[] = [
-  { key: 'year', header: 'Year' },
-  { key: 'event', header: 'Event' },
-  { key: 'category', header: 'Category' },
-  { key: 'opponent', header: 'Opponent' },
-  { key: 'result', header: 'Result' },
-  { key: 'score', header: 'Score', align: 'right' },
-  { key: 'prize', header: 'Prize', align: 'right', render: (row) => formatMoney(row.prize) },
-  {
-    key: 'impact',
-    header: 'Legacy Impact',
-    align: 'right',
-    render: (row) => <span className={row.impact >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{row.impact >= 0 ? '+' : ''}{row.impact.toFixed(1)}</span>,
-  },
-]
-
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <SectionCard title={title} className="h-[280px]">
-      <div className="h-[220px] w-full">{children}</div>
-    </SectionCard>
-  )
+function compactMoney(value: number) {
+  const sign = value < 0 ? '-' : ''
+  const absolute = Math.abs(value)
+  if (absolute >= 1_000_000) return `${sign}£${(absolute / 1_000_000).toFixed(1)}m`
+  if (absolute >= 1_000) return `${sign}£${Math.round(absolute / 1_000)}k`
+  return `${sign}£${absolute}`
 }
 
 export function LegacyStatsPage() {
@@ -74,21 +52,13 @@ export function LegacyStatsPage() {
     { label: 'Earnings', value: Math.min(15, Math.round(totalPrizeMoney / 500)), max: 15 },
     { label: 'Longevity', value: Math.min(10, historySnapshots.length), max: 10 },
   ]
-  const rankingTrend = trendSnapshots.map((snapshot) => ({
-    label: `W${snapshot.week}`,
-    value: snapshot.ranking || currentRanking,
-  }))
-  const prizeTrend = trendSnapshots.map((snapshot) => ({
-    label: `W${snapshot.week}`,
-    value: snapshot.totalPrizeMoney,
-  }))
-  const confidenceTrend = trendSnapshots.map((snapshot) => ({
-    label: `W${snapshot.week}`,
-    value: snapshot.confidence,
-  }))
+  const rankingTrend = trendSnapshots.map((snapshot) => ({ label: `W${snapshot.week}`, value: snapshot.ranking || currentRanking }))
+  const prizeTrend = trendSnapshots.map((snapshot) => ({ label: `W${snapshot.week}`, value: snapshot.totalPrizeMoney }))
+  const confidenceTrend = trendSnapshots.map((snapshot) => ({ label: `W${snapshot.week}`, value: snapshot.confidence }))
+  const prizeByEvent = tournamentArchive.slice(0, 8).map((event) => ({ event: event.tournamentName.replace(/ Championship| Masters| Open/g, ''), prize: event.prizeMoney }))
   const finalsData: LegacyFinalRow[] = tournamentArchive
     .filter((event) => event.status === 'Completed' && event.matchesPlayed > 0)
-    .slice(0, 6)
+    .slice(0, 7)
     .map((event) => ({
       id: event.id,
       year: event.startDate.slice(0, 4) || gameState.season,
@@ -100,175 +70,86 @@ export function LegacyStatsPage() {
       prize: event.prizeMoney,
       impact: Number((event.rankingPoints / 12).toFixed(1)),
     }))
-  const dynamicMilestones = [
-    currentRanking > 0 ? `Highest ranking reached: #${currentRanking}` : 'Ranking progress still to come',
-    `${matchesWon} wins recorded in the persistent career log`,
-    `${tournamentArchive.length} tournament records now archived across ${Math.max(1, gameState.history.seasonRecords.length || 1)} season windows`,
-    `${historySnapshots.length} weekly snapshots are available for trend review`,
-  ]
-  const liveSnapshot = [
-    { label: 'Current Rank', value: currentRanking > 0 ? `#${currentRanking}` : 'Unranked' },
-    { label: 'Confidence', value: `${gameState.player.confidence}%` },
-    { label: 'Morale', value: `${gameState.player.morale}%` },
-    { label: 'Cash', value: formatMoney(gameState.player.cash) },
-    { label: 'Sponsors', value: `${gameState.sponsors.length}` },
-  ]
-  const liveAchievements = [
-    { label: 'Reputation', value: `${gameState.player.reputation}%`, detail: 'Current standing in the live save' },
-    { label: 'Inbox Activity', value: `${gameState.inbox.length}`, detail: 'Messages generated so far' },
-    { label: 'Weekly Progress', value: `Week ${gameState.week}`, detail: 'Current save timeline' },
-    { label: 'Support System', value: gameState.currentCoachId ? 'Staffed' : 'Lean', detail: 'Coach and support setup' },
-  ]
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Career"
-        title="Career Stats & Legacy"
-        description={`Your journey, your numbers, your legacy. Current-save outcomes for ${gameState.player.fullName}, combining results, ranking position, reputation, and benchmark status.`}
-        actions={<ActionButton onClick={continueWeek}>Continue Career</ActionButton>}
-      />
+    <div className="space-y-6 pb-10">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-semibold uppercase text-gray-500">Career</p>
+          <h1 className="mt-1 text-2xl font-bold text-white">Career Stats & Legacy</h1>
+          <p className="mt-1 text-sm text-gray-400">Your journey, your numbers, your legacy for {gameState.player.fullName}.</p>
+        </div>
+        <div className="flex gap-2"><button type="button" className="btn-secondary text-xs" onClick={() => navigate('/season-review')}>Season Review</button><button type="button" className="btn-primary text-xs" onClick={continueWeek}>Continue Career</button></div>
+      </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.5fr_360px]">
-        <div className="space-y-6">
-          <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
-            <SectionCard title="Legacy Score" subtitle={summary.legacyTier}>
-              <div className="flex items-center justify-center py-4">
-                <CircularMeter value={summary.legacyScore} label="Legacy" />
-              </div>
-            </SectionCard>
+      <div className="grid grid-cols-5 gap-4">
+        {[
+          { label: 'Matches Played', value: summary.matchesPlayed, sub: 'Career Total', icon: Target },
+          { label: 'Matches Won', value: summary.matchesWon, sub: `${summary.winRate}% Win Rate`, icon: Trophy },
+          { label: 'Titles', value: summary.titles, sub: 'Career Total', icon: Award },
+          { label: 'Major Titles', value: summary.majorTitles, sub: 'Career Total', icon: Medal },
+          { label: 'Total Prize Money', value: compactMoney(summary.totalPrizeMoney), sub: 'Career Earnings', icon: Wallet },
+        ].map((stat) => {
+          const Icon = stat.icon
+          return <div key={stat.label} className="card card-body text-center"><Icon className="mx-auto mb-1 h-4 w-4 text-green-400" /><p className="metric-label">{stat.label}</p><p className="mt-1 text-xl font-bold text-white">{stat.value}</p><p className="text-[10px] text-gray-400">{stat.sub}</p></div>
+        })}
+      </div>
 
-            <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
-              <MetricCard label="Matches Played" value={summary.matchesPlayed} subValue="Career Total" tone="blue" icon={<Activity className="h-5 w-5" />} />
-              <MetricCard label="Matches Won" value={summary.matchesWon} subValue={`${summary.winRate}% Win Rate`} tone="green" icon={<Trophy className="h-5 w-5" />} />
-              <MetricCard label="Titles" value={summary.titles} subValue="Career Total" tone="gold" icon={<Award className="h-5 w-5" />} />
-              <MetricCard label="Major Titles" value={summary.majorTitles} subValue="Career Total" tone="gold" icon={<Medal className="h-5 w-5" />} />
-              <MetricCard label="Century Breaks" value={summary.centuryBreaks} subValue="Career Total" tone="blue" icon={<LineChartIcon className="h-5 w-5" />} />
-              <MetricCard label="Maximum Breaks" value={summary.maximumBreaks} subValue="Career Total" tone="amber" icon={<Award className="h-5 w-5" />} />
-              <MetricCard label="Highest Ranking" value={summary.highestRanking} subValue="Best Achieved" tone="green" icon={<LineChartIcon className="h-5 w-5" />} />
-              <MetricCard label="Total Prize Money" value={formatMoney(summary.totalPrizeMoney)} subValue="Career Earnings" tone="gold" icon={<Wallet className="h-5 w-5" />} />
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-3 space-y-4">
+          <div className="card card-body text-center">
+            <p className="text-[10px] font-semibold uppercase text-gray-500">Legacy Score</p>
+            <div className="mx-auto mt-3 flex h-28 w-28 flex-col items-center justify-center rounded-full border-4 border-green-500">
+              <span className="text-4xl font-bold text-white">{summary.legacyScore}</span>
+              <span className="text-xs text-gray-400">/100</span>
+            </div>
+            <p className="mt-3 text-sm font-semibold text-green-400">{summary.legacyTier}</p>
+          </div>
+
+          <div className="card card-body">
+            <h3 className="mb-3 text-xs font-semibold text-white">Legacy Breakdown</h3>
+            <div className="space-y-3">
+              {legacyBreakdown.map((item) => <div key={item.label}><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{item.label}</span><span className="text-white">{item.value}/{item.max}</span></div><ProgressBar value={item.value} max={item.max} compact /></div>)}
             </div>
           </div>
 
-          <div className="rounded-xl border border-scm-border bg-scm-panel/80 px-4 py-3 text-sm text-scm-textSoft">
-            This page is the live career archive for the current save, combining results, trends, milestones, and reputation into one history view.
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-3">
-            <ChartCard title="Ranking Over Time">
-              <ResponsiveContainer>
-                <LineChart data={rankingTrend}>
-                  <CartesianGrid stroke="#203449" vertical={false} />
-                  <XAxis dataKey="label" stroke="#94a3b8" tickLine={false} axisLine={false} />
-                  <YAxis reversed stroke="#94a3b8" tickLine={false} axisLine={false} width={40} />
-                  <Tooltip contentStyle={{ backgroundColor: '#102033', border: '1px solid #31506f', borderRadius: '12px' }} />
-                  <Line type="monotone" dataKey="value" stroke="#7ad34b" strokeWidth={3} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartCard>
-
-            <ChartCard title="Prize Money Over Time">
-              <ResponsiveContainer>
-                <AreaChart data={prizeTrend}>
-                  <CartesianGrid stroke="#203449" vertical={false} />
-                  <XAxis dataKey="label" stroke="#94a3b8" tickLine={false} axisLine={false} />
-                  <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} width={56} />
-                  <Tooltip contentStyle={{ backgroundColor: '#102033', border: '1px solid #31506f', borderRadius: '12px' }} />
-                  <Area type="monotone" dataKey="value" stroke="#22c55e" fill="#22c55e22" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </ChartCard>
-
-            <ChartCard title="Confidence Over Time">
-              <ResponsiveContainer>
-                <AreaChart data={confidenceTrend}>
-                  <CartesianGrid stroke="#203449" vertical={false} />
-                  <XAxis dataKey="label" stroke="#94a3b8" tickLine={false} axisLine={false} />
-                  <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} width={40} />
-                  <Tooltip contentStyle={{ backgroundColor: '#102033', border: '1px solid #31506f', borderRadius: '12px' }} />
-                  <Area type="monotone" dataKey="value" stroke="#7ad34b" fill="#7ad34b22" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </ChartCard>
-          </div>
-
-          <SectionCard title="Career Finals" subtitle="Major final appearances and legacy impact from big-stage results.">
-            <DataTable columns={finalColumns} data={finalsData.length > 0 ? finalsData : []} />
-          </SectionCard>
-
-          <div className="grid gap-6 xl:grid-cols-[1fr_320px_1.1fr]">
-            <SectionCard title="Career Snapshot" subtitle="Top-level career markers in one row.">
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                {liveSnapshot.map((item) => (
-                  <div key={item.label} className="rounded-xl border border-scm-border bg-scm-panelSoft p-4">
-                    <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">{item.label}</p>
-                    <p className="mt-2 font-semibold text-scm-text">{item.value}</p>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Milestone Highlights" subtitle="Career peaks reached so far.">
-              <ul className="space-y-3 text-sm text-scm-textSoft">
-                {dynamicMilestones.map((milestone) => (
-                  <li key={milestone} className="flex gap-3"><span className="mt-1 h-2 w-2 rounded-full bg-scm-green" />{milestone}</li>
-                ))}
-              </ul>
-            </SectionCard>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <ActionButton tone="secondary" className="justify-center py-6" onClick={() => navigate('/rankings')}>View Records</ActionButton>
-              <ActionButton tone="secondary" className="justify-center py-6" onClick={() => navigate('/season-review')}>Compare Eras</ActionButton>
-              <ActionButton className="justify-center py-6" onClick={continueWeek}>Continue Career</ActionButton>
+          <div className="card card-body">
+            <h3 className="mb-3 text-xs font-semibold text-white">Career Snapshot</h3>
+            <div className="space-y-2 text-xs">
+              {[
+                ['Current Rank', currentRanking > 0 ? `#${currentRanking}` : 'Unranked'],
+                ['Century Breaks', summary.centuryBreaks],
+                ['Maximums', summary.maximumBreaks],
+                ['Sponsors', gameState.sponsors.length],
+                ['Week', gameState.week],
+              ].map(([label, value]) => <div key={label} className="flex justify-between rounded bg-surface-light/50 px-3 py-2"><span className="text-gray-400">{label}</span><span className="text-white">{value}</span></div>)}
             </div>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <SectionCard title="Legacy Breakdown" subtitle={`${summary.legacyScore} / 100`}>
-            <div className="space-y-4">
-              {legacyBreakdown.map((item) => (
-                <div key={item.label}>
-                  <div className="mb-2 flex items-center justify-between text-sm">
-                    <span className="text-scm-textSoft">{item.label}</span>
-                    <span className="text-scm-text">{item.value} / {item.max}</span>
-                  </div>
-                  <ProgressBar value={item.value} max={item.max} tone="green" />
-                </div>
-              ))}
-            </div>
-          </SectionCard>
+        <div className="col-span-9 space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="card"><div className="card-header"><h3 className="text-sm font-semibold text-white">Ranking Over Time</h3></div><div className="card-body h-[170px]"><ResponsiveContainer width="100%" height="100%"><LineChart data={rankingTrend}><CartesianGrid stroke="#203449" vertical={false} /><XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} /><YAxis reversed tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} width={36} /><Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 11 }} /><Line type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2} dot={{ fill: '#22c55e', r: 3 }} /></LineChart></ResponsiveContainer></div></div>
+            <div className="card"><div className="card-header"><h3 className="text-sm font-semibold text-white">Prize Trend</h3></div><div className="card-body h-[170px]"><ResponsiveContainer width="100%" height="100%"><AreaChart data={prizeTrend}><CartesianGrid stroke="#203449" vertical={false} /><XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} width={48} /><Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 11 }} /><Area type="monotone" dataKey="value" stroke="#22c55e" fill="#22c55e22" strokeWidth={2} /></AreaChart></ResponsiveContainer></div></div>
+            <div className="card"><div className="card-header"><h3 className="text-sm font-semibold text-white">Confidence</h3></div><div className="card-body h-[170px]"><ResponsiveContainer width="100%" height="100%"><AreaChart data={confidenceTrend}><CartesianGrid stroke="#203449" vertical={false} /><XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} width={36} /><Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 11 }} /><Area type="monotone" dataKey="value" stroke="#7ad34b" fill="#7ad34b22" strokeWidth={2} /></AreaChart></ResponsiveContainer></div></div>
+          </div>
 
-          <SectionCard title="Hall of Fame Benchmark" subtitle="Where this save currently lands among all-time tiers.">
-            <div className="space-y-4 text-sm">
-              {[
-                ['All-Time Legend', 100],
-                ['World Champion', 85],
-                ['Ranking Winner', 70],
-                ['Tour Pro', 50],
-                ['Club Player', 25],
-              ].map(([label, threshold]) => (
-                <div key={label} className={`rounded-xl border px-4 py-3 ${summary.legacyScore >= Number(threshold) && Number(threshold) === 70 ? 'border-scm-green bg-scm-green/10' : 'border-scm-border bg-scm-panelSoft'}`}>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-semibold text-scm-text">{label}</span>
-                    <span className="text-scm-textSoft">{threshold}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
+          <div className="card">
+            <div className="card-header"><h3 className="text-sm font-semibold text-white">Prize Money by Event</h3><LineChartIcon className="h-4 w-4 text-green-400" /></div>
+            <div className="card-body h-[190px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={prizeByEvent}><XAxis dataKey="event" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 11 }} /><Bar dataKey="prize" fill="#22c55e" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
+          </div>
 
-          <SectionCard title="Achievements & Reputation" subtitle="How the broader career is perceived.">
-            <div className="grid gap-4 md:grid-cols-2">
-              {liveAchievements.map((achievement) => (
-                <div key={achievement.label} className="rounded-xl border border-scm-border bg-scm-panelSoft p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">{achievement.label}</p>
-                  <p className="mt-2 text-2xl font-semibold text-scm-text">{achievement.value}</p>
-                  <p className="mt-1 text-sm text-scm-textSoft">{achievement.detail}</p>
-                </div>
-              ))}
+          <div className="card overflow-hidden">
+            <div className="card-header"><h3 className="text-sm font-semibold text-white">Career Finals & Completed Events</h3></div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead><tr className="border-b border-border text-gray-500"><th className="px-4 py-2 text-left">Year</th><th className="px-4 py-2 text-left">Event</th><th className="px-4 py-2 text-left">Opponent</th><th className="px-4 py-2 text-left">Result</th><th className="px-4 py-2 text-left">Score</th><th className="px-4 py-2 text-right">Prize</th><th className="px-4 py-2 text-right">Legacy Impact</th></tr></thead>
+                <tbody>
+                  {finalsData.length > 0 ? finalsData.map((final) => <tr key={final.id} className="border-b border-border/50 hover:bg-surface-light/50"><td className="px-4 py-2 text-gray-400">{final.year}</td><td className="px-4 py-2 text-white">{final.event}</td><td className="px-4 py-2 text-white">{final.opponent}</td><td className={final.result === 'Winner' || final.result === 'Won' ? 'px-4 py-2 text-green-400' : 'px-4 py-2 text-red-400'}>{final.result}</td><td className="px-4 py-2 text-white">{final.score}</td><td className="px-4 py-2 text-right text-green-400">{formatMoney(final.prize)}</td><td className={final.impact >= 0 ? 'px-4 py-2 text-right font-medium text-green-400' : 'px-4 py-2 text-right font-medium text-red-400'}>{final.impact >= 0 ? '+' : ''}{final.impact}</td></tr>) : <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No completed tournament finals are archived yet.</td></tr>}
+                </tbody>
+              </table>
             </div>
-          </SectionCard>
+          </div>
         </div>
       </div>
     </div>

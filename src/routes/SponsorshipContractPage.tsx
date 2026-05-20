@@ -1,266 +1,46 @@
-import { useMemo } from 'react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Info, Scale, Star } from 'lucide-react'
-import { PageHeader } from '../components/layout/PageHeader'
-import { ActionButton } from '../components/ui/ActionButton'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { SectionCard } from '../components/ui/SectionCard'
-import { StatusBadge } from '../components/ui/StatusBadge'
 import { useGame } from '../context/GameStateContext'
 import { buildSponsorshipContractData } from '../utils/liveRouteData'
 import { formatMoney } from '../utils/formatters'
 
-function renderStars(value: number) {
-  return Array.from({ length: 5 }, (_, index) => (
-    <span key={index} className={index < value ? 'text-scm-gold' : 'text-scm-borderStrong'}>★</span>
-  ))
+function probabilityClass(value: number) {
+  if (value >= 65) return 'bg-green-600/20 text-green-400'
+  if (value >= 45) return 'bg-amber-600/20 text-amber-400'
+  return 'bg-red-600/20 text-red-400'
 }
 
-function getProbabilityTone(value: number): 'green' | 'amber' | 'red' {
-  if (value >= 65) return 'green'
-  if (value >= 45) return 'amber'
-  return 'red'
+function stars(value: number) {
+  return Array.from({ length: 5 }, (_, index) => <span key={index} className={index < value ? 'text-amber-400' : 'text-gray-700'}>★</span>)
 }
 
 export function SponsorshipContractPage() {
   const [searchParams] = useSearchParams()
   const { gameState, acceptSponsor, rejectSponsor, negotiateSponsor } = useGame()
   const selectedOfferId = searchParams.get('offer')
-  const selectedOffer = useMemo(
-    () => gameState.sponsorOffers.find((offer) => offer.id === selectedOfferId) ?? gameState.sponsorOffers.find((offer) => offer.status === 'Available') ?? gameState.sponsorOffers[0],
-    [gameState.sponsorOffers, selectedOfferId],
-  )
+  const selectedOffer = useMemo(() => gameState.sponsorOffers.find((offer) => offer.id === selectedOfferId) ?? gameState.sponsorOffers.find((offer) => offer.status === 'Available') ?? gameState.sponsorOffers[0], [gameState.sponsorOffers, selectedOfferId])
   const contractData = selectedOffer ? buildSponsorshipContractData(gameState, selectedOffer) : null
   const [selectedNegotiationLabel, setSelectedNegotiationLabel] = useState(contractData?.negotiationOptions[0]?.label ?? '')
   const [negotiationTone, setNegotiationTone] = useState<'Conservative' | 'Balanced' | 'Ambitious'>('Balanced')
 
   if (!selectedOffer || selectedOffer.status !== 'Available' || !contractData) {
-    return (
-      <div className="space-y-6">
-        <PageHeader
-          eyebrow="Support"
-          title="Sponsorship Contract Detail"
-          description="That offer is no longer available for action."
-        />
-
-        <SectionCard>
-          <div className="rounded-2xl border border-scm-border bg-scm-panelSoft p-8 text-center">
-            <p className="text-2xl font-semibold text-scm-text">Offer unavailable</p>
-            <p className="mt-3 text-sm text-scm-textSoft">The selected sponsor offer has already been accepted or rejected.</p>
-            <div className="mt-6">
-              <Link to="/sponsorship"><ActionButton>Back To Offers</ActionButton></Link>
-            </div>
-          </div>
-        </SectionCard>
-      </div>
-    )
+    return <div className="space-y-6 pb-10"><div><p className="text-[10px] font-semibold uppercase text-gray-500">Support</p><h1 className="mt-1 text-2xl font-bold text-white">Sponsorship Contract Detail</h1><p className="mt-1 text-sm text-gray-400">That offer is no longer available.</p></div><div className="card card-body p-8 text-center"><p className="text-2xl font-semibold text-white">Offer unavailable</p><p className="mt-3 text-sm text-gray-400">The selected sponsor offer has already been accepted or rejected.</p><Link to="/sponsorship" className="btn-primary mt-6 inline-flex">Back To Offers</Link></div></div>
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Support"
-        title="Sponsorship Contract Detail"
-        description={`Sponsor: ${selectedOffer.name}. Review the full commercial package, negotiation levers, and overall brand impact before signing.`}
-      />
-
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_1fr_0.95fr]">
-        <div className="space-y-6">
-          <SectionCard>
-            <div className="grid gap-4 xl:grid-cols-[180px_1fr]">
-              <div className="flex items-center justify-center rounded-3xl border border-scm-border bg-scm-panelSoft p-6 text-center text-4xl font-semibold text-scm-green">
-                A
-              </div>
-              <div>
-                <div className="flex items-center gap-3">
-                  <h2 className="text-3xl font-semibold text-scm-text">{selectedOffer.name}</h2>
-                  <StatusBadge tone="green">Exclusive</StatusBadge>
-                </div>
-                <p className="mt-2 text-scm-textMuted">{selectedOffer.category}</p>
-
-                <div className="mt-5 grid gap-4 md:grid-cols-4">
-                  <div className="rounded-xl border border-scm-border bg-scm-panelSoft p-4"><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Brand Fit</p><p className="mt-2 text-2xl font-semibold text-emerald-300">{selectedOffer.brandFit}%</p></div>
-                  <div className="rounded-xl border border-scm-border bg-scm-panelSoft p-4"><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Reputation Tier</p><p className="mt-2 text-2xl font-semibold text-scm-gold">{selectedOffer.minimumReputation}+</p></div>
-                  <div className="rounded-xl border border-scm-border bg-scm-panelSoft p-4"><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Contract Status</p><p className="mt-2 text-2xl font-semibold text-scm-text">Under Review</p></div>
-                  <div className="rounded-xl border border-scm-border bg-scm-panelSoft p-4"><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Deal Rating</p><p className="mt-2 text-2xl font-semibold text-emerald-300">{Math.round((selectedOffer.brandFit + Math.min(100, selectedOffer.monthlyValue / 25)) / 2)}/100</p></div>
-                </div>
-
-                <div className="mt-5 grid gap-3 md:grid-cols-4 text-sm">
-                  <div className="rounded-xl border border-scm-border bg-scm-panelSoft p-4"><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Monthly Payment</p><p className="mt-2 text-scm-green">{formatMoney(selectedOffer.monthlyValue)}</p></div>
-                  <div className="rounded-xl border border-scm-border bg-scm-panelSoft p-4"><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Win Bonuses</p><p className="mt-2 text-scm-text">{selectedOffer.bonusClause}</p></div>
-                  <div className="rounded-xl border border-scm-border bg-scm-panelSoft p-4"><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Contract Length</p><p className="mt-2 text-scm-text">{selectedOffer.contractLength}</p></div>
-                  <div className="rounded-xl border border-scm-border bg-scm-panelSoft p-4"><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Behaviour</p><p className="mt-2 text-scm-text">{selectedOffer.behaviour}</p></div>
-                </div>
-              </div>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Sponsor Slots Included">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="text-left text-xs uppercase tracking-[0.16em] text-scm-textMuted">
-                  <tr>
-                    <th className="px-3 py-2">Slot</th>
-                    <th className="px-3 py-2">Annual Value</th>
-                    <th className="px-3 py-2">Visibility</th>
-                    <th className="px-3 py-2">Fit</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {contractData.includedSlots.map((slot) => (
-                    <tr key={slot.slot} className="border-t border-scm-border">
-                      <td className="px-3 py-3 text-scm-text">{slot.slot}</td>
-                      <td className="px-3 py-3 text-scm-text">{formatMoney(slot.annualValue)}</td>
-                      <td className="px-3 py-3 text-scm-textSoft">{slot.visibility}</td>
-                      <td className="px-3 py-3"><div className="flex items-center gap-1">{renderStars(Math.max(1, Math.round(slot.fit / 20)))}</div></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </SectionCard>
-
-          <div className="grid gap-6 xl:grid-cols-2">
-            <SectionCard title="Advisor Notes">
-              <div className="space-y-4 text-sm text-scm-textSoft">
-                <p>{contractData.advisor.note}</p>
-                <p className="text-emerald-300">Recommendation: {contractData.advisor.recommendation}</p>
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Deal Comparison">
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="text-left text-xs uppercase tracking-[0.16em] text-scm-textMuted">
-                    <tr>
-                      <th className="px-3 py-2">Metric</th>
-                      <th className="px-3 py-2">Current</th>
-                      <th className="px-3 py-2">Apex Deal</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {contractData.comparisonRows.map((row) => (
-                      <tr key={row.metric} className="border-t border-scm-border">
-                        <td className="px-3 py-3 text-scm-text">{row.metric}</td>
-                        <td className="px-3 py-3 text-scm-textSoft">{row.current}</td>
-                        <td className="px-3 py-3 text-emerald-300">{row.proposed}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </SectionCard>
-          </div>
+    <div className="space-y-6 pb-10">
+      <div><p className="text-[10px] font-semibold uppercase text-gray-500">Support</p><h1 className="mt-1 text-2xl font-bold text-white">Sponsorship Contract Detail</h1><p className="mt-1 text-sm text-gray-400">Sponsor: {selectedOffer.name}. Review package, negotiation levers, and brand impact.</p></div>
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-8 space-y-4">
+          <div className="card card-body"><div className="grid grid-cols-[140px_1fr] gap-4"><div className="flex items-center justify-center rounded-xl border border-border bg-surface-light p-6 text-center text-4xl font-semibold text-green-400">A</div><div><div className="flex items-center gap-3"><h2 className="text-3xl font-semibold text-white">{selectedOffer.name}</h2><span className="rounded bg-green-600/20 px-2 py-1 text-[10px] text-green-400">Exclusive</span></div><p className="mt-2 text-gray-400">{selectedOffer.category}</p><div className="mt-5 grid grid-cols-4 gap-3 text-xs"><div className="rounded bg-surface-light/50 p-3"><span className="text-gray-500">Brand Fit</span><p className="mt-1 text-lg font-bold text-green-400">{selectedOffer.brandFit}%</p></div><div className="rounded bg-surface-light/50 p-3"><span className="text-gray-500">Required Rep</span><p className="mt-1 text-lg font-bold text-amber-400">{selectedOffer.minimumReputation}+</p></div><div className="rounded bg-surface-light/50 p-3"><span className="text-gray-500">Status</span><p className="mt-1 text-lg font-bold text-white">Review</p></div><div className="rounded bg-surface-light/50 p-3"><span className="text-gray-500">Deal Rating</span><p className="mt-1 text-lg font-bold text-green-400">{Math.round((selectedOffer.brandFit + Math.min(100, selectedOffer.monthlyValue / 25)) / 2)}/100</p></div></div></div></div></div>
+          <div className="grid grid-cols-4 gap-3">{[['Monthly Payment', formatMoney(selectedOffer.monthlyValue)], ['Win Bonuses', selectedOffer.bonusClause], ['Length', selectedOffer.contractLength], ['Behaviour', selectedOffer.behaviour]].map(([label, value]) => <div key={label} className="card card-body"><p className="metric-label">{label}</p><p className="mt-2 text-sm font-semibold text-white">{value}</p></div>)}</div>
+          <div className="card overflow-hidden"><div className="card-header"><h3 className="text-sm font-semibold text-white">Sponsor Slots Included</h3></div><table className="w-full text-xs"><thead><tr className="border-b border-border text-gray-500"><th className="px-3 py-2 text-left">Slot</th><th className="px-3 py-2 text-left">Annual Value</th><th className="px-3 py-2 text-left">Visibility</th><th className="px-3 py-2 text-left">Fit</th></tr></thead><tbody>{contractData.includedSlots.map((slot) => <tr key={slot.slot} className="border-b border-border/50"><td className="px-3 py-2 text-white">{slot.slot}</td><td className="px-3 py-2 text-white">{formatMoney(slot.annualValue)}</td><td className="px-3 py-2 text-gray-400">{slot.visibility}</td><td className="px-3 py-2">{stars(Math.max(1, Math.round(slot.fit / 20)))}</td></tr>)}</tbody></table></div>
+          <div className="grid grid-cols-2 gap-4"><div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Advisor Notes</h3><p className="text-sm text-gray-400">{contractData.advisor.note}</p><p className="mt-3 text-green-400">Recommendation: {contractData.advisor.recommendation}</p></div><div className="card overflow-hidden"><div className="card-header"><h3 className="text-sm font-semibold text-white">Deal Comparison</h3></div><table className="w-full text-xs"><tbody>{contractData.comparisonRows.map((row) => <tr key={row.metric} className="border-b border-border/50"><td className="px-3 py-2 text-white">{row.metric}</td><td className="px-3 py-2 text-gray-400">{row.current}</td><td className="px-3 py-2 text-green-400">{row.proposed}</td></tr>)}</tbody></table></div></div>
+          <div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Obligations & Brand Impact</h3><div className="grid grid-cols-3 gap-4"><div><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">Reputation Impact</span><span className="text-green-400">+8</span></div><ProgressBar value={80} compact /></div><div><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">Fan Reaction</span><span className="text-green-400">{selectedOffer.brandFit}%</span></div><ProgressBar value={selectedOffer.brandFit} compact /></div><div><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">Obligation Load</span><span className="text-amber-400">3/5</span></div><ProgressBar value={60} tone="amber" compact /></div></div><p className="mt-4 flex items-center gap-2 rounded border border-amber-600/30 bg-amber-600/10 p-3 text-xs text-amber-100"><Info className="h-4 w-4" /> This deal is strong commercially, but it leaves less room for low-effort additions later.</p></div>
         </div>
-
-        <div className="space-y-6">
-          <SectionCard title="Contract Terms">
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="text-left text-xs uppercase tracking-[0.16em] text-scm-textMuted">
-                  <tr>
-                    <th className="px-3 py-2">Terms</th>
-                    <th className="px-3 py-2">Details</th>
-                    <th className="px-3 py-2">Value / Impact</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {contractData.terms.map((term) => (
-                    <tr key={term.label} className="border-t border-scm-border">
-                      <td className="px-3 py-3 text-scm-text">{term.label}</td>
-                      <td className="px-3 py-3 text-scm-textSoft">{term.details}</td>
-                      <td className="px-3 py-3 text-emerald-300">{term.valueImpact}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Obligations & Brand Impact">
-            <div className="grid gap-4 md:grid-cols-3">
-              <div>
-                <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">Reputation Impact</span><span className="text-emerald-300">+8</span></div>
-                <ProgressBar value={80} tone="green" />
-              </div>
-              <div>
-                <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">Fan Reaction / Brand Fit</span><span className="text-emerald-300">92%</span></div>
-                <ProgressBar value={92} tone="green" />
-              </div>
-              <div>
-                <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">Obligation Load</span><span className="text-amber-300">3 / 5</span></div>
-                <ProgressBar value={60} tone="amber" />
-              </div>
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-100">
-              <p className="flex items-center gap-2"><Info className="h-4 w-4" />Consideration: obligation load</p>
-              <p className="mt-2">You already carry several visible sponsor commitments. Taking this deal is strong commercially, but it leaves less room for low-effort additions later.</p>
-            </div>
-          </SectionCard>
-        </div>
-
-        <div className="space-y-6">
-          <SectionCard title="Negotiation Options">
-            <div className="space-y-4 text-sm">
-              {contractData.negotiationOptions.map((item) => (
-                <button key={item.label} type="button" onClick={() => setSelectedNegotiationLabel(item.label)} className={`w-full rounded-2xl border p-4 text-left transition ${selectedNegotiationLabel === item.label ? 'border-emerald-500/45 bg-emerald-500/10' : 'border-scm-border bg-scm-panelSoft hover:border-emerald-500/30'}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-scm-text">{item.label}</p>
-                      <p className="mt-1 text-scm-textMuted">{item.adjustment}</p>
-                    </div>
-                    <StatusBadge tone={getProbabilityTone(item.probability)}>{item.sponsorResponse}</StatusBadge>
-                  </div>
-                  <div className="mt-3">
-                    <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textMuted">Response chance</span><span className="text-scm-text">{item.probability}%</span></div>
-                    <ProgressBar value={item.probability} tone={getProbabilityTone(item.probability)} />
-                  </div>
-                  <p className="mt-3 text-emerald-300">{item.impact}</p>
-                </button>
-              ))}
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Negotiation Tone">
-            <div className="grid gap-3">
-              {(['Conservative', 'Balanced', 'Ambitious'] as const).map((tone) => (
-                <button
-                  key={tone}
-                  type="button"
-                  onClick={() => setNegotiationTone(tone)}
-                  className={`rounded-xl border px-4 py-3 text-sm ${negotiationTone === tone ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-200' : 'border-scm-border bg-scm-panelSoft text-scm-text'}`}
-                >
-                  {tone}
-                </button>
-              ))}
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Strengths">
-            <ul className="space-y-3 text-sm text-scm-textSoft">
-              {contractData.advisor.strengths.map((item) => (
-                <li key={item} className="flex gap-3"><span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />{item}</li>
-              ))}
-            </ul>
-          </SectionCard>
-
-          <SectionCard title="Risks / Considerations">
-            <ul className="space-y-3 text-sm text-scm-textSoft">
-              {contractData.advisor.risks.map((item) => (
-                <li key={item} className="flex gap-3"><span className="mt-1 h-2 w-2 rounded-full bg-rose-500" />{item}</li>
-              ))}
-            </ul>
-          </SectionCard>
-
-          <div className="grid gap-3">
-            <ActionButton className="justify-center" icon={<Star className="h-4 w-4" />} onClick={() => acceptSponsor(selectedOffer.id)}>Accept Contract</ActionButton>
-            <ActionButton tone="secondary" className="justify-center" icon={<Scale className="h-4 w-4" />} onClick={() => negotiateSponsor(selectedOffer.id, selectedNegotiationLabel, negotiationTone)}>Negotiate Terms</ActionButton>
-            <ActionButton tone="secondary" className="justify-center" onClick={() => rejectSponsor(selectedOffer.id)}>Reject Deal</ActionButton>
-            <Link to="/sponsorship"><ActionButton tone="secondary" className="w-full justify-center">Compare Offers</ActionButton></Link>
-          </div>
-        </div>
+        <div className="col-span-4 space-y-4"><div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Negotiation Options</h3><div className="space-y-3">{contractData.negotiationOptions.map((item) => <button key={item.label} type="button" onClick={() => setSelectedNegotiationLabel(item.label)} className={`w-full rounded border p-3 text-left text-xs ${selectedNegotiationLabel === item.label ? 'border-green-600/30 bg-green-600/10' : 'border-border bg-surface-light/50'}`}><div className="flex items-start justify-between"><div><p className="font-semibold text-white">{item.label}</p><p className="mt-1 text-gray-400">{item.adjustment}</p></div><span className={`rounded px-1.5 py-0.5 text-[10px] ${probabilityClass(item.probability)}`}>{item.sponsorResponse}</span></div><div className="mt-2"><ProgressBar value={item.probability} tone={item.probability >= 65 ? 'green' : item.probability >= 45 ? 'amber' : 'red'} compact /></div><p className="mt-2 text-green-400">{item.impact}</p></button>)}</div></div><div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Negotiation Tone</h3><div className="grid gap-2">{(['Conservative', 'Balanced', 'Ambitious'] as const).map((tone) => <button key={tone} type="button" onClick={() => setNegotiationTone(tone)} className={negotiationTone === tone ? 'tab-active text-xs' : 'tab-inactive text-xs'}>{tone}</button>)}</div></div><div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Strengths</h3><ul className="space-y-2 text-xs text-gray-400">{contractData.advisor.strengths.map((item) => <li key={item} className="flex gap-2"><span className="text-green-400">+</span>{item}</li>)}</ul></div><div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Risks</h3><ul className="space-y-2 text-xs text-gray-400">{contractData.advisor.risks.map((item) => <li key={item} className="flex gap-2"><span className="text-red-400">-</span>{item}</li>)}</ul></div><div className="grid gap-2"><button type="button" className="btn-primary justify-center text-xs" onClick={() => acceptSponsor(selectedOffer.id)}><Star className="h-3.5 w-3.5" /> Accept Contract</button><button type="button" className="btn-secondary justify-center text-xs" onClick={() => negotiateSponsor(selectedOffer.id, selectedNegotiationLabel, negotiationTone)}><Scale className="h-3.5 w-3.5" /> Negotiate Terms</button><button type="button" className="btn-secondary justify-center text-xs" onClick={() => rejectSponsor(selectedOffer.id)}>Reject Deal</button><Link to="/sponsorship" className="btn-secondary justify-center text-xs">Compare Offers</Link></div></div>
       </div>
     </div>
   )

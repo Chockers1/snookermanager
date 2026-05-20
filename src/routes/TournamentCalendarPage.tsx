@@ -1,32 +1,24 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarDays, ChevronLeft, ChevronRight, Search } from 'lucide-react'
-import { PageHeader } from '../components/layout/PageHeader'
-import { ActionButton } from '../components/ui/ActionButton'
+import { CalendarDays, ChevronLeft, ChevronRight, MapPin, Search, Trophy } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { SectionCard } from '../components/ui/SectionCard'
-import { StatusBadge } from '../components/ui/StatusBadge'
 import { useGame } from '../context/GameStateContext'
 import { formatMoney } from '../utils/formatters'
 import { buildCalendarData } from '../utils/liveRouteData'
 
-const accentClasses = {
-  green: 'border-emerald-400/30 bg-emerald-500/12 text-emerald-200',
-  violet: 'border-violet-400/30 bg-violet-500/12 text-violet-200',
-  gold: 'border-amber-400/30 bg-amber-500/12 text-amber-100',
-  orange: 'border-orange-400/30 bg-orange-500/12 text-orange-100',
-  blue: 'border-sky-400/30 bg-sky-500/12 text-sky-200',
-} as const
-
-const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const previousMonthDays = [27, 28, 29, 30]
-const currentMonthDays = Array.from({ length: 31 }, (_, index) => ({ label: index + 1, inMonth: true }))
-const calendarCells = [...previousMonthDays.map((label) => ({ label, inMonth: false })), ...currentMonthDays]
-const monthShortLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const monthLongLabels = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const monthShortLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const levelFilters = ['All Tours', 'Junior Pathway', 'Amateur Circuit', 'Q Tour', 'Q School', 'Main Tour', 'Legacy'] as const
 
 type CalendarLevelFilter = (typeof levelFilters)[number]
+
+const tierColorClasses = {
+  green: 'bg-green-500',
+  violet: 'bg-violet-500',
+  gold: 'bg-amber-500',
+  orange: 'bg-orange-500',
+  blue: 'bg-blue-500',
+}
 
 function getTournamentLevel(stageId: number): Exclude<CalendarLevelFilter, 'All Tours'> {
   if (stageId <= 3) return 'Junior Pathway'
@@ -35,18 +27,6 @@ function getTournamentLevel(stageId: number): Exclude<CalendarLevelFilter, 'All 
   if (stageId === 6) return 'Q School'
   if (stageId >= 7 && stageId <= 12) return 'Main Tour'
   return 'Legacy'
-}
-
-function getStatusTone(status: string): 'green' | 'amber' | 'red' | 'blue' {
-  if (status === 'Skipped') return 'red'
-  if (status === 'High Cost') return 'amber'
-  if (status === 'Considering') return 'blue'
-  return 'green'
-}
-
-function getProgressTone(tone: 'green' | 'amber' | 'red' | 'blue'): 'green' | 'amber' | 'red' {
-  if (tone === 'blue') return 'green'
-  return tone
 }
 
 function formatEventDates(startDay: number, endDay?: number, startMonth = 0, endMonth = startMonth) {
@@ -62,21 +42,16 @@ function eventOverlapsMonth(event: { startMonth: number; startYear: number; endM
   return targetKey >= eventStartKey && targetKey <= eventEndKey
 }
 
-function eventMatchesDay(
-  event: { startDay: number; endDay?: number; startMonth: number; startYear: number; endMonth: number; endYear: number },
-  month: number,
-  year: number,
-  day: number,
-) {
-  if (!eventOverlapsMonth(event, month, year)) return false
+function statusClass(status: string) {
+  if (status === 'Entered') return 'bg-green-600/20 text-green-400 border-green-600/30'
+  if (status === 'High Cost') return 'bg-amber-600/20 text-amber-400 border-amber-600/30'
+  if (status === 'Skipped') return 'bg-red-600/20 text-red-400 border-red-600/30'
+  return 'bg-surface-light text-gray-400 border-border'
+}
 
-  const startsThisMonth = event.startMonth === month && event.startYear === year
-  const endsThisMonth = event.endMonth === month && event.endYear === year
-
-  if (startsThisMonth && endsThisMonth) return day >= event.startDay && day <= (event.endDay ?? event.startDay)
-  if (startsThisMonth) return day >= event.startDay
-  if (endsThisMonth) return day <= (event.endDay ?? event.startDay)
-  return true
+function progressTone(tone: 'green' | 'amber' | 'red' | 'blue') {
+  if (tone === 'blue') return 'green'
+  return tone
 }
 
 export function TournamentCalendarPage() {
@@ -87,21 +62,13 @@ export function TournamentCalendarPage() {
   const equipmentReady = Boolean(gameState.equipment.currentCueId && gameState.equipment.currentChalkId && gameState.equipment.currentTipId)
   const monthOptions = useMemo(() => {
     const uniqueMonths = new Map<string, { label: string; month: number; year: number }>()
-
     calendarData.events
       .slice()
       .sort((left, right) => (left.startYear - right.startYear) || (left.startMonth - right.startMonth) || (left.startDay - right.startDay))
       .forEach((event) => {
         const key = `${event.startYear}-${event.startMonth}`
-        if (!uniqueMonths.has(key)) {
-          uniqueMonths.set(key, {
-            label: `${monthLongLabels[event.startMonth]} ${event.startYear}`,
-            month: event.startMonth,
-            year: event.startYear,
-          })
-        }
+        if (!uniqueMonths.has(key)) uniqueMonths.set(key, { label: `${monthLongLabels[event.startMonth]} ${event.startYear}`, month: event.startMonth, year: event.startYear })
       })
-
     return Array.from(uniqueMonths.values())
   }, [calendarData.events])
   const currentDate = new Date(`${gameState.currentDate}T00:00:00`)
@@ -111,217 +78,138 @@ export function TournamentCalendarPage() {
   const [selectedTournamentId, setSelectedTournamentId] = useState(gameState.tournaments.find((event) => event.status === 'Entered')?.id ?? gameState.tournaments[0]?.id ?? '')
   const activeMonth = monthOptions[monthIndex] ?? monthOptions[0]
   const visibleEvents = useMemo(
-    () => calendarData.events.filter((event) => (
-      eventOverlapsMonth(event, activeMonth.month, activeMonth.year)
-      && (levelFilter === 'All Tours' || getTournamentLevel(event.stageId) === levelFilter)
-    )),
+    () => calendarData.events.filter((event) => eventOverlapsMonth(event, activeMonth.month, activeMonth.year) && (levelFilter === 'All Tours' || getTournamentLevel(event.stageId) === levelFilter)),
     [activeMonth.month, activeMonth.year, calendarData.events, levelFilter],
   )
-  const selectedTournament = gameState.tournaments.find(
-    (event) => event.id === selectedTournamentId && visibleEvents.some((calendarEvent) => calendarEvent.id === event.id),
-  ) ?? gameState.tournaments.find((event) => event.id === visibleEvents[0]?.id) ?? null
-  const selectedCalendarEvent = selectedTournament
-    ? visibleEvents.find((event) => event.id === selectedTournament.id) ?? visibleEvents[0] ?? null
-    : visibleEvents[0] ?? null
+  const selectedTournament = gameState.tournaments.find((event) => event.id === selectedTournamentId && visibleEvents.some((calendarEvent) => calendarEvent.id === event.id))
+    ?? gameState.tournaments.find((event) => event.id === visibleEvents[0]?.id)
+    ?? null
+  const selectedCalendarEvent = selectedTournament ? visibleEvents.find((event) => event.id === selectedTournament.id) ?? visibleEvents[0] ?? null : visibleEvents[0] ?? null
   const selectedEventDetail = selectedTournament ? calendarData.getDetail(selectedTournament.id) : null
+  const selectedStatus = selectedTournament ? liveTournamentsById.get(selectedTournament.id)?.status ?? selectedTournament.status : 'Available'
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Tournaments"
-        title="Tournament Calendar"
-        description="July to June pathway calendar with separate junior, amateur, Q Tour, Q School, main-tour, and legacy views. Multi-day events stay visible for their full span."
-        actions={
-          <div className="flex items-center gap-3">
-            <ActionButton tone="secondary" icon={<CalendarDays className="h-4 w-4" />} onClick={() => setMonthIndex(defaultMonthIndex)}>Today</ActionButton>
-            <ActionButton tone="secondary" icon={<ChevronLeft className="h-4 w-4" />} onClick={() => setMonthIndex((value) => Math.max(0, value - 1))}>Previous</ActionButton>
-            <ActionButton tone="secondary" icon={<ChevronRight className="h-4 w-4" />} onClick={() => setMonthIndex((value) => Math.min(monthOptions.length - 1, value + 1))}>Next</ActionButton>
-          </div>
-        }
-      />
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-white">Tournament Calendar</h1>
+          <p className="mt-1 text-sm text-gray-400">Season pathway schedule - {activeMonth.label}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" className="btn-secondary text-xs" onClick={() => setMonthIndex(defaultMonthIndex)}><CalendarDays className="h-3.5 w-3.5" /> Today</button>
+          <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => setMonthIndex((value) => Math.max(0, value - 1))} aria-label="Previous month"><ChevronLeft className="h-3.5 w-3.5" /></button>
+          <span className="min-w-36 text-center text-sm font-medium text-white">{activeMonth.label}</span>
+          <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => setMonthIndex((value) => Math.min(monthOptions.length - 1, value + 1))} aria-label="Next month"><ChevronRight className="h-3.5 w-3.5" /></button>
+        </div>
+      </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.6fr_360px]">
-        <div className="space-y-6">
-          <SectionCard title={activeMonth.label} subtitle="The calendar now separates junior pathway, amateur, Q Tour, Q School, main-tour, and legacy schedules across the full season.">
-            <div className="mb-4 flex flex-wrap gap-2">
-              {levelFilters.map((filter) => (
-                <button
-                  key={filter}
-                  type="button"
-                  onClick={() => setLevelFilter(filter)}
-                  className={`rounded-full border px-3 py-2 text-sm font-semibold ${levelFilter === filter ? 'border-scm-green/40 bg-scm-green/15 text-emerald-200' : 'border-scm-border bg-scm-panelSoft text-scm-textSoft hover:border-scm-green/35 hover:text-scm-text'}`}
-                >
-                  {filter}
-                </button>
-              ))}
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-7 space-y-4">
+          <div className="card">
+            <div className="card-header">
+              <div className="flex flex-wrap items-center gap-3 text-[10px]">
+                {(['gold', 'green', 'blue', 'orange'] as const).map((tone) => <div key={tone} className="flex items-center gap-1"><div className={`h-2 w-2 rounded ${tierColorClasses[tone]}`} /><span className="text-gray-400">{tone === 'gold' ? 'Major' : tone === 'green' ? 'Ranking' : tone === 'blue' ? 'Standard' : 'Pathway'}</span></div>)}
+              </div>
             </div>
-            <div className="grid grid-cols-7 gap-2 text-xs uppercase tracking-[0.16em] text-scm-textMuted">
-              {dayLabels.map((label) => (
-                <div key={label} className="rounded-xl border border-scm-border bg-scm-panelSoft px-3 py-2 text-center">{label}</div>
-              ))}
+            <div className="card-header border-t border-border">
+              <div className="flex flex-wrap items-center gap-3">
+                {levelFilters.map((filter) => (
+                  <button key={filter} type="button" onClick={() => setLevelFilter(filter)} className={levelFilter === filter ? 'tab-active text-[10px]' : 'tab-inactive text-[10px]'}>{filter}</button>
+                ))}
+              </div>
             </div>
-            <div className="mt-2 grid grid-cols-7 gap-2">
-              {calendarCells.map((cell, index) => {
-                const events = cell.inMonth
-                  ? visibleEvents.filter((event) => eventMatchesDay(event, activeMonth.month, activeMonth.year, cell.label))
-                  : []
-
+            <div className="card-body space-y-2">
+              {visibleEvents.length === 0 ? <p className="py-8 text-center text-sm text-gray-400">No events match this month and tour filter.</p> : null}
+              {visibleEvents.map((event) => {
+                const liveStatus = liveTournamentsById.get(event.id)?.status ?? event.status
+                const selected = selectedTournament?.id === event.id
                 return (
-                  <div key={`${cell.label}-${index}`} className={`min-h-[122px] rounded-2xl border p-3 ${cell.inMonth ? 'border-scm-border bg-scm-panel' : 'border-scm-border/40 bg-scm-panelSoft/60 text-scm-textMuted'}`}>
-                    <div className="mb-2 flex items-center justify-between text-sm">
-                      <span>{cell.label}</span>
-                      {events.length > 1 && <span className="text-xs text-scm-textMuted">{events.length} events</span>}
+                  <button
+                    key={event.id}
+                    type="button"
+                    onClick={() => setSelectedTournamentId(event.id)}
+                    className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${selected ? 'border-green-600/30 bg-green-600/10' : 'border-transparent bg-surface-light/50 hover:bg-surface-light'}`}
+                  >
+                    <div className={`h-12 w-1.5 shrink-0 rounded-full ${tierColorClasses[event.accent as keyof typeof tierColorClasses]}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate text-sm font-medium text-white">{event.name}</h3>
+                        <span className={`shrink-0 rounded border px-2 py-0.5 text-[10px] ${statusClass(liveStatus)}`}>{liveStatus}</span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
+                        <span>{formatEventDates(event.startDay, event.endDay, event.startMonth, event.endMonth)}</span>
+                        <span className="flex min-w-0 items-center gap-1"><MapPin className="h-2.5 w-2.5 shrink-0" /> <span className="truncate">{event.location}</span></span>
+                        <span>{event.tourCircuit}</span>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      {events.slice(0, 3).map((event) => (
-                        <button key={event.id} type="button" onClick={() => setSelectedTournamentId(event.id)} className={`w-full rounded-xl border px-2.5 py-2 text-left text-xs leading-5 ${accentClasses[event.accent as keyof typeof accentClasses]}`}>
-                          <p className="font-semibold">{event.tourCircuit}</p>
-                          <p>{event.name}</p>
-                        </button>
-                      ))}
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-green-400">{formatMoney(event.totalPrizeFund)}</p>
+                      <p className="text-[10px] text-gray-500">Prize fund</p>
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
-          </SectionCard>
-
-          <SectionCard title="Upcoming Events" subtitle="Estimated costs include entry, travel, and expected lodging.">
-            <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-scm-border bg-scm-panelSoft px-4 py-3 text-sm text-scm-textSoft">
-              <div className="flex items-center gap-3">
-                <StatusBadge tone="blue">{levelFilter}</StatusBadge>
-                <span>{visibleEvents.length} visible in {activeMonth.label}</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-xl border border-scm-border px-3 py-2 text-scm-textMuted">
-                <Search className="h-4 w-4" />
-                <span>Filter by month and tour level</span>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="text-left text-xs uppercase tracking-[0.16em] text-scm-textMuted">
-                  <tr>
-                    <th className="px-3 py-2">Date</th>
-                    <th className="px-3 py-2">Event</th>
-                    <th className="px-3 py-2">Tour</th>
-                    <th className="px-3 py-2">Location</th>
-                    <th className="px-3 py-2 text-right">Entry</th>
-                    <th className="px-3 py-2 text-right">Travel</th>
-                    <th className="px-3 py-2 text-right">Prize Fund</th>
-                    <th className="px-3 py-2 text-right">Ranking Type</th>
-                    <th className="px-3 py-2 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleEvents.length === 0 ? (
-                    <tr className="border-t border-scm-border">
-                      <td colSpan={9} className="px-3 py-6 text-center text-sm text-scm-textSoft">No events match this month and pathway-tour filter.</td>
-                    </tr>
-                  ) : null}
-                  {visibleEvents.map((event) => {
-                    const liveStatus = liveTournamentsById.get(event.id)?.status ?? event.status
-                    return (
-                      <tr key={event.id} className={`cursor-pointer border-t border-scm-border ${event.id === selectedTournament?.id ? 'bg-scm-gold/10' : ''}`} onClick={() => setSelectedTournamentId(event.id)}>
-                        <td className="px-3 py-3 text-scm-textSoft">{formatEventDates(event.startDay, event.endDay, event.startMonth, event.endMonth)}</td>
-                        <td className="px-3 py-3 font-medium text-scm-text">{event.name}</td>
-                        <td className="px-3 py-3"><span className={`rounded-full px-2.5 py-1 text-xs ${accentClasses[event.accent as keyof typeof accentClasses]}`}>{event.tourCircuit}</span></td>
-                        <td className="px-3 py-3 text-scm-textSoft">{event.location}</td>
-                        <td className="px-3 py-3 text-right text-scm-text">{formatMoney(event.entryFee)}</td>
-                        <td className="px-3 py-3 text-right text-scm-text">{formatMoney(event.travelCost + event.hotelCost)}</td>
-                        <td className="px-3 py-3 text-right text-scm-text">{formatMoney(event.totalPrizeFund)}</td>
-                        <td className="px-3 py-3 text-right text-scm-text">{event.rankingType}</td>
-                        <td className="px-3 py-3 text-right"><StatusBadge tone={getStatusTone(liveStatus)}>{liveStatus}</StatusBadge></td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </SectionCard>
+          </div>
         </div>
 
-        <div className="space-y-6">
-          <SectionCard title="Event Details" subtitle="Selected event costs, pathway impact, and reward structure.">
-            {!selectedTournament || !selectedCalendarEvent || !selectedEventDetail ? (
-              <div className="rounded-2xl border border-scm-border bg-scm-panelSoft p-4 text-sm text-scm-textSoft">
-                No events match the current month and tour filter. Switch month or choose another pathway level to continue planning.
+        <div className="col-span-5 space-y-4">
+          {!selectedTournament || !selectedCalendarEvent || !selectedEventDetail ? (
+            <div className="card card-body p-8 text-center text-sm text-gray-400">Select an event to see entry detail.</div>
+          ) : (
+            <>
+              <div className="card overflow-hidden border-green-600/30">
+                <div className="bg-gradient-to-r from-green-600/10 via-transparent to-transparent p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase text-green-400">{selectedCalendarEvent.pathwayTier}</p>
+                      <h2 className="mt-1 truncate text-xl font-bold text-white">{selectedTournament.name}</h2>
+                      <p className="mt-1 text-xs text-gray-400">{formatEventDates(selectedCalendarEvent.startDay, selectedCalendarEvent.endDay, selectedCalendarEvent.startMonth, selectedCalendarEvent.endMonth)} - {selectedTournament.location}</p>
+                    </div>
+                    <Trophy className="h-8 w-8 shrink-0 text-amber-400" />
+                  </div>
+                </div>
               </div>
-            ) : (
-              <>
-                <div className="rounded-2xl border border-scm-gold/40 bg-scm-panelSoft p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.16em] text-scm-gold">{selectedCalendarEvent.pathwayTier}</p>
-                      <h3 className="mt-2 text-2xl font-semibold text-scm-text">{selectedTournament.name}</h3>
-                      <p className="mt-2 text-sm text-scm-textSoft">{formatEventDates(selectedCalendarEvent.startDay, selectedCalendarEvent.endDay, selectedCalendarEvent.startMonth, selectedCalendarEvent.endMonth)} · {selectedTournament.location}</p>
-                    </div>
-                    <div className="rounded-full border border-scm-gold/40 p-3 text-scm-gold"><CalendarDays className="h-6 w-6" /></div>
+
+              <div className="card card-body space-y-3">
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div><span className="text-gray-500">Tour</span><p className="text-white">{selectedTournament.tourCircuit ?? selectedCalendarEvent.tourCircuit}</p></div>
+                  <div><span className="text-gray-500">Ranking</span><p className="text-white">{selectedTournament.rankingType ?? selectedCalendarEvent.rankingType}</p></div>
+                  <div><span className="text-gray-500">Format</span><p className="text-white">{selectedTournament.format}</p></div>
+                  <div><span className="text-gray-500">Status</span><p className="text-white">{selectedStatus}</p></div>
+                  <div><span className="text-gray-500">Entry Fee</span><p className="text-white">{formatMoney(selectedTournament.entryFee)}</p></div>
+                  <div><span className="text-gray-500">Travel + Hotel</span><p className="text-white">{formatMoney(selectedTournament.travelCost + selectedTournament.hotelCost)}</p></div>
+                  <div><span className="text-gray-500">Prize Fund</span><p className="font-bold text-green-400">{formatMoney(selectedTournament.totalPrizeFund ?? selectedCalendarEvent.totalPrizeFund)}</p></div>
+                  <div><span className="text-gray-500">Winner Prize</span><p className="font-bold text-green-400">{formatMoney(selectedTournament.winnerPrize ?? selectedCalendarEvent.winnerPrize)}</p></div>
+                </div>
+                <div className="border-t border-border pt-3">
+                  <p className="mb-2 text-[10px] font-semibold uppercase text-gray-500">Entry Requirements</p>
+                  <div className="space-y-1 text-xs text-gray-400">
+                    <p className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-green-500" /> {selectedTournament.unlockRequirement ?? selectedCalendarEvent.unlockRequirement}</p>
+                    <p className="flex items-center gap-2"><span className={equipmentReady ? 'h-2 w-2 rounded-full bg-green-500' : 'h-2 w-2 rounded-full bg-red-500'} /> Equipment slots ready</p>
+                    <p className="flex items-center gap-2"><span className={gameState.player.cash >= selectedTournament.entryFee ? 'h-2 w-2 rounded-full bg-green-500' : 'h-2 w-2 rounded-full bg-red-500'} /> Entry cash available</p>
                   </div>
                 </div>
+              </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Tour / Circuit</p><p className="mt-1 text-scm-text">{selectedTournament.tourCircuit ?? selectedCalendarEvent.tourCircuit}</p></div>
-                  <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Ranking Type</p><p className="mt-1 text-scm-text">{selectedTournament.rankingType ?? selectedCalendarEvent.rankingType}</p></div>
-                  <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Format</p><p className="mt-1 text-scm-text">{selectedTournament.format}</p></div>
-                  <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Pathway Tier</p><p className="mt-1 text-scm-text">{selectedTournament.pathwayTier ?? selectedCalendarEvent.pathwayTier}</p></div>
-                  <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Prize Fund</p><p className="mt-1 text-scm-text">{formatMoney(selectedTournament.totalPrizeFund ?? selectedCalendarEvent.totalPrizeFund)}</p></div>
-                  <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Winner Prize</p><p className="mt-1 text-scm-text">{formatMoney(selectedTournament.winnerPrize ?? selectedCalendarEvent.winnerPrize)}</p></div>
-                  <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Entry Fee</p><p className="mt-1 text-scm-text">{formatMoney(selectedTournament.entryFee)}</p></div>
-                  <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Est. Total Cost</p><p className="mt-1 text-rose-300">{formatMoney(selectedTournament.entryFee + selectedTournament.travelCost + selectedTournament.hotelCost)}</p></div>
-                </div>
-
-                <div className="rounded-2xl border border-scm-border bg-scm-panelSoft p-4 text-sm text-scm-textSoft">
-                  <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Event Summary</p>
-                  <p className="mt-3 leading-7">{`${selectedTournament.name} runs from ${formatEventDates(selectedCalendarEvent.startDay, selectedCalendarEvent.endDay, selectedCalendarEvent.startMonth, selectedCalendarEvent.endMonth)} on the ${selectedTournament.tourCircuit ?? selectedCalendarEvent.tourCircuit}, uses ${selectedTournament.rankingType ?? selectedCalendarEvent.rankingType} ranking logic, and is designed to ${selectedTournament.progressionImpact ?? selectedCalendarEvent.progressionImpact}`}</p>
-                </div>
-
-                <div className="rounded-2xl border border-scm-border bg-scm-panelSoft p-4 text-sm text-scm-textSoft">
-                  <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Access Rule</p>
-                  <p className="mt-3">{selectedTournament.unlockRequirement ?? selectedCalendarEvent.unlockRequirement}</p>
-                  <p className="mt-3 text-scm-text">{selectedTournament.reward ?? selectedCalendarEvent.reward ?? selectedTournament.progressionImpact ?? selectedCalendarEvent.progressionImpact}</p>
-                </div>
-
-                <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-sm text-emerald-100">
-                  <p className="font-semibold">{selectedEventDetail.alertTitle}</p>
-                  <p className="mt-2">{selectedEventDetail.alertText}</p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {selectedEventDetail.decisionImpact.map((item) => (
-                    <div key={item.label} className="rounded-xl border border-scm-border bg-scm-panelSoft p-4 text-center">
-                      <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">{item.label}</p>
-                      <p className={`mt-2 text-xl font-semibold ${item.tone === 'green' ? 'text-emerald-300' : item.tone === 'amber' ? 'text-amber-300' : 'text-rose-300'}`}>{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="space-y-4">
-                  {selectedEventDetail.progressMeters.map((meter) => (
-                    <div key={meter.label}>
-                      <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="text-scm-textSoft">{meter.label}</span>
-                        <span className="text-scm-text">{meter.detail}</span>
-                      </div>
-                      <ProgressBar value={(meter.value / meter.max) * 100} tone={getProgressTone(meter.tone)} />
-                    </div>
-                  ))}
-                </div>
-
-                {!equipmentReady ? (
-                  <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4 text-sm text-rose-100">
-                    Tournament entry is locked until a cue, chalk, and tip are equipped.
+              <div className="card card-body space-y-3">
+                <div className="flex items-center gap-2 rounded-lg bg-surface-light/50 px-3 py-2 text-xs text-gray-400"><Search className="h-3 w-3" /> {selectedEventDetail.alertText}</div>
+                {selectedEventDetail.progressMeters.map((meter) => (
+                  <div key={meter.label}>
+                    <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{meter.label}</span><span className="text-white">{meter.detail}</span></div>
+                    <ProgressBar value={(meter.value / meter.max) * 100} tone={progressTone(meter.tone)} compact />
                   </div>
-                ) : null}
+                ))}
+              </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <ActionButton className="justify-center" onClick={() => equipmentReady ? enterTournament(selectedTournament.id) : navigate('/equipment/cues')}>{equipmentReady ? 'Enter Event' : 'Open Equipment'}</ActionButton>
-                  <ActionButton tone="secondary" className="justify-center" onClick={() => navigate('/travel')}>Travel Plan</ActionButton>
-                  <ActionButton tone="secondary" className="justify-center" onClick={() => navigate('/finance')}>View Budget</ActionButton>
-                  <ActionButton tone="secondary" className="justify-center" onClick={() => typeof window !== 'undefined' && window.print()}>Export Calendar</ActionButton>
-                </div>
-              </>
-            )}
-          </SectionCard>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" className="btn-primary justify-center text-xs" onClick={() => equipmentReady ? enterTournament(selectedTournament.id) : navigate('/equipment/cues')}>{equipmentReady ? 'Enter Tournament' : 'Open Equipment'} <ChevronRight className="h-3 w-3" /></button>
+                <button type="button" className="btn-secondary justify-center text-xs" onClick={() => navigate('/travel')}>Travel Plan</button>
+                <button type="button" className="btn-secondary justify-center text-xs" onClick={() => navigate('/finance')}>View Budget</button>
+                <button type="button" className="btn-secondary justify-center text-xs" onClick={() => navigate('/tournaments/hub')}>Tournament Hub</button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

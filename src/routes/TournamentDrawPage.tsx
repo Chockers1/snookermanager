@@ -1,29 +1,26 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Route } from 'lucide-react'
-import { PageHeader } from '../components/layout/PageHeader'
-import { ActionButton } from '../components/ui/ActionButton'
+import { Download, Route, Trophy } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { SectionCard } from '../components/ui/SectionCard'
 import { useGame } from '../context/GameStateContext'
 import { buildTournamentDrawData } from '../utils/liveRouteData'
 
-function getDifficultyColor(difficulty: 'Moderate' | 'Challenging' | 'Very Tough') {
-  if (difficulty === 'Very Tough') return 'text-rose-300'
-  if (difficulty === 'Challenging') return 'text-amber-300'
-  return 'text-emerald-300'
+function difficultyClass(difficulty: 'Moderate' | 'Challenging' | 'Very Tough') {
+  if (difficulty === 'Very Tough') return 'text-red-400'
+  if (difficulty === 'Challenging') return 'text-amber-400'
+  return 'text-green-400'
 }
 
-function getDifficultyValue(difficulty: 'Moderate' | 'Challenging' | 'Very Tough') {
+function difficultyValue(difficulty: 'Moderate' | 'Challenging' | 'Very Tough') {
   if (difficulty === 'Very Tough') return 84
   if (difficulty === 'Challenging') return 62
   return 44
 }
 
-function getProgressClasses(status: 'completed' | 'current' | 'upcoming') {
-  if (status === 'completed') return 'border-emerald-500/45 bg-emerald-500/10 text-emerald-200'
-  if (status === 'current') return 'border-scm-gold/45 bg-scm-gold/10 text-scm-gold'
-  return 'border-scm-border bg-scm-panelSoft text-scm-textMuted'
+function progressClass(status: 'completed' | 'current' | 'upcoming') {
+  if (status === 'completed') return 'border-green-600/30 bg-green-600/10 text-green-400'
+  if (status === 'current') return 'border-amber-600/30 bg-amber-600/10 text-amber-400'
+  return 'border-border bg-surface-light text-gray-500'
 }
 
 export function TournamentDrawPage() {
@@ -31,30 +28,38 @@ export function TournamentDrawPage() {
   const { gameState } = useGame()
   const [compactView, setCompactView] = useState(false)
   const drawData = buildTournamentDrawData(gameState)
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Tournaments"
-        title="Tournament Draw"
-        description="Study the bracket, projected route, and opponent difficulty before deciding how aggressively to push the next match block."
-        actions={<div className="flex items-center gap-3"><ActionButton onClick={() => setCompactView(false)}>Full Draw</ActionButton><ActionButton tone="secondary" onClick={() => setCompactView(true)}>Compact</ActionButton><ActionButton tone="secondary" icon={<Download className="h-4 w-4" />} onClick={() => typeof window !== 'undefined' && window.print()}>Print / Export</ActionButton></div>}
-      />
 
-      <div className="grid gap-6 xl:grid-cols-[1.65fr_340px]">
-        <div className="space-y-6">
-          <SectionCard title="Bracket" subtitle="Ryan path styling is adapted here for Elliot's current event route.">
-            <div className="overflow-x-auto">
-              <div className="flex min-w-[1200px] gap-4">
+  return (
+    <div className="space-y-5 pb-10">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase text-gray-500">Tournaments</p>
+          <h1 className="mt-1 text-2xl font-bold text-white">Tournament Draw</h1>
+          <p className="mt-1 text-sm text-gray-400">Projected route, bracket position, and opponent difficulty.</p>
+        </div>
+        <div className="flex gap-2">
+          <button type="button" className={compactView ? 'btn-secondary text-xs' : 'btn-primary text-xs'} onClick={() => setCompactView(false)}>Full Draw</button>
+          <button type="button" className={compactView ? 'btn-primary text-xs' : 'btn-secondary text-xs'} onClick={() => setCompactView(true)}>Compact</button>
+          <button type="button" className="btn-secondary text-xs" onClick={() => typeof window !== 'undefined' && window.print()}><Download className="h-3.5 w-3.5" /> Print</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-8 space-y-4">
+          <div className="card">
+            <div className="card-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Trophy className="h-3.5 w-3.5 text-green-400" /> Bracket</h3><span className="text-[10px] text-gray-400">{drawData.currentPosition.currentRound}</span></div>
+            <div className="card-body overflow-x-auto">
+              <div className="flex min-w-[980px] gap-3">
                 {drawData.bracket.map((round) => (
                   <div key={round.label} className="min-w-[190px] flex-1">
-                    <p className="mb-3 text-xs uppercase tracking-[0.16em] text-scm-textMuted">{round.label}</p>
-                    <div className="space-y-4">
+                    <p className="mb-2 text-[10px] font-semibold uppercase text-gray-500">{round.label}</p>
+                    <div className="space-y-3">
                       {round.matches.slice(0, compactView ? 2 : round.matches.length).map((match) => (
-                        <div key={match.id} className={`rounded-2xl border p-3 ${match.placeholder ? 'border-dashed border-scm-border bg-scm-panelSoft/70 text-scm-textMuted' : 'border-scm-border bg-scm-panelSoft'}`}>
+                        <div key={match.id} className={`rounded-lg border p-2 ${match.placeholder ? 'border-dashed border-border bg-surface-light/40 text-gray-500' : 'border-border bg-surface-light/50'}`}>
                           {[match.top, match.bottom].map((player) => (
-                            <div key={`${match.id}-${player.name}`} className={`flex items-center justify-between rounded-xl px-3 py-2 ${'highlighted' in player && player.highlighted ? 'bg-emerald-500/10 text-emerald-200' : 'text-scm-text'}`}>
-                              <span>{player.rank ? `[${player.rank}] ` : ''}{player.name}</span>
-                              <span>{player.score ?? '-'}</span>
+                            <div key={`${match.id}-${player.name}`} className={`flex items-center justify-between rounded px-2 py-1.5 text-xs ${'highlighted' in player && player.highlighted ? 'bg-green-600/15 text-green-400' : 'text-white'}`}>
+                              <span className="truncate">{player.rank ? `[${player.rank}] ` : ''}{player.name}</span>
+                              <span className="ml-2 shrink-0">{player.score ?? '-'}</span>
                             </div>
                           ))}
                         </div>
@@ -64,61 +69,55 @@ export function TournamentDrawPage() {
                 ))}
               </div>
             </div>
-          </SectionCard>
+          </div>
 
-          <SectionCard title="Route Progress">
-            <div className="grid gap-3 md:grid-cols-6">
-              {drawData.progress.map((step) => (
-                <div key={step.label} className={`rounded-xl border px-3 py-3 text-center text-xs uppercase tracking-[0.16em] ${getProgressClasses(step.status)}`}>{step.label}</div>
-              ))}
+          <div className="card">
+            <div className="card-header"><h3 className="text-sm font-semibold text-white">Route Progress</h3></div>
+            <div className="card-body grid grid-cols-6 gap-2">
+              {drawData.progress.map((step) => <div key={step.label} className={`rounded-lg border px-3 py-3 text-center text-[10px] font-semibold uppercase ${progressClass(step.status)}`}>{step.label}</div>)}
             </div>
-          </SectionCard>
+          </div>
         </div>
 
-        <div className="space-y-6">
-          <SectionCard title="Path & Opponent Outlook">
-            <div className="space-y-3">
+        <div className="col-span-4 space-y-4">
+          <div className="card card-body">
+            <h3 className="mb-3 text-xs font-semibold text-white">Path & Opponent Outlook</h3>
+            <div className="space-y-2">
               {drawData.opponentOutlook.map((opponent) => (
-                <div key={opponent.id} className="rounded-xl border border-scm-border bg-scm-panelSoft p-4 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-scm-text">{opponent.name}</p>
-                      <p className="text-scm-textMuted">Rank {opponent.rank} · {opponent.nation}</p>
-                    </div>
-                    <span className={getDifficultyColor(opponent.difficulty)}>{opponent.difficulty}</span>
+                <div key={opponent.id} className="rounded-lg bg-surface-light/50 p-3 text-xs">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0"><p className="truncate font-semibold text-white">{opponent.name}</p><p className="text-gray-400">Rank {opponent.rank} - {opponent.nation}</p></div>
+                    <span className={`shrink-0 ${difficultyClass(opponent.difficulty)}`}>{opponent.difficulty}</span>
                   </div>
-                  <div className="mt-3 flex items-center justify-between text-xs text-scm-textMuted"><span>H2H</span><span>{opponent.headToHead}</span></div>
-                  <div className="mt-3"><ProgressBar value={getDifficultyValue(opponent.difficulty)} tone={opponent.difficulty === 'Very Tough' ? 'red' : opponent.difficulty === 'Challenging' ? 'amber' : 'green'} /></div>
+                  <div className="mt-2 flex justify-between text-[10px] text-gray-500"><span>H2H</span><span>{opponent.headToHead}</span></div>
+                  <div className="mt-2"><ProgressBar value={difficultyValue(opponent.difficulty)} tone={opponent.difficulty === 'Very Tough' ? 'red' : opponent.difficulty === 'Challenging' ? 'amber' : 'green'} compact /></div>
                 </div>
               ))}
             </div>
-          </SectionCard>
+          </div>
 
-          <SectionCard title="Current Position">
-            <div className="rounded-2xl border border-scm-border bg-scm-panelSoft p-4 text-sm text-scm-textSoft">
-              <div className="flex items-center justify-between"><span>Current Round</span><span className="text-scm-text">{drawData.currentPosition.currentRound}</span></div>
-              <div className="mt-3 flex items-center justify-between"><span>Best Result</span><span className="text-scm-text">{drawData.currentPosition.bestResult}</span></div>
-              <div className="mt-3 flex items-center justify-between"><span>Projected Route</span><span className="text-scm-text">{drawData.currentPosition.projectedRoute}</span></div>
+          <div className="card card-body">
+            <h3 className="mb-3 text-xs font-semibold text-white">Current Position</h3>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between"><span className="text-gray-400">Current Round</span><span className="text-white">{drawData.currentPosition.currentRound}</span></div>
+              <div className="flex justify-between"><span className="text-gray-400">Best Result</span><span className="text-white">{drawData.currentPosition.bestResult}</span></div>
+              <div className="flex justify-between"><span className="text-gray-400">Projected Route</span><span className="text-white">{drawData.currentPosition.projectedRoute}</span></div>
             </div>
-            <div className="mt-4 rounded-2xl border border-scm-border bg-scm-panelSoft p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Bracket Difficulty</p>
-              <div className="mt-4 h-3 rounded-full bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500" />
-              <p className="mt-3 text-sm text-scm-textSoft">Overall difficulty: <span className="text-amber-300">{drawData.currentPosition.difficultyLabel}</span></p>
+            <div className="mt-4">
+              <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">Bracket Difficulty</span><span className="text-amber-400">{drawData.currentPosition.difficultyLabel}</span></div>
+              <div className="h-2 overflow-hidden rounded-full bg-gradient-to-r from-green-500 via-amber-400 to-red-500"><div className="h-full bg-white/20" style={{ width: `${drawData.difficultyScore}%` }} /></div>
             </div>
-          </SectionCard>
+          </div>
 
-          <SectionCard title="Draw Insights">
-            <div className="space-y-3 text-sm text-scm-textSoft">
-              {drawData.insights.map((item) => (
-                <div key={item.label} className="flex items-center justify-between rounded-xl border border-scm-border bg-scm-panelSoft px-4 py-3">
-                  <span>{item.label}</span>
-                  <span className="text-scm-text">{item.value}</span>
-                </div>
-              ))}
+          <div className="card card-body">
+            <h3 className="mb-3 text-xs font-semibold text-white">Draw Insights</h3>
+            <div className="space-y-2">
+              {drawData.insights.map((item) => <div key={item.label} className="flex justify-between rounded bg-surface-light/50 px-3 py-2 text-xs"><span className="text-gray-400">{item.label}</span><span className="text-white">{item.value}</span></div>)}
             </div>
-          </SectionCard>
+          </div>
 
-          <ActionButton tone="secondary" className="w-full justify-center" icon={<Route className="h-4 w-4" />} onClick={() => navigate('/rankings')}>View Detailed Stats</ActionButton>
+          <button type="button" className="btn-primary w-full justify-center text-xs" onClick={() => navigate('/match/preview')}><Route className="h-3.5 w-3.5" /> Scout Next Opponent</button>
+          <button type="button" className="btn-secondary w-full justify-center text-xs" onClick={() => navigate('/rankings')}>View Rankings</button>
         </div>
       </div>
     </div>

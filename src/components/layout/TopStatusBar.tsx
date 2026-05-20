@@ -1,9 +1,8 @@
-import { Bell, CalendarClock, Coins, Mail, Settings } from 'lucide-react'
+import { Bell, CalendarClock, Mail, Settings, TrendingDown, TrendingUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { Player } from '../../types/game'
 import { useGame } from '../../context/GameStateContext'
 import { formatMoney } from '../../utils/formatters'
-import { FormDots } from '../game/FormDots'
 
 type TopStatusBarProps = {
   player: Player
@@ -12,78 +11,97 @@ type TopStatusBarProps = {
 export function TopStatusBar({ player }: TopStatusBarProps) {
   const { gameState } = useGame()
   const navigate = useNavigate()
-  const currentRanking = gameState.rankings.find((row) => row.playerName === player.fullName)?.ranking
+  const playerRankingRow = gameState.rankings.find((row) => row.playerName === player.fullName)
+  const currentRanking = playerRankingRow?.ranking
     ?? player.worldRanking
     ?? player.amateurRanking
+  const rankingMovement = playerRankingRow?.movement ?? 0
   const nextEvent = gameState.tournaments.find((event) => event.status === 'Entered')
-    ?? gameState.tournaments.find((event) => event.status === 'Available' || event.status === 'High Cost')
+    ?? gameState.tournaments.find((event) => event.status === 'Booked' || event.status === 'Available' || event.status === 'High Cost')
     ?? gameState.tournaments[0]
   const inboxCount = gameState.inbox.length
   const notificationCount = Math.max(player.notificationCount, inboxCount)
 
   return (
-    <header className="flex h-[78px] items-center justify-between border-b border-scm-border bg-scm-panel/90 px-6 backdrop-blur-sm">
-      <div className="flex items-center gap-5">
+    <header className="flex h-14 shrink-0 items-center overflow-hidden border-b border-border bg-sidebar px-4">
+      <div className="flex min-w-0 shrink-0 items-center gap-2 border-r border-border pr-4">
         <button
           type="button"
           onClick={() => navigate('/career/progression')}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-scm-borderStrong bg-scm-deep text-lg font-semibold text-scm-gold transition hover:border-scm-green/50 hover:text-emerald-200"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface text-xs font-bold text-white transition hover:bg-surface-light"
         >
           {player.firstName[0]}
         </button>
         <button
           type="button"
           onClick={() => navigate('/career/progression')}
-          className="text-left transition hover:text-scm-text"
+          className="min-w-0 text-left"
         >
-          <div className="flex items-center gap-3">
-            <span className="text-base font-semibold text-scm-text">{player.fullName}</span>
-            <span className="text-sm text-scm-textMuted">{player.nationality}</span>
-            <span className="rounded-full bg-scm-deep px-2 py-1 text-xs text-scm-textSoft">{player.careerStage}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="max-w-[120px] truncate text-xs font-semibold text-white">{player.fullName}</span>
+            <span className="shrink-0 text-[10px] text-gray-500">{player.nationality}</span>
           </div>
-          <div className="mt-1 flex items-center gap-4 text-xs text-scm-textMuted">
-            <span>{player.rankingLabel}: {currentRanking != null ? `#${currentRanking}` : 'Unranked'}</span>
-            <span>Confidence {player.confidence}%</span>
-            <FormDots values={player.form} />
-          </div>
+          <p className="max-w-[140px] truncate text-[10px] text-gray-500">{player.careerStage}</p>
         </button>
       </div>
-      <div className="flex items-center gap-6 text-sm text-scm-textSoft">
-        <button
-          type="button"
-          onClick={() => navigate('/finance')}
-          className="flex items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-scm-deep/60"
-        >
-          <Coins className="h-4 w-4 text-scm-green" />
-          <div>
-            <div className="text-scm-text">{formatMoney(player.cash)}</div>
-            <div className={`text-xs ${player.cashFlow >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{player.cashFlow >= 0 ? '+' : ''}{formatMoney(player.cashFlow)} flow</div>
-          </div>
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate('/tournaments/hub')}
-          className="flex items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-scm-deep/60"
-        >
-          <CalendarClock className="h-4 w-4 text-scm-gold" />
-          <div>
-            <div className="text-scm-text">{nextEvent?.name ?? player.nextEvent}</div>
-            <div className="text-xs text-scm-textMuted">{nextEvent ? `${player.daysUntilEvent} days` : 'No event scheduled'}</div>
-          </div>
-        </button>
-        <button type="button" onClick={() => navigate('/inbox')} className="relative rounded-lg bg-scm-deep p-2 text-scm-textSoft transition hover:bg-scm-panelHover">
+
+      <button type="button" onClick={() => navigate('/rankings')} className="flex shrink-0 items-center gap-1.5 border-r border-border px-4 transition hover:bg-white/5">
+        <span className="whitespace-nowrap text-[9px] uppercase text-gray-500">{player.rankingLabel}</span>
+        <span className="text-base font-bold text-white">{currentRanking ?? '-'}</span>
+        {rankingMovement > 0 ? (
+          <span className="flex items-center text-[10px] text-green-400"><TrendingUp className="h-2.5 w-2.5" /><span className="ml-0.5">{rankingMovement}</span></span>
+        ) : rankingMovement < 0 ? (
+          <span className="flex items-center text-[10px] text-red-400"><TrendingDown className="h-2.5 w-2.5" /><span className="ml-0.5">{Math.abs(rankingMovement)}</span></span>
+        ) : null}
+      </button>
+
+      <div className="flex shrink-0 items-center gap-1.5 border-r border-border px-4">
+        <span className="whitespace-nowrap text-[9px] uppercase text-gray-500">Form</span>
+        <div className="flex items-center gap-0.5">
+          {player.form.slice(0, 10).map((result, index) => (
+            <span
+              key={`${result}-${index}`}
+              className={`h-2 w-2 rounded-full ${result === 'W' ? 'bg-green-500' : result === 'L' ? 'bg-red-500' : 'bg-amber-500'}`}
+            />
+          ))}
+        </div>
+      </div>
+
+      <button type="button" onClick={() => navigate('/mental')} className="flex shrink-0 items-center gap-1.5 border-r border-border px-4 transition hover:bg-white/5">
+        <span className="whitespace-nowrap text-[9px] uppercase text-gray-500">Confidence</span>
+        <span className="text-xs font-bold text-white">{player.confidence}%</span>
+        <div className="h-1.5 w-12 overflow-hidden rounded-full bg-gray-700">
+          <div className="h-full rounded-full bg-green-500" style={{ width: `${player.confidence}%` }} />
+        </div>
+      </button>
+
+      <button type="button" onClick={() => navigate('/finance')} className="flex shrink-0 items-center gap-1.5 border-r border-border px-4 transition hover:bg-white/5">
+        <span className="whitespace-nowrap text-[9px] uppercase text-gray-500">Funds</span>
+        <span className="whitespace-nowrap text-xs font-bold text-white">{formatMoney(player.cash)}</span>
+        <span className={`whitespace-nowrap text-[10px] ${player.cashFlow >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+          {player.cashFlow >= 0 ? '+' : ''}{formatMoney(player.cashFlow)}
+        </span>
+      </button>
+
+      <button type="button" onClick={() => navigate('/tournaments/hub')} className="flex min-w-0 shrink items-center gap-1.5 px-4 text-left transition hover:bg-white/5">
+        <CalendarClock className="h-3.5 w-3.5 shrink-0 text-green-400" />
+        <span className="shrink-0 whitespace-nowrap text-[9px] uppercase text-gray-500">Next</span>
+        <div className="min-w-0">
+          <p className="truncate text-[11px] font-medium text-white">{nextEvent?.name ?? player.nextEvent}</p>
+          <p className="truncate text-[9px] text-gray-500">{nextEvent?.format ?? 'No event scheduled'}</p>
+        </div>
+      </button>
+
+      <div className="ml-auto flex shrink-0 items-center gap-2 pl-3">
+        <button type="button" onClick={() => navigate('/inbox')} className="relative p-1.5 text-gray-400 transition-colors hover:text-white">
           <Mail className="h-4 w-4" />
-          <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-scm-green px-1 text-[10px] font-semibold text-scm-deep">
-            {inboxCount}
-          </span>
+          <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-green-600 px-1 text-[8px] font-bold text-white">{inboxCount}</span>
         </button>
-        <button type="button" onClick={() => navigate('/inbox')} className="relative rounded-lg bg-scm-deep p-2 text-scm-textSoft transition hover:bg-scm-panelHover">
+        <button type="button" onClick={() => navigate('/inbox')} className="relative p-1.5 text-gray-400 transition-colors hover:text-white">
           <Bell className="h-4 w-4" />
-          <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-scm-amber px-1 text-[10px] font-semibold text-scm-deep">
-            {notificationCount}
-          </span>
+          <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-bold text-white">{notificationCount}</span>
         </button>
-        <button type="button" onClick={() => navigate('/new-career')} className="rounded-lg bg-scm-deep p-2 text-scm-textSoft transition hover:bg-scm-panelHover">
+        <button type="button" onClick={() => navigate('/new-career')} className="p-1.5 text-gray-400 transition-colors hover:text-white">
           <Settings className="h-4 w-4" />
         </button>
       </div>

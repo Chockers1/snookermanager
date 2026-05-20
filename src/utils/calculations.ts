@@ -61,15 +61,14 @@ function getPersonalityKeywordBonus(personalityType?: string) {
   return bonus
 }
 
-export function calculateOverallRating(params: {
-  attributes: PlayerAttributes
+export function calculateOverallRatingFromAverages(params: {
+  technicalAverage: number
+  mentalAverage: number
+  physicalAverage: number
   personalityTraits?: PersonalitySlider[]
   playingStyle?: string
 }) {
-  const { attributes, personalityTraits, playingStyle } = params
-  const technicalAverage = calculateAverage(Object.values(attributes.technical))
-  const mentalAverage = calculateAverage(Object.values(attributes.mental))
-  const physicalAverage = calculateAverage(Object.values(attributes.physical))
+  const { technicalAverage, mentalAverage, physicalAverage, personalityTraits, playingStyle } = params
   const traitMap = buildTraitMap(personalityTraits)
   const competitiveness = (traitMap.Competitiveness ?? 50) - 50
   const perseverance = (traitMap.Perseverance ?? 50) - 50
@@ -88,22 +87,20 @@ export function calculateOverallRating(params: {
   return clamp(Math.round(baseRating + traitModifier + getPlayingStyleRatingBonus(playingStyle)), 1, 99)
 }
 
-export function calculatePotentialRating(params: {
-  attributes: PlayerAttributes
+export function calculatePotentialRatingFromProfile(params: {
+  overallRating: number
+  mentalAverage: number
   personalityTraits?: PersonalitySlider[]
   age?: number
   playingStyle?: string
   personalityType?: string
-  overallRating?: number
 }) {
-  const { age, attributes, personalityTraits, personalityType, playingStyle } = params
-  const overallRating = params.overallRating ?? calculateOverallRating({ attributes, personalityTraits, playingStyle })
+  const { age, mentalAverage, personalityTraits, personalityType, playingStyle, overallRating } = params
   const traitMap = buildTraitMap(personalityTraits)
   const perseverance = (traitMap.Perseverance ?? 50) - 50
   const competitiveness = (traitMap.Competitiveness ?? 50) - 50
   const sportsmanship = (traitMap.Sportsmanship ?? 50) - 50
   const mediaHandling = (traitMap['Media Handling'] ?? 50) - 50
-  const mentalAverage = calculateAverage(Object.values(attributes.mental))
   const growthModifier = perseverance * 0.11 + competitiveness * 0.08 + sportsmanship * 0.05 + mediaHandling * 0.03
   const mentalBonus = (mentalAverage - 70) * 0.12
   const potential =
@@ -116,6 +113,47 @@ export function calculatePotentialRating(params: {
     getPersonalityKeywordBonus(personalityType)
 
   return clamp(Math.max(overallRating + 1, potential, getAgePotentialFloor(age, overallRating)), overallRating, 99)
+}
+
+export function calculateOverallRating(params: {
+  attributes: PlayerAttributes
+  personalityTraits?: PersonalitySlider[]
+  playingStyle?: string
+}) {
+  const { attributes, personalityTraits, playingStyle } = params
+  const technicalAverage = calculateAverage(Object.values(attributes.technical))
+  const mentalAverage = calculateAverage(Object.values(attributes.mental))
+  const physicalAverage = calculateAverage(Object.values(attributes.physical))
+
+  return calculateOverallRatingFromAverages({
+    technicalAverage,
+    mentalAverage,
+    physicalAverage,
+    personalityTraits,
+    playingStyle,
+  })
+}
+
+export function calculatePotentialRating(params: {
+  attributes: PlayerAttributes
+  personalityTraits?: PersonalitySlider[]
+  age?: number
+  playingStyle?: string
+  personalityType?: string
+  overallRating?: number
+}) {
+  const { age, attributes, personalityTraits, personalityType, playingStyle } = params
+  const overallRating = params.overallRating ?? calculateOverallRating({ attributes, personalityTraits, playingStyle })
+  const mentalAverage = calculateAverage(Object.values(attributes.mental))
+
+  return calculatePotentialRatingFromProfile({
+    overallRating,
+    mentalAverage,
+    personalityTraits,
+    age,
+    playingStyle,
+    personalityType,
+  })
 }
 
 export function calculateTechnicalAverage(attributes: Record<string, number>): number {

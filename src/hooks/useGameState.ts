@@ -1847,15 +1847,101 @@ function createCompetitionRowsFromBase(baseRows: RankingRow[], player: Player, p
   )
 }
 
-function buildCompetitionTables(baseRows: RankingRow[], player: Player): CompetitionTablesState {
+const GENERATED_COMPETITOR_FIRST_NAMES = [
+  'Adrian', 'Bartosz', 'Cedric', 'Dylan', 'Emil', 'Fraser', 'Gareth', 'Hamza', 'Ivan', 'Jasper', 'Kaito', 'Lennon', 'Mateo', 'Nathan', 'Oskar', 'Pavel',
+  'Quentin', 'Rafael', 'Sebastian', 'Tariq', 'Ulrich', 'Viktor', 'Wesley', 'Xander', 'Yannick', 'Zane', 'Bailey', 'Connor', 'Dario', 'Euan', 'Freddie', 'Gianni',
+  'Harris', 'Ilyas', 'Joel', 'Kieran', 'Lorenzo', 'Malik', 'Niall', 'Otis', 'Patrick', 'Reuben', 'Samir', 'Tobias', 'Vincent', 'Warren', 'Yusuf', 'Zac',
+]
+
+const GENERATED_COMPETITOR_LAST_NAMES = [
+  'Ashford', 'Barker', 'Caldwell', 'Drayton', 'Easton', 'Forster', 'Grimaldi', 'Harrington', 'Iqbal', 'Janssen', 'Kovacs', 'Langford', 'Madsen', 'Novak', 'Olsen', 'Patel',
+  'Quinnell', 'Rossi', 'Sinclair', 'Tanaka', 'Upton', 'Vos', 'Westbrook', 'Xu', 'Yilmaz', 'Zimmer', 'Ainsley', 'Bouchard', 'Costa', 'Davenport', 'El-Sayed', 'Fletcher',
+  'Gallagher', 'Hayashi', 'Iversen', 'Kowalski', 'Lombardi', 'Mendoza', 'Nakamura', 'Otero', 'Petrov', 'Rahman', 'Sorensen', 'Tremblay', 'Urban', 'Verma', 'Whitaker', 'Yates',
+]
+
+const GENERATED_COMPETITOR_NATIONS = ['ENG', 'SCO', 'WAL', 'IRL', 'NIR', 'BEL', 'GER', 'NED', 'POL', 'AUS', 'THA', 'CHN', 'IND', 'PAK', 'CAN', 'BRA', 'JPN', 'NOR', 'SWE', 'ITA', 'ESP', 'FRA']
+
+const COMPETITION_POOL_PROFILES: Record<Exclude<CompetitionTableKey, 'world' | 'oneYear'>, { count: number; pointsStart: number; pointsStep: number; prizeStart: number; prizeStep: number; eventBase: number; seedOffset: number }> = {
+  amateur: { count: 96, pointsStart: 4600, pointsStep: 34, prizeStart: 92000, prizeStep: 640, eventBase: 7, seedOffset: 11 },
+  qTour: { count: 72, pointsStart: 2800, pointsStep: 28, prizeStart: 48000, prizeStep: 420, eventBase: 6, seedOffset: 173 },
+  qSchool: { count: 64, pointsStart: 1200, pointsStep: 15, prizeStart: 0, prizeStep: 0, eventBase: 4, seedOffset: 347 },
+  senior: { count: 48, pointsStart: 2100, pointsStep: 24, prizeStart: 36000, prizeStep: 380, eventBase: 5, seedOffset: 521 },
+  youth: { count: 64, pointsStart: 1800, pointsStep: 21, prizeStart: 12000, prizeStep: 120, eventBase: 6, seedOffset: 701 },
+}
+
+function createGeneratedRankingIdentity(seenNames: Set<string>, seed: number) {
+  const maxAttempts = GENERATED_COMPETITOR_FIRST_NAMES.length * GENERATED_COMPETITOR_LAST_NAMES.length
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const value = seed + attempt
+    const firstName = GENERATED_COMPETITOR_FIRST_NAMES[value % GENERATED_COMPETITOR_FIRST_NAMES.length]
+    const lastName = GENERATED_COMPETITOR_LAST_NAMES[Math.floor(value / GENERATED_COMPETITOR_FIRST_NAMES.length) % GENERATED_COMPETITOR_LAST_NAMES.length]
+    const playerName = `${firstName} ${lastName}`
+
+    if (!seenNames.has(playerName)) {
+      seenNames.add(playerName)
+      return {
+        playerName,
+        nation: GENERATED_COMPETITOR_NATIONS[value % GENERATED_COMPETITOR_NATIONS.length],
+      }
+    }
+  }
+
+  const playerName = `Tour Player ${seed}`
+  seenNames.add(playerName)
   return {
-    world: createCompetitionRowsFromBase(baseRows, player, 1, 1, 8),
-    oneYear: createCompetitionRowsFromBase(baseRows, player, 0.46, 0.46, 6),
-    amateur: createCompetitionRowsFromBase(baseRows, player, 0.78, 0.42, 7),
-    qTour: createCompetitionRowsFromBase(baseRows, player, 0.28, 0.16, 5),
-    qSchool: createCompetitionRowsFromBase(baseRows, player, 0.08, 0, 3).map((row) => ({ ...row, prizeMoney: 0 })),
-    senior: createCompetitionRowsFromBase(baseRows, player, 0.18, 0.12, 5),
-    youth: createCompetitionRowsFromBase(baseRows, player, 0.24, 0.05, 6),
+    playerName,
+    nation: GENERATED_COMPETITOR_NATIONS[seed % GENERATED_COMPETITOR_NATIONS.length],
+  }
+}
+
+function createCompetitionPoolRows(key: Exclude<CompetitionTableKey, 'world' | 'oneYear'>, seenNames: Set<string>): RankingRow[] {
+  const profile = COMPETITION_POOL_PROFILES[key]
+
+  return Array.from({ length: profile.count }, (_, index) => {
+    const identity = createGeneratedRankingIdentity(seenNames, profile.seedOffset + index * 7)
+    const ranking = index + 1
+
+    return {
+      id: `rank-${key}-${ranking}`,
+      playerName: identity.playerName,
+      nation: identity.nation,
+      ranking,
+      movement: [1, 0, -1, 2, -2, 0, 3, -3][(index + profile.seedOffset) % 8],
+      points: Math.max(12, profile.pointsStart - index * profile.pointsStep + ((index % 5) * 3)),
+      prizeMoney: Math.max(0, profile.prizeStart - index * profile.prizeStep),
+      highlighted: false,
+    }
+  })
+}
+
+function buildCompetitionTables(baseRows: RankingRow[], player: Player, options?: { reservePlayerName?: boolean }): CompetitionTablesState {
+  const seenNames = new Set<string>([player.fullName])
+  baseRows.forEach((row) => {
+    if (options?.reservePlayerName && row.playerName === player.fullName) return
+    seenNames.add(row.playerName)
+  })
+  const competitionBaseRows = baseRows.map((row) => {
+    if (!options?.reservePlayerName || row.playerName !== player.fullName) return row
+
+    const identity = createGeneratedRankingIdentity(seenNames, 997 + row.ranking * 13)
+    return {
+      ...row,
+      id: `${row.id}-reserve`,
+      playerName: identity.playerName,
+      nation: identity.nation,
+      highlighted: false,
+    }
+  })
+
+  return {
+    world: createCompetitionRowsFromBase(competitionBaseRows, player, 1, 1, 8),
+    oneYear: createCompetitionRowsFromBase(competitionBaseRows, player, 0.46, 0.46, 6),
+    amateur: createCompetitionRowsFromBase(createCompetitionPoolRows('amateur', seenNames), player, 1, 1, 7),
+    qTour: createCompetitionRowsFromBase(createCompetitionPoolRows('qTour', seenNames), player, 1, 1, 6),
+    qSchool: createCompetitionRowsFromBase(createCompetitionPoolRows('qSchool', seenNames), player, 1, 0, 4).map((row) => ({ ...row, prizeMoney: 0 })),
+    senior: createCompetitionRowsFromBase(createCompetitionPoolRows('senior', seenNames), player, 1, 1, 5),
+    youth: createCompetitionRowsFromBase(createCompetitionPoolRows('youth', seenNames), player, 1, 1, 6),
   }
 }
 
@@ -4303,8 +4389,8 @@ function initializeCompetitionTablesForNewCareer(
   playerName: string,
   level: NewCareerStartingLevel,
 ): CompetitionTablesState {
-  const resetRows = (rows: CompetitionTableRow[]) => resetSeasonalCompetitionRows(rows, playerName)
-  const primaryRows = resetRows(tables[level.competitionTable]).map((row) => (
+  const rankRows = (rows: CompetitionTableRow[]) => rerankCompetitionRows(rows, playerName)
+  const primaryRows = rankRows(tables[level.competitionTable]).map((row) => (
     row.playerName === playerName
       ? {
           ...row,
@@ -4314,13 +4400,13 @@ function initializeCompetitionTablesForNewCareer(
   ))
 
   return {
-    world: resetRows(tables.world),
-    oneYear: resetRows(tables.oneYear),
-    amateur: level.competitionTable === 'amateur' ? primaryRows : resetRows(tables.amateur),
-    qTour: level.competitionTable === 'qTour' ? primaryRows : resetRows(tables.qTour),
-    qSchool: resetRows(tables.qSchool),
-    senior: level.competitionTable === 'senior' ? primaryRows : resetRows(tables.senior),
-    youth: level.competitionTable === 'youth' ? primaryRows : resetRows(tables.youth),
+    world: rankRows(tables.world),
+    oneYear: rankRows(tables.oneYear),
+    amateur: level.competitionTable === 'amateur' ? primaryRows : rankRows(tables.amateur),
+    qTour: level.competitionTable === 'qTour' ? primaryRows : rankRows(tables.qTour),
+    qSchool: rankRows(tables.qSchool),
+    senior: level.competitionTable === 'senior' ? primaryRows : rankRows(tables.senior),
+    youth: level.competitionTable === 'youth' ? primaryRows : rankRows(tables.youth),
   }
 }
 
@@ -4328,7 +4414,7 @@ function getNextUpcomingTournament(state: Pick<GameState, 'tournaments' | 'curre
   const isCurrentOrUpcomingEvent = (event: Tournament) => (event.endDate ?? event.startDate) >= state.currentDate
 
   return state.tournaments.find((event) => event.status === 'Entered' && isCurrentOrUpcomingEvent(event))
-    ?? state.tournaments.find((event) => (event.status === 'Available' || event.status === 'High Cost') && isCurrentOrUpcomingEvent(event))
+    ?? state.tournaments.find((event) => (event.status === 'Booked' || event.status === 'Available' || event.status === 'High Cost') && isCurrentOrUpcomingEvent(event))
     ?? state.tournaments[0]
 }
 
@@ -7232,9 +7318,9 @@ function recalculateState(state: GameState, lastAction = state.lastAction): Game
   const isCurrentOrUpcomingEvent = (event: Tournament) => (event.endDate ?? event.startDate) >= state.currentDate
   const relevantTournaments = state.tournaments.filter((event) => getCompetitionKeysForTournament(event).includes(primaryCompetitionKey))
   const nextEvent = relevantTournaments.find((event) => event.status === 'Entered' && isCurrentOrUpcomingEvent(event))
-    ?? relevantTournaments.find((event) => (event.status === 'Available' || event.status === 'High Cost') && isCurrentOrUpcomingEvent(event))
+    ?? relevantTournaments.find((event) => (event.status === 'Booked' || event.status === 'Available' || event.status === 'High Cost') && isCurrentOrUpcomingEvent(event))
     ?? state.tournaments.find((event) => event.status === 'Entered' && isCurrentOrUpcomingEvent(event))
-    ?? state.tournaments.find((event) => (event.status === 'Available' || event.status === 'High Cost') && isCurrentOrUpcomingEvent(event))
+    ?? state.tournaments.find((event) => (event.status === 'Booked' || event.status === 'Available' || event.status === 'High Cost') && isCurrentOrUpcomingEvent(event))
     ?? relevantTournaments[0]
     ?? state.tournaments[0]
   const activePlayerRow = activeRankings.find((row) => row.playerName === state.player.fullName)
@@ -7397,7 +7483,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
     notificationCount: 2,
   }
   const competitionTables = initializeCompetitionTablesForNewCareer(
-    applyStartingLevelToCompetitionTables(buildCompetitionTables(starterRankings, player), player.fullName, selectedStartingLevel),
+    applyStartingLevelToCompetitionTables(buildCompetitionTables(starterRankings, player, { reservePlayerName: true }), player.fullName, selectedStartingLevel),
     player.fullName,
     selectedStartingLevel,
   )

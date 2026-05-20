@@ -1,19 +1,26 @@
 import { useNavigate } from 'react-router-dom'
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { Award, BarChart3, CalendarDays, Trophy } from 'lucide-react'
-import { PageHeader } from '../components/layout/PageHeader'
-import { ActionButton } from '../components/ui/ActionButton'
-import { CircularMeter } from '../components/ui/CircularMeter'
+import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Brain, ChevronRight, Coins, Handshake, HeartPulse, Medal, Trophy, TrendingUp, Wallet } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { SectionCard } from '../components/ui/SectionCard'
 import { useGame } from '../context/GameStateContext'
 import { buildSeasonReviewData } from '../utils/liveRouteData'
 import { formatMoney } from '../utils/formatters'
 
-function getMetricTone(label: string) {
-  if (label === 'Worst Defeat') return 'text-rose-300'
-  if (label === 'Financial Result' || label === 'Ranking Movement') return 'text-emerald-300'
-  return 'text-scm-text'
+function metricColor(label: string) {
+  if (label === 'Financial Result' || label === 'Ranking Movement') return 'text-green-400'
+  if (label === 'Fatigue') return 'text-amber-400'
+  return 'text-white'
+}
+
+function getMetricIcon(label: string) {
+  if (label === 'Record') return Trophy
+  if (label === 'Current Rank') return Medal
+  if (label === 'Ranking Movement') return TrendingUp
+  if (label === 'Prize Money') return Coins
+  if (label === 'Financial Result') return Wallet
+  if (label === 'Confidence') return Brain
+  if (label === 'Fatigue') return HeartPulse
+  return Handshake
 }
 
 export function SeasonReviewPage() {
@@ -23,7 +30,6 @@ export function SeasonReviewPage() {
   const currentCoach = gameState.coaches.find((coach) => coach.id === gameState.currentCoachId)
   const currentSeasonMatches = gameState.history.matchLog.filter((match) => match.season === gameState.season)
   const currentSeasonEvents = gameState.history.tournamentHistory.filter((event) => event.season === gameState.season)
-  const archivedSeasons = gameState.history.seasonRecords.slice(0, 3)
   const totalPrizeMoney = currentSeasonMatches.reduce((sum, match) => sum + match.prizeMoney, 0)
   const sponsorIncome = gameState.sponsors.reduce((sum, sponsor) => sum + sponsor.monthlyValue, 0)
   const totalIncome = totalPrizeMoney + sponsorIncome
@@ -36,255 +42,93 @@ export function SeasonReviewPage() {
     ? gameState.history.snapshots.filter((snapshot) => snapshot.season === gameState.season)
     : [{ label: 'Current', season: gameState.season, week: gameState.week, date: gameState.currentDate, ranking: playerRank?.ranking ?? 0, cash: gameState.player.cash, confidence: gameState.player.confidence, fatigue: gameState.player.fatigue, morale: gameState.player.morale, reputation: gameState.player.reputation, sponsorCount: gameState.sponsors.length, matchesPlayed: currentSeasonMatches.length, wins: winCount, losses: lossCount, totalPrizeMoney }]
   const seasonHistory = historySnapshots.slice(-8)
-  const rankingMovementData = seasonHistory.map((snapshot) => ({
-    label: `W${snapshot.week}`,
-    value: snapshot.ranking || (playerRank?.ranking ?? 0),
-  }))
-  const prizeMoneyByEvent = (currentSeasonEvents.length ? currentSeasonEvents.slice(0, 6).reverse().map((event) => ({
-    label: event.tournamentName.length > 16 ? `${event.tournamentName.slice(0, 16)}...` : event.tournamentName,
-    value: event.prizeMoney,
-  })) : currentSeasonMatches.slice(0, 6).reverse().map((match) => ({
-    label: match.tournamentName.length > 16 ? `${match.tournamentName.slice(0, 16)}...` : match.tournamentName,
-    value: match.prizeMoney,
-  })))
-  const seasonHighlights = {
-    record: [
-      `${winCount} wins and ${lossCount} losses are currently recorded this save.`,
-      `Current ranking sits at #${playerRank?.ranking ?? '-'}.`,
-    ],
-    milestones: [
-      `${currentSeasonEvents.length} tournament records are logged for ${gameState.season}.`,
-      `${gameState.history.seasonRecords.length} completed seasons are archived in persistent history.`,
-    ],
-    notableResults: (currentSeasonEvents.length
-      ? currentSeasonEvents.slice(0, 3).map((event) => `${event.result} at ${event.tournamentName}${event.rounds.length ? ` (${event.rounds.at(-1)})` : ''}`)
-      : currentSeasonMatches.slice(0, 3).map((match) => `${match.result} vs ${match.opponentName} in the ${match.round} of ${match.tournamentName} (${match.score})`)),
+  const rankingMovementData = seasonHistory.map((snapshot) => ({ label: `W${snapshot.week}`, value: snapshot.ranking || (playerRank?.ranking ?? 0) }))
+  const prizeMoneyByEvent = (currentSeasonEvents.length ? currentSeasonEvents.slice(0, 7).reverse().map((event) => ({ label: event.tournamentName.length > 12 ? `${event.tournamentName.slice(0, 12)}...` : event.tournamentName, value: event.prizeMoney })) : currentSeasonMatches.slice(0, 7).reverse().map((match) => ({ label: match.tournamentName.length > 12 ? `${match.tournamentName.slice(0, 12)}...` : match.tournamentName, value: match.prizeMoney })))
+  const currentSeasonSnapshot = {
+    season: gameState.season,
+    record: `${winCount}-${lossCount}`,
+    titles: currentSeasonEvents.filter((event) => event.result === 'Winner').length,
+    prizeMoney: totalPrizeMoney,
+    bestResult: currentSeasonEvents.some((event) => event.result === 'Winner') ? 'Winner' : currentSeasonEvents[0]?.result ?? 'No deep run yet',
+    note: currentSeasonEvents.some((event) => event.result === 'Winner')
+      ? 'Silverware is now setting the tone for the next campaign.'
+      : currentSeasonEvents.length > 0
+        ? 'A platform is in place for stronger deep runs next season.'
+        : 'Plenty of opportunities in the new season.',
   }
-  const seasonArchiveCards = [
-    {
-      season: gameState.season,
-      record: `${winCount}-${lossCount}`,
-      titles: currentSeasonEvents.filter((event) => event.result === 'Winner').length,
-      prizeMoney: totalPrizeMoney,
-      bestResult: currentSeasonEvents.some((event) => event.result === 'Winner') ? 'Winner' : currentSeasonEvents[0]?.result ?? 'No deep run yet',
-    },
-    ...archivedSeasons.map((season) => ({
-      season: season.season,
-      record: `${season.wins}-${season.losses}`,
-      titles: season.titles,
-      prizeMoney: season.prizeMoney,
-      bestResult: season.bestResult,
-    })),
-  ].slice(0, 3)
-  const liveHeadlineMetrics = [
-    { label: 'Record', value: `${winCount}-${lossCount}`, detail: 'Live save results' },
-    { label: 'Current Rank', value: `#${playerRank?.ranking ?? '-'}`, detail: gameState.player.rankingLabel },
-    { label: 'Financial Result', value: formatMoney(netProfit), detail: 'Cash movement from the current save' },
-    { label: 'Confidence', value: `${gameState.player.confidence}%`, detail: 'Current mental edge' },
-    { label: 'Fatigue', value: `${gameState.player.fatigue}%`, detail: 'Recovery pressure' },
-    { label: 'Sponsors', value: `${gameState.sponsors.length}`, detail: 'Active commercial deals' },
+  const metrics = [
+    { label: 'Record', value: `${winCount}-${lossCount}`, sub: 'Live save results' },
+    { label: 'Current Rank', value: `#${playerRank?.ranking ?? '-'}`, sub: gameState.player.rankingLabel },
+    { label: 'Ranking Movement', value: playerRank?.movement ? `${playerRank.movement > 0 ? '+' : ''}${playerRank.movement}` : '0', sub: 'Current table movement' },
+    { label: 'Prize Money', value: formatMoney(totalPrizeMoney), sub: 'Season earnings' },
+    { label: 'Financial Result', value: formatMoney(netProfit), sub: netProfit >= 0 ? 'Profit' : 'Deficit' },
+    { label: 'Confidence', value: `${gameState.player.confidence}%`, sub: 'Mental edge' },
+    { label: 'Fatigue', value: `${gameState.player.fatigue}%`, sub: 'Recovery pressure' },
+    { label: 'Sponsors', value: `${gameState.sponsors.length}`, sub: 'Commercial deals' },
   ]
-  const liveFinancialSummary = [
-    { label: 'Prize Money', value: totalPrizeMoney },
-    { label: 'Sponsor Income', value: sponsorIncome },
-    { label: 'Current Cash', value: gameState.player.cash },
-    { label: 'Staff Costs Exposure', value: totalExpenses },
-  ]
+  const highlights = currentSeasonEvents.length
+    ? currentSeasonEvents.slice(0, 4).map((event) => `${event.result} at ${event.tournamentName}${event.rounds.length ? ` (${event.rounds.at(-1)})` : ''}`)
+    : currentSeasonMatches.slice(0, 4).map((match) => `${match.result} vs ${match.opponentName} in ${match.tournamentName} (${match.score})`)
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Support"
-        title="End Of Season Review"
-        description={`Current ${gameState.season} save review for ${gameState.player.fullName} across results, development, finances, and support systems.`}
-        actions={<div className="flex items-center gap-3"><ActionButton tone="secondary" onClick={() => navigate('/career/stats')}>View Season Summary Report</ActionButton></div>}
-      />
-
-      <div className="grid gap-6 xl:grid-cols-[1.55fr_320px]">
-        <div className="space-y-6">
-          <SectionCard title="Season Summary">
-            <div className="grid gap-4 xl:grid-cols-11">
-              {liveHeadlineMetrics.map((metric) => (
-                <div key={metric.label} className="rounded-xl border border-scm-border bg-scm-panelSoft p-4 xl:col-span-1">
-                  <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">{metric.label}</p>
-                  <p className={`mt-3 text-3xl font-semibold ${getMetricTone(metric.label)}`}>{metric.value}</p>
-                  <p className="mt-2 text-xs text-scm-textMuted">{metric.detail}</p>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-
-          <div className="grid gap-6 xl:grid-cols-[1.1fr_1.1fr_0.9fr]">
-            <SectionCard title="Ranking Movement Over Season">
-              <div className="h-[220px] w-full">
-                <ResponsiveContainer>
-                  <LineChart data={rankingMovementData}>
-                    <CartesianGrid stroke="#203449" vertical={false} />
-                    <XAxis dataKey="label" stroke="#94a3b8" tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} width={38} reversed />
-                    <Tooltip contentStyle={{ backgroundColor: '#102033', border: '1px solid #31506f', borderRadius: '12px' }} />
-                    <Line type="monotone" dataKey="value" stroke="#7ad34b" strokeWidth={3} dot={{ r: 2 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Prize Money Earned By Event">
-              <div className="h-[220px] w-full">
-                <ResponsiveContainer>
-                  <BarChart data={prizeMoneyByEvent}>
-                    <CartesianGrid stroke="#203449" vertical={false} />
-                    <XAxis dataKey="label" stroke="#94a3b8" tickLine={false} axisLine={false} interval={0} angle={-20} textAnchor="end" height={56} />
-                    <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} width={48} />
-                    <Tooltip contentStyle={{ backgroundColor: '#102033', border: '1px solid #31506f', borderRadius: '12px' }} />
-                    <Bar dataKey="value" fill="#7ad34b" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Attribute Growth By Category">
-              <div className="space-y-4">
-                {seasonData.attributeGrowth.map((item) => (
-                  <div key={item.label}>
-                    <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">{item.label}</span><span className="text-emerald-300">+{item.value}</span></div>
-                    <ProgressBar value={(item.value / 3) * 100} tone="green" />
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-4">
-            <SectionCard title="Coach Grade">
-              <p className="text-5xl font-semibold text-scm-green">{seasonData.panels.coachGrade.grade}</p>
-              <p className="mt-2 text-scm-text">{seasonData.panels.coachGrade.detail}</p>
-              <p className="mt-3 text-sm text-scm-textSoft">{seasonData.panels.coachGrade.note}</p>
-            </SectionCard>
-
-            <SectionCard title="Sponsor Grade">
-              <p className="text-5xl font-semibold text-scm-green">{seasonData.panels.sponsorGrade.grade}</p>
-              <p className="mt-2 text-scm-text">{seasonData.panels.sponsorGrade.detail}</p>
-              <p className="mt-3 text-sm text-scm-textSoft">{seasonData.panels.sponsorGrade.note}</p>
-            </SectionCard>
-
-            <SectionCard title="Fan Growth">
-              <p className="text-4xl font-semibold text-scm-green">{seasonData.panels.fanGrowth.growth}</p>
-              <p className="mt-2 text-scm-text">{seasonData.panels.fanGrowth.fans} total fans</p>
-              <p className="mt-3 text-sm text-scm-textSoft">{seasonData.panels.fanGrowth.delta}</p>
-            </SectionCard>
-
-            <SectionCard title="Next Season Objectives">
-              <div className="space-y-3">
-                {seasonData.objectives.map((item) => (
-                  <div key={item.label}>
-                    <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">{item.label}</span><span className={item.completed ? 'text-emerald-300' : 'text-amber-300'}>{item.progress}</span></div>
-                    <ProgressBar value={item.completed ? 100 : 70} tone={item.completed ? 'green' : 'amber'} />
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-          </div>
+    <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
+      <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0"><h1 className="text-2xl font-bold leading-tight text-white">End of Season Review</h1><p className="mt-1 truncate text-xs text-gray-400">Season {gameState.season} review for {gameState.player.fullName}.</p></div>
+          <div className="card flex shrink-0 items-center gap-3 px-4 py-2.5"><div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-green-500 bg-green-600/20"><span className="text-lg font-bold text-green-400">{seasonData.grade.grade}</span></div><div><p className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Season Grade</p><p className="text-xs text-gray-400">{seasonData.panels.verdict.summary}</p></div></div>
         </div>
+      </div>
 
-        <div className="space-y-6">
-          <SectionCard>
-            <div className="grid gap-4 md:grid-cols-[110px_1fr]">
-              <div className="flex justify-center"><CircularMeter value={88} label={`Grade ${seasonData.grade.grade}`} /></div>
-              <div>
-                <p className="text-xl font-semibold text-scm-text">Season Grade</p>
-                <p className="mt-2 text-sm text-scm-textSoft">The live save currently sits at rank #{playerRank?.ranking ?? '-'} with {winCount} wins, {lossCount} losses, and {gameState.sponsors.length} active sponsor deals.</p>
+      <div className="grid grid-cols-8 gap-2">{metrics.map((metric) => {
+        const Icon = getMetricIcon(metric.label)
+
+        return (
+          <div key={metric.label} className="card min-h-0 px-3 py-2.5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-light/50">
+                <Icon className={`h-4 w-4 ${metricColor(metric.label)}`} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{metric.label}</p>
+                <p className={`mt-1 text-lg font-bold ${metricColor(metric.label)}`}>{metric.value}</p>
+                <p className="text-[10px] text-gray-400">{metric.sub}</p>
               </div>
             </div>
-          </SectionCard>
+          </div>
+        )
+      })}</div>
 
-          <SectionCard title="Season Highlights">
-            <div className="space-y-5 text-sm">
-              <div>
-                <p className="font-semibold text-scm-green">Record Summary</p>
-                <ul className="mt-3 space-y-2 text-scm-textSoft">
-                  {seasonHighlights.record.map((item) => <li key={item}>{item}</li>)}
-                </ul>
-              </div>
-              <div>
-                <p className="font-semibold text-scm-green">Milestones Achieved</p>
-                <ul className="mt-3 space-y-2 text-scm-textSoft">
-                  {seasonHighlights.milestones.map((item) => <li key={item}>{item}</li>)}
-                </ul>
-              </div>
-              <div>
-                <p className="font-semibold text-scm-green">Notable Results</p>
-                <ul className="mt-3 space-y-2 text-scm-textSoft">
-                  {seasonHighlights.notableResults.map((item) => <li key={item}>{item}</li>)}
-                </ul>
-              </div>
-            </div>
-          </SectionCard>
+      <div className="grid min-h-0 flex-1 grid-cols-12 grid-rows-[0.37fr_0.33fr_0.3fr] gap-2">
+        <div className="col-span-6 card min-h-0 flex h-full flex-col overflow-hidden"><div className="card-header px-3 py-2"><h3 className="text-sm font-semibold text-white">Ranking Movement Over Season</h3></div><div className="card-body h-full min-h-0 px-2 py-2"><ResponsiveContainer width="100%" height="100%"><LineChart data={rankingMovementData}><XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} /><YAxis reversed tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} width={26} /><Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 11 }} /><Line type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2} dot={{ fill: '#22c55e', r: 3 }} /></LineChart></ResponsiveContainer></div></div>
+        <div className="col-span-6 card min-h-0 flex h-full flex-col overflow-hidden"><div className="card-header px-3 py-2"><h3 className="text-sm font-semibold text-white">Prize Money Earned by Event</h3></div><div className="card-body h-full min-h-0 px-2 py-2"><ResponsiveContainer width="100%" height="100%"><BarChart data={prizeMoneyByEvent}><XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} width={32} /><Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 11 }} /><Bar dataKey="value" fill="#22c55e" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div></div>
 
-          <SectionCard title="Financial Summary">
-            <div className="space-y-3 text-sm">
-              {liveFinancialSummary.map((item) => (
-                <div key={item.label} className="flex items-center justify-between"><span className="text-scm-textSoft">{item.label}</span><span className={item.value >= 0 ? 'text-scm-text' : 'text-rose-300'}>{formatMoney(item.value)}</span></div>
-              ))}
-              <div className="border-t border-scm-border pt-3 flex items-center justify-between text-base"><span className="text-scm-text">Net Profit</span><span className="text-scm-green">{formatMoney(netProfit)}</span></div>
-            </div>
-          </SectionCard>
+        <div className="col-span-4 card min-h-0 flex h-full flex-col overflow-hidden px-3 py-3">
+          <div className="grid grid-cols-3 gap-2 border-b border-border pb-3">
+            <div className="rounded-lg bg-surface-light/50 px-2.5 py-2 text-center"><p className="text-[10px] uppercase text-gray-500">Coach Grade</p><p className="mt-1 text-xl font-bold text-green-400">{seasonData.panels.coachGrade.grade}</p><p className="text-[10px] text-gray-400">{seasonData.panels.coachGrade.detail}</p></div>
+            <div className="rounded-lg bg-surface-light/50 px-2.5 py-2 text-center"><p className="text-[10px] uppercase text-gray-500">Sponsor Grade</p><p className="mt-1 text-xl font-bold text-green-400">{seasonData.panels.sponsorGrade.grade}</p><p className="text-[10px] text-gray-400">{seasonData.panels.sponsorGrade.detail}</p></div>
+            <div className="rounded-lg bg-surface-light/50 px-2.5 py-2 text-center"><p className="text-[10px] uppercase text-gray-500">Fan Growth</p><p className="mt-1 text-xl font-bold text-green-400">{seasonData.panels.fanGrowth.growth}</p><p className="text-[10px] text-gray-400">{seasonData.panels.fanGrowth.fans} fans</p></div>
+          </div>
+          <div className="mt-3 min-h-0 flex-1 overflow-auto scrollbar-thin"><h3 className="mb-2 text-xs font-semibold text-white">Attribute Growth</h3><div className="space-y-2">{seasonData.attributeGrowth.map((item) => <div key={item.label}><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{item.label}</span><span className="text-green-400">+{item.value}</span></div><ProgressBar value={(item.value / 3) * 100} compact /></div>)}</div></div>
+        </div>
+        <div className="col-span-4 card min-h-0 flex h-full flex-col overflow-hidden px-3 py-3"><h3 className="mb-2 text-xs font-semibold text-white">Season Highlights</h3><div className="grid grid-cols-2 gap-2 text-xs"><div><span className="text-gray-400">Matches Played</span><p className="font-medium text-white">{currentSeasonMatches.length}</p></div><div><span className="text-gray-400">Matches Won</span><p className="font-medium text-white">{winCount}</p></div><div><span className="text-gray-400">Tournaments Logged</span><p className="font-medium text-white">{currentSeasonEvents.length}</p></div><div><span className="text-gray-400">Titles</span><p className="font-medium text-white">{currentSeasonEvents.filter((event) => event.result === 'Winner').length}</p></div></div><div className="mt-2 border-t border-border pt-2"><p className="mb-1 text-[10px] font-semibold uppercase text-gray-500">Notable Results</p><ul className="min-h-0 space-y-1 overflow-auto text-xs text-green-400 scrollbar-thin">{highlights.length ? highlights.map((item) => <li key={item}>{item}</li>) : <li>No notable results logged yet.</li>}</ul></div></div>
+        <div className="col-span-4 card min-h-0 flex h-full flex-col overflow-hidden px-3 py-3"><h3 className="mb-2 text-xs font-semibold text-white">Financial Summary</h3><div className="space-y-1.5 text-xs"><div className="flex justify-between"><span className="text-gray-400">Prize Money</span><span className="text-white">{formatMoney(totalPrizeMoney)}</span></div><div className="flex justify-between"><span className="text-gray-400">Sponsorship Income</span><span className="text-white">{formatMoney(sponsorIncome)}</span></div><div className="flex justify-between border-t border-border pt-2"><span className="font-medium text-gray-400">Total Income</span><span className="font-medium text-white">{formatMoney(totalIncome)}</span></div><div className="mt-2 flex justify-between"><span className="text-gray-400">Costs Exposure</span><span className="text-red-400">{formatMoney(totalExpenses)}</span></div><div className="flex justify-between border-t border-border pt-2 font-bold"><span className="text-white">NET PROFIT</span><span className={netProfit >= 0 ? 'text-green-400' : 'text-red-400'}>{formatMoney(netProfit)}</span></div></div></div>
 
-          <SectionCard title="Overall Verdict">
-            <p className="text-3xl font-semibold text-scm-green">{seasonData.panels.verdict.grade}</p>
-            <p className="mt-2 text-xl text-scm-text">{seasonData.panels.verdict.title}</p>
-            <p className="mt-3 text-sm text-scm-textSoft">{seasonData.panels.verdict.summary}</p>
-          </SectionCard>
-
-          <SectionCard title="Season Archive">
-            <div className="space-y-3">
-              {seasonArchiveCards.map((season) => (
-                <div key={season.season} className="rounded-xl border border-scm-border bg-scm-panelSoft p-4 text-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-semibold text-scm-text">{season.season}</span>
-                    <span className="text-scm-gold">{season.bestResult}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-scm-textSoft"><span>Record</span><span>{season.record}</span></div>
-                  <div className="mt-1 flex items-center justify-between text-scm-textSoft"><span>Titles</span><span>{season.titles}</span></div>
-                  <div className="mt-1 flex items-center justify-between text-scm-textSoft"><span>Prize Money</span><span>{formatMoney(season.prizeMoney)}</span></div>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <SectionCard title="Sponsor Sentiment">
-              <div className="flex justify-center"><CircularMeter value={seasonData.panels.sponsorSentiment.value} label={seasonData.panels.sponsorSentiment.detail} /></div>
-            </SectionCard>
-            <SectionCard title="Fan Sentiment">
-              <div className="flex justify-center"><CircularMeter value={Math.round(seasonData.panels.fanSentiment.value * 20)} label={seasonData.panels.fanSentiment.detail} /></div>
-            </SectionCard>
+        <div className="col-span-5 card min-h-0 flex h-full flex-col overflow-hidden px-3 py-3"><div className="flex items-start gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-surface-light text-sm font-bold text-green-400">{currentCoach?.name.split(' ').map((part) => part[0]).join('').slice(0, 2) ?? 'ST'}</div><div className="min-w-0 flex-1"><h3 className="text-sm font-semibold text-white">Coach Review</h3><p className="mt-2 line-clamp-4 text-xs italic leading-relaxed text-gray-400">{seasonData.panels.coachGrade.note}</p><p className="mt-2 text-xs text-gray-500">-- {currentCoach?.name ?? 'Support Team'}</p></div></div></div>
+        <div className="col-span-7 card min-h-0 flex h-full flex-col overflow-hidden px-3 py-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-light/50"><Trophy className="h-4 w-4 text-green-400" /></div>
+            <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">{currentSeasonSnapshot.season} Season Snapshot</p></div>
+          </div>
+          <div className="mt-3 grid min-h-0 flex-1 grid-cols-[0.2fr_0.2fr_0.2fr_0.4fr] gap-0 overflow-hidden rounded-lg border border-border bg-surface-light/35">
+            <div className="flex flex-col justify-center border-r border-border px-4"><p className="text-[10px] uppercase text-gray-500">Record</p><p className="mt-1 text-2xl font-bold text-white">{currentSeasonSnapshot.record}</p></div>
+            <div className="flex flex-col justify-center border-r border-border px-4"><p className="text-[10px] uppercase text-gray-500">Titles</p><p className="mt-1 text-2xl font-bold text-white">{currentSeasonSnapshot.titles}</p></div>
+            <div className="flex flex-col justify-center border-r border-border px-4"><p className="text-[10px] uppercase text-gray-500">Prize</p><p className="mt-1 text-2xl font-bold text-white">{formatMoney(currentSeasonSnapshot.prizeMoney)}</p></div>
+            <div className="flex flex-col justify-center px-5"><p className="text-2xl font-bold text-green-400">{currentSeasonSnapshot.bestResult}</p><p className="mt-1 text-sm text-gray-400">{currentSeasonSnapshot.note}</p></div>
           </div>
         </div>
       </div>
 
-      <SectionCard title="Coach Review">
-        <div className="grid gap-6 xl:grid-cols-[1fr_1fr_1fr_1fr] xl:items-center">
-          <div>
-            <p className="text-lg font-semibold text-scm-text">{currentCoach?.name ?? 'No active coach'}</p>
-            <p className="mt-2 text-sm text-scm-green">{currentCoach?.type ?? 'Support Team'}</p>
-          </div>
-          <div className="xl:col-span-2">
-            <p className="text-sm leading-7 text-scm-textSoft">{currentCoach ? `${currentCoach.name} remains the active coach in the save, with ${currentCoach.compatibility}% compatibility and a weekly cost of ${formatMoney(currentCoach.weeklyCost)}.` : seasonData.panels.coachReview}</p>
-          </div>
-          <div className="flex items-center justify-end gap-3 text-scm-gold">
-            <Award className="h-6 w-6" />
-            <BarChart3 className="h-6 w-6" />
-            <Trophy className="h-6 w-6" />
-          </div>
-        </div>
-      </SectionCard>
-
-      <div className="grid gap-3 md:grid-cols-3">
-        <ActionButton tone="secondary" className="justify-center" icon={<BarChart3 className="h-4 w-4" />} onClick={() => navigate('/career/stats')}>View Full Stats</ActionButton>
-        <ActionButton tone="secondary" className="justify-center" icon={<CalendarDays className="h-4 w-4" />} onClick={() => navigate('/calendar')}>Set Next Season Plan</ActionButton>
-        <ActionButton className="justify-center" icon={<Trophy className="h-4 w-4" />} onClick={continueWeek}>Continue To Offseason</ActionButton>
-      </div>
+      <div className="flex justify-center gap-2 rounded-lg border border-border bg-surface-light/40 px-3 py-2.5"><button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => navigate('/career/stats')}><TrendingUp className="h-3.5 w-3.5" /> View Full Stats</button><button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => navigate('/training')}>Set Next Season Plan</button><button type="button" className="btn-primary px-3 py-2 text-xs" onClick={continueWeek}><Trophy className="h-3.5 w-3.5" /> Continue to Offseason <ChevronRight className="h-3.5 w-3.5" /></button></div>
     </div>
   )
 }

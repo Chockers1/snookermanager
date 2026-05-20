@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-white font-sans antialiased;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #1e2d3d transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: #1e2d3d;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #2a3f52;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface border border-border rounded-lg;
+  }
+
+  .card-header {
+    @apply px-4 py-3 border-b border-border flex items-center justify-between;
+  }
+
+  .card-body {
+    @apply p-4;
+  }
+
+  .btn-primary {
+    @apply bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2;
+  }
+
+  .btn-secondary {
+    @apply bg-surface-light hover:bg-border text-white font-medium px-4 py-2 rounded-lg transition-colors border border-border flex items-center gap-2;
+  }
+
+  .metric-label {
+    @apply text-[10px] text-gray-500 uppercase font-semibold tracking-wider;
+  }
+
+  .metric-value {
+    @apply text-xl font-bold text-white;
+  }
+
+  .progress-bar {
+    @apply h-2 bg-gray-700/50 rounded-full overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-500;
+  }
+
+  .tab-active {
+    @apply text-green-400 border-b-2 border-green-400 font-medium;
+  }
+
+  .tab-inactive {
+    @apply text-gray-400 hover:text-white border-b-2 border-transparent;
+  }
+}

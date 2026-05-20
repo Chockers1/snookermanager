@@ -1,12 +1,7 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Activity, CalendarRange, RefreshCcw, Save, WandSparkles } from 'lucide-react'
-import { PageHeader } from '../components/layout/PageHeader'
-import { ActionButton } from '../components/ui/ActionButton'
-import { CircularMeter } from '../components/ui/CircularMeter'
+import { Activity, Calendar, Copy, RotateCcw, Save, Zap } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { SectionCard } from '../components/ui/SectionCard'
-import { StatusBadge } from '../components/ui/StatusBadge'
 import { useGame } from '../context/GameStateContext'
 import { buildTrainingPlannerData } from '../utils/liveRouteData'
 import {
@@ -14,27 +9,57 @@ import {
   buildRecoveryTrainingPlan,
   buildTrainingCell,
   cloneTrainingPlan,
+  getTrainingSessionOption,
   getTrainingSessionOptionId,
   summarizeTrainingPlan,
   TRAINING_SESSION_OPTIONS,
   type TrainingSessionKey,
 } from '../utils/trainingPlan'
+import type { TrainingCell } from '../types/game'
 
-const categoryStyles = {
-  Technical: 'border-scm-green/30 bg-scm-green/10 text-emerald-100',
-  Mental: 'border-violet-500/30 bg-violet-500/10 text-violet-100',
-  Physical: 'border-scm-blue/30 bg-scm-blue/10 text-sky-100',
-  'Match Prep': 'border-scm-gold/30 bg-scm-gold/10 text-amber-100',
-  Recovery: 'border-indigo-400/30 bg-indigo-400/10 text-indigo-100',
-  Travel: 'border-slate-400/30 bg-slate-400/10 text-slate-100',
-  Rest: 'border-slate-500/30 bg-slate-500/10 text-slate-100',
+const sessionRows = [
+  { key: 'morning', label: 'Morning', time: '08:00 - 11:00' },
+  { key: 'afternoon', label: 'Afternoon', time: '13:00 - 16:00' },
+  { key: 'evening', label: 'Evening', time: '18:00 - 21:00' },
+] as const
+
+const categoryStyles: Record<TrainingCell['category'], string> = {
+  Technical: 'border-green-600/30 bg-green-600/10 text-green-400',
+  Mental: 'border-amber-600/30 bg-amber-600/10 text-amber-400',
+  Physical: 'border-blue-600/30 bg-blue-600/10 text-blue-400',
+  'Match Prep': 'border-violet-600/30 bg-violet-600/10 text-violet-400',
+  Recovery: 'border-sky-600/30 bg-sky-600/10 text-sky-400',
+  Travel: 'border-gray-500/30 bg-gray-500/10 text-gray-400',
+  Rest: 'border-gray-600/30 bg-gray-600/10 text-gray-400',
 }
 
-const accentStyles = {
-  green: 'border-scm-green/30 bg-scm-green/10',
-  violet: 'border-violet-500/30 bg-violet-500/10',
-  blue: 'border-scm-blue/30 bg-scm-blue/10',
-  gold: 'border-scm-gold/30 bg-scm-gold/10',
+const balanceColors = {
+  green: 'bg-green-500',
+  violet: 'bg-violet-500',
+  blue: 'bg-blue-500',
+  gold: 'bg-amber-500',
+}
+
+function getCategoryBadgeClass(category: TrainingCell['category']) {
+  return `inline-flex rounded border px-1.5 py-0.5 text-[9px] font-medium leading-none ${categoryStyles[category]}`
+}
+
+function getLoadPillClass(load: number) {
+  if (load >= 30) return 'rounded bg-red-600/20 px-1.5 py-0.5 text-[9px] font-medium text-red-400'
+  if (load >= 18) return 'rounded bg-amber-600/20 px-1.5 py-0.5 text-[9px] font-medium text-amber-400'
+  return 'rounded bg-green-600/20 px-1.5 py-0.5 text-[9px] font-medium text-green-400'
+}
+
+function getLoadLabel(load: number) {
+  if (load >= 30) return 'High'
+  if (load >= 18) return 'Med'
+  return 'Low'
+}
+
+function getRiskToneClass(value: number) {
+  if (value >= 70) return 'text-red-400'
+  if (value >= 50) return 'text-amber-400'
+  return 'text-green-400'
 }
 
 export function TrainingPlannerPage() {
@@ -54,231 +79,203 @@ export function TrainingPlannerPage() {
     gameState.attributes,
     currentCoach?.compatibility ?? 0,
   )
-  const derivedWeekLoad = summary.weekLoad
+  const nextCompetition = plannerData.enteredCompetitions[0] ?? null
+  const weekStart = plannerWeek[0]?.dateLabel ?? gameState.currentDate
+  const weekEnd = plannerWeek[plannerWeek.length - 1]?.dateLabel ?? gameState.currentDate
+  const visibleCompetitions = plannerData.enteredCompetitions.slice(0, 2)
+  const hiddenCompetitionCount = Math.max(0, plannerData.enteredCompetitions.length - visibleCompetitions.length)
+  const focusOfWeek = summary.expectedGains[0]
+  const supportMetrics = [
+    { label: 'Weekly Load', value: `${summary.weekLoad}%`, sub: summary.weekLoadLabel, tone: 'text-white' },
+    { label: 'Fatigue Risk', value: `${summary.fatigueRisk}%`, sub: `Trend ${summary.fatigueTrend > 0 ? '+' : ''}${summary.fatigueTrend}%`, tone: getRiskToneClass(summary.fatigueRisk) },
+    { label: 'Confidence', value: `+${summary.confidenceProjection}%`, sub: summary.confidenceLabel, tone: 'text-green-400' },
+    { label: 'Coach Bonus', value: `+${summary.coachImpact}%`, sub: currentCoach?.name ?? 'No active coach', tone: 'text-green-400' },
+  ]
 
   useEffect(() => {
     setPlannerWeek(cloneTrainingPlan(plannerData.week))
   }, [gameState.currentDate, gameState.week, gameState.trainingPlan])
 
-  const handleSessionChange = (dayIndex: number, sessionKey: TrainingSessionKey, optionId: string) => {
+  function handleSessionChange(dayIndex: number, sessionKey: TrainingSessionKey, optionId: string) {
     setPlannerWeek((currentWeek) => {
       const nextWeek = cloneTrainingPlan(currentWeek)
-      nextWeek[dayIndex] = {
-        ...nextWeek[dayIndex],
-        [sessionKey]: buildTrainingCell(optionId),
-      }
+      nextWeek[dayIndex] = { ...nextWeek[dayIndex], [sessionKey]: buildTrainingCell(optionId) }
       return nextWeek
     })
   }
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Training"
-        title="Weekly Training Planner"
-        description="Build the week around skill growth, fatigue control, and next-event readiness. Saving the schedule now applies this week’s training effects to the live save."
-        actions={
-          <div className="flex items-center gap-3">
-            <ActionButton tone="secondary" icon={<WandSparkles className="h-4 w-4" />} onClick={() => setPlannerWeek(buildAutoTrainingPlan(gameState.currentDate, gameState.player.fatigue, competitionPlan, plannerData.travelBooked))}>Auto Plan</ActionButton>
-            <ActionButton tone="secondary" icon={<RefreshCcw className="h-4 w-4" />} onClick={() => setPlannerWeek(buildRecoveryTrainingPlan(gameState.currentDate, competitionPlan))}>Clear Week</ActionButton>
-            <ActionButton tone="secondary" icon={<CalendarRange className="h-4 w-4" />} onClick={() => navigate('/calendar')}>Week</ActionButton>
-            <ActionButton icon={<Save className="h-4 w-4" />} onClick={() => applyTrainingPlan(plannerWeek)}>Save Schedule</ActionButton>
-          </div>
-        }
-      />
+  function handleApplyPlan() {
+    applyTrainingPlan(plannerWeek)
+  }
 
-      <div className="rounded-xl border border-scm-border bg-scm-panel/80 px-4 py-3 text-sm text-scm-textSoft">
-        The planner below is the active weekly schedule for the live save. Changes here apply directly to the current career state.
+  return (
+    <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
+      <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface/85 px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">Training Planner</p>
+          <h1 className="mt-1 text-2xl font-bold leading-tight text-white">Weekly Training Planner</h1>
+          <p className="mt-1 truncate text-xs text-gray-400">Week {gameState.week} · {weekStart} - {weekEnd}</p>
+        </div>
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          <button type="button" className="btn-secondary px-3 py-1.5 text-[11px]" onClick={() => setPlannerWeek(buildAutoTrainingPlan(gameState.currentDate, gameState.player.fatigue, competitionPlan, plannerData.travelBooked))}><Zap className="h-3.5 w-3.5" /> Auto-Plan</button>
+          <button type="button" className="btn-secondary px-3 py-1.5 text-[11px]" onClick={() => setPlannerWeek(buildRecoveryTrainingPlan(gameState.currentDate, competitionPlan))}><RotateCcw className="h-3.5 w-3.5" /> Recovery Plan</button>
+          <button type="button" className="btn-secondary px-3 py-1.5 text-[11px]" onClick={() => setPlannerWeek(cloneTrainingPlan(plannerData.week))}><Copy className="h-3.5 w-3.5" /> Reset Week</button>
+          <button type="button" className="btn-primary px-3 py-1.5 text-[11px]" onClick={handleApplyPlan}><Save className="h-3.5 w-3.5" /> Apply Plan</button>
+        </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.55fr_320px]">
-        <div className="space-y-6">
-          <SectionCard title="Competition Commitments" subtitle="Entered tournaments and travel requirements affecting this week.">
-            {plannerData.enteredCompetitions.length > 0 ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                {plannerData.enteredCompetitions.map((competition) => (
-                  <div key={competition.id} className="rounded-xl border border-scm-border bg-scm-panelSoft px-4 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-scm-text">{competition.name}</p>
-                        <p className="mt-1 text-sm text-scm-textSoft">{competition.location}</p>
-                      </div>
-                      <StatusBadge tone={competition.travelBooked ? 'green' : 'amber'}>{competition.travelBooked ? 'Travel Booked' : 'Travel Pending'}</StatusBadge>
-                    </div>
-                    <p className="mt-3 text-sm text-scm-textSoft">{competition.daysAway <= 0 ? 'Event week is live now.' : `${competition.daysAway} days until start`} · {competition.date}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-scm-textSoft">No entered competitions are currently shaping the planner. Enter tournaments from the calendar or tournament hub to plan around them here.</p>
-            )}
-          </SectionCard>
-
-          <SectionCard title="Weekly Grid" subtitle="Morning, afternoon, and evening sessions laid out to match the FM-style planner flow.">
-            <div className="overflow-x-auto">
-              <div className="grid min-w-[1080px] grid-cols-[110px_repeat(7,minmax(0,1fr))] gap-2 text-sm">
+      <div className="grid min-h-0 flex-1 grid-cols-12 gap-2">
+        <div className="col-span-9 grid min-h-0 grid-rows-[1.44fr_0.34fr_0.54fr] gap-2">
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-header">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Calendar className="h-3.5 w-3.5 text-green-400" /> Weekly Schedule</h3>
+              <span className="truncate text-[10px] text-gray-400">{nextCompetition ? `Next Competition: ${nextCompetition.name} · ${nextCompetition.date}` : 'No entered competition this week'}</span>
+            </div>
+            <div className="card-body flex min-h-0 flex-1 overflow-hidden p-2">
+              <div className="grid min-h-0 flex-1 grid-cols-[4.75rem_repeat(7,minmax(0,1fr))] grid-rows-[auto_repeat(3,minmax(0,1fr))] gap-1.5">
                 <div />
                 {plannerWeek.map((day) => (
-                  <div key={day.day} className="rounded-lg bg-scm-deep/80 px-3 py-3 text-center">
-                    <p className="text-xs uppercase tracking-[0.18em] text-scm-textMuted">{day.day}</p>
-                    <p className="mt-1 font-semibold text-scm-text">{day.dateLabel}</p>
-                    {day.competitionName && <p className="mt-2 text-xs text-amber-200">{day.competitionName}</p>}
+                  <div key={`${day.day}-header`} className="rounded-lg border border-border bg-surface-light/40 px-2 py-1.5">
+                    <p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-white">{day.day}</p>
+                    <p className={`mt-0.5 truncate text-[10px] ${day.competitionName ? 'text-amber-400' : 'text-gray-500'}`}>{day.dateLabel}</p>
                   </div>
                 ))}
-
-                {[
-                  ['Morning', '08:00 - 11:00'],
-                  ['Afternoon', '13:00 - 16:00'],
-                  ['Evening', '18:00 - 21:00'],
-                ].map(([label, time], rowIndex) => (
-                  <>
-                    <div key={`${label}-label`} className="rounded-lg bg-scm-deep/80 px-3 py-4 text-scm-text">
-                      <p className="font-semibold">{label}</p>
-                      <p className="mt-1 text-xs text-scm-textMuted">{time}</p>
+                {sessionRows.map((row) => (
+                  <Fragment key={row.key}>
+                    <div className="rounded-lg border border-border bg-surface-light/35 px-2 py-1.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white">{row.label}</p>
+                      <p className="mt-0.5 text-[9px] text-gray-500">{row.time}</p>
                     </div>
                     {plannerWeek.map((day, dayIndex) => {
-                      const session = rowIndex === 0 ? day.morning : rowIndex === 1 ? day.afternoon : day.evening
-                      const sessionKey: TrainingSessionKey = rowIndex === 0 ? 'morning' : rowIndex === 1 ? 'afternoon' : 'evening'
+                      const session = day[row.key]
+                      const option = getTrainingSessionOption(getTrainingSessionOptionId(session))
+
                       return (
-                        <div key={`${day.day}-${label}`} className={`rounded-lg border px-3 py-4 ${categoryStyles[session.category]}`}>
+                        <div key={`${day.day}-${row.key}`} className="min-w-0 rounded-lg border border-border bg-surface-light/50 p-1.5">
                           <select
                             value={getTrainingSessionOptionId(session)}
-                            onChange={(event) => handleSessionChange(dayIndex, sessionKey, event.target.value)}
-                            className="w-full rounded-md border border-white/15 bg-scm-deep/70 px-2 py-2 text-sm font-semibold text-scm-text focus:border-scm-green/40 focus:outline-none"
+                            onChange={(event) => handleSessionChange(dayIndex, row.key, event.target.value)}
+                            className="w-full rounded-md border border-border bg-surface px-2 py-1 text-[11px] font-medium text-white focus:border-green-500/50 focus:outline-none"
+                            title={session.title}
                           >
-                            {TRAINING_SESSION_OPTIONS.map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.title}
-                              </option>
-                            ))}
+                            {TRAINING_SESSION_OPTIONS.map((optionItem) => <option key={optionItem.id} value={optionItem.id}>{optionItem.title}</option>)}
                           </select>
-                          <p className="mt-2 text-xs opacity-80">{session.subtitle}</p>
-                          <div className="mt-3"><StatusBadge tone="slate">{session.category}</StatusBadge></div>
+                          <div className="mt-1 flex items-center justify-between gap-1.5">
+                            <span className={getCategoryBadgeClass(session.category)}>{session.category}</span>
+                            <span className={getLoadPillClass(option.load)}>{getLoadLabel(option.load)}</span>
+                          </div>
+                          <p className="mt-1 truncate text-[9px] text-gray-400">{session.subtitle}</p>
                         </div>
                       )
                     })}
-                  </>
-                ))}
-
-                <div className="rounded-lg bg-scm-deep/80 px-3 py-3 text-scm-text">
-                  <p className="font-semibold">Load</p>
-                </div>
-                {plannerWeek.map((day) => (
-                  <div key={`${day.day}-load`} className="rounded-lg bg-scm-panelSoft px-3 py-3">
-                    <ProgressBar value={day.load} tone={day.load > 80 ? 'amber' : day.load > 55 ? 'blue' : 'green'} />
-                    <p className="mt-2 text-xs text-scm-textSoft">{day.loadLabel}</p>
-                  </div>
+                  </Fragment>
                 ))}
               </div>
             </div>
-          </SectionCard>
+          </div>
 
-          <div className="grid gap-6 xl:grid-cols-[1.25fr_0.9fr]">
-            <SectionCard title="Drill Library" subtitle="Compact drill categories to keep the week composition readable.">
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {plannerData.drillLibrary.map((group) => (
-                  <div key={group.title} className={`rounded-xl border p-4 ${accentStyles[group.accent]}`}>
-                    <p className="font-semibold text-scm-text">{group.title}</p>
-                    <div className="mt-4 space-y-3 text-sm">
-                      {group.drills.map((drill) => (
-                        <div key={drill.name} className="flex items-center justify-between gap-3 text-scm-textSoft">
-                          <span>{drill.name}</span>
-                          <StatusBadge tone={drill.intensity === 'High' ? 'green' : drill.intensity === 'Medium' ? 'amber' : 'slate'}>{drill.intensity}</StatusBadge>
+          <div className="grid min-h-0 grid-cols-4 gap-2">
+            {supportMetrics.map((metric) => (
+              <div key={metric.label} className="card flex min-h-0 flex-col justify-center p-3 text-center">
+                <p className="metric-label">{metric.label}</p>
+                <p className={`mt-1 text-lg font-bold ${metric.tone}`}>{metric.value}</p>
+                <p className="truncate text-[10px] text-gray-400">{metric.sub}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid min-h-0 grid-cols-2 gap-2">
+            <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+              <div className="card-header"><h3 className="text-sm font-semibold text-white">Competition Commitments</h3><button type="button" className="text-[10px] text-green-400" onClick={() => navigate('/calendar')}>Calendar</button></div>
+              <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
+                {visibleCompetitions.length > 0 ? (
+                  <>
+                    <div className="space-y-2">
+                      {visibleCompetitions.map((competition) => (
+                        <div key={competition.id} className="rounded-lg border border-border bg-surface-light/45 p-2.5 text-xs">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-white">{competition.name}</p>
+                              <p className="mt-0.5 truncate text-[10px] text-gray-400">{competition.date} · {competition.location}</p>
+                            </div>
+                            <span className={competition.travelBooked ? 'rounded bg-green-600/20 px-1.5 py-0.5 text-[9px] text-green-400' : 'rounded bg-amber-600/20 px-1.5 py-0.5 text-[9px] text-amber-400'}>{competition.travelBooked ? 'Booked' : 'Pending'}</span>
+                          </div>
+                          <p className="mt-1 truncate text-[10px] text-gray-500">{competition.daysAway <= 0 ? 'Event week is live now' : `${competition.daysAway} days until start`}</p>
                         </div>
                       ))}
                     </div>
-                  </div>
-                ))}
+                    {hiddenCompetitionCount > 0 ? <p className="text-[10px] text-gray-500">{hiddenCompetitionCount} more competition{hiddenCompetitionCount === 1 ? '' : 's'} shaping the plan.</p> : null}
+                  </>
+                ) : <p className="text-xs text-gray-400">No entered competitions are currently shaping the week.</p>}
               </div>
-            </SectionCard>
+            </div>
 
-            <SectionCard title="Weekly Summary" subtitle="Snapshot of the current plan balance and workload.">
-              <div className="space-y-4 text-sm text-scm-textSoft">
-                <div className="flex items-center justify-between"><span>Total Sessions</span><span className="text-scm-text">{summary.totalSessions}</span></div>
-                <div className="flex items-center justify-between"><span>Training Load</span><span className="text-scm-text">{summary.weekLoad}%</span></div>
-                <div className="flex items-center justify-between"><span>Avg. Session Intensity</span><span className="text-scm-text">{summary.averageIntensity}</span></div>
-                <div className="flex items-center justify-between"><span>Rest Sessions</span><span className="text-scm-text">{summary.restSessions}</span></div>
-                <div className="flex items-center justify-between"><span>Travel Sessions</span><span className="text-scm-text">{summary.travelSessions}</span></div>
-                <div className="border-t border-scm-border pt-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Balance</p>
-                  <div className="mt-3 space-y-3">
-                    {summary.balance.map((item) => (
-                      <div key={item.label}>
-                        <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-[0.14em] text-scm-textMuted">
-                          <span>{item.label}</span>
-                          <span>{item.value}% ({item.sessions})</span>
-                        </div>
-                        <ProgressBar value={item.value} tone={item.tone === 'violet' ? 'blue' : item.tone} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+              <div className="card-header"><h3 className="text-sm font-semibold text-white">Recovery Snapshot</h3><span className="text-[10px] text-gray-400">Plan health</span></div>
+              <div className="card-body grid h-full min-h-0 grid-cols-2 gap-x-4 gap-y-2 p-3 text-[10px]">
+                <div className="min-w-0"><p className="text-gray-500">Fatigue Risk</p><p className={`mt-1 truncate text-sm font-semibold ${getRiskToneClass(summary.fatigueRisk)}`}>{summary.fatigueRisk}%</p></div>
+                <div className="min-w-0"><p className="text-gray-500">Confidence</p><p className="mt-1 truncate text-sm font-semibold text-white">{gameState.player.confidence}%</p></div>
+                <div className="min-w-0"><p className="text-gray-500">Recovery Blocks</p><p className="mt-1 truncate text-sm font-semibold text-green-400">{summary.restSessions}</p></div>
+                <div className="min-w-0"><p className="text-gray-500">Travel Blocks</p><p className="mt-1 truncate text-sm font-semibold text-white">{summary.travelSessions}</p></div>
+                <div className="min-w-0"><p className="text-gray-500">Coach Fit</p><p className="mt-1 truncate text-sm font-semibold text-green-400">+{summary.coachImpact}%</p></div>
+                <div className="min-w-0"><p className="text-gray-500">Focus</p><p className="mt-1 truncate text-sm font-semibold text-white">{focusOfWeek?.label ?? 'Balanced'}</p></div>
+                <div className="col-span-2 min-w-0 border-t border-border pt-2"><p className="truncate text-[10px] text-gray-400">{currentCoach ? `${currentCoach.name} is adding structure to the week.` : 'No active coach is shaping the plan.'}</p></div>
               </div>
-            </SectionCard>
+            </div>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <SectionCard title="Training Load" subtitle="Week Load">
-            <div className="grid grid-cols-7 gap-2">
-              {plannerWeek.map((day) => (
-                <div key={`${day.day}-bar`} className="text-center">
-                  <div className="mx-auto h-20 w-4 rounded-full bg-scm-deep/80">
-                    <div className="rounded-full bg-scm-green" style={{ height: `${Math.max(12, day.load)}%`, marginTop: `${100 - Math.max(12, day.load)}%` }} />
-                  </div>
-                  <p className="mt-2 text-xs text-scm-textMuted">{day.day[0]}</p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-4 text-2xl font-semibold text-scm-text">{derivedWeekLoad}%</p>
-            <p className="text-sm text-amber-200">{summary.weekLoadLabel}</p>
-          </SectionCard>
-
-          <SectionCard title="Fatigue Risk" subtitle="Monitor recovery on Sat/Sun.">
-            <div className="space-y-3">
-              <ProgressBar value={summary.fatigueRisk} tone="amber" />
-              <div className="flex items-center justify-between text-sm"><span className="text-scm-text">{summary.fatigueRisk}%</span><span className={summary.fatigueTrend <= 0 ? 'text-emerald-300' : 'text-rose-300'}>Trend {summary.fatigueTrend > 0 ? '+' : ''}{summary.fatigueTrend}%</span></div>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Expected Attribute Gains" subtitle="This Week">
-            <div className="space-y-4">
-              {summary.expectedGains.map((gain) => (
-                <div key={gain.label}>
-                  <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">{gain.label}</span><span className="text-emerald-300">+{gain.value}</span></div>
-                  <ProgressBar value={Math.min(100, gain.value * 14)} tone="green" />
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Coach Impact" subtitle={`${currentCoach?.name ?? 'Head Coach'} · Active Coach`}>
-            <p className="text-3xl font-semibold text-emerald-300">+{summary.coachImpact}%</p>
-            <p className="mt-2 text-sm text-scm-textSoft">Strong focus on technical play and mental resilience this week.</p>
-          </SectionCard>
-
-          <SectionCard title="Confidence Impact" subtitle="Projected confidence">
-            <div className="flex items-center gap-4">
-              <CircularMeter value={86} label="Projected" />
-              <div>
-                <p className="text-3xl font-semibold text-emerald-300">+{summary.confidenceProjection}%</p>
-                <p className="mt-2 text-sm text-scm-textSoft">{summary.confidenceLabel}</p>
+        <div className="col-span-3 grid min-h-0 grid-rows-[0.84fr_0.62fr_0.72fr_0.72fr_auto] gap-2">
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-header"><h3 className="text-xs font-semibold text-white">Training Load</h3><span className="text-[10px] text-gray-400">This week</span></div>
+            <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
+              <div className="space-y-2">
+                <div><div className="mb-1 flex justify-between text-[10px]"><span className="text-gray-400">Weekly Load</span><span className="text-white">{summary.weekLoad}%</span></div><ProgressBar value={summary.weekLoad} tone={summary.weekLoad >= 80 ? 'red' : summary.weekLoad >= 55 ? 'amber' : 'green'} compact /></div>
+                <div><div className="mb-1 flex justify-between text-[10px]"><span className="text-gray-400">Fatigue Impact</span><span className={getRiskToneClass(summary.fatigueRisk)}>{summary.fatigueTrend > 0 ? '+' : ''}{summary.fatigueTrend}%</span></div><ProgressBar value={summary.fatigueRisk} tone={summary.fatigueRisk >= 70 ? 'red' : 'amber'} compact /></div>
+                <div><div className="mb-1 flex justify-between text-[10px]"><span className="text-gray-400">Confidence Boost</span><span className="text-green-400">+{summary.confidenceProjection}%</span></div><ProgressBar value={Math.min(100, summary.confidenceProjection * 12)} compact /></div>
+                <div><div className="mb-1 flex justify-between text-[10px]"><span className="text-gray-400">Coach Bonus</span><span className="text-green-400">+{summary.coachImpact}%</span></div><ProgressBar value={Math.min(100, summary.coachImpact * 10)} compact /></div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 border-t border-border pt-2 text-center">
+                <div><p className="text-[9px] uppercase tracking-[0.16em] text-gray-500">Sessions</p><p className="mt-1 text-sm font-semibold text-white">{summary.totalSessions}</p></div>
+                <div><p className="text-[9px] uppercase tracking-[0.16em] text-gray-500">Intensity</p><p className="mt-1 text-sm font-semibold text-amber-400">{summary.averageIntensity}</p></div>
+                <div><p className="text-[9px] uppercase tracking-[0.16em] text-gray-500">Target</p><p className="mt-1 text-sm font-semibold text-green-400">80-90%</p></div>
               </div>
             </div>
-          </SectionCard>
+          </div>
 
-          <SectionCard title="Training Balance" subtitle={`${summary.totalSessions} Sessions`}>
-            <div className="space-y-3">
-              {summary.balance.map((item) => (
-                <div key={item.label} className="flex items-center justify-between text-sm">
-                  <span className="text-scm-textSoft">{item.label}</span>
-                  <span className="text-scm-text">{item.value}% ({item.sessions})</span>
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-header"><h3 className="text-xs font-semibold text-white">Focus Of The Week</h3></div>
+            <div className="card-body flex h-full min-h-0 flex-col gap-2 p-3 text-xs text-gray-400">
+              <div className="rounded-lg border border-green-600/20 bg-green-600/10 p-2"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-green-400">Primary</p><p className="mt-1 text-xs font-medium text-white">{focusOfWeek?.label ?? 'Match sharpness'}</p><p className="mt-0.5 text-[10px]">Lean into {focusOfWeek?.label?.toLowerCase() ?? 'pre-match sharpness'} while coach impact sits at +{summary.coachImpact}%.</p></div>
+              <div className="rounded-lg border border-amber-600/20 bg-amber-600/10 p-2"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-400">Watch</p><p className="mt-1 text-xs font-medium text-white">Fatigue management</p><p className="mt-0.5 text-[10px]">Risk is {summary.fatigueRisk}%. Recovery blocks protect readiness before the event.</p></div>
+            </div>
+          </div>
+
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-header"><h3 className="text-xs font-semibold text-white">Weekly Focus Areas</h3></div>
+            <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
+              {summary.expectedGains.map((gain) => (
+                <div key={gain.label}>
+                  <div className="mb-1 flex justify-between text-[10px]"><span className="text-gray-400">{gain.label}</span><span className="text-green-400">+{gain.value}</span></div>
+                  <ProgressBar value={Math.min(100, gain.value * 14)} compact />
                 </div>
               ))}
             </div>
-          </SectionCard>
+          </div>
 
-          <ActionButton className="w-full justify-center py-4" icon={<Activity className="h-4 w-4" />} onClick={() => navigate('/training/report')}>Continue</ActionButton>
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-header"><h3 className="text-xs font-semibold text-white">Weekly Balance</h3></div>
+            <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
+              {summary.balance.map((item) => (
+                <div key={item.label}>
+                  <div className="mb-1 flex justify-between text-[10px]"><span className="text-gray-400">{item.label}</span><span className="text-white">{item.value}% ({item.sessions})</span></div>
+                  <div className="progress-bar h-1.5"><div className={`progress-fill ${balanceColors[item.tone]}`} style={{ width: `${item.value}%` }} /></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button type="button" className="btn-primary w-full justify-center py-2.5 text-sm" onClick={() => navigate('/training/report')}><Activity className="h-4 w-4" /> View Training Report</button>
         </div>
       </div>
     </div>

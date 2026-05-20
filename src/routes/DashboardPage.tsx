@@ -1,359 +1,548 @@
-import { ArrowRight, BadgePoundSterling, CalendarRange, Mail, ShieldCheck, Swords, Trophy, Star } from 'lucide-react'
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import {
+  Activity,
+  BadgePoundSterling,
+  CalendarDays,
+  ChevronRight,
+  Dumbbell,
+  Play,
+  Route,
+  Swords,
+  Target,
+  Trophy,
+  Users,
+  Wrench,
+} from 'lucide-react'
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useNavigate } from 'react-router-dom'
-import { PageHeader } from '../components/layout/PageHeader'
-import { RightContextPanel } from '../components/layout/RightContextPanel'
-import { AttributeGroupPanel } from '../components/game/AttributeGroupPanel'
-import { CoachTable } from '../components/game/CoachTable'
-import { EquipmentCard } from '../components/game/EquipmentCard'
-import { FundsCard } from '../components/game/FundsCard'
-import { InboxMessageList } from '../components/game/InboxMessageList'
-import { NextEventCard } from '../components/game/NextEventCard'
-import { PlayerSummaryCard } from '../components/game/PlayerSummaryCard'
-import { RankingTable } from '../components/game/RankingTable'
-import { TrainingWeekGrid } from '../components/game/TrainingWeekGrid'
-import { ActionButton } from '../components/ui/ActionButton'
-import { AlertBox } from '../components/ui/AlertBox'
-import { DecisionPanel } from '../components/ui/DecisionPanel'
-import { MetricCard } from '../components/ui/MetricCard'
-import { SectionCard } from '../components/ui/SectionCard'
-import { StatusBadge } from '../components/ui/StatusBadge'
 import { useGame } from '../context/GameStateContext'
-import { getCoachAvailability } from '../utils/coachMarket'
 import { buildDashboardData } from '../utils/liveRouteData'
-import { formatMoney, formatSigned } from '../utils/formatters'
+import { formatMoney } from '../utils/formatters'
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
+}
+
+function compactMoney(value: number) {
+  const sign = value < 0 ? '-' : ''
+  const absolute = Math.abs(value)
+  if (absolute >= 1_000_000) return `${sign}£${(absolute / 1_000_000).toFixed(1)}m`
+  if (absolute >= 1_000) return `${sign}£${Math.round(absolute / 1_000)}k`
+  return `${sign}£${absolute}`
+}
+
+function formatFinanceValue(value: number | null | undefined, fallback = 'TBA') {
+  return typeof value === 'number' && Number.isFinite(value) ? compactMoney(value) : fallback
+}
+
+function attributeRows(attributes: Record<string, number>, count: number) {
+  return Object.entries(attributes)
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, count)
+}
+
+function getFormPercent(results: string[]) {
+  const window = results.slice(0, 10)
+  if (window.length === 0) return 0
+  return Math.round((window.filter((result) => result === 'W').length / window.length) * 100)
+}
+
+function getReadinessScore(confidence: number, morale: number, fatigue: number) {
+  return clamp(Math.round((confidence + morale + (100 - fatigue)) / 3), 0, 100)
+}
+
+function HeroMetric({
+  label,
+  value,
+  detail,
+  tone = 'text-white',
+}: {
+  label: string
+  value: string
+  detail?: string
+  tone?: string
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-surface/80 px-3 py-2.5">
+      <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">{label}</p>
+      <p className={`mt-1 text-base font-bold ${tone}`}>{value}</p>
+      {detail ? <p className="mt-0.5 truncate text-[10px] text-gray-400">{detail}</p> : null}
+    </div>
+  )
+}
 
 export function DashboardPage() {
-  const { gameState, continueWeek, continueToNextTournament } = useGame()
+  const { gameState, continueWeek, continueToNextTournament, enterTournament, startLiveMatch } = useGame()
   const navigate = useNavigate()
-  const { currentCue, scoutedCue, financeChart, trainingWeek, newsRail } = buildDashboardData(gameState)
+  const { currentCue, financeChart, trainingWeek } = buildDashboardData(gameState)
   const enteredEvent = gameState.tournaments.find((event) => event.status === 'Entered')
-  const nextEvent = enteredEvent ?? gameState.tournaments.find((event) => event.status === 'Available' || event.status === 'High Cost') ?? gameState.tournaments[0]
-  const canPlayTournament = !!enteredEvent && gameState.player.daysUntilEvent <= 7
-  const nextMatchRoute = gameState.liveMatch?.status === 'In Progress' ? '/match/live' : '/match/preview'
-  const nextMatchLabel = gameState.liveMatch?.status === 'In Progress'
-    ? 'Resume Live Match'
-    : canPlayTournament
-      ? 'Play Tournament'
-      : 'Open Match Centre'
+  const nextEvent = enteredEvent
+    ?? gameState.tournaments.find((event) => event.status === 'Booked' || event.status === 'Available' || event.status === 'High Cost')
+    ?? gameState.tournaments[0]
   const currentRanking = gameState.rankings.find((row) => row.playerName === gameState.player.fullName)?.ranking
     ?? gameState.player.worldRanking
     ?? gameState.player.amateurRanking
-  const coachSnapshot = gameState.coaches
-    .filter((coach) => getCoachAvailability(coach, currentRanking ?? 999, gameState.player.reputation).available)
-    .slice()
-    .sort((left, right) => right.compatibility - left.compatibility)
-    .slice(0, 6)
-  const latestMatches = gameState.matches.slice(0, 4)
-  const nextEventTravelTotal = nextEvent.travelCost + nextEvent.hotelCost
-  const nextEventSummary = canPlayTournament
-    ? `${nextEvent.name} is live this week. The draw is set and the next match is ready to start.`
-    : nextEventTravelTotal > 0
-      ? `${nextEvent.name} is the next target. Travel and lodging are the main costs this week, with ${nextEvent.rankingValue} ranking points available.`
-      : `${nextEvent.name} is the next target. Travel overhead is light, so the focus can stay on preparation and match reps.`
-  const dashboardMetrics = [
-    {
-      label: 'Current Ranking',
-      value: currentRanking != null ? `#${currentRanking}` : 'Unranked',
-      subValue: gameState.player.careerStage,
-      tone: 'gold' as const,
-    },
-    {
-      label: 'Weekly Cash Flow',
-      value: `${gameState.player.cashFlow >= 0 ? '+' : ''}${formatMoney(gameState.player.cashFlow)}`,
-      subValue: `${formatMoney(gameState.player.cash)} balance`,
-      tone: gameState.player.cashFlow >= 0 ? 'green' as const : 'red' as const,
-    },
-    {
-      label: 'Confidence',
-      value: `${gameState.player.confidence}%`,
-      subValue: `${gameState.player.morale}% morale`,
-      tone: gameState.player.confidence >= 75 ? 'green' as const : 'amber' as const,
-    },
-    {
-      label: 'Fatigue Risk',
-      value: `${gameState.player.fatigue}%`,
-      subValue: gameState.player.fatigue >= 60 ? 'Recovery needed' : 'Manageable',
-      tone: gameState.player.fatigue >= 60 ? 'red' as const : 'amber' as const,
-    },
-  ]
-  const financeSnapshot = {
-    income: Math.max(gameState.finance.cashFlow, 0),
-    expenses: Math.max(-gameState.finance.cashFlow, 0),
-    surplus: gameState.finance.cashFlow,
-    burnRate: Math.max(-gameState.finance.cashFlow, 0),
+  const canPlayTournament = !!enteredEvent && gameState.player.daysUntilEvent <= 7
+  const hasLiveMatchInProgress = gameState.liveMatch?.status === 'In Progress'
+  const activeCoach = gameState.coaches.find((coach) => coach.id === gameState.currentCoachId)
+  const latestMatches = gameState.matches.slice(0, 5)
+  const weeklySchedule = trainingWeek.slice(0, 7)
+  const upcomingOpponent = gameState.tournamentProgress.draw
+    .flatMap((round) => round.matches)
+    .find((match) => match.top.name === gameState.player.fullName || match.bottom.name === gameState.player.fullName)
+  const opponentName = upcomingOpponent
+    ? upcomingOpponent.top.name === gameState.player.fullName ? upcomingOpponent.bottom.name : upcomingOpponent.top.name
+    : 'Opponent TBD'
+  const rankingTrend = gameState.history.snapshots.slice(-10).map((snapshot) => ({
+    label: `W${snapshot.week}`,
+    rank: snapshot.ranking || currentRanking || 0,
+  }))
+  const fallbackRankingTrend = Array.from({ length: 8 }, (_, index) => ({
+    label: `W${Math.max(1, gameState.week - (7 - index))}`,
+    rank: Math.max(1, (currentRanking ?? 40) + (7 - index)),
+  }))
+  const activeRankingTrend = rankingTrend.length > 1 ? rankingTrend : fallbackRankingTrend
+  const topTechnicalRows = attributeRows(gameState.attributes.technical, 5)
+  const topMentalRows = attributeRows(gameState.attributes.mental, 4)
+  const formPercent = getFormPercent(gameState.player.form)
+  const readinessScore = getReadinessScore(gameState.player.confidence, gameState.player.morale, gameState.player.fatigue)
+  const seasonPrizeMoney = gameState.matches.reduce((sum, match) => sum + match.prizeMoneyEarned, 0)
+  const seasonMatches = gameState.matches.length
+  const seasonWins = gameState.matches.filter((match) => match.result === 'Won').length
+  const seasonWinRate = seasonMatches > 0 ? Math.round((seasonWins / seasonMatches) * 100) : 0
+  const latestFinancePoint = financeChart[financeChart.length - 1] ?? { income: 0, expenses: 0 }
+  const eventStatusLabel = hasLiveMatchInProgress
+    ? 'Match live'
+    : enteredEvent
+      ? canPlayTournament ? 'Ready to play' : 'Entry accepted'
+      : nextEvent ? 'Entry pending' : 'No event selected'
+  const eventStageLabel = hasLiveMatchInProgress
+    ? gameState.liveMatch?.round ?? 'Live match'
+    : gameState.tournamentProgress.currentRound ?? 'Entry'
+  const primaryEventActionLabel = hasLiveMatchInProgress
+    ? 'Resume Live Match'
+    : enteredEvent
+      ? canPlayTournament ? 'Play Live Match' : 'Continue To Event'
+      : 'Save Next Event'
+  const currentCueBonus = Object.entries(currentCue?.bonuses ?? {}).sort((left, right) => right[1] - left[1])[0]
+  const rankingBest = activeRankingTrend.length > 0 ? Math.min(...activeRankingTrend.map((point) => point.rank)) : currentRanking ?? 0
+  const rankingAverage = activeRankingTrend.length > 0 ? Math.round(activeRankingTrend.reduce((sum, point) => sum + point.rank, 0) / activeRankingTrend.length) : currentRanking ?? 0
+  const rankingLowest = activeRankingTrend.length > 0 ? Math.max(...activeRankingTrend.map((point) => point.rank)) : currentRanking ?? 0
+  const latestResult = latestMatches[0]
+  const nextTargetRank = Math.max(1, (currentRanking ?? 2) - 1)
+  const goalFocus = [topTechnicalRows[0]?.[0], topMentalRows[0]?.[0]].filter(Boolean).join(' & ') || 'Match readiness'
+
+  function handlePrimaryEventAction() {
+    if (hasLiveMatchInProgress) {
+      navigate('/match/live')
+      return
+    }
+
+    if (enteredEvent && canPlayTournament) {
+      startLiveMatch(enteredEvent.id)
+      navigate('/match/live')
+      return
+    }
+
+    if (enteredEvent) {
+      continueToNextTournament()
+      navigate('/tournaments/hub')
+      return
+    }
+
+    if (nextEvent) {
+      enterTournament(nextEvent.id)
+      navigate('/tournaments/hub')
+      return
+    }
+
+    navigate('/calendar')
   }
-  const topInboxMessages = gameState.inbox.slice(0, 2)
-  const topNavigationCards = [
-    {
-      title: 'Inbox',
-      subtitle: topInboxMessages[0]?.subject ?? 'No urgent messages',
-      detail: `${gameState.player.inboxCount} messages waiting in the current save.`,
-      icon: <Mail className="h-5 w-5" />,
-      route: '/inbox',
-    },
-    {
-      title: 'Next Tournament',
-      subtitle: nextEvent.name,
-      detail: `${nextEvent.location} · ${nextEvent.startDate}`,
-      icon: <Trophy className="h-5 w-5" />,
-      route: '/tournaments/hub',
-    },
-    {
-      title: 'Next Match',
-      subtitle: gameState.liveMatch?.status === 'In Progress' ? `${gameState.liveMatch.playerFrames}-${gameState.liveMatch.opponentFrames} vs ${gameState.liveMatch.opponentName}` : nextEvent.name,
-      detail: nextMatchLabel,
-      icon: <Swords className="h-5 w-5" />,
-      route: nextMatchRoute,
-    },
-  ]
+
+  function handleSecondaryEventAction() {
+    if (enteredEvent || hasLiveMatchInProgress) {
+      navigate('/tournaments/hub')
+      return
+    }
+
+    navigate('/calendar')
+  }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Career Dashboard"
-        title="Command Centre"
-        description="Dense overview of form, finances, preparation, and the next event for the active local save."
-        actions={
-          <div className="flex items-center gap-3">
-            <ActionButton tone="secondary" icon={<CalendarRange className="h-4 w-4" />} onClick={() => navigate('/training')}>
-              Weekly Planner
-            </ActionButton>
-            {canPlayTournament ? (
-              <ActionButton tone="secondary" icon={<Trophy className="h-4 w-4" />} onClick={() => navigate(nextMatchRoute)}>Play Tournament</ActionButton>
-            ) : (
-              <ActionButton tone="secondary" icon={<Trophy className="h-4 w-4" />} onClick={continueToNextTournament}>Continue To Tournament</ActionButton>
-            )}
-            <ActionButton icon={<ArrowRight className="h-4 w-4" />} onClick={continueWeek}>Continue Week</ActionButton>
+    <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
+      <div className="card shrink-0 overflow-hidden">
+        <div className="grid grid-cols-12 items-stretch gap-2 px-4 py-3">
+          <div className="col-span-5">
+            <div className="flex items-start gap-4">
+              <button
+                type="button"
+                onClick={() => navigate('/rankings')}
+                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-green-600/40 bg-green-600/10 transition hover:border-green-500/70"
+              >
+                <span className="text-2xl font-bold text-green-400">{currentRanking ?? '-'}</span>
+              </button>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="truncate text-xl font-bold text-white">{gameState.player.fullName}</h1>
+                  <span className="rounded-full bg-surface-light px-2 py-0.5 text-[10px] font-semibold uppercase text-green-400">{gameState.player.nationality}</span>
+                </div>
+                <p className="mt-1 truncate text-xs text-gray-400">{gameState.player.personalityType} · {gameState.player.playingStyle} · {gameState.player.cueStyle ?? 'Traditional Cue Action'}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-gray-500">
+                  <span>Age <span className="font-medium text-white">{gameState.player.age}</span></span>
+                  <span>Hand <span className="font-medium text-white">{gameState.player.handedness}</span></span>
+                  <span>Coach <span className="font-medium text-green-400">{activeCoach?.name ?? 'Open slot'}</span></span>
+                  <span>Status <span className="font-medium text-white">{gameState.player.competitiveStatus ?? gameState.player.rankingLabel}</span></span>
+                </div>
+              </div>
+            </div>
           </div>
-        }
-      />
 
-      <div className="grid gap-4 xl:grid-cols-4">
-        {dashboardMetrics.map((metric) => (
-          <button
-            key={metric.label}
-            type="button"
-            onClick={() => navigate(metric.label === 'Current Ranking' ? '/rankings' : metric.label === 'Weekly Cash Flow' ? '/finance' : metric.label === 'Fatigue Risk' ? '/health' : '/mental')}
-            className="text-left"
-          >
-            <MetricCard
-              label={metric.label}
-              value={metric.value}
-              subValue={metric.subValue}
-              tone={metric.tone}
-              icon={
-                metric.label === 'Current Ranking' ? (
-                  <Star className="h-5 w-5" />
-                ) : metric.label === 'Weekly Cash Flow' ? (
-                  <BadgePoundSterling className="h-5 w-5" />
-                ) : metric.label === 'Fatigue Risk' ? (
-                  <ShieldCheck className="h-5 w-5" />
-                ) : (
-                  <Star className="h-5 w-5" />
-                )
-              }
-            />
-          </button>
-        ))}
+          <div className="col-span-4 grid grid-cols-4 gap-2">
+            <HeroMetric label="Current Ranking" value={`#${currentRanking ?? '-'}`} detail={gameState.player.rankingLabel} />
+            <HeroMetric label="Form" value={`${formPercent}%`} detail="Last 10 matches" tone={formPercent >= 55 ? 'text-green-400' : 'text-white'} />
+            <HeroMetric label="Earnings" value={formatMoney(seasonPrizeMoney)} detail={`${seasonWins} wins this season`} tone="text-white" />
+            <HeroMetric label="Tournament" value={nextEvent?.name ?? 'None'} detail={`${eventStageLabel} · ${nextEvent?.format ?? 'Awaiting format'}`} tone="text-white" />
+          </div>
+
+          <div className="col-span-3 grid grid-cols-3 gap-2">
+            <HeroMetric label="Form (Last 10)" value={`${formPercent}%`} tone={formPercent >= 55 ? 'text-green-400' : 'text-white'} />
+            <HeroMetric label="Confidence" value={`${gameState.player.confidence}%`} tone={gameState.player.confidence >= 70 ? 'text-green-400' : 'text-white'} />
+            <HeroMetric label="Readiness" value={`${readinessScore}%`} tone={readinessScore >= 70 ? 'text-green-400' : readinessScore >= 50 ? 'text-amber-400' : 'text-red-400'} />
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        {topNavigationCards.map((card) => (
-          <button
-            key={card.title}
-            type="button"
-            onClick={() => navigate(card.route)}
-            className="rounded-xl border border-scm-border bg-scm-panel/95 p-4 text-left shadow-panel transition hover:border-scm-green/45 hover:bg-scm-panelSoft"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-scm-textMuted">{card.title}</p>
-                <p className="mt-2 text-xl font-semibold text-scm-text">{card.subtitle}</p>
+      <div className="card shrink-0 overflow-hidden border-green-600/30 bg-gradient-to-r from-green-600/10 via-surface to-surface">
+        <div className="grid grid-cols-12 items-center gap-2 px-4 py-3">
+          <div className="col-span-5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-green-500/40 bg-green-600/10">
+                <Trophy className="h-5 w-5 text-green-400" />
               </div>
-              <div className="rounded-full border border-scm-borderStrong bg-scm-deep/70 p-2 text-scm-green">{card.icon}</div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-green-400">Tournament</p>
+                <h2 className="mt-1 truncate text-base font-bold text-white">{nextEvent?.name ?? 'No tournament scheduled'}</h2>
+                <p className="mt-1 truncate text-[11px] text-gray-400">{eventStageLabel} · {nextEvent?.format ?? 'Awaiting format'} · {eventStatusLabel}</p>
+              </div>
             </div>
-            <p className="mt-3 text-sm text-scm-textSoft">{card.detail}</p>
-            {card.title === 'Inbox' && topInboxMessages.length > 0 && (
-              <div className="mt-4 space-y-2 border-t border-scm-border pt-3">
-                {topInboxMessages.map((message) => (
-                  <div key={message.id} className="rounded-lg bg-scm-panelSoft/80 px-3 py-2">
-                    <p className="text-sm font-semibold text-scm-text">{message.subject}</p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.16em] text-scm-textMuted">{message.sender}</p>
+          </div>
+
+          <div className="col-span-3 grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-border bg-surface/80 px-3 py-3 text-center">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">Next Stage</p>
+              <p className="mt-1 truncate text-sm font-bold text-white">{eventStageLabel}</p>
+            </div>
+            <div className="rounded-xl border border-border bg-surface/80 px-3 py-3 text-center">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">Opponent</p>
+              <p className="mt-1 truncate text-sm font-bold text-white">{opponentName}</p>
+            </div>
+          </div>
+
+          <div className="col-span-4 flex items-center justify-end gap-2">
+            <button type="button" onClick={handleSecondaryEventAction} className="btn-secondary text-xs">
+              {enteredEvent || hasLiveMatchInProgress ? <Route className="h-3.5 w-3.5" /> : <CalendarDays className="h-3.5 w-3.5" />}
+              {enteredEvent || hasLiveMatchInProgress ? 'Tournament Hub' : 'Choose Event'}
+            </button>
+            <button type="button" onClick={handlePrimaryEventAction} className="btn-primary px-5 text-xs">
+              {hasLiveMatchInProgress || canPlayTournament ? <Play className="h-3.5 w-3.5" /> : <Swords className="h-3.5 w-3.5" />}
+              {primaryEventActionLabel}
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid min-h-0 flex-1 grid-cols-12 gap-2">
+        <div className="grid min-h-0 col-span-4 gap-2 grid-rows-[1.18fr_0.92fr_0.62fr]">
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-header">
+              <h3 className="flex items-center gap-2 text-xs font-semibold text-white">
+                <CalendarDays className="h-3.5 w-3.5 shrink-0 text-green-400" />
+                <span className="truncate">Upcoming & Recent Results</span>
+              </h3>
+            </div>
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <div className="min-h-0 flex-1 overflow-x-auto px-3">
+                <table className="w-full text-[10px]">
+                  <thead>
+                    <tr className="border-b border-border text-gray-500">
+                      <th className="whitespace-nowrap py-1.5 pr-3 text-left font-medium">Date</th>
+                      <th className="whitespace-nowrap px-3 py-1.5 text-left font-medium">Tournament</th>
+                      <th className="whitespace-nowrap px-3 py-1.5 text-left font-medium">Round</th>
+                      <th className="whitespace-nowrap px-3 py-1.5 text-left font-medium">Opponent</th>
+                      <th className="whitespace-nowrap px-3 py-1.5 text-left font-medium">Result</th>
+                      <th className="whitespace-nowrap py-1.5 pl-3 text-right font-medium">Prize</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {latestMatches.length > 0 ? latestMatches.map((match) => (
+                      <tr key={match.id} className="border-b border-border/50 transition-colors hover:bg-surface-light/40">
+                        <td className="whitespace-nowrap py-1.5 pr-3 text-gray-400">{match.playedOn ?? gameState.currentDate}</td>
+                        <td className="whitespace-nowrap px-3 py-1.5 text-white">{gameState.tournaments.find((event) => event.id === match.tournamentId)?.name ?? 'Career match'}</td>
+                        <td className="px-3 py-1.5 text-gray-400">{match.round}</td>
+                        <td className="whitespace-nowrap px-3 py-1.5 text-white">{match.opponentName}</td>
+                        <td className="px-3 py-1.5">
+                          <span className={match.result === 'Won' ? 'font-medium text-green-400' : 'font-medium text-red-400'}>{match.playerFrames}-{match.opponentFrames}</span>
+                        </td>
+                        <td className="whitespace-nowrap py-1.5 pl-3 text-right text-green-400">{compactMoney(match.prizeMoneyEarned)}</td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-gray-400">No completed matches yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="border-t border-border px-3 py-2.5">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">Upcoming Event</p>
+                <div className="mt-2 flex items-center gap-2 text-[10px]">
+                  <span className="shrink-0 text-gray-400">{nextEvent?.startDate ?? gameState.currentDate}</span>
+                  <span className="truncate font-medium text-white">{nextEvent?.name ?? 'No event scheduled'}</span>
+                  <span className="shrink-0 text-gray-400">{eventStageLabel}</span>
+                  <span className="truncate text-white">{opponentName}</span>
+                  <span className="ml-auto shrink-0 text-gray-400">{nextEvent?.format ?? '-'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-header">
+              <h3 className="flex items-center gap-2 text-xs font-semibold text-white">
+                <Dumbbell className="h-3.5 w-3.5 shrink-0 text-green-400" />
+                <span className="truncate">Training Week Overview</span>
+              </h3>
+              <span className="text-[9px] text-gray-400">Week {gameState.week}</span>
+            </div>
+            <div className="card-body flex h-full flex-col gap-3">
+              <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                <Users className="h-3 w-3 shrink-0" />
+                <span className="truncate">Focus: {activeCoach?.name ?? 'Self-managed training'} week</span>
+              </div>
+              <div className="space-y-2">
+                {topTechnicalRows.slice(0, 5).map(([label, value]) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <span className="w-24 shrink-0 truncate text-[10px] text-gray-300">{label}</span>
+                    <span className="shrink-0 rounded bg-green-600/15 px-1 py-0.5 text-[9px] font-medium text-green-400">Focus</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="progress-bar h-1.5"><div className="progress-fill bg-green-500" style={{ width: `${value}%` }} /></div>
+                    </div>
+                    <span className="w-7 shrink-0 text-right text-[9px] text-gray-400">{value}</span>
                   </div>
                 ))}
               </div>
-            )}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
-          <button type="button" onClick={() => navigate('/career/progression')} className="block w-full text-left">
-            <PlayerSummaryCard player={gameState.player} />
-          </button>
-
-          <div className="grid gap-6 2xl:grid-cols-[1.15fr_0.85fr]">
-            <SectionCard title="Weekly Training Overview" subtitle="Current seven-day plan with compact morning, afternoon, and evening blocks." onClick={() => navigate('/training')}>
-              <TrainingWeekGrid week={trainingWeek} />
-            </SectionCard>
-
-            <SectionCard title="Recent Results" subtitle="Latest competitive outcomes feeding confidence and ranking movement." onClick={() => navigate('/match/result')}>
-              {latestMatches.length > 0 ? (
-                <div className="space-y-3">
-                  {latestMatches.map((match) => (
-                  <div key={match.id} className="rounded-xl border border-scm-border bg-scm-panelSoft p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-scm-text">{match.playerName} {match.playerFrames}-{match.opponentFrames} {match.opponentName}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-scm-textMuted">{match.round} · Best of {match.bestOf}</p>
-                      </div>
-                      <StatusBadge tone={match.result === 'Won' ? 'green' : 'amber'}>{match.result}</StatusBadge>
-                    </div>
-                    <div className="mt-3 grid grid-cols-3 gap-3 text-sm text-scm-textSoft">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Highest break</p>
-                        <p className="mt-1 text-scm-text">{match.highestBreak}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Confidence</p>
-                        <p className="mt-1 text-scm-text">{formatSigned(match.confidenceChange)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Prize money</p>
-                        <p className="mt-1 text-scm-text">{formatMoney(match.prizeMoneyEarned)}</p>
-                      </div>
-                    </div>
-                  </div>
+              <div className="mt-auto border-t border-border pt-2">
+                <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">Week Schedule</p>
+                <div className="grid grid-cols-7 gap-1 text-[9px]">
+                  {weeklySchedule.map((day) => <div key={day.day} className="text-center text-gray-500">{day.day.slice(0, 3)}</div>)}
+                  {weeklySchedule.map((day) => (
+                    <div key={`${day.day}-focus`} className="truncate rounded bg-surface-light px-1 py-1 text-center text-gray-300">{day.morning}</div>
                   ))}
                 </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-scm-border bg-scm-panelSoft/70 p-4 text-sm text-scm-textSoft">
-                  No competitive matches have been played in this save yet. Enter the next event or continue the week to start building live form.
+              </div>
+            </div>
+          </div>
+
+          <button type="button" onClick={() => navigate('/equipment/cues')} className="card min-h-0 flex h-full flex-col text-left transition hover:border-green-500/50">
+            <div className="card-header">
+              <h3 className="flex items-center gap-2 text-xs font-semibold text-white">
+                <Wrench className="h-3.5 w-3.5 shrink-0 text-green-400" />
+                <span className="truncate">Equipment</span>
+              </h3>
+            </div>
+            <div className="card-body flex h-full flex-col justify-between gap-2">
+              <div>
+                <p className="truncate text-sm font-semibold text-white">{currentCue?.name ?? 'No cue selected'}</p>
+                <p className="mt-1 text-[10px] text-gray-400">{gameState.player.cueStyle ?? 'Traditional'} · {currentCueBonus ? `${currentCueBonus[0]} +${currentCueBonus[1]}` : 'No active bonus'}</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-[10px]">
+                <div>
+                  <p className="text-gray-500">Condition</p>
+                  <p className="font-semibold text-white">{currentCue?.condition ?? 0}%</p>
                 </div>
-              )}
-            </SectionCard>
-          </div>
+                <div>
+                  <p className="text-gray-500">Familiarity</p>
+                  <p className="font-semibold text-white">{currentCue?.familiarity ?? 0}%</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Cue Ball</p>
+                  <p className="font-semibold text-green-400">+{currentCue?.bonuses['Cue Ball Control'] ?? 0}</p>
+                </div>
+              </div>
+            </div>
+          </button>
+        </div>
 
-          <div className="grid gap-6 2xl:grid-cols-3">
-            <button type="button" onClick={() => navigate('/player/attributes')} className="text-left">
-              <AttributeGroupPanel title="Technical Profile" attributes={gameState.attributes.technical} />
-            </button>
-            <button type="button" onClick={() => navigate('/player/attributes')} className="text-left">
-              <AttributeGroupPanel title="Mental Profile" attributes={gameState.attributes.mental} />
-            </button>
-            <button type="button" onClick={() => navigate('/player/attributes')} className="text-left">
-              <AttributeGroupPanel title="Physical Profile" attributes={gameState.attributes.physical} />
-            </button>
-          </div>
+        <div className="grid min-h-0 col-span-4 gap-2 grid-rows-[1.18fr_0.92fr_0.62fr]">
+          <button type="button" onClick={() => navigate('/player/attributes')} className="card min-h-0 flex h-full flex-col text-left transition hover:border-green-500/50">
+            <div className="card-header">
+              <h3 className="truncate text-xs font-semibold text-white">Attributes Summary</h3>
+            </div>
+            <div className="card-body flex h-full flex-col gap-2.5">
+              <div>
+                <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">Technical Skills</p>
+                <div className="space-y-1.5">
+                  {topTechnicalRows.slice(0, 4).map(([label, value]) => (
+                    <div key={label}>
+                      <div className="mb-0.5 flex items-center justify-between gap-2 text-[10px]">
+                        <span className="truncate text-gray-300">{label}</span>
+                        <span className="font-medium text-white">{value}</span>
+                      </div>
+                      <div className="progress-bar h-1.5"><div className="progress-fill bg-green-500" style={{ width: `${value}%` }} /></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="border-t border-border pt-1.5">
+                <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">Mental Skills</p>
+                <div className="space-y-1.5">
+                  {topMentalRows.slice(0, 3).map(([label, value]) => (
+                    <div key={label}>
+                      <div className="mb-0.5 flex items-center justify-between gap-2 text-[10px]">
+                        <span className="truncate text-gray-300">{label}</span>
+                        <span className="font-medium text-white">{value}</span>
+                      </div>
+                      <div className="progress-bar h-1.5"><div className="progress-fill bg-amber-500" style={{ width: `${value}%` }} /></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </button>
 
-          <div className="grid gap-6 2xl:grid-cols-[1.05fr_0.95fr]">
-            <SectionCard title="Finance Trend" subtitle="Income versus expense line for the current cycle." onClick={() => navigate('/finance')}>
-              <div className="h-[280px] w-full">
-                <ResponsiveContainer>
-                  <AreaChart data={financeChart}>
+          <button type="button" onClick={() => navigate('/rankings')} className="card min-h-0 flex h-full flex-col text-left transition hover:border-green-500/50">
+            <div className="card-header">
+              <h3 className="flex items-center gap-2 text-xs font-semibold text-white">
+                <Target className="h-3.5 w-3.5 shrink-0 text-green-400" />
+                <span className="truncate">Ranking Progression</span>
+              </h3>
+            </div>
+            <div className="card-body flex h-full flex-col">
+              <div className="flex-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={activeRankingTrend}>
                     <defs>
-                      <linearGradient id="incomeFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#22c55e" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#22c55e" stopOpacity={0.02} />
-                      </linearGradient>
-                      <linearGradient id="expenseFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f2b705" stopOpacity={0.25} />
-                        <stop offset="100%" stopColor="#f2b705" stopOpacity={0.02} />
+                      <linearGradient id="dashboardRankGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.32} />
+                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid stroke="#203449" vertical={false} />
-                    <XAxis dataKey="label" stroke="#94a3b8" tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} width={56} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#102033',
-                        border: '1px solid #31506f',
-                        borderRadius: '12px',
-                        color: '#f8fafc',
-                      }}
-                    />
-                    <Area type="monotone" dataKey="income" stroke="#22c55e" fill="url(#incomeFill)" strokeWidth={2} />
-                    <Area type="monotone" dataKey="expenses" stroke="#f2b705" fill="url(#expenseFill)" strokeWidth={2} />
+                    <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                    <YAxis reversed tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} width={30} />
+                    <Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 10 }} />
+                    <Area type="monotone" dataKey="rank" stroke="#22c55e" fill="url(#dashboardRankGradient)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-            </SectionCard>
-            <SectionCard title="Coach Market Snapshot" subtitle="Currently unlocked staff options ranked by fit for the active save." onClick={() => navigate('/staff/coaches')}>
-              <CoachTable coaches={coachSnapshot} />
-            </SectionCard>
-          </div>
-
-          <div className="grid gap-6 2xl:grid-cols-[0.95fr_1.05fr]">
-            <SectionCard title="Equipment Summary" subtitle="Current cue with a scouted alternative ready for later equipment flow." onClick={() => navigate('/equipment/cues')}>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <EquipmentCard cue={currentCue} />
-                <EquipmentCard cue={scoutedCue} />
+              <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+                <div><p className="text-[9px] text-gray-500">Current</p><p className="text-xs font-bold text-white">{currentRanking ?? '-'}</p></div>
+                <div><p className="text-[9px] text-gray-500">Best</p><p className="text-xs font-bold text-white">{rankingBest || '-'}</p></div>
+                <div><p className="text-[9px] text-gray-500">Average</p><p className="text-xs font-bold text-white">{rankingAverage || '-'}</p></div>
+                <div><p className="text-[9px] text-gray-500">Lowest</p><p className="text-xs font-bold text-white">{rankingLowest || '-'}</p></div>
               </div>
-            </SectionCard>
-            <SectionCard title="Ranking Snapshot" subtitle={`Current player highlighted inside the live ${gameState.player.rankingLabel.toLowerCase()} table.`} onClick={() => navigate('/rankings')}>
-              <RankingTable rows={gameState.rankings.slice(0, 8)} />
-            </SectionCard>
+            </div>
+          </button>
+
+          <div className="card min-h-0 flex h-full flex-col">
+            <div className="card-header">
+              <h3 className="text-xs font-semibold text-white">Goals</h3>
+            </div>
+            <div className="card-body grid h-full gap-2 text-[10px] text-gray-300">
+              <div className="flex items-center justify-between gap-3"><span className="text-gray-500">Main Goal</span><span className="truncate text-right font-medium text-green-400">{enteredEvent ? `Win ${nextEvent?.name ?? 'next event'}` : 'Lock in next event'}</span></div>
+              <div className="flex items-center justify-between gap-3"><span className="text-gray-500">Ranking Push</span><span className="truncate text-right font-medium text-white">Reach #{nextTargetRank}</span></div>
+              <div className="flex items-center justify-between gap-3"><span className="text-gray-500">Season Win Rate</span><span className="truncate text-right font-medium text-white">{seasonWinRate}%</span></div>
+              <div className="flex items-center justify-between gap-3"><span className="text-gray-500">Focus</span><span className="truncate text-right font-medium text-white">{goalFocus}</span></div>
+            </div>
           </div>
         </div>
 
-        <RightContextPanel>
-          <button type="button" onClick={() => navigate('/tournaments/hub')} className="block w-full text-left">
-            <NextEventCard tournament={nextEvent} />
-          </button>
-          <button type="button" onClick={() => navigate('/finance')} className="block w-full text-left">
-            <FundsCard snapshot={financeSnapshot} />
-          </button>
-
-          <SectionCard title="News Feed" subtitle="Inbox-driven Football Manager-style information rail." onClick={() => navigate('/inbox')}>
-            <div className="space-y-3">
-              {newsRail.map((item) => (
-                <div key={item.id} className="rounded-xl border border-scm-border bg-scm-panelSoft p-4">
-                  <StatusBadge tone="slate">{item.tag}</StatusBadge>
-                  <p className="mt-3 font-semibold text-scm-text">{item.title}</p>
-                  <p className="mt-2 text-sm text-scm-textSoft">{item.detail}</p>
+        <div className="grid min-h-0 col-span-4 gap-2 grid-rows-[1.18fr_0.92fr_0.62fr]">
+          <div className="card min-h-0 flex h-full flex-col border-green-600/25">
+            <div className="card-header">
+              <h3 className="text-xs font-semibold text-white">Up Next</h3>
+            </div>
+            <div className="card-body flex h-full flex-col justify-between gap-1.5">
+              <div className="rounded-xl border border-green-600/25 bg-green-600/8 p-2">
+                <div className="flex items-start gap-2">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-600/20">
+                    <Trophy className="h-3.5 w-3.5 text-green-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold leading-tight text-white">{nextEvent?.name ?? 'No event selected'}</p>
+                    <p className="mt-0.5 truncate text-[10px] leading-tight text-gray-400">{eventStageLabel} · {nextEvent?.format ?? 'Awaiting format'}</p>
+                    <p className="mt-0.5 truncate text-[10px] leading-tight text-gray-400">{nextEvent?.startDate ?? gameState.currentDate} · {nextEvent?.location ?? 'Calendar'}</p>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </SectionCard>
-
-          <DecisionPanel
-            title="Up Next"
-            summary={nextEventSummary}
-          >
-            <div className="space-y-3 text-sm text-scm-textSoft">
-              <div className="flex items-center justify-between">
-                <span>Travel + stay</span>
-                <span>{formatMoney(nextEvent.travelCost + nextEvent.hotelCost)}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span>Entry fee</span>
-                <span>{formatMoney(nextEvent.entryFee)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Ranking value</span>
-                <span>{nextEvent.rankingValue} pts</span>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <ActionButton className="flex-1" onClick={continueWeek}>Continue Week</ActionButton>
-                {canPlayTournament ? (
-                  <ActionButton tone="secondary" className="flex-1" onClick={() => navigate(nextMatchRoute)}>Play Tournament</ActionButton>
-                ) : (
-                  <ActionButton tone="secondary" className="flex-1" onClick={continueToNextTournament}>Continue To Tournament</ActionButton>
-                )}
+              <div className="rounded-xl border border-border bg-surface-light/40 p-2">
+                <div className="flex items-center justify-between gap-2.5">
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">Opponent</p>
+                    <p className="mt-0.5 truncate text-xs font-semibold leading-tight text-white">{opponentName}</p>
+                  </div>
+                  <button type="button" onClick={handlePrimaryEventAction} className="btn-primary shrink-0 px-2 py-0.5 text-[9px]">
+                    Prepare
+                    <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
             </div>
-          </DecisionPanel>
+          </div>
 
-          <AlertBox title="Latest Update">
-            {gameState.lastAction}
-          </AlertBox>
+          <button type="button" onClick={() => navigate('/finance')} className="card min-h-0 flex h-full flex-col text-left transition hover:border-green-500/50">
+            <div className="card-header">
+              <h3 className="flex items-center gap-2 text-xs font-semibold text-white">
+                <BadgePoundSterling className="h-3.5 w-3.5 shrink-0 text-green-400" />
+                <span className="truncate">Finances Overview</span>
+              </h3>
+              <span className="text-[9px] text-gray-400">This Month</span>
+            </div>
+            <div className="card-body flex h-full flex-col justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Balance</p>
+                <p className="mt-1.5 truncate text-2xl font-bold text-white">{formatMoney(gameState.player.cash)}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
+                <div className="min-w-0">
+                  <p className="truncate text-gray-500">Winnings</p>
+                  <p className="mt-1 truncate font-semibold text-green-400">{formatFinanceValue(latestFinancePoint.income, 'TBA')}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-gray-500">Expenses</p>
+                  <p className="mt-1 truncate font-semibold text-red-400">{formatFinanceValue(latestFinancePoint.expenses, 'TBA')}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-gray-500">Entries</p>
+                  <p className="mt-1 truncate font-semibold text-white">{nextEvent ? formatFinanceValue(nextEvent.entryFee) : 'TBA'}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-gray-500">Status</p>
+                  <p className="mt-1 truncate font-semibold text-green-400">{gameState.player.cash >= 10_000 ? 'Stable' : gameState.player.cash >= 5_000 ? 'Caution' : 'Tight'}</p>
+                </div>
+              </div>
+            </div>
+          </button>
 
-          <SectionCard title="Inbox Preview" subtitle="Latest messages surfaced without leaving the dashboard." onClick={() => navigate('/inbox')}>
-            <InboxMessageList messages={gameState.inbox.slice(0, 4)} />
-          </SectionCard>
-        </RightContextPanel>
+          <div className="card min-h-0 flex h-full flex-col">
+            <div className="card-header">
+              <h3 className="flex items-center gap-2 text-xs font-semibold text-white">
+                <Activity className="h-3.5 w-3.5 shrink-0 text-green-400" />
+                <span className="truncate">Quick Actions</span>
+              </h3>
+            </div>
+            <div className="card-body flex h-full flex-col justify-between gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <button type="button" onClick={() => navigate('/mental')} className="btn-secondary justify-center text-[10px]">Before Match Routine</button>
+                <button type="button" onClick={() => navigate(latestResult ? '/match/result' : '/calendar')} className="btn-secondary justify-center text-[10px]">Review Last Event</button>
+              </div>
+              <button type="button" onClick={handlePrimaryEventAction} className="btn-primary w-full justify-center text-xs">
+                {primaryEventActionLabel}
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" onClick={continueWeek} className="text-left text-[10px] font-medium text-gray-400 transition hover:text-green-400">Advance One Week</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

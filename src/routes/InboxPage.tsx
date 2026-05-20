@@ -1,27 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCircle2, MailOpen, Settings, Trophy } from 'lucide-react'
-import { Link } from 'react-router-dom'
-import { PageHeader } from '../components/layout/PageHeader'
-import { ActionButton } from '../components/ui/ActionButton'
-import { SectionCard } from '../components/ui/SectionCard'
-import { StatusBadge } from '../components/ui/StatusBadge'
+import { Link, useNavigate } from 'react-router-dom'
+import { AlertTriangle, Bell, Check, CheckCircle2, ChevronRight, Mail, Trophy } from 'lucide-react'
 import { useGame } from '../context/GameStateContext'
 import { buildInboxData } from '../utils/liveRouteData'
 
-const accentStyles = {
-  green: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200',
-  gold: 'border-amber-500/25 bg-amber-500/10 text-amber-100',
-  blue: 'border-sky-500/25 bg-sky-500/10 text-sky-200',
-  amber: 'border-orange-500/25 bg-orange-500/10 text-orange-100',
-  red: 'border-rose-500/25 bg-rose-500/10 text-rose-200',
-  violet: 'border-violet-500/25 bg-violet-500/10 text-violet-200',
-} as const
-
-function getPriorityTone(priority: 'Low' | 'Medium' | 'High'): 'blue' | 'amber' | 'red' | 'green' {
-  if (priority === 'High') return 'red'
-  if (priority === 'Medium') return 'amber'
-  return 'blue'
+function priorityClass(priority: 'Low' | 'Medium' | 'High') {
+  if (priority === 'High') return 'bg-red-600/20 text-red-400'
+  if (priority === 'Medium') return 'bg-amber-600/20 text-amber-400'
+  return 'bg-sky-600/20 text-sky-400'
 }
 
 export function InboxPage() {
@@ -33,16 +19,7 @@ export function InboxPage() {
   const [showActionableOnly, setShowActionableOnly] = useState(false)
   const [reviewedIds, setReviewedIds] = useState<string[]>([])
   const [selectedMessageId, setSelectedMessageId] = useState(gameState.inbox[0]?.id ?? '')
-  const categoryBadges = [
-    { label: 'All', count: gameState.inbox.length },
-    { label: 'High Priority', count: gameState.inbox.filter((item) => item.priority === 'High').length },
-    { label: 'Staff', count: gameState.inbox.filter((item) => /coach|staff|medical/i.test(item.sender)).length },
-    { label: 'Events', count: gameState.inbox.filter((item) => /tournament|event|tour/i.test(`${item.subject} ${item.preview}`)).length },
-  ]
-  const featuredTournament =
-    gameState.tournaments.find((item) => item.status === 'Available' || item.status === 'High Cost') ??
-    gameState.tournaments.find((item) => item.status === 'Entered') ??
-    gameState.tournaments[0]
+
   const filteredInbox = useMemo(() => gameState.inbox.filter((item) => {
     if (showActionableOnly && !item.actionRoute) return false
     if (categoryFilter === 'High Priority') return item.priority === 'High'
@@ -50,260 +27,184 @@ export function InboxPage() {
     if (categoryFilter === 'Events') return /tournament|event|tour/i.test(`${item.subject} ${item.preview}`)
     return true
   }), [categoryFilter, gameState.inbox, showActionableOnly])
+
+  const uniqueNewsCards = useMemo(() => {
+    const seen = new Set<string>()
+    return newsCards.filter((card) => {
+      const key = `${card.title}-${card.source}-${card.date}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }, [newsCards])
+
   const selectedMessage = filteredInbox.find((item) => item.id === selectedMessageId) ?? filteredInbox[0] ?? null
+  const featuredTournament =
+    gameState.tournaments.find((item) => item.status === 'Booked' || item.status === 'Available' || item.status === 'High Cost') ??
+    gameState.tournaments.find((item) => item.status === 'Entered') ??
+    gameState.tournaments[0]
+  const tabs = [
+    { id: 'All', label: 'All', count: gameState.inbox.length },
+    { id: 'High Priority', label: 'High Priority', count: gameState.inbox.filter((item) => item.priority === 'High').length },
+    { id: 'Staff', label: 'Staff', count: gameState.inbox.filter((item) => /coach|staff|medical/i.test(item.sender)).length },
+    { id: 'Events', label: 'Events', count: gameState.inbox.filter((item) => /tournament|event|tour/i.test(`${item.subject} ${item.preview}`)).length },
+  ] as const
 
   useEffect(() => {
-    if (!selectedMessage && filteredInbox[0]) {
-      setSelectedMessageId(filteredInbox[0].id)
-    }
+    if (!selectedMessage && filteredInbox[0]) setSelectedMessageId(filteredInbox[0].id)
   }, [filteredInbox, selectedMessage])
 
-  const openMessage = (messageId: string) => {
+  function openMessage(messageId: string) {
     setSelectedMessageId(messageId)
-    setReviewedIds((previous) => (previous.includes(messageId) ? previous : [...previous, messageId]))
+    setReviewedIds((previous) => previous.includes(messageId) ? previous : [...previous, messageId])
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Support"
-        title="Inbox & News Centre"
-        description="Your hub for career updates, media stories, tournament decisions, and support-system alerts."
-        actions={
-          <div className="flex items-center gap-3">
-            <ActionButton tone="secondary" icon={<CheckCircle2 className="h-4 w-4" />} onClick={() => setReviewedIds(filteredInbox.map((item) => item.id))}>Mark All Read</ActionButton>
-            <ActionButton tone="secondary" icon={<Settings className="h-4 w-4" />} onClick={() => setShowActionableOnly((value) => !value)}>{showActionableOnly ? 'Show All Messages' : 'Message Settings'}</ActionButton>
-          </div>
-        }
-      />
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="flex shrink-0 items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-semibold uppercase text-gray-500">Support</p>
+          <h1 className="mt-1 text-2xl font-bold text-white">Inbox & News Centre</h1>
+          <p className="mt-1 text-sm text-gray-400">Career updates, media stories, tournament decisions, and support alerts.</p>
+        </div>
+        <div className="flex gap-2">
+          <button type="button" className="btn-secondary text-xs" onClick={() => setReviewedIds(filteredInbox.map((item) => item.id))}>
+            <Check className="h-3.5 w-3.5" /> Mark All Read
+          </button>
+          <button type="button" className="btn-secondary text-xs" onClick={() => setShowActionableOnly((value) => !value)}>
+            {showActionableOnly ? 'Show All' : 'Actionable'}
+          </button>
+        </div>
+      </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.6fr_420px]">
-        <div className="space-y-6">
-          <SectionCard>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-2">
-                {categoryBadges.map((badge, index) => (
-                  <button
-                    key={badge.label}
-                    onClick={() => setCategoryFilter(badge.label as 'All' | 'High Priority' | 'Staff' | 'Events')}
-                    className={`rounded-full border px-3 py-2 text-sm ${categoryFilter === badge.label || (index === 0 && categoryFilter === 'All') ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-200' : 'border-scm-border bg-scm-panelSoft text-scm-textMuted'}`}
-                  >
-                    {badge.label} <span className="ml-2 rounded-full bg-scm-panel px-2 py-0.5 text-xs">{badge.count}</span>
-                  </button>
-                ))}
-              </div>
-              <button type="button" onClick={() => setCategoryFilter('All')} className="rounded-xl border border-scm-border bg-scm-panelSoft px-4 py-2 text-sm text-scm-text">All Priorities</button>
-            </div>
+      <div className="flex shrink-0 flex-wrap gap-2">
+        {tabs.map((tab) => (
+          <button key={tab.id} type="button" onClick={() => setCategoryFilter(tab.id)} className={categoryFilter === tab.id ? 'tab-active text-xs' : 'tab-inactive text-xs'}>
+            {tab.label} <span className="ml-1 rounded bg-surface px-1.5 py-0.5">{tab.count}</span>
+          </button>
+        ))}
+      </div>
 
-            <div className="mt-5 overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="text-left text-xs uppercase tracking-[0.16em] text-scm-textMuted">
-                  <tr>
-                    <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2">Subject</th>
-                    <th className="px-3 py-2">Preview</th>
-                    <th className="px-3 py-2">Sender</th>
-                    <th className="px-3 py-2">Date</th>
-                    <th className="px-3 py-2">Priority</th>
-                    <th className="px-3 py-2">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInbox.map((item, index) => {
-                    const active = selectedMessage?.id === item.id
-
-                    return (
-                    <tr
-                      key={item.id}
-                      onClick={() => openMessage(item.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault()
-                          openMessage(item.id)
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      aria-pressed={active}
-                      className={`border-t border-scm-border transition ${reviewedIds.includes(item.id) ? 'opacity-60' : ''} ${active ? 'bg-emerald-500/12' : index === 1 ? 'bg-emerald-500/8' : 'hover:bg-scm-panelSoft/80'} cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-scm-green/35`}
-                    >
-                      <td className="px-3 py-3">
-                        <div className="flex items-center gap-3">
-                          <span className={`h-3 w-3 rounded-full ${item.priority === 'High' ? 'bg-rose-500' : item.priority === 'Medium' ? 'bg-amber-400' : 'bg-emerald-500'}`} />
-                          <div className={`rounded-xl border p-2 ${item.priority === 'High' ? accentStyles.red : item.priority === 'Medium' ? accentStyles.amber : accentStyles.green}`}><MailOpen className="h-4 w-4" /></div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div>
-                          <p className="font-semibold text-scm-text">{item.subject}</p>
-                          <p className="mt-1 text-xs text-scm-textMuted">{item.priority} priority</p>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-scm-textSoft">{item.preview}</td>
-                      <td className="px-3 py-3">
-                        <p className="text-scm-text">{item.sender}</p>
-                        <p className="text-xs text-scm-textMuted">Career update</p>
-                      </td>
-                      <td className="px-3 py-3 text-scm-textSoft">{item.date}<br />Today</td>
-                      <td className="px-3 py-3"><StatusBadge tone={getPriorityTone(item.priority)}>{item.priority}</StatusBadge></td>
-                      <td className="px-3 py-3">
-                        {item.actionRoute && item.actionLabel ? (
-                          <Link to={item.actionRoute}>
-                            <ActionButton tone="secondary" className="whitespace-nowrap px-2 py-1 text-xs">
-                              {item.actionLabel}
-                            </ActionButton>
-                          </Link>
-                        ) : (
-                          <span className="text-xs text-scm-textMuted">No action</span>
-                        )}
-                      </td>
-                    </tr>
-                  )})}
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-4 text-sm text-scm-textMuted">Showing 1 to {filteredInbox.length} of {gameState.inbox.length} messages</p>
-          </SectionCard>
-
-          <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-            <SectionCard title="Latest News" subtitle="Stories shaping fan sentiment and tour context.">
-              <div className="grid gap-4 md:grid-cols-3">
-                {newsCards.map((card) => (
-                  <div key={card.id} className="rounded-2xl border border-scm-border bg-scm-panelSoft p-4">
-                    <p className="text-xs uppercase tracking-[0.16em] text-scm-green">{card.tag}</p>
-                    <p className="mt-3 font-semibold text-scm-text">{card.title}</p>
-                    <p className="mt-4 text-sm text-scm-textMuted">{card.source}</p>
-                    <p className="mt-1 text-xs text-scm-textMuted">{card.date}</p>
+      <div className="grid min-h-0 flex-1 grid-cols-12 items-stretch gap-4">
+        <div className="col-span-5 card flex min-h-0 overflow-hidden">
+          <div className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
+            {filteredInbox.map((message) => (
+              <button
+                key={message.id}
+                type="button"
+                onClick={() => openMessage(message.id)}
+                className={`flex w-full items-start gap-3 p-3 text-left transition-colors ${selectedMessage?.id === message.id ? 'bg-green-600/10' : 'hover:bg-surface-light/50'} ${reviewedIds.includes(message.id) ? 'opacity-60' : ''}`}
+              >
+                <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${reviewedIds.includes(message.id) ? 'bg-transparent' : 'bg-green-500'}`} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium text-white">{message.subject}</span>
+                    {!reviewedIds.includes(message.id) ? <span className="rounded bg-green-600 px-1 text-[9px] text-white">New</span> : null}
                   </div>
-                ))}
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Upcoming Deadlines">
-              <div className="space-y-3">
-                {deadlines.map((item) => (
-                  <div key={item.id} className="rounded-2xl border border-scm-border bg-scm-panelSoft p-4 text-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-scm-text">{item.title}</p>
-                        <p className="mt-1 text-scm-textMuted">{item.dueText}</p>
-                      </div>
-                      <span className="text-scm-gold">{item.countdown}</span>
-                    </div>
+                  <p className="mt-0.5 truncate text-xs text-gray-400">{message.preview}</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500">{message.sender}</span>
+                    <span className="text-[10px] text-gray-600">|</span>
+                    <span className="text-[10px] text-gray-500">{message.date}</span>
                   </div>
-                ))}
-              </div>
-            </SectionCard>
+                </div>
+                <span className={`rounded px-1.5 py-0.5 text-[10px] ${priorityClass(message.priority)}`}>{message.priority}</span>
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="space-y-6">
-          <SectionCard title="Selected Message" subtitle={selectedMessage ? 'Click any inbox row to read the message in full context.' : 'No messages match the current filter.'}>
-            {selectedMessage ? (
-              <div className="space-y-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">From {selectedMessage.sender}</p>
-                    <h3 className="mt-2 text-2xl font-semibold text-scm-text">{selectedMessage.subject}</h3>
+        <div className="col-span-7 flex min-h-0 flex-col gap-4 overflow-hidden">
+          {selectedMessage ? (
+            <div className="card shrink-0">
+              <div className="card-header">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-white">{selectedMessage.subject}</h3>
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] ${priorityClass(selectedMessage.priority)}`}>{selectedMessage.priority}</span>
                   </div>
-                  <StatusBadge tone={getPriorityTone(selectedMessage.priority)}>{selectedMessage.priority}</StatusBadge>
+                  <p className="mt-0.5 text-xs text-gray-400">From: {selectedMessage.sender} - {selectedMessage.date}</p>
                 </div>
-
-                <div className="rounded-2xl border border-scm-border bg-scm-panelSoft p-4">
-                  <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Message Body</p>
-                  <p className="mt-3 text-sm leading-7 text-scm-textSoft">{selectedMessage.preview}</p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl border border-scm-border bg-scm-panelSoft p-4 text-sm">
-                    <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Sender</p>
-                    <p className="mt-2 text-scm-text">{selectedMessage.sender}</p>
-                  </div>
-                  <div className="rounded-xl border border-scm-border bg-scm-panelSoft p-4 text-sm">
-                    <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Date</p>
-                    <p className="mt-2 text-scm-text">{selectedMessage.date}</p>
-                  </div>
-                  <div className="rounded-xl border border-scm-border bg-scm-panelSoft p-4 text-sm">
-                    <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Status</p>
-                    <p className="mt-2 text-scm-text">{reviewedIds.includes(selectedMessage.id) ? 'Reviewed' : 'Unread'}</p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  {selectedMessage.actionRoute && selectedMessage.actionLabel ? (
-                    <Link to={selectedMessage.actionRoute}>
-                      <ActionButton>{selectedMessage.actionLabel}</ActionButton>
+              </div>
+              <div className="card-body">
+                <p className="text-sm leading-relaxed text-gray-300">{selectedMessage.preview}</p>
+                {selectedMessage.actionRoute && selectedMessage.actionLabel ? (
+                  <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+                    <Link to={selectedMessage.actionRoute} className="btn-primary text-xs">
+                      {selectedMessage.actionLabel} <ChevronRight className="h-3 w-3" />
                     </Link>
-                  ) : null}
-                  <ActionButton tone="secondary" onClick={() => setReviewedIds((previous) => previous.filter((item) => item !== selectedMessage.id))}>
-                    Mark As Unread
-                  </ActionButton>
-                </div>
+                    <button type="button" className="btn-secondary text-xs" onClick={() => setReviewedIds((previous) => previous.filter((id) => id !== selectedMessage.id))}>
+                      Mark Unread
+                    </button>
+                  </div>
+                ) : null}
               </div>
-            ) : (
-              <p className="text-sm text-scm-textMuted">No messages are available for the current filter.</p>
-            )}
-          </SectionCard>
+            </div>
+          ) : null}
 
-          <SectionCard>
-            <div className="flex items-center justify-between gap-4">
+          <div className="card card-body shrink-0">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-scm-gold">Tournament Invite</p>
-                <h3 className="mt-2 text-3xl font-semibold text-scm-text">{featuredTournament?.name ?? 'No featured event'}</h3>
-                <p className="mt-2 text-sm text-scm-textSoft">From Tournament Office</p>
+                <p className="text-[10px] font-semibold uppercase text-amber-400">Tournament Invite</p>
+                <h3 className="mt-2 text-2xl font-semibold text-white">{featuredTournament?.name ?? 'No featured event'}</h3>
+                <p className="mt-2 text-sm text-gray-400">
+                  {featuredTournament ? `${featuredTournament.location} - ${featuredTournament.status}` : 'No active tournament decision is waiting right now.'}
+                </p>
               </div>
-              <StatusBadge tone="amber">{featuredTournament?.status ?? 'Awaiting'}</StatusBadge>
+              <Mail className="h-8 w-8 text-green-400" />
             </div>
-
-            <p className="mt-4 text-sm text-scm-textMuted">Current week {gameState.week}</p>
-            <p className="mt-5 text-sm leading-7 text-scm-textSoft">{featuredTournament ? `${featuredTournament.name} is the clearest next decision in the save. Entering now commits entry, travel, and hotel costs, but creates a direct route into prize money and ranking movement.` : 'No active tournament decision is waiting right now.'}</p>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {featuredTournament ? [
-                { label: 'Location', value: featuredTournament.location },
-                { label: 'Prize Money', value: `£${featuredTournament.prizeMoney.toLocaleString('en-GB')}` },
-                { label: 'Ranking Value', value: `${featuredTournament.rankingValue} pts` },
-                { label: 'Total Cost', value: `£${(featuredTournament.entryFee + featuredTournament.travelCost + featuredTournament.hotelCost).toLocaleString('en-GB')}` },
-              ].map((detail) => (
-                <div key={detail.label} className="rounded-xl border border-scm-border bg-scm-panelSoft p-4 text-sm">
-                  <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">{detail.label}</p>
-                  <p className="mt-2 text-scm-text">{detail.value}</p>
-                </div>
-              )) : null}
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-scm-border bg-scm-panelSoft p-4">
-              <p className="flex items-center gap-2 text-sm font-semibold text-scm-gold"><Trophy className="h-4 w-4" />Why It Matters</p>
-              <p className="mt-3 text-sm text-scm-textSoft">{featuredTournament ? `${featuredTournament.name} can shift the save immediately: entry affects cash, match simulation affects confidence and fatigue, and results feed the ladder right away.` : 'The inbox will surface bigger decisions once new events and offers arrive.'}</p>
-            </div>
-
-            {!equipmentReady ? (
-              <div className="mt-5 rounded-2xl border border-rose-500/25 bg-rose-500/10 p-4 text-sm text-rose-100">
-                Tournament invites stay blocked until a cue, chalk, and tip are equipped.
+            {featuredTournament ? (
+              <div className="mt-4 grid grid-cols-4 gap-3 text-xs">
+                <div><span className="text-gray-500">Prize Money</span><p className="text-green-400">£{featuredTournament.prizeMoney.toLocaleString('en-GB')}</p></div>
+                <div><span className="text-gray-500">Ranking Value</span><p className="text-white">{featuredTournament.rankingValue} pts</p></div>
+                <div><span className="text-gray-500">Total Cost</span><p className="text-white">£{(featuredTournament.entryFee + featuredTournament.travelCost + featuredTournament.hotelCost).toLocaleString('en-GB')}</p></div>
+                <div><span className="text-gray-500">Cash</span><p className="text-white">£{gameState.player.cash.toLocaleString('en-GB')}</p></div>
               </div>
             ) : null}
-
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              {featuredTournament ? [
-                { label: 'Ranking Upside', value: `${featuredTournament.rankingValue}`, detail: 'Points available' },
-                { label: 'Prize Pool', value: `£${featuredTournament.prizeMoney.toLocaleString('en-GB')}`, detail: 'Top-end return' },
-                { label: 'Cash On Hand', value: `£${gameState.player.cash.toLocaleString('en-GB')}`, detail: 'Current save balance' },
-              ].map((item) => (
-                <div key={item.label} className="rounded-xl border border-scm-border bg-scm-panelSoft p-4 text-center">
-                  <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">{item.label}</p>
-                  <p className="mt-2 text-2xl font-semibold text-emerald-300">{item.value}</p>
-                  <p className="mt-1 text-sm text-scm-textSoft">{item.detail}</p>
-                </div>
-              )) : null}
+            <div className="mt-4 flex items-center gap-2 rounded border border-amber-600/30 bg-amber-600/10 p-3 text-xs text-amber-100">
+              <AlertTriangle className="h-4 w-4" /> {equipmentReady ? 'Equipment ready for entry.' : 'Equip cue, chalk, and tip before entering.'}
             </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <ActionButton className="justify-center" icon={<CheckCircle2 className="h-4 w-4" />} onClick={() => equipmentReady ? (featuredTournament && enterTournament(featuredTournament.id)) : navigate('/equipment/cues')}>{equipmentReady ? 'Accept Invite' : 'Open Equipment'}</ActionButton>
-              <ActionButton tone="secondary" className="justify-center" onClick={() => navigate('/calendar')}>Decline Invite</ActionButton>
-              <ActionButton tone="secondary" className="justify-center" onClick={() => navigate('/finance')}>Open Finance</ActionButton>
-              <ActionButton tone="secondary" className="justify-center" icon={<Bell className="h-4 w-4" />} onClick={() => navigate('/staff/coaches')}>Speak To Coach</ActionButton>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button type="button" className="btn-primary justify-center text-xs" onClick={() => equipmentReady ? (featuredTournament && enterTournament(featuredTournament.id)) : navigate('/equipment/cues')}>
+                <CheckCircle2 className="h-3.5 w-3.5" /> {equipmentReady ? 'Accept Invite' : 'Open Equipment'}
+              </button>
+              <button type="button" className="btn-secondary justify-center text-xs" onClick={() => navigate('/calendar')}>Decline Invite</button>
+              <button type="button" className="btn-secondary justify-center text-xs" onClick={() => navigate('/finance')}>Open Finance</button>
+              <button type="button" className="btn-secondary justify-center text-xs" onClick={() => navigate('/staff/coaches')}><Bell className="h-3.5 w-3.5" /> Speak To Coach</button>
+              <button type="button" className="btn-secondary col-span-2 justify-center text-xs" onClick={() => navigate('/tournaments/hub')}>
+                <Trophy className="h-3.5 w-3.5" /> Tournament Hub
+              </button>
             </div>
-          </SectionCard>
+          </div>
+
+          <div className="grid shrink-0 grid-cols-2 gap-4">
+            <div className="card card-body">
+              <h4 className="mb-3 text-xs font-semibold text-white">Latest News</h4>
+              <div className="space-y-2">
+                {uniqueNewsCards.slice(0, 3).map((card) => (
+                  <div key={card.id} className="rounded bg-surface-light/50 p-3">
+                    <p className="text-[10px] uppercase text-green-400">{card.tag}</p>
+                    <p className="mt-1 text-xs font-medium text-white">{card.title}</p>
+                    <p className="mt-1 text-[10px] text-gray-500">{card.source} - {card.date}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="card card-body">
+              <h4 className="mb-3 text-xs font-semibold text-white">Upcoming Deadlines</h4>
+              <div className="space-y-2">
+                {deadlines.map((item) => (
+                  <div key={item.id} className="rounded bg-surface-light/50 p-3">
+                    <div className="flex justify-between">
+                      <p className="text-xs font-medium text-white">{item.title}</p>
+                      <span className="text-[10px] text-amber-400">{item.countdown}</span>
+                    </div>
+                    <p className="mt-1 text-[10px] text-gray-500">{item.dueText}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -1,30 +1,30 @@
 import { useNavigate } from 'react-router-dom'
 import { Activity, AlertTriangle, BrainCircuit, HeartPulse, ShieldAlert, Target } from 'lucide-react'
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { PageHeader } from '../components/layout/PageHeader'
-import { ActionButton } from '../components/ui/ActionButton'
-import { CircularMeter } from '../components/ui/CircularMeter'
-import { MetricCard } from '../components/ui/MetricCard'
+import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { SectionCard } from '../components/ui/SectionCard'
 import { useGame } from '../context/GameStateContext'
 
 const metricIcons = [Activity, HeartPulse, BrainCircuit, Activity, ShieldAlert, Target]
+
+function average(values: number[]) {
+  if (values.length === 0) return 0
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+}
 
 export function TrainingReportPage() {
   const { gameState } = useGame()
   const navigate = useNavigate()
   const currentCoach = gameState.coaches.find((coach) => coach.id === gameState.currentCoachId)
-  const technicalAverage = Math.round(Object.values(gameState.attributes.technical).reduce((sum, value) => sum + value, 0) / Object.values(gameState.attributes.technical).length)
-  const mentalAverage = Math.round(Object.values(gameState.attributes.mental).reduce((sum, value) => sum + value, 0) / Object.values(gameState.attributes.mental).length)
-  const physicalAverage = Math.round(Object.values(gameState.attributes.physical).reduce((sum, value) => sum + value, 0) / Object.values(gameState.attributes.physical).length)
+  const technicalAverage = average(Object.values(gameState.attributes.technical))
+  const mentalAverage = average(Object.values(gameState.attributes.mental))
+  const physicalAverage = average(Object.values(gameState.attributes.physical))
   const reportMetrics = [
-    { label: 'Confidence', value: `${gameState.player.confidence}%`, subtitle: 'Current live value', tone: 'green' as const },
-    { label: 'Fatigue', value: `${gameState.player.fatigue}%`, subtitle: 'Recovery pressure', tone: 'amber' as const },
-    { label: 'Morale', value: `${gameState.player.morale}%`, subtitle: 'Current morale', tone: 'green' as const },
-    { label: 'Technical Avg', value: technicalAverage, subtitle: 'Technical profile', tone: 'blue' as const },
-    { label: 'Mental Avg', value: mentalAverage, subtitle: 'Mental profile', tone: 'blue' as const },
-    { label: 'Physical Avg', value: physicalAverage, subtitle: 'Physical profile', tone: 'amber' as const },
+    { label: 'Confidence', value: `${gameState.player.confidence}%`, subtitle: 'Current live value', tone: 'text-green-400' },
+    { label: 'Fatigue', value: `${gameState.player.fatigue}%`, subtitle: 'Recovery pressure', tone: gameState.player.fatigue >= 70 ? 'text-red-400' : 'text-amber-400' },
+    { label: 'Morale', value: `${gameState.player.morale}%`, subtitle: 'Current morale', tone: 'text-green-400' },
+    { label: 'Technical Avg', value: technicalAverage, subtitle: 'Technical profile', tone: 'text-sky-400' },
+    { label: 'Mental Avg', value: mentalAverage, subtitle: 'Mental profile', tone: 'text-sky-400' },
+    { label: 'Physical Avg', value: physicalAverage, subtitle: 'Physical profile', tone: 'text-amber-400' },
   ]
   const reportGains = [
     { label: 'Long Potting', current: gameState.attributes.technical['Long Potting'], change: gameState.trainingAppliedWeek === gameState.week ? 2 : 0 },
@@ -33,17 +33,6 @@ export function TrainingReportPage() {
     { label: 'Focus', current: gameState.attributes.mental.Focus, change: gameState.trainingAppliedWeek === gameState.week ? 1 : 0 },
     { label: 'Stamina', current: gameState.attributes.physical.Stamina, change: gameState.trainingAppliedWeek === gameState.week ? 1 : 0 },
   ]
-  const trainingCondition = [
-    { label: 'Confidence', value: gameState.player.confidence, subtitle: gameState.player.confidence >= 75 ? 'High' : 'Stable', tone: 'green' as const },
-    { label: 'Fatigue', value: gameState.player.fatigue, subtitle: gameState.player.fatigue >= 70 ? 'Heavy' : gameState.player.fatigue >= 45 ? 'Managed' : 'Fresh', tone: gameState.player.fatigue >= 70 ? 'red' as const : 'amber' as const },
-    { label: 'Morale', value: gameState.player.morale, subtitle: gameState.player.morale >= 70 ? 'Positive' : 'Mixed', tone: 'blue' as const },
-    { label: 'Match Fitness', value: Math.max(0, 100 - gameState.player.fatigue), subtitle: 'Ready state', tone: 'green' as const },
-  ]
-  const nextFocus = reportGains.slice().sort((left, right) => left.current - right.current).map((item) => item.label)
-  const drillPerformance = reportGains.map((gain) => ({
-    drill: gain.label,
-    performance: Number(((gain.current + gain.change * 5) / 10).toFixed(1)),
-  }))
   const trainingLoadChart = Array.from({ length: 7 }, (_, index) => ({
     label: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index],
     value: Math.max(30, Math.min(95, 58 + (index % 3) * 8 - (gameState.player.fatigue > 60 ? 6 : 0))),
@@ -54,136 +43,154 @@ export function TrainingReportPage() {
     { label: 'Mental', value: Math.max(1, Math.round(mentalAverage / 28)) },
     { label: 'Physical', value: Math.max(1, Math.round(physicalAverage / 30)) },
   ]
+  const nextFocus = reportGains.slice().sort((left, right) => left.current - right.current).map((item) => item.label)
   const trainingRecoveryAdvice = [
-    gameState.player.fatigue >= 60 ? 'Reduce one heavy session and add more recovery time early in the week.' : 'Keep the current training rhythm but protect one full recovery block.',
+    gameState.player.fatigue >= 60 ? 'Reduce one heavy session and add recovery early in the week.' : 'Keep the current rhythm but protect one full recovery block.',
     `Primary development focus should stay on ${nextFocus[0] ?? 'match sharpness'}.`,
     'Avoid stacking technical intensity and mental pressure sessions on consecutive days.',
   ]
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Training"
-        title="Weekly Training Report"
-        description={`Training week report for ${gameState.player.fullName}. End-of-week feedback, gains, fatigue, and next-focus guidance before competition.`}
-        actions={<ActionButton onClick={() => navigate('/training')}>View Next Week Plan</ActionButton>}
-      />
+    <div className="space-y-5 pb-10">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase text-gray-500">Training</p>
+          <h1 className="mt-1 text-2xl font-bold text-white">Weekly Training Report</h1>
+          <p className="mt-1 max-w-3xl text-sm text-gray-400">End-of-week feedback for {gameState.player.fullName}: gains, fatigue, and next-focus guidance before competition.</p>
+        </div>
+        <button type="button" onClick={() => navigate('/training')} className="btn-primary shrink-0 text-xs">View Next Week Plan</button>
+      </div>
 
-      <div className="grid gap-4 xl:grid-cols-6">
+      <div className="grid grid-cols-6 gap-3">
         {reportMetrics.map((metric, index) => {
           const Icon = metricIcons[index]
-          return <MetricCard key={metric.label} label={metric.label} value={metric.value} subValue={metric.subtitle} tone={metric.tone} icon={<Icon className="h-5 w-5" />} />
+          return (
+            <div key={metric.label} className="card card-body text-center">
+              <Icon className="mx-auto mb-1 h-4 w-4 text-gray-500" />
+              <p className="metric-label">{metric.label}</p>
+              <p className={`mt-1 text-lg font-bold ${metric.tone}`}>{metric.value}</p>
+              <p className="truncate text-[10px] text-gray-400">{metric.subtitle}</p>
+            </div>
+          )
         })}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.55fr_320px]">
-        <div className="space-y-6">
-          <div className="grid gap-6 xl:grid-cols-3">
-            <SectionCard title="Attribute Improvement" subtitle="Current ratings and change this week.">
-              <div className="space-y-4">
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-8 space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="card">
+              <div className="card-header"><h3 className="text-sm font-semibold text-white">Attribute Improvement</h3></div>
+              <div className="card-body space-y-3">
                 {reportGains.map((gain) => (
                   <div key={gain.label}>
-                    <div className="mb-2 flex items-center justify-between text-sm">
-                      <span className="text-scm-textSoft">{gain.label}</span>
-                      <span className="text-scm-text">{gain.current} <span className={gain.change > 0 ? 'text-emerald-300' : 'text-scm-textMuted'}>{gain.change > 0 ? `+${gain.change}` : '+0'}</span></span>
+                    <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{gain.label}</span><span className="text-white">{gain.current} <span className={gain.change > 0 ? 'text-green-400' : 'text-gray-500'}>{gain.change > 0 ? `+${gain.change}` : '+0'}</span></span></div>
+                    <ProgressBar value={gain.current} tone={gain.current >= 75 ? 'green' : gain.current >= 65 ? 'amber' : 'red'} compact />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="card card-body">
+              <h3 className="mb-3 text-sm font-semibold text-white">Coach Notes</h3>
+              <p className="text-xs leading-relaxed text-gray-300">{currentCoach ? `${currentCoach.name} sees the clearest next gains in ${nextFocus.slice(0, 2).join(' and ')}. ${gameState.lastAction}` : gameState.lastAction}</p>
+              <div className="mt-5 flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-surface-light text-xs font-bold text-white">{currentCoach?.name.split(' ').map((part) => part[0]).join('').slice(0, 2) ?? 'ST'}</div>
+                <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{currentCoach?.name ?? 'Support Team'}</p><p className="text-xs text-green-400">{currentCoach?.type ?? 'No active coach'}</p></div>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-header"><h3 className="text-sm font-semibold text-white">Drill Performance</h3></div>
+              <div className="card-body space-y-3">
+                {reportGains.map((gain) => {
+                  const performance = Number(((gain.current + gain.change * 5) / 10).toFixed(1))
+                  return (
+                    <div key={gain.label}>
+                      <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{gain.label}</span><span className={performance >= 8 ? 'text-green-400' : 'text-amber-400'}>{performance.toFixed(1)}</span></div>
+                      <ProgressBar value={performance * 10} tone={performance >= 8 ? 'green' : 'amber'} compact />
                     </div>
-                    <ProgressBar value={gain.current} tone={gain.current >= 75 ? 'green' : gain.current >= 65 ? 'amber' : 'red'} />
-                  </div>
-                ))}
+                  )
+                })}
               </div>
-            </SectionCard>
-
-            <SectionCard title="Coach Notes" subtitle="Head coach review">
-              <p className="text-sm leading-7 text-scm-textSoft">{currentCoach ? `${currentCoach.name} sees the clearest next gains in ${nextFocus.slice(0, 2).join(' and ')}. ${gameState.lastAction}` : gameState.lastAction}</p>
-              <div className="mt-6 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-scm-panelSoft text-scm-text">{currentCoach?.name.split(' ').map((part) => part[0]).join('').slice(0, 2) ?? 'ST'}</div>
-                <div>
-                  <p className="font-semibold text-scm-text">{currentCoach?.name ?? 'Support Team'}</p>
-                  <p className="text-sm text-scm-green">{currentCoach?.type ?? 'No active coach'}</p>
-                </div>
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Drill Performance" subtitle="Weekly execution quality across the main session types.">
-              <div className="space-y-4">
-                {drillPerformance.map((drill) => (
-                  <div key={drill.drill}>
-                    <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">{drill.drill}</span><span className={drill.performance >= 8 ? 'text-emerald-300' : 'text-amber-300'}>{drill.performance.toFixed(1)}</span></div>
-                    <ProgressBar value={drill.performance * 10} tone={drill.performance >= 8 ? 'green' : 'amber'} />
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
+            </div>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr_0.95fr]">
-            <SectionCard title="Weekly Load & Condition" subtitle="Compared to last week">
-              <div className="grid gap-4 md:grid-cols-2">
-                {trainingCondition.map((condition) => (
-                  <div key={condition.label} className="rounded-xl border border-scm-border bg-scm-panelSoft p-4 text-center">
-                    <CircularMeter value={Math.min(condition.value, 100)} label={condition.label} />
-                    <p className={`mt-3 font-semibold ${condition.tone === 'red' ? 'text-rose-300' : condition.tone === 'amber' ? 'text-amber-300' : condition.tone === 'blue' ? 'text-sky-300' : 'text-emerald-300'}`}>{condition.subtitle}</p>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="card">
+              <div className="card-header"><h3 className="text-sm font-semibold text-white">Condition</h3></div>
+              <div className="card-body space-y-3">
+                {[
+                  { label: 'Confidence', value: gameState.player.confidence, tone: 'green' as const },
+                  { label: 'Fatigue', value: gameState.player.fatigue, tone: 'amber' as const },
+                  { label: 'Morale', value: gameState.player.morale, tone: 'blue' as const },
+                  { label: 'Match Fitness', value: Math.max(0, 100 - gameState.player.fatigue), tone: 'green' as const },
+                ].map((condition) => (
+                  <div key={condition.label}>
+                    <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{condition.label}</span><span className="text-white">{condition.value}%</span></div>
+                    <ProgressBar value={condition.value} tone={condition.tone} compact />
                   </div>
                 ))}
               </div>
-            </SectionCard>
+            </div>
 
-            <SectionCard title="Training Load Over The Week" subtitle="Load units versus ideal range">
-              <div className="h-[240px] w-full">
+            <div className="card">
+              <div className="card-header"><h3 className="text-sm font-semibold text-white">Training Load</h3></div>
+              <div className="card-body h-[230px]">
                 <ResponsiveContainer>
                   <LineChart data={trainingLoadChart}>
-                    <CartesianGrid stroke="#203449" vertical={false} />
-                    <XAxis dataKey="label" stroke="#94a3b8" tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} width={40} />
-                    <Tooltip contentStyle={{ backgroundColor: '#102033', border: '1px solid #31506f', borderRadius: '12px' }} />
-                    <Line type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={3} dot={{ r: 3 }} />
+                    <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} width={30} />
+                    <Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 10 }} />
+                    <Line type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2} dot={{ r: 2 }} />
                     <Line type="monotone" dataKey="optimal" stroke="#94a3b8" strokeDasharray="5 5" dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-            </SectionCard>
+            </div>
 
-            <SectionCard title="Attribute Gains By Category" subtitle="This week">
-              <div className="h-[240px] w-full">
+            <div className="card">
+              <div className="card-header"><h3 className="text-sm font-semibold text-white">Category Gains</h3></div>
+              <div className="card-body h-[230px]">
                 <ResponsiveContainer>
                   <BarChart data={trainingCategoryGains}>
-                    <CartesianGrid stroke="#203449" vertical={false} />
-                    <XAxis dataKey="label" stroke="#94a3b8" tickLine={false} axisLine={false} />
-                    <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} width={40} />
-                    <Tooltip contentStyle={{ backgroundColor: '#102033', border: '1px solid #31506f', borderRadius: '12px' }} />
-                    <Bar dataKey="value" fill="#7ad34b" radius={[8, 8, 0, 0]} />
+                    <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} width={30} />
+                    <Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 10 }} />
+                    <Bar dataKey="value" fill="#22c55e" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            </SectionCard>
+            </div>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <SectionCard title="Warning" subtitle="Fatigue risk rising after heavy training week.">
-            <div className="flex items-start gap-3 rounded-xl border border-scm-red/35 bg-scm-red/10 p-4">
-              <AlertTriangle className="mt-0.5 h-5 w-5 text-scm-red" />
-              <p className="text-sm text-rose-100">{gameState.player.fatigue >= 65 ? 'Load has been productive, but fatigue is now high enough to compromise freshness if the next week is not adjusted.' : 'The current load is manageable, but recovery should still stay in the weekly plan to protect match readiness.'}</p>
+        <div className="col-span-4 space-y-4">
+          <div className="card card-body">
+            <div className="flex items-start gap-3 rounded-lg border border-red-600/30 bg-red-600/10 p-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
+              <p className="text-xs leading-relaxed text-red-100">{gameState.player.fatigue >= 65 ? 'Load has been productive, but fatigue is now high enough to compromise freshness if next week is not adjusted.' : 'The current load is manageable, but recovery should stay in the weekly plan to protect match readiness.'}</p>
             </div>
-          </SectionCard>
+          </div>
 
-          <SectionCard title="Recommended Next Focus" subtitle="Primary, secondary, and tertiary emphasis">
-            <div className="space-y-4 text-sm text-scm-textSoft">
-              <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Primary Focus</p><p className="mt-1 text-xl text-scm-text">{gameState.player.fatigue >= 60 ? 'Recovery & Sharpness' : nextFocus[0]}</p></div>
-              <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Secondary Focus</p><p className="mt-1 text-scm-text">{nextFocus[1] ?? 'Match Readiness'}</p></div>
-              <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Tertiary Focus</p><p className="mt-1 text-scm-text">{nextFocus[2] ?? 'Match Readiness'}</p></div>
+          <div className="card card-body">
+            <h3 className="mb-3 text-xs font-semibold text-white">Recommended Next Focus</h3>
+            <div className="space-y-3 text-xs">
+              <div><p className="text-[10px] uppercase text-gray-500">Primary Focus</p><p className="mt-1 text-lg text-white">{gameState.player.fatigue >= 60 ? 'Recovery and Sharpness' : nextFocus[0]}</p></div>
+              <div><p className="text-[10px] uppercase text-gray-500">Secondary Focus</p><p className="mt-1 text-white">{nextFocus[1] ?? 'Match Readiness'}</p></div>
+              <div><p className="text-[10px] uppercase text-gray-500">Tertiary Focus</p><p className="mt-1 text-white">{nextFocus[2] ?? 'Match Readiness'}</p></div>
             </div>
-          </SectionCard>
+          </div>
 
-          <SectionCard title="Recovery Advice" subtitle="Suggested next-week adjustments">
-            <ul className="space-y-3 text-sm text-scm-textSoft">
+          <div className="card card-body">
+            <h3 className="mb-3 text-xs font-semibold text-white">Recovery Advice</h3>
+            <div className="space-y-2">
               {trainingRecoveryAdvice.map((item) => (
-                <li key={item} className="flex gap-3"><span className="mt-1 h-2 w-2 rounded-full bg-scm-green" />{item}</li>
+                <div key={item} className="flex items-start gap-2 text-xs text-gray-300"><span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />{item}</div>
               ))}
-            </ul>
-          </SectionCard>
+            </div>
+          </div>
 
-          <ActionButton className="w-full justify-center py-4" onClick={() => navigate('/training')}>View Next Week Plan</ActionButton>
+          <button type="button" className="btn-primary w-full justify-center py-3" onClick={() => navigate('/training')}>View Next Week Plan</button>
         </div>
       </div>
     </div>

@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { PageHeader } from '../components/layout/PageHeader'
-import { ActionButton } from '../components/ui/ActionButton'
-import { CircularMeter } from '../components/ui/CircularMeter'
+import { ChevronRight, Star } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { SectionCard } from '../components/ui/SectionCard'
-import { StatusBadge } from '../components/ui/StatusBadge'
 import { useGame } from '../context/GameStateContext'
 import { getCoachAvailability, getCoachContractOptions } from '../utils/coachMarket'
 import { formatMoney } from '../utils/formatters'
 
 function getPlayerRanking(fullName: string, rankingRows: { playerName: string; ranking: number }[], fallbackRanking?: number | null) {
   return rankingRows.find((row) => row.playerName === fullName)?.ranking ?? fallbackRanking ?? 0
+}
+
+function initials(name: string) {
+  return name.split(' ').map((part) => part[0]).join('').slice(0, 2)
 }
 
 export function CoachProfilePage() {
@@ -21,160 +21,63 @@ export function CoachProfilePage() {
   const coach = gameState.coaches.find((entry) => entry.id === id) ?? gameState.coaches[0]
   const ranking = getPlayerRanking(gameState.player.fullName, gameState.rankings, gameState.player.amateurRanking)
   const availability = getCoachAvailability(coach, ranking, gameState.player.reputation)
-  const coachAttributeRatings = [
-    { label: 'Technical', value: coach.technical },
-    { label: 'Tactical', value: coach.tactical },
-    { label: 'Mental', value: coach.mental },
-    { label: 'Motivation', value: coach.motivation },
-    { label: 'Compatibility', value: coach.compatibility },
-  ]
+  const contractOptions = getCoachContractOptions(coach)
+  const [selectedContractLabel, setSelectedContractLabel] = useState(contractOptions.find((option) => option.selected)?.label ?? contractOptions[0]?.label ?? '')
+  const [shortlisted, setShortlisted] = useState(false)
+  const selectedOption = contractOptions.find((option) => option.label === selectedContractLabel) ?? contractOptions[0]
+  const ratings = [
+    ['Technical Knowledge', coach.technical],
+    ['Tactical Knowledge', coach.tactical],
+    ['Mental Support', coach.mental],
+    ['Motivation', coach.motivation],
+    ['Compatibility', coach.compatibility],
+  ] as const
   const predictedImpact = [
     { label: 'Long Potting', value: Math.max(1, Math.round(coach.technical / 18)) },
     { label: 'Safety Play', value: Math.max(1, Math.round(coach.tactical / 18)) },
     { label: 'Focus', value: Math.max(1, Math.round(coach.mental / 18)) },
     { label: 'Stamina', value: Math.max(1, Math.round(coach.motivation / 20)) },
   ]
-  const contractOptions = getCoachContractOptions(coach)
-  const coachProfile = {
-    personality: coach.motivation >= 80 ? 'Demanding Professional' : coach.mental >= 75 ? 'Measured Mentor' : 'Development Specialist',
-    summary: `${coach.name} specialises in ${coach.specialism.toLowerCase()} and currently fits this save at ${coach.compatibility}% compatibility.`,
-    bestFor: `${coach.type} development with ${coach.level.toLowerCase()}-level expectations.`,
-    highlights: coach.strengths.slice(0, 3),
-    languages: ['English', coach.level === 'Elite' ? 'International tour experience' : 'Domestic tour experience'],
-  }
-  const advisorRecommendation = coach.compatibility >= 75 ? 'This is a strong fit if the weekly budget can absorb the staff cost.' : 'Useful specialist coach, but only worth it if the current weakness matches the specialism.'
-  const [selectedContractLabel, setSelectedContractLabel] = useState(contractOptions.find((option) => option.selected)?.label ?? contractOptions[0]?.label ?? '')
-  const [shortlisted, setShortlisted] = useState(false)
 
   function handleHireCoach() {
     if (!availability.available) return
-    hireCoach(coach.id, selectedContractLabel)
+    hireCoach(coach.id, selectedOption?.label)
     navigate('/staff/coaches')
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Staff"
-        title="Coach Profile"
-        description="Detailed coach decision screen with strengths, predicted impact, contract options, and advisor guidance."
-        actions={<StatusBadge tone={availability.available ? 'green' : 'red'}>{availability.available ? 'Available Now' : 'Stage Locked'}</StatusBadge>}
-      />
+    <div className="space-y-6 pb-10">
+      <div className="flex items-start justify-between gap-4">
+        <div><p className="text-[10px] font-semibold uppercase text-gray-500">Staff</p><h1 className="mt-1 text-2xl font-bold text-white">Coach Profile</h1><p className="mt-1 text-sm text-gray-400">Detailed coach decision screen with strengths, contract options, and advisor guidance.</p></div>
+        <span className={availability.available ? 'rounded bg-green-600/20 px-2 py-1 text-[10px] text-green-400' : 'rounded bg-red-600/20 px-2 py-1 text-[10px] text-red-400'}>{availability.available ? 'Available Now' : 'Stage Locked'}</span>
+      </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.45fr_0.95fr]">
-        <div className="space-y-6">
-          <div className="grid gap-6 xl:grid-cols-[1.1fr_1fr]">
-            <SectionCard title={coach.name} subtitle={coach.specialism}>
-              <div className="grid gap-4 grid-cols-[160px_1fr]">
-                <div className="flex h-[180px] items-center justify-center rounded-xl border border-scm-borderStrong bg-scm-panelSoft text-4xl text-scm-textMuted">MK</div>
-                <div>
-                  <div className="flex items-center gap-3"><p className="text-4xl font-semibold text-scm-text">{coach.name}</p><StatusBadge tone="green">Strong Fit</StatusBadge></div>
-                  <p className="mt-2 text-sm text-scm-green">Specialism: {coach.type}</p>
-                  <div className="mt-6 grid grid-cols-2 gap-4 text-sm text-scm-textSoft">
-                    <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Coach Type</p><p className="mt-1 text-scm-text">{coach.type} Coach</p></div>
-                    <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Reputation</p><p className="mt-1 text-scm-text">{coach.reputation}</p></div>
-                    <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Coach Level</p><p className="mt-1 text-scm-text">{coach.level}</p></div>
-                    <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Compatibility</p><p className="mt-1 text-scm-text">{coach.compatibility}%</p></div>
-                    <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Weekly Cost</p><p className="mt-1 text-scm-text">{formatMoney(coach.weeklyCost)}</p></div>
-                    <div><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Personality</p><p className="mt-1 text-scm-text">{coachProfile.personality}</p></div>
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Summary" subtitle="Career highlights and fit context">
-              <p className="text-sm leading-6 text-scm-textSoft">{coachProfile.summary}</p>
-              <p className="mt-4 text-sm"><span className="font-semibold text-scm-green">Best For:</span> <span className="text-scm-textSoft">{coachProfile.bestFor}</span></p>
-              <div className="mt-6 grid gap-6 md:grid-cols-2">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Career Highlights</p>
-                  <ul className="mt-3 space-y-2 text-sm text-scm-textSoft">
-                    {coachProfile.highlights.map((item) => <li key={item} className="flex gap-3"><span className="mt-1 h-2 w-2 rounded-full bg-scm-gold" />{item}</li>)}
-                  </ul>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Working Profile</p>
-                  <ul className="mt-3 space-y-2 text-sm text-scm-textSoft">
-                    {coachProfile.languages.map((item) => <li key={item}>{item}</li>)}
-                  </ul>
-                </div>
-              </div>
-            </SectionCard>
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-8 space-y-4">
+          <div className="card card-body">
+            <div className="grid grid-cols-[160px_1fr] gap-4">
+              <div className="flex h-[180px] items-center justify-center rounded-xl border border-border bg-surface-light text-4xl text-gray-500">{initials(coach.name)}</div>
+              <div><div className="flex items-center gap-3"><h2 className="text-4xl font-semibold text-white">{coach.name}</h2><span className="rounded bg-green-600/20 px-2 py-1 text-[10px] text-green-400">{coach.compatibility >= 75 ? 'Strong Fit' : 'Specialist Fit'}</span></div><p className="mt-2 text-sm text-green-400">Specialism: {coach.specialism}</p><div className="mt-6 grid grid-cols-3 gap-4 text-sm text-gray-400"><div><p className="text-[10px] uppercase text-gray-500">Coach Type</p><p className="mt-1 text-white">{coach.type}</p></div><div><p className="text-[10px] uppercase text-gray-500">Reputation</p><p className="mt-1 text-white">{coach.reputation}</p></div><div><p className="text-[10px] uppercase text-gray-500">Level</p><p className="mt-1 text-white">{coach.level}</p></div><div><p className="text-[10px] uppercase text-gray-500">Compatibility</p><p className="mt-1 text-white">{coach.compatibility}%</p></div><div><p className="text-[10px] uppercase text-gray-500">Weekly Cost</p><p className="mt-1 text-white">{formatMoney(coach.weeklyCost)}</p></div><div><p className="text-[10px] uppercase text-gray-500">Working Style</p><p className="mt-1 text-white">{coach.motivation >= 80 ? 'Demanding Professional' : coach.mental >= 75 ? 'Measured Mentor' : 'Development Specialist'}</p></div></div></div>
+            </div>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[0.95fr_0.95fr_1.1fr]">
-            <SectionCard title="Coach Attributes" subtitle="Technical and support profile">
-              <div className="space-y-4">
-                {coachAttributeRatings.map((item) => (
-                  <div key={item.label}>
-                    <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">{item.label}</span><span className="text-scm-text">{item.value}</span></div>
-                    <ProgressBar value={item.value} tone={item.value >= 85 ? 'green' : item.value >= 75 ? 'green' : item.value >= 60 ? 'amber' : 'red'} />
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Predicted Impact On Player Attributes" subtitle="12-week projection">
-              <div className="space-y-4">
-                {predictedImpact.map((item) => (
-                  <div key={item.label}>
-                    <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">{item.label}</span><span className="text-emerald-300">+{item.value}</span></div>
-                    <ProgressBar value={item.value * 12} tone="green" />
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Contract Options" subtitle="Choose the length and weekly spend before signing.">
-              <div className="space-y-3">
-                {contractOptions.map((option) => (
-                  <button key={option.label} type="button" onClick={() => setSelectedContractLabel(option.label)} className={`w-full rounded-xl border p-4 text-left ${selectedContractLabel === option.label ? 'border-scm-green bg-scm-green/10' : 'border-scm-border bg-scm-panelSoft'}`}>
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="font-semibold text-scm-text">{option.label}</p>
-                        <p className="mt-1 text-sm text-scm-textSoft">{formatMoney(option.weeklyCost)} / week</p>
-                      </div>
-                      <p className="text-sm text-scm-text">Total {formatMoney(option.totalCost)}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <div className="mt-4 rounded-xl border border-scm-red/35 bg-scm-red/10 p-4 text-sm text-rose-100">
-                Selected contract: {selectedContractLabel}. {availability.available ? 'This coach is available to sign now if the budget works.' : availability.reason}.
-              </div>
-            </SectionCard>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Coach Attributes</h3><div className="space-y-3">{ratings.map(([label, value]) => <div key={label}><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{label}</span><span className="text-white">{value}</span></div><ProgressBar value={value} compact /></div>)}</div></div>
+            <div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Predicted Impact</h3><div className="space-y-3">{predictedImpact.map((item) => <div key={item.label}><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{item.label}</span><span className="text-green-400">+{item.value}</span></div><ProgressBar value={item.value * 12} compact /></div>)}</div></div>
+            <div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Advisor Recommendation</h3><p className="text-xs leading-relaxed text-gray-400">{coach.compatibility >= 75 ? 'This is a strong fit if the weekly budget can absorb the staff cost.' : 'Useful specialist coach, but best if the current weakness matches the specialism.'}</p><p className="mt-4 text-lg font-semibold text-green-400">Recommendation: {availability.available ? 'Hire' : 'Monitor'}</p></div>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[0.9fr_0.9fr_0.8fr_1.1fr]">
-            <SectionCard title="Strengths">
-              <ul className="space-y-3 text-sm text-scm-textSoft">
-                {coach.strengths.map((item) => <li key={item} className="flex gap-3"><span className="mt-1 h-2 w-2 rounded-full bg-scm-green" />{item}</li>)}
-              </ul>
-            </SectionCard>
-            <SectionCard title="Weaknesses">
-              <ul className="space-y-3 text-sm text-scm-textSoft">
-                {coach.weaknesses.map((item) => <li key={item} className="flex gap-3"><span className="mt-1 h-2 w-2 rounded-full bg-scm-red" />{item}</li>)}
-              </ul>
-            </SectionCard>
-            <SectionCard title="Style Fit">
-              <div className="flex items-center justify-center py-4"><CircularMeter value={coach.compatibility} label="Fit" /></div>
-              <p className="text-sm text-scm-textSoft">{coach.name}'s coaching style aligns with the current player profile and development priorities.</p>
-            </SectionCard>
-            <SectionCard title="Advisor Recommendation">
-              <p className="text-sm leading-6 text-scm-textSoft">{advisorRecommendation}</p>
-              <p className="mt-4 text-lg font-semibold text-emerald-300">Recommendation: Hire</p>
-            </SectionCard>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Strengths</h3><ul className="space-y-2 text-xs text-gray-300">{coach.strengths.map((item) => <li key={item} className="flex gap-2"><span className="text-green-400">+</span>{item}</li>)}</ul></div>
+            <div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Weaknesses</h3><ul className="space-y-2 text-xs text-gray-300">{coach.weaknesses.map((item) => <li key={item} className="flex gap-2"><span className="text-red-400">-</span>{item}</li>)}</ul></div>
           </div>
         </div>
 
-        <SectionCard title="Decision Row" subtitle="Primary actions exposed exactly where the user needs them.">
-          <div className="space-y-4">
-            <Link to="/staff/coaches"><ActionButton tone="secondary" className="w-full justify-center">Back to Market</ActionButton></Link>
-            <ActionButton className="w-full justify-center" disabled={!availability.available} onClick={handleHireCoach}>Hire Coach</ActionButton>
-            <ActionButton tone="secondary" className="w-full justify-center" onClick={() => setSelectedContractLabel(contractOptions.at(-1)?.label ?? selectedContractLabel)}>Negotiate Contract</ActionButton>
-            <ActionButton tone="secondary" className="w-full justify-center" onClick={() => setShortlisted((value) => !value)}>{shortlisted ? 'Remove From Shortlist' : 'Add to Shortlist'}</ActionButton>
-          </div>
-        </SectionCard>
+        <div className="col-span-4 space-y-4">
+          <div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Contract Options</h3><div className="space-y-2">{contractOptions.map((option) => <button key={option.label} type="button" onClick={() => setSelectedContractLabel(option.label)} className={`w-full rounded border p-3 text-left text-xs ${selectedContractLabel === option.label ? 'border-green-600/30 bg-green-600/10' : 'border-border bg-surface-light/50'}`}><div className="flex items-center justify-between"><span className="font-medium text-white">{option.label}</span><span className="text-green-400">{formatMoney(option.totalCost)}</span></div><p className="mt-1 text-gray-400">{formatMoney(option.weeklyCost)} per week</p></button>)}</div><div className="mt-3 rounded border border-amber-600/30 bg-amber-600/10 p-3 text-xs text-amber-100">Selected contract: {selectedContractLabel}. {availability.available ? 'Available to sign now if the budget works.' : availability.reason}</div></div>
+          <div className="card card-body text-center"><Star className="mx-auto h-5 w-5 fill-amber-400 text-amber-400" /><p className="metric-label mt-2">Style Fit</p><p className="mt-1 text-3xl font-bold text-white">{coach.compatibility}%</p><ProgressBar value={coach.compatibility} compact /></div>
+          <div className="card card-body space-y-3"><Link to="/staff/coaches" className="btn-secondary w-full justify-center text-xs">Back to Market</Link><button type="button" className="btn-primary w-full justify-center text-xs" disabled={!availability.available} onClick={handleHireCoach}>Hire Coach <ChevronRight className="h-3 w-3" /></button><button type="button" className="btn-secondary w-full justify-center text-xs" onClick={() => setSelectedContractLabel(contractOptions.at(-1)?.label ?? selectedContractLabel)}>Negotiate Contract</button><button type="button" className="btn-secondary w-full justify-center text-xs" onClick={() => setShortlisted((value) => !value)}>{shortlisted ? 'Remove From Shortlist' : 'Add to Shortlist'}</button></div>
+        </div>
       </div>
     </div>
   )

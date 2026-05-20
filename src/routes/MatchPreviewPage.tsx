@@ -1,30 +1,94 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BrainCircuit, Clock3, Gauge, ShieldCheck, Thermometer, Trophy } from 'lucide-react'
-import { PageHeader } from '../components/layout/PageHeader'
-import { ActionButton } from '../components/ui/ActionButton'
-import { CircularMeter } from '../components/ui/CircularMeter'
+import {
+  AlertTriangle,
+  BarChart3,
+  ChevronRight,
+  Clock,
+  Gauge,
+  Info,
+  MapPin,
+  Search,
+  ShieldCheck,
+  Swords,
+  Target,
+  Users,
+  Wrench,
+  Zap,
+} from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { SectionCard } from '../components/ui/SectionCard'
 import { useGame } from '../context/GameStateContext'
 import { buildMatchPreviewData } from '../utils/liveRouteData'
+import { formatMoney } from '../utils/formatters'
 
-function getRankValue(rank: number | null | undefined) {
-  return rank ?? 0
+const FRAME_PLANS = ['Attack', 'Balanced', 'Safety'] as const
+const MENTAL_FOCUS_OPTIONS = ['Composed', 'Confident', 'Counter'] as const
+const TEMPO_OPTIONS = ['Steady', 'Quick'] as const
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
 }
 
-function getTraitTone(value: number): 'green' | 'amber' | 'red' {
-  if (value >= 75) return 'green'
-  if (value >= 60) return 'amber'
-  return 'red'
+function getRankValue(rank: number | null | undefined) {
+  return rank ?? '-'
+}
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+}
+
+function getDifficultyLabel(playerRank: number | null | undefined, opponentRank: number | undefined) {
+  if (!opponentRank || !playerRank) return 'Unknown test'
+  const edge = opponentRank - playerRank
+  if (edge >= 8) return 'Favourite'
+  if (edge >= -7) return 'Even match'
+  return 'Underdog test'
+}
+
+function getReadinessScore(confidence: number, fatigue: number, cueFamiliarity: number, pressureLevel: number) {
+  return clamp(Math.round((confidence + (100 - fatigue) + cueFamiliarity + (100 - pressureLevel)) / 4), 0, 100)
+}
+
+function metricTone(value: number, inverse = false) {
+  const adjusted = inverse ? 100 - value : value
+  if (adjusted >= 72) return 'text-green-400'
+  if (adjusted >= 52) return 'text-amber-400'
+  return 'text-red-400'
+}
+
+function getEdgeTone(edge: number | null) {
+  if (edge == null) return 'text-gray-500'
+  if (edge >= 5) return 'text-green-400'
+  if (edge <= -5) return 'text-red-400'
+  return 'text-amber-400'
+}
+
+function formatEdgeLabel(edge: number | null) {
+  if (edge == null) return 'Scout estimate pending'
+  if (edge > 0) return `You +${edge}`
+  if (edge < 0) return `Opponent +${Math.abs(edge)}`
+  return 'Even matchup'
 }
 
 export function MatchPreviewPage() {
   const { gameState, startLiveMatch } = useGame()
   const navigate = useNavigate()
+  const [plan, setPlan] = useState<(typeof FRAME_PLANS)[number]>('Balanced')
+  const [focus, setFocus] = useState<(typeof MENTAL_FOCUS_OPTIONS)[number]>('Composed')
+  const [tempo, setTempo] = useState<(typeof TEMPO_OPTIONS)[number]>('Steady')
   const {
     activeTournament,
     activeRound,
     nextOpponent,
+    playerOverall,
+    playerPotential,
+    opponentOverall,
+    opponentPotential,
     currentCue,
     currentCueState,
     currentChalk,
@@ -33,216 +97,338 @@ export function MatchPreviewPage() {
     totalMeetings,
     wins,
     losses,
-    lastMeeting,
-    frameDifferential,
+    eventMatchesPlayed,
+    eventWins,
+    eventLosses,
+    eventFrameDifferential,
     strengths,
     weaknesses,
+    matchAttributeComparison,
+    attributeComparison,
     scoutNotes,
     scoutConfidence,
     tacticalPlan,
     cueFamiliarity,
-    mentalOutlook,
-    recentPlayerResults,
     recentOpponentResults,
     matchInfo,
     pressureLevel,
   } = buildMatchPreviewData(gameState)
+  const playerRank = gameState.player.amateurRanking ?? gameState.player.worldRanking
   const activeLiveMatch = gameState.liveMatch?.status === 'In Progress' ? gameState.liveMatch : null
+  const opponentName = nextOpponent?.playerName ?? 'Opponent TBD'
+  const opponentRank = nextOpponent?.ranking
+  const readinessScore = getReadinessScore(gameState.player.confidence, gameState.player.fatigue, cueFamiliarity, pressureLevel)
+  const difficultyLabel = getDifficultyLabel(playerRank, opponentRank)
+  const equipmentRows = [
+    { label: 'Cue', name: currentCue?.name ?? 'No cue selected', condition: currentCueState?.condition ?? currentCue?.condition ?? 0 },
+    { label: 'Chalk', name: currentChalk?.name ?? 'Standard chalk', condition: clamp(70 + (currentChalk?.consistency ?? 0) / 2, 0, 100) },
+    { label: 'Tip', name: currentTip?.name ?? 'Standard tip', condition: currentCueState?.tipCondition ?? currentTip?.durability ?? 0 },
+  ]
+  const keyScoutRows = strengths.slice(0, 3)
+  const riskScoutRows = weaknesses.slice(0, 3)
+  const opponentPatternText = recentOpponentResults.map((result) => `${result.result} ${result.score}`).join(' • ') || 'No recent data yet'
+
+  function handleStartMatch() {
+    if (activeLiveMatch) {
+      navigate('/match/live')
+      return
+    }
+    if (!activeTournament?.id) return
+    startLiveMatch(activeTournament.id)
+    navigate('/match/live')
+  }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Match Centre"
-        title="Match Preview"
-        description={`${activeTournament?.name ?? 'Match Preview'} · ${activeRound ?? 'Awaiting Entry'} · ${bestOf}. Review the tactical plan, opponent report, and readiness before the opening break.`}
-      />
-
-      <div className="grid gap-4 xl:grid-cols-6">
-        <SectionCard><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Player</p><p className="mt-2 text-xl font-semibold text-scm-text">{gameState.player.fullName}</p><p className="mt-1 text-scm-green">{gameState.player.careerStage}</p></SectionCard>
-        <SectionCard><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">{gameState.player.rankingLabel}</p><p className="mt-2 text-3xl font-semibold text-scm-text">{getRankValue(gameState.player.amateurRanking ?? gameState.player.worldRanking)}</p></SectionCard>
-        <SectionCard><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Form (Last 10)</p><div className="mt-4 flex gap-2">{gameState.player.form.map((result, index) => <span key={`${result}-${index}`} className={`flex h-8 w-8 items-center justify-center rounded-full ${result === 'W' ? 'bg-emerald-500/15 text-emerald-200' : 'bg-rose-500/15 text-rose-200'}`}>{result}</span>)}</div></SectionCard>
-        <SectionCard><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Confidence</p><p className="mt-2 text-3xl font-semibold text-emerald-300">{gameState.player.confidence}%</p></SectionCard>
-        <SectionCard><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Funds</p><p className="mt-2 text-3xl font-semibold text-scm-gold">£{gameState.player.cash.toLocaleString('en-GB')}</p></SectionCard>
-        <SectionCard><p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Next Event</p><p className="mt-2 text-xl font-semibold text-scm-text">{activeTournament?.name ?? 'No event scheduled'}</p><p className="mt-1 text-scm-textSoft">{activeTournament?.startDate ?? gameState.currentDate}</p></SectionCard>
+    <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
+      <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-surface/85 px-4 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[11px] font-medium text-gray-500">
+            <span className="truncate">{activeTournament?.name ?? 'Match Centre'}</span>
+            <ChevronRight className="h-3 w-3" />
+            <span>{activeRound ?? 'Awaiting Entry'}</span>
+            <ChevronRight className="h-3 w-3" />
+            <span>{bestOf}</span>
+          </div>
+          <h1 className="mt-1 text-2xl font-bold leading-tight text-white">Match Preview</h1>
+          <p className="mt-1 truncate text-xs text-gray-400">Pre-match briefing for {gameState.player.fullName} against {opponentName}.</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="card flex h-[52px] w-[110px] flex-col items-center justify-center text-center">
+            <p className="text-[9px] font-semibold uppercase text-gray-500">Difficulty</p>
+            <p className="text-[13px] font-bold text-green-400">{difficultyLabel}</p>
+          </div>
+          <div className="card flex h-[52px] w-[98px] flex-col items-center justify-center text-center">
+            <p className="text-[9px] font-semibold uppercase text-gray-500">Readiness</p>
+            <p className="text-[13px] font-bold text-white">{readinessScore}%</p>
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.45fr_360px]">
-        <div className="space-y-6">
-          <div className="grid gap-6 xl:grid-cols-[1fr_220px_1.05fr]">
-            <SectionCard title="Home" subtitle={`${gameState.player.fullName} vs ${nextOpponent?.playerName ?? 'Opponent TBD'}`}>
-              <div className="space-y-4">
-                <div className="rounded-2xl border border-scm-border bg-scm-panelSoft p-4">
-                  <p className="text-xl font-semibold text-scm-text">{gameState.player.fullName}</p>
-                  <div className="mt-4 grid gap-3 text-sm text-scm-textSoft">
-                    <div className="flex justify-between"><span>{gameState.player.rankingLabel}</span><span className="text-scm-text">{getRankValue(gameState.player.amateurRanking ?? gameState.player.worldRanking)}</span></div>
-                    <div className="flex justify-between"><span>Confidence</span><span className="text-emerald-300">{gameState.player.confidence}%</span></div>
-                    <div className="flex justify-between"><span>Fatigue</span><span className="text-amber-300">{gameState.player.fatigue}%</span></div>
-                    <div className="flex justify-between"><span>Highest Break</span><span className="text-scm-text">{gameState.matches[0]?.highestBreak ?? 0}</span></div>
-                  </div>
-                </div>
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Head-to-Head">
-              <div className="flex h-full flex-col items-center justify-center text-center">
-                <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Total Meetings</p>
-                <p className="mt-3 text-4xl font-semibold text-scm-text">{totalMeetings}</p>
-                <CircularMeter value={67} label="Win Share" />
-                <p className="mt-4 text-sm text-scm-textSoft">{gameState.player.fullName.split(' ')[0]} leads {wins}-{losses}</p>
-                <p className="mt-2 text-xs text-scm-textMuted">Last meeting: {lastMeeting}</p>
-                <p className="mt-2 text-sm text-emerald-300">Frame differential {frameDifferential}</p>
-              </div>
-            </SectionCard>
-
-            <SectionCard title={`Opponent Scout Report: ${nextOpponent?.playerName ?? 'Opponent TBD'}`}>
-              <div className="grid gap-4 xl:grid-cols-2">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">Strengths</p>
-                  <div className="mt-3 space-y-3">
-                    {strengths.map((trait) => (
-                      <div key={trait.label}>
-                        <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">{trait.label}</span><span className="text-scm-text">{trait.value}</span></div>
-                        <ProgressBar value={trait.value} tone={getTraitTone(trait.value)} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-rose-300">Weaknesses</p>
-                  <div className="mt-3 space-y-3">
-                    {weaknesses.map((trait) => (
-                      <div key={trait.label}>
-                        <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">{trait.label}</span><span className="text-scm-text">{trait.value}</span></div>
-                        <ProgressBar value={trait.value} tone={getTraitTone(trait.value)} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-5 rounded-2xl border border-scm-border bg-scm-panelSoft p-4 text-sm text-scm-textSoft">
-                <p>{scoutNotes}</p>
-                <p className="mt-3 text-emerald-300">Scout confidence {scoutConfidence}%</p>
-              </div>
-            </SectionCard>
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-[1.05fr_1.05fr_0.9fr]">
-            <SectionCard title="Tactical Plan">
-              <div className="space-y-4">
-                {tacticalPlan.map((item) => (
-                  <div key={item.label}>
-                    <div className="mb-2 flex items-center justify-between text-sm">
-                      <div>
-                        <p className="text-scm-text">{item.label}</p>
-                        <p className="text-xs text-scm-textMuted">{item.description}</p>
-                      </div>
-                      <span className="text-emerald-300">{item.level}%</span>
-                    </div>
-                    <ProgressBar value={item.level} tone={item.level >= 65 ? 'green' : 'amber'} />
-                    <p className="mt-2 text-xs text-scm-gold">{item.impact}</p>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Equipment Check">
-              <div className="space-y-4">
-                {[
-                  { label: 'Cue', name: currentCue?.name, value: currentCueState?.condition ?? currentCue?.condition ?? 0 },
-                  { label: 'Chalk', name: currentChalk?.name, value: Math.max(0, Math.min(100, 70 + (currentChalk?.consistency ?? 0) / 2)) },
-                  { label: 'Tip', name: currentTip?.name, value: currentCueState?.tipCondition ?? currentTip?.durability ?? 0 },
-                ].map((item) => (
-                  <div key={item.label} className="rounded-xl border border-scm-border bg-scm-panelSoft p-4">
-                    <div className="flex items-center justify-between"><p className="font-semibold text-scm-text">{item.label}</p><span className="text-emerald-300">{item.value}%</span></div>
-                    <p className="mt-2 text-sm text-scm-textSoft">{item.name}</p>
-                    <div className="mt-3"><ProgressBar value={item.value} tone="green" /></div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-5 grid gap-4 md:grid-cols-[120px_1fr]">
-                <div className="flex justify-center"><CircularMeter value={cueFamiliarity} label="Cue Familiarity" /></div>
-                <div className="space-y-2 rounded-xl border border-scm-border bg-scm-panelSoft p-4 text-sm text-scm-textSoft">
-                  <div className="flex justify-between"><span>Cue Ball Control</span><span className="text-emerald-300">+{currentCue?.bonuses['Cue Ball Control'] ?? 0}</span></div>
-                  <div className="flex justify-between"><span>Consistency</span><span className="text-emerald-300">+{currentCue?.bonuses.Consistency ?? 0}</span></div>
-                  <div className="flex justify-between"><span>Break Building</span><span className="text-emerald-300">+{currentCue?.bonuses['Break Building'] ?? 0}</span></div>
-                  <div className="flex justify-between"><span>Miscue Reduction</span><span className="text-emerald-300">+{currentTip?.miscueReduction ?? 0}</span></div>
-                </div>
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Mental Readiness">
-              <div className="space-y-4">
-                {[
-                  { label: 'Pressure Level', value: pressureLevel, tone: 'amber' as const },
-                  { label: 'Confidence', value: gameState.player.confidence, tone: 'green' as const },
-                  { label: 'Focus', value: gameState.attributes.mental.Focus, tone: 'green' as const },
-                  { label: 'Composure', value: gameState.attributes.mental.Composure, tone: 'green' as const },
-                ].map((item) => (
-                  <div key={item.label}>
-                    <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">{item.label}</span><span className="text-scm-text">{item.value}%</span></div>
-                    <ProgressBar value={item.value} tone={item.tone} />
-                  </div>
-                ))}
-              </div>
-              <div className="mt-5 rounded-2xl border border-scm-green/25 bg-scm-green/10 p-4 text-sm text-scm-textSoft">
-                <p className="flex items-center gap-2 text-emerald-200"><BrainCircuit className="h-4 w-4" />Mental outlook</p>
-                <p className="mt-3">{mentalOutlook}</p>
-              </div>
-            </SectionCard>
-          </div>
-
-          <SectionCard title="Recent Results">
-            <div className="grid gap-6 xl:grid-cols-2">
-              <div>
-                <p className="mb-3 text-sm font-semibold text-emerald-300">{gameState.player.fullName} (Last 4)</p>
-                <div className="space-y-3">
-                  {recentPlayerResults.map((result) => (
-                    <div key={result.id} className="grid grid-cols-[72px_1fr_44px_56px] items-center gap-3 rounded-xl border border-scm-border bg-scm-panelSoft px-4 py-3 text-sm">
-                      <span className="text-scm-textMuted">{result.date}</span>
-                      <span className="text-scm-text">{result.opponent}</span>
-                      <span className={result.result === 'W' ? 'text-emerald-300' : 'text-rose-300'}>{result.result}</span>
-                      <span className="text-scm-text">{result.score}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="mb-3 text-sm font-semibold text-amber-300">{nextOpponent?.playerName ?? 'Opponent TBD'} (Last 4)</p>
-                <div className="space-y-3">
-                  {recentOpponentResults.map((result) => (
-                    <div key={result.id} className="grid grid-cols-[72px_1fr_44px_56px] items-center gap-3 rounded-xl border border-scm-border bg-scm-panelSoft px-4 py-3 text-sm">
-                      <span className="text-scm-textMuted">{result.date}</span>
-                      <span className="text-scm-text">{result.opponent}</span>
-                      <span className={result.result === 'W' ? 'text-emerald-300' : 'text-rose-300'}>{result.result}</span>
-                      <span className="text-scm-text">{result.score}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+      <div className="grid grid-cols-6 gap-2">
+        {[
+          { icon: Clock, label: 'Match Time', value: matchInfo.time },
+          { icon: MapPin, label: 'Venue', value: activeTournament?.location ?? 'Venue TBC' },
+          { icon: Target, label: 'Table', value: matchInfo.table },
+          { icon: ShieldCheck, label: 'Referee', value: matchInfo.referee },
+          { icon: Zap, label: 'Conditions', value: matchInfo.conditions, tone: 'text-green-400' },
+          { icon: Swords, label: 'Format', value: bestOf },
+        ].map((item) => (
+          <div key={item.label} className="card flex h-[52px] min-w-0 items-center gap-3 px-3 py-2">
+            <item.icon className="h-[18px] w-[18px] shrink-0 text-gray-400" />
+            <div className="min-w-0">
+              <p className="text-[9px] font-semibold uppercase text-gray-500">{item.label}</p>
+              <p className={`truncate text-[12px] font-bold ${item.tone ?? 'text-white'}`}>{item.value}</p>
             </div>
-          </SectionCard>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="card min-h-0 border-green-600/70 bg-gradient-to-r from-green-600/15 via-green-600/5 to-surface p-3.5">
+          <div className="mb-2.5 flex items-center gap-2 text-[10px] font-semibold uppercase text-green-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-green-500" /> You
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-green-500 bg-green-600/10 text-2xl font-bold text-green-400">
+              {getInitials(gameState.player.fullName)}
+            </div>
+            <div className="min-w-0">
+              <h2 className="truncate text-xl font-bold text-white">{gameState.player.fullName}</h2>
+              <p className="truncate text-[11px] text-gray-400">{gameState.player.careerStage} - {gameState.player.playingStyle}</p>
+              <p className="mt-1.5 text-[11px] text-gray-400">
+                {gameState.player.rankingLabel} <span className="font-bold text-white">#{getRankValue(playerRank)}</span>
+                <span className="mx-2 text-border">|</span>
+                Cash <span className="font-bold text-green-400">{formatMoney(gameState.player.cash)}</span>
+              </p>
+              <p className="mt-0.5 text-[11px] text-gray-400">
+                OVR <span className="font-bold text-white">{playerOverall}</span>
+                <span className="mx-2 text-border">|</span>
+                POT <span className="font-bold text-green-400">{playerPotential}</span>
+              </p>
+            </div>
+          </div>
+          <div className="mt-2.5 grid grid-cols-3 border-t border-border/60 pt-2 text-center">
+            <div><p className="text-[10px] text-gray-400">Confidence</p><p className={`text-[15px] font-bold ${metricTone(gameState.player.confidence)}`}>{gameState.player.confidence}%</p></div>
+            <div className="border-x border-border"><p className="text-[10px] text-gray-400">Fatigue</p><p className={`text-[15px] font-bold ${metricTone(gameState.player.fatigue, true)}`}>{gameState.player.fatigue}%</p></div>
+            <div><p className="text-[10px] text-gray-400">Pressure</p><p className={`text-[15px] font-bold ${metricTone(pressureLevel, true)}`}>{pressureLevel}%</p></div>
+          </div>
         </div>
 
-        <div className="space-y-6">
-          <SectionCard title="Match Information">
-            <div className="space-y-4 text-sm text-scm-textSoft">
-              <div className="flex items-center justify-between"><span className="flex items-center gap-2"><Trophy className="h-4 w-4 text-scm-gold" />Round</span><span className="text-scm-text">{activeRound ?? 'Awaiting Entry'}</span></div>
-              <div className="flex items-center justify-between"><span className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-scm-gold" />Match Time</span><span className="text-scm-text">{matchInfo.time}</span></div>
-              <div className="flex items-center justify-between"><span className="flex items-center gap-2"><Gauge className="h-4 w-4 text-scm-gold" />Table</span><span className="text-scm-text">{matchInfo.table}</span></div>
-              <div className="flex items-center justify-between"><span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-scm-gold" />Referee</span><span className="text-scm-text">{matchInfo.referee}</span></div>
-              <div className="flex items-center justify-between"><span className="flex items-center gap-2"><Thermometer className="h-4 w-4 text-scm-gold" />Temperature</span><span className="text-scm-text">{matchInfo.temperature}</span></div>
-              <div className="flex items-center justify-between"><span className="flex items-center gap-2"><Trophy className="h-4 w-4 text-scm-gold" />Conditions</span><span className="text-emerald-300">{matchInfo.conditions}</span></div>
-            </div>
-          </SectionCard>
-
-          <div className="grid gap-3">
-            <ActionButton className="justify-center" onClick={() => {
-              startLiveMatch(activeTournament?.id)
-              navigate('/match/live')
-            }}>{activeLiveMatch ? 'Resume Live Match' : 'Start Match'}</ActionButton>
-            <ActionButton tone="secondary" className="justify-center" onClick={() => navigate('/training')}>Adjust Training</ActionButton>
-            <ActionButton tone="secondary" className="justify-center" onClick={() => navigate('/equipment/chalk-tips')}>Change Equipment</ActionButton>
+        <div className="card min-h-0 border-red-600/70 bg-gradient-to-l from-red-600/15 via-red-600/5 to-surface p-3.5">
+          <div className="mb-2.5 flex items-center gap-2 text-[10px] font-semibold uppercase text-red-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> Opponent
           </div>
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-red-500 bg-red-600/10 text-2xl font-bold text-red-400">
+              {getInitials(opponentName)}
+            </div>
+            <div className="min-w-0">
+              <h2 className="truncate text-xl font-bold text-white">{opponentName}</h2>
+              <p className="truncate text-[11px] text-gray-400">Ranking band scout - {difficultyLabel}</p>
+              <p className="mt-1.5 text-[11px] text-gray-400">
+                Rank <span className="font-bold text-white">#{getRankValue(opponentRank)}</span>
+                <span className="mx-2 text-border">|</span>
+                Scout <span className={`font-bold ${metricTone(scoutConfidence)}`}>{scoutConfidence}%</span>
+              </p>
+              <p className="mt-0.5 text-[11px] text-gray-400">
+                OVR <span className="font-bold text-white">{opponentOverall ?? '--'}</span>
+                <span className="mx-2 text-border">|</span>
+                POT <span className="font-bold text-amber-400">{opponentPotential ?? '--'}</span>
+              </p>
+            </div>
+          </div>
+          <div className="mt-2.5 grid grid-cols-3 border-t border-border/60 pt-2 text-center">
+            <div><p className="text-[10px] text-gray-400">Event</p><p className="text-[15px] font-bold text-white">{eventMatchesPlayed}</p></div>
+            <div className="border-x border-border"><p className="text-[10px] text-gray-400">Record</p><p className="text-[15px] font-bold text-white">{eventWins}-{eventLosses}</p></div>
+            <div><p className="text-[10px] text-gray-400">Frames</p><p className={`text-[15px] font-bold ${eventFrameDifferential >= 0 ? 'text-green-400' : 'text-red-400'}`}>{eventFrameDifferential > 0 ? '+' : ''}{eventFrameDifferential}</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid min-h-0 flex-1 grid-cols-12 gap-2">
+        <div className="col-span-4 grid min-h-0 grid-rows-[0.26fr_0.74fr] gap-2">
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-header px-3 py-2">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Users className="h-4 w-4 text-gray-400" />Head-to-Head</h3>
+            </div>
+            <div className="flex h-full items-center p-2.5">
+              <div className="grid w-full grid-cols-3 rounded-md border border-border bg-surface-light/30 py-2 text-center">
+                <div><p className="text-2xl font-bold text-green-400">{wins}</p><p className="text-[9px] text-gray-500">Your Wins</p></div>
+                <div className="border-x border-border"><p className="text-2xl font-bold text-gray-400">{totalMeetings}</p><p className="text-[9px] text-gray-500">Meetings</p></div>
+                <div><p className="text-2xl font-bold text-red-400">{losses}</p><p className="text-[9px] text-gray-500">Losses</p></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-header px-3 py-2">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Search className="h-4 w-4 text-gray-400" />Scout Report</h3>
+              <span className="text-[10px] font-bold text-amber-400">{scoutConfidence}% confidence</span>
+            </div>
+            <div className="card-body flex h-full min-h-0 flex-col gap-3 overflow-auto px-3 py-3 scrollbar-thin">
+              <div>
+                <p className="mb-1.5 text-[10px] font-semibold uppercase text-green-400">Your strongest routes</p>
+                <div className="space-y-2">
+                  {keyScoutRows.map((trait) => (
+                    <div key={trait.label} className="flex items-center gap-2">
+                      <span className="w-24 shrink-0 truncate text-[11px] font-medium text-white">{trait.label}</span>
+                      <div className="min-w-0 flex-1"><ProgressBar value={trait.value} compact /></div>
+                      <span className="w-8 shrink-0 text-right text-[11px] font-bold text-white">{trait.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-1.5 text-[10px] font-semibold uppercase text-red-400">Risk watch</p>
+                <div className="space-y-2">
+                  {riskScoutRows.map((trait) => (
+                    <div key={trait.label} className="flex items-center gap-2">
+                      <span className="w-24 shrink-0 truncate text-[11px] font-medium text-white">{trait.label}</span>
+                      <div className="min-w-0 flex-1"><ProgressBar value={trait.value} tone="amber" compact /></div>
+                      <span className="w-8 shrink-0 text-right text-[11px] font-bold text-white">{trait.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-surface-light/40 p-2.5 text-[11px] leading-relaxed text-gray-300">
+                <p className="flex gap-2"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" /><span>{scoutNotes}</span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-span-4 grid min-h-0 grid-rows-[0.46fr_0.54fr] gap-2">
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-header px-3 py-2">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Target className="h-4 w-4 text-gray-400" />Tactical Plan</h3>
+              <span className="rounded bg-green-600/20 px-2 py-0.5 text-[9px] font-semibold uppercase text-green-400">Pre-match</span>
+            </div>
+            <div className="card-body flex h-full min-h-0 flex-col gap-2.5 px-3 py-3">
+              <div className="flex items-center border-b border-border pb-1.5">
+                <p className="w-24 shrink-0 text-[9px] font-semibold uppercase text-gray-500">Frame Plan</p>
+                <div className="grid min-w-0 flex-1 grid-cols-3">
+                  {FRAME_PLANS.map((option) => (
+                    <button key={option} type="button" onClick={() => setPlan(option)} className={plan === option ? 'tab-active px-2 py-0.5 text-[10px]' : 'tab-inactive px-2 py-0.5 text-[10px]'}>{option}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center border-b border-border pb-1.5">
+                <p className="w-24 shrink-0 text-[9px] font-semibold uppercase text-gray-500">Mental Focus</p>
+                <div className="grid min-w-0 flex-1 grid-cols-3">
+                  {MENTAL_FOCUS_OPTIONS.map((option) => (
+                    <button key={option} type="button" onClick={() => setFocus(option)} className={focus === option ? 'tab-active px-2 py-0.5 text-[10px]' : 'tab-inactive px-2 py-0.5 text-[10px]'}>{option}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center">
+                <p className="w-24 shrink-0 text-[9px] font-semibold uppercase text-gray-500">Tempo</p>
+                <div className="grid min-w-0 flex-1 grid-cols-2">
+                  {TEMPO_OPTIONS.map((option) => (
+                    <button key={option} type="button" onClick={() => setTempo(option)} className={tempo === option ? 'tab-active px-2 py-0.5 text-[10px]' : 'tab-inactive px-2 py-0.5 text-[10px]'}>{option}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-lg border border-green-600/40 bg-green-600/10 p-2.5">
+                <p className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase text-green-400"><Info className="h-3.5 w-3.5" />Coach briefing</p>
+                <p className="text-[11px] leading-relaxed text-gray-300">{tacticalPlan[0]?.description} {tacticalPlan[0]?.impact}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-body flex h-full min-h-0 flex-col gap-2.5 px-3 py-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-white"><BarChart3 className="h-4 w-4 text-gray-400" />Matchup Analysis</h3>
+              <div className="space-y-2">
+                {tacticalPlan.map((item) => (
+                  <div key={item.label} className="flex items-center gap-2">
+                    <span className="w-28 shrink-0 truncate text-[11px] font-medium text-white">{item.label}</span>
+                    <div className="min-w-0 flex-1"><ProgressBar value={item.level} tone={item.level >= 65 ? 'green' : 'amber'} compact /></div>
+                    <span className="w-10 shrink-0 text-right text-[11px] font-bold text-green-400">{item.level}%</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-auto rounded-lg border border-amber-600/40 bg-amber-600/10 p-2.5 text-[11px] text-gray-300">
+                <p className="mb-1 flex items-center gap-2 font-semibold uppercase text-amber-400"><AlertTriangle className="h-4 w-4" />Danger zone</p>
+                <p>{gameState.player.fatigue >= 60 ? 'Fatigue is the main threat. Keep visits controlled and avoid forcing long attacking sequences.' : 'Pressure can swing quickly if the opponent settles first.'}</p>
+                <p className="mt-1">Use safety to break rhythm when needed.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-span-4 grid min-h-0 grid-rows-[0.74fr_0.26fr] gap-2">
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-header px-3 py-2">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Gauge className="h-4 w-4 text-gray-400" />Match Profile Comparison</h3>
+              <span className="text-[10px] font-semibold text-gray-500">You vs {getInitials(opponentName)}</span>
+            </div>
+            <div className="card-body flex h-full min-h-0 flex-col gap-2 overflow-auto px-3 py-3 scrollbar-thin">
+              <div className="grid grid-cols-4 gap-1.5 text-center">
+                {matchAttributeComparison.map((item) => (
+                  <div key={item.label} className="rounded-md border border-border bg-surface-light/40 p-1.5">
+                    <p className="text-[9px] text-gray-400">{item.label}</p>
+                    <p className="text-[15px] font-bold text-white">
+                      <span className="text-green-400">{item.player}</span>
+                      <span className="px-1 text-gray-500">/</span>
+                      <span className="text-red-400">{item.opponent ?? '--'}</span>
+                    </p>
+                    <p className={`mt-0.5 text-[9px] font-semibold uppercase ${getEdgeTone(item.edge)}`}>{formatEdgeLabel(item.edge)}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-2">
+                {attributeComparison.map((item) => (
+                  <div key={item.label} className="flex items-center gap-2">
+                    <span className="w-8 shrink-0 text-right text-[11px] font-bold text-green-400">{item.player}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="truncate text-[11px] font-medium text-white">{item.label}</span>
+                        <span className={`text-[10px] font-semibold ${getEdgeTone(item.edge)}`}>{formatEdgeLabel(item.edge)}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <ProgressBar value={item.player} tone="green" compact />
+                        <ProgressBar value={item.opponent ?? 0} tone="amber" compact />
+                      </div>
+                    </div>
+                    <span className="w-8 shrink-0 text-right text-[11px] font-bold text-red-400">{item.opponent ?? '--'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-body grid h-full min-h-0 grid-cols-[1fr_0.9fr] gap-3 px-3 py-3">
+              <div className="min-w-0 space-y-2">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Wrench className="h-4 w-4 text-gray-400" />Equipment Check</h3>
+                {equipmentRows.map((item) => (
+                  <div key={item.label} className="flex items-center gap-2 text-[11px]">
+                    <span className="rounded border border-green-600/40 bg-green-600/10 px-1.5 py-0.5 text-center text-[9px] font-bold text-green-400">{item.label.slice(0, 3).toUpperCase()}</span>
+                    <span className="min-w-0 flex-1 truncate font-medium text-white">{item.name}</span>
+                    <span className="shrink-0 text-gray-400">{Math.round(item.condition)}%</span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-l border-border pl-3 text-[11px]">
+                <div className="mb-2 flex justify-between gap-2"><span className="text-gray-400">Familiarity</span><span className="font-bold text-green-400">{cueFamiliarity}%</span></div>
+                <div className="flex justify-between gap-2"><span className="text-gray-400">Primary Bonus</span><span className="text-right font-bold text-green-400">+{currentCue?.bonuses['Cue Ball Control'] ?? 0} cue ball</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card card-body flex items-center justify-between gap-4 px-3 py-2.5">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase text-gray-500">Recent opponent pattern</p>
+          <p className="truncate text-xs text-gray-300">{opponentPatternText}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button type="button" onClick={() => navigate('/training')} className="btn-secondary px-3 py-2 text-xs">Adjust Training</button>
+          <button type="button" onClick={() => navigate('/equipment/chalk-tips')} className="btn-secondary px-3 py-2 text-xs">Change Equipment</button>
+          <button type="button" onClick={handleStartMatch} className="btn-primary px-4 py-2 text-xs">
+            {activeLiveMatch ? 'Resume Match' : 'Start Match'} <ChevronRight className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
     </div>
