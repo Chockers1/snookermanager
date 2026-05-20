@@ -184,19 +184,174 @@ export function NewCareerPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-10">
-      <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase text-gray-500">Career</p><h1 className="mt-1 text-2xl font-bold text-white">Create Player</h1><p className="mt-1 text-sm text-gray-400">Set up identity, background, temperament, and the starting profile for a new local career.</p></div><button type="button" className="btn-secondary text-xs" onClick={handleRandomise}><Dice5 className="h-3.5 w-3.5" /> Randomise</button></div>
-      <div className="flex flex-wrap items-center gap-2">{steps.map((step, index) => <button key={step} type="button" onClick={() => setCurrentStep(index)} className="flex items-center gap-2"><span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${index === currentStep ? 'bg-green-600 text-white' : index < currentStep ? 'bg-green-600/20 text-green-400' : 'bg-surface text-gray-500'}`}>{index < currentStep ? <Check className="h-4 w-4" /> : index + 1}</span><span className={index === currentStep ? 'text-sm font-medium text-white' : 'text-sm text-gray-500'}>{step}</span>{index < steps.length - 1 ? <span className="h-px w-10 bg-border" /> : null}</button>)}</div>
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-5 space-y-4">
-          {currentStep === 0 ? <div className="card card-body space-y-4"><h2 className="text-sm font-semibold uppercase tracking-wider text-white">1. Identity</h2><div><label className="mb-1 block text-xs text-gray-400">Name</label><input value={form.fullName} onChange={(event) => updateField('fullName', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500" /></div><div><label className="mb-1 block text-xs text-gray-400">Nationality</label><input value={form.nationality} onChange={(event) => updateField('nationality', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500" /></div><div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block text-xs text-gray-400">Age</label><input type="number" min={12} max={80} value={form.age} onChange={(event) => updateField('age', event.target.value)} onBlur={() => updateField('age', String(normalizedAge))} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500" /></div><div><label className="mb-1 block text-xs text-gray-400">Handedness</label><select value={form.handedness} onChange={(event) => updateField('handedness', event.target.value as 'Right-handed' | 'Left-handed')} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500"><option>Right-handed</option><option>Left-handed</option></select></div></div><div><label className="mb-1 block text-xs text-gray-400">Cue Style</label><select value={form.cueStyle} onChange={(event) => updateField('cueStyle', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500">{cueStyles.map((style) => <option key={style}>{style}</option>)}</select></div><div><label className="mb-1 block text-xs text-gray-400">Playing Style</label><select value={form.playingStyle} onChange={(event) => updateField('playingStyle', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500">{playingStyles.map((style) => <option key={style}>{style}</option>)}</select></div><div><p className="mb-2 text-xs text-gray-400">Starting Level</p><div className="grid gap-2">{createPlayerStartingLevelCatalog.map((level) => { const eligible = isStartingLevelEligible(level, normalizedAge); const selected = level.id === selectedStartingLevel.id; return <button key={level.id} type="button" disabled={!eligible} onClick={() => updateField('startingLevelId', level.id)} className={`rounded-lg border p-3 text-left text-xs ${selected ? 'border-green-600/40 bg-green-600/10' : eligible ? 'border-border bg-surface-light/50 hover:border-green-600/30' : 'cursor-not-allowed border-border bg-surface-light/20 opacity-50'}`}><div className="flex justify-between"><span className="font-semibold text-white">{level.name}</span><span className="text-gray-500">Age {level.minAge}-{level.maxAge}</span></div><p className="mt-1 text-gray-400">{level.rankingLabel}</p></button> })}</div><p className="mt-2 text-[10px] text-gray-500">Eligible now: {eligibleStartingLevels.map((level) => level.name).join(' / ')}</p></div></div> : null}
-          {currentStep === 1 ? <div className="space-y-3"><h2 className="text-sm font-semibold uppercase tracking-wider text-white">2. Choose Starting Background</h2>{createPlayerBackgroundCatalog.map((background) => <button key={background.id} type="button" onClick={() => setPreviewBackgroundId(background.id)} className={`card card-body flex w-full items-start gap-4 text-left transition-colors ${previewBackground.id === background.id ? 'border-green-500 bg-green-600/5' : 'hover:border-border-light'}`}><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-light"><ShieldCheck className="h-5 w-5 text-green-400" /></div><div className="flex-1"><div className="flex items-center gap-2"><span className="text-sm font-semibold text-white">{background.name}</span><span className={`rounded px-1.5 py-0.5 text-[10px] ${difficultyClass(background.difficulty)}`}>Difficulty: {background.difficulty}</span>{selectedBackground.id === background.id ? <span className="rounded bg-amber-600/20 px-1.5 py-0.5 text-[10px] text-amber-400">Selected</span> : null}</div><p className="mt-0.5 text-xs text-gray-400">{background.description}</p></div>{previewBackground.id === background.id ? <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-600"><Check className="h-3 w-3 text-white" /></div> : null}</button>)}</div> : null}
-          {currentStep === 2 ? <div className="card card-body space-y-4"><div className="flex items-center justify-between"><h2 className="text-sm font-semibold uppercase tracking-wider text-white">3. Temperament & Attributes</h2><span className={sliderPointsRemaining === 0 ? 'text-xs text-green-400' : 'text-xs text-amber-400'}>{sliderPointsRemaining} pts left</span></div><ProgressBar value={Math.round((sliderPointsUsed / sliderBudget) * 100)} compact />{form.sliders.map((slider) => { const finalSlider = effectiveSliders.find((entry) => entry.label === slider.label) ?? slider; const styleDelta = getPlayingStyleSliderDelta(form.playingStyle, slider.label); return <div key={slider.label} className="rounded-lg bg-surface-light/50 p-3"><div className="mb-2 flex items-center justify-between text-xs"><span className="text-gray-300">{slider.label}</span><span className="text-white">Final {finalSlider.value}</span></div><input type="range" min={20} max={90} value={slider.value} onChange={(event) => updateSlider(slider.label, Number(event.target.value))} className="w-full accent-green-500" /><div className="mt-2 flex justify-between text-[10px] text-gray-500"><span>Base {slider.value}</span><span>{styleDelta === 0 ? 'No style shift' : styleDelta > 0 ? `Style +${styleDelta}` : `Style ${styleDelta}`}</span></div><div className="mt-2"><ProgressBar value={finalSlider.value} compact /></div></div> })}</div> : null}
-          {currentStep === 3 ? <div className="card card-body space-y-4"><h2 className="text-sm font-semibold uppercase tracking-wider text-white">4. Confirm Player</h2>{[['Name', form.fullName], ['Nationality', form.nationality], ['Age', String(normalizedAge)], ['Handedness', form.handedness], ['Background', selectedBackground.name], ['Starting Level', selectedStartingLevel.name], ['Starting Overall', `${startingRating} / 100`], ['Potential', `${startingPotential} / 100`], ['Starting Funds', formatMoney(selectedBackground.funds)]].map(([label, value]) => <div key={label} className="flex justify-between text-sm"><span className="text-gray-400">{label}</span><span className="text-white">{value}</span></div>)}<div className="rounded border border-amber-600/30 bg-amber-600/10 p-3 text-xs text-amber-100">Creating a new career overwrites the current local save.</div></div> : null}
+    <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
+      <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Career</p>
+            <h1 className="mt-1 text-2xl font-bold leading-tight text-white">Create Player</h1>
+            <p className="mt-1 truncate text-xs text-gray-400">Set up identity, background, temperament, and the starting profile for a new local career.</p>
+          </div>
+          <button type="button" className="btn-secondary shrink-0 px-3 py-2 text-xs" onClick={handleRandomise}><Dice5 className="h-3.5 w-3.5" /> Randomise</button>
         </div>
-        <div className="col-span-7"><div className="card card-body"><h3 className="mb-4 text-sm font-semibold uppercase text-gray-500">Player Preview</h3><div className="flex items-start gap-6"><div className="flex h-40 w-32 items-center justify-center rounded-xl bg-surface-light"><UserRound className="h-12 w-12 text-gray-600" /></div><div className="flex-1"><h2 className="text-xl font-bold text-white">{form.fullName}</h2><p className="mt-0.5 text-sm text-gray-400">{form.nationality}</p><div className="mt-4 grid grid-cols-2 gap-3 text-xs"><div><span className="text-gray-500">Age</span><p className="text-white">{normalizedAge}</p></div><div><span className="text-gray-500">Handedness</span><p className="text-white">{form.handedness}</p></div><div><span className="text-gray-500">Cue Style</span><p className="text-white">{form.cueStyle}</p></div><div><span className="text-gray-500">Playing Style</span><p className="text-white">{form.playingStyle}</p></div><div><span className="text-gray-500">Personality</span><p className="text-white">{derivedPersonality}</p></div><div><span className="text-gray-500">Background</span><p className="text-white">{selectedBackground.name}</p></div></div></div><div className="text-center"><div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-green-600/30"><div><p className="text-2xl font-bold text-white">{startingRating}</p><p className="text-[9px] text-gray-500">/100</p></div></div><p className="mt-1 text-[10px] text-gray-400">PROSPECT</p></div></div><div className="mt-6 border-t border-border pt-4"><h4 className="mb-3 text-xs font-semibold uppercase text-gray-500">Background Summary - {activeBackground.name}</h4><div className="grid grid-cols-3 gap-4"><div><p className="mb-1 text-[10px] text-gray-500">Starting Bonuses</p>{activeBackground.bonuses.map((bonus) => <p key={bonus.label} className="text-xs text-green-400">+{bonus.label} {bonus.value}</p>)}</div><div><p className="mb-1 text-[10px] text-gray-500">Starting Weaknesses</p>{activeBackground.weaknesses.map((weakness) => <p key={weakness.label} className="text-xs text-red-400">{weakness.label} {weakness.value}</p>)}</div><div><p className="mb-1 text-[10px] text-gray-500">Starting Funds</p><p className="text-lg font-bold text-white">{formatMoney(activeBackground.funds)}</p><p className={`mt-2 inline-flex rounded px-1.5 py-0.5 text-[10px] ${difficultyClass(activeBackground.difficulty)}`}>{activeBackground.difficulty}</p></div></div></div><div className="mt-6 border-t border-border pt-4"><h4 className="mb-3 text-xs font-semibold uppercase text-gray-500">Attribute Projection</h4><div className="grid grid-cols-2 gap-3">{attributePreview.map((attribute) => <div key={attribute.label}><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{attribute.label}</span><span className="text-white">{attribute.value}</span></div><ProgressBar value={attribute.value} compact /></div>)}</div></div><div className="mt-6 border-t border-border pt-4"><h4 className="mb-3 text-xs font-semibold uppercase text-gray-500">Style Notes</h4><div className="grid grid-cols-2 gap-4 text-xs text-gray-400"><div><p className="font-semibold text-white">{playingStyleProfile.summary}</p><p className="mt-2">{playingStyleProfile.temperament}</p></div><div><p className="font-semibold text-white">{cueStyleProfile.summary}</p><p className="mt-2">Potential {startingPotential} with {selectedStartingLevel.name} start.</p></div></div></div></div></div>
       </div>
-      <div className="flex items-center justify-between"><div className="text-xs text-gray-500">Active save: <span className="text-white">{gameState.player.fullName}</span></div><div className="flex gap-2"><button type="button" className="btn-secondary text-xs" onClick={() => { if (currentStep > 0) setCurrentStep((step) => step - 1); else resetForm() }}><ChevronLeft className="h-3.5 w-3.5" /> {currentStep > 0 ? 'Back' : 'Reset'}</button>{currentStep < steps.length - 1 ? <button type="button" className="btn-primary text-xs" disabled={currentStep === 0 && !canContinueFromIdentity} onClick={continueStep}>Continue <ChevronRight className="h-3.5 w-3.5" /></button> : <button type="button" className="btn-primary text-xs" onClick={handleConfirm}>Start Career <ChevronRight className="h-3.5 w-3.5" /></button>}</div></div>
+
+      <div className="rounded-xl border border-border bg-surface/70 px-3 py-2.5">
+        <div className="flex items-center gap-3 overflow-x-auto scrollbar-thin">
+          {steps.map((step, index) => (
+            <button key={step} type="button" onClick={() => setCurrentStep(index)} className="flex shrink-0 items-center gap-2">
+              <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${index === currentStep ? 'bg-green-600 text-white' : index < currentStep ? 'bg-green-600/20 text-green-400' : 'bg-surface text-gray-500'}`}>
+                {index < currentStep ? <Check className="h-4 w-4" /> : index + 1}
+              </span>
+              <span className={index === currentStep ? 'text-sm font-medium text-white' : 'text-sm text-gray-500'}>{step}</span>
+              {index < steps.length - 1 ? <span className="h-px w-8 bg-border" /> : null}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid min-h-0 flex-1 grid-cols-12 gap-2">
+        <div className="col-span-5 min-h-0">
+          {currentStep === 0 ? (
+            <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+              <div className="card-header px-3 py-2"><h2 className="text-sm font-semibold uppercase tracking-wider text-white">1. Identity</h2><span className="text-[10px] text-gray-500">Starting setup</span></div>
+              <div className="card-body min-h-0 flex-1 overflow-auto px-3 py-3 scrollbar-thin">
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="mb-1 block text-xs text-gray-400">Name</label><input value={form.fullName} onChange={(event) => updateField('fullName', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500" /></div>
+                  <div><label className="mb-1 block text-xs text-gray-400">Nationality</label><input value={form.nationality} onChange={(event) => updateField('nationality', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500" /></div>
+                  <div><label className="mb-1 block text-xs text-gray-400">Age</label><input type="number" min={12} max={80} value={form.age} onChange={(event) => updateField('age', event.target.value)} onBlur={() => updateField('age', String(normalizedAge))} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500" /></div>
+                  <div><label className="mb-1 block text-xs text-gray-400">Handedness</label><select value={form.handedness} onChange={(event) => updateField('handedness', event.target.value as 'Right-handed' | 'Left-handed')} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500"><option>Right-handed</option><option>Left-handed</option></select></div>
+                  <div><label className="mb-1 block text-xs text-gray-400">Cue Style</label><select value={form.cueStyle} onChange={(event) => updateField('cueStyle', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500">{cueStyles.map((style) => <option key={style}>{style}</option>)}</select></div>
+                  <div><label className="mb-1 block text-xs text-gray-400">Playing Style</label><select value={form.playingStyle} onChange={(event) => updateField('playingStyle', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500">{playingStyles.map((style) => <option key={style}>{style}</option>)}</select></div>
+                </div>
+                <div className="mt-3">
+                  <p className="mb-2 text-xs text-gray-400">Starting Level</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {createPlayerStartingLevelCatalog.map((level) => {
+                      const eligible = isStartingLevelEligible(level, normalizedAge)
+                      const selected = level.id === selectedStartingLevel.id
+
+                      return <button key={level.id} type="button" disabled={!eligible} onClick={() => updateField('startingLevelId', level.id)} className={`rounded-lg border p-2.5 text-left text-xs ${selected ? 'border-green-600/40 bg-green-600/10' : eligible ? 'border-border bg-surface-light/50 hover:border-green-600/30' : 'cursor-not-allowed border-border bg-surface-light/20 opacity-50'}`}><div className="flex justify-between gap-2"><span className="font-semibold text-white">{level.name}</span><span className="shrink-0 text-gray-500">Age {level.minAge}-{level.maxAge}</span></div><p className="mt-1 text-gray-400">{level.rankingLabel}</p></button>
+                    })}
+                  </div>
+                  <p className="mt-2 text-[10px] text-gray-500">Eligible now: {eligibleStartingLevels.map((level) => level.name).join(' / ')}</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {currentStep === 1 ? (
+            <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+              <div className="card-header px-3 py-2"><h2 className="text-sm font-semibold uppercase tracking-wider text-white">2. Background</h2><span className="text-[10px] text-gray-500">Choose a starting route</span></div>
+              <div className="card-body min-h-0 flex-1 space-y-2 overflow-auto px-3 py-3 scrollbar-thin">
+                {createPlayerBackgroundCatalog.map((background) => <button key={background.id} type="button" onClick={() => setPreviewBackgroundId(background.id)} className={`flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${previewBackground.id === background.id ? 'border-green-500 bg-green-600/5' : 'border-transparent bg-surface-light/50 hover:border-border-light'}`}><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-light"><ShieldCheck className="h-4 w-4 text-green-400" /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-sm font-semibold text-white">{background.name}</span><span className={`rounded px-1.5 py-0.5 text-[10px] ${difficultyClass(background.difficulty)}`}>Difficulty: {background.difficulty}</span>{selectedBackground.id === background.id ? <span className="rounded bg-amber-600/20 px-1.5 py-0.5 text-[10px] text-amber-400">Selected</span> : null}</div><p className="mt-0.5 text-xs text-gray-400">{background.description}</p></div>{previewBackground.id === background.id ? <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-600"><Check className="h-3 w-3 text-white" /></div> : null}</button>)}
+              </div>
+            </div>
+          ) : null}
+
+          {currentStep === 2 ? (
+            <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+              <div className="card-header px-3 py-2"><h2 className="text-sm font-semibold uppercase tracking-wider text-white">3. Attributes</h2><span className={sliderPointsRemaining === 0 ? 'text-[10px] text-green-400' : 'text-[10px] text-amber-400'}>{sliderPointsRemaining} pts left</span></div>
+              <div className="card-body min-h-0 flex-1 overflow-auto px-3 py-3 scrollbar-thin">
+                <ProgressBar value={Math.round((sliderPointsUsed / sliderBudget) * 100)} compact />
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {form.sliders.map((slider) => {
+                    const finalSlider = effectiveSliders.find((entry) => entry.label === slider.label) ?? slider
+                    const styleDelta = getPlayingStyleSliderDelta(form.playingStyle, slider.label)
+
+                    return <div key={slider.label} className="rounded-lg bg-surface-light/50 p-2.5"><div className="mb-1.5 flex items-center justify-between text-xs"><span className="text-gray-300">{slider.label}</span><span className="text-white">Final {finalSlider.value}</span></div><input type="range" min={20} max={90} value={slider.value} onChange={(event) => updateSlider(slider.label, Number(event.target.value))} className="w-full accent-green-500" /><div className="mt-1.5 flex justify-between text-[10px] text-gray-500"><span>Base {slider.value}</span><span>{styleDelta === 0 ? 'No style shift' : styleDelta > 0 ? `Style +${styleDelta}` : `Style ${styleDelta}`}</span></div><div className="mt-1.5"><ProgressBar value={finalSlider.value} compact /></div></div>
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {currentStep === 3 ? (
+            <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+              <div className="card-header px-3 py-2"><h2 className="text-sm font-semibold uppercase tracking-wider text-white">4. Confirm</h2><span className="text-[10px] text-gray-500">Ready to start</span></div>
+              <div className="card-body min-h-0 flex-1 overflow-auto px-3 py-3 scrollbar-thin">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  {[['Name', form.fullName], ['Nationality', form.nationality], ['Age', String(normalizedAge)], ['Handedness', form.handedness], ['Background', selectedBackground.name], ['Starting Level', selectedStartingLevel.name], ['Starting Overall', `${startingRating} / 100`], ['Potential', `${startingPotential} / 100`], ['Starting Funds', formatMoney(selectedBackground.funds)]].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-surface-light/35 px-3 py-2"><span className="text-gray-400">{label}</span><span className="text-right text-white">{value}</span></div>)}
+                </div>
+                <div className="mt-3 rounded border border-amber-600/30 bg-amber-600/10 p-3 text-xs text-amber-100">Creating a new career overwrites the current local save.</div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="col-span-7 min-h-0">
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-header px-3 py-2"><h3 className="text-sm font-semibold uppercase text-gray-500">Player Preview</h3><span className="text-[10px] text-gray-500">Live projection</span></div>
+            <div className="card-body flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-3 py-3">
+              <div className="rounded-xl border border-border bg-surface-light/35 px-4 py-3">
+                <div className="grid grid-cols-[112px_1fr_auto] gap-4">
+                  <div className="flex h-28 w-24 items-center justify-center rounded-xl bg-surface-light"><UserRound className="h-10 w-10 text-gray-600" /></div>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-xl font-bold text-white">{form.fullName}</h2>
+                    <p className="mt-0.5 text-sm text-gray-400">{form.nationality}</p>
+                    <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
+                      <div><span className="text-gray-500">Age</span><p className="text-white">{normalizedAge}</p></div>
+                      <div><span className="text-gray-500">Handedness</span><p className="text-white">{form.handedness}</p></div>
+                      <div><span className="text-gray-500">Cue Style</span><p className="text-white">{form.cueStyle}</p></div>
+                      <div><span className="text-gray-500">Playing Style</span><p className="text-white">{form.playingStyle}</p></div>
+                      <div><span className="text-gray-500">Personality</span><p className="text-white">{derivedPersonality}</p></div>
+                      <div><span className="text-gray-500">Background</span><p className="text-white">{activeBackground.name}</p></div>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-green-600/30"><div><p className="text-2xl font-bold text-white">{startingRating}</p><p className="text-[9px] text-gray-500">/100</p></div></div>
+                    <p className="mt-1 text-[10px] text-gray-400">PROSPECT</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid min-h-0 flex-1 grid-cols-[0.95fr_1.05fr] gap-3 overflow-hidden">
+                <div className="grid min-h-0 grid-rows-[0.56fr_0.44fr] gap-3">
+                  <div className="rounded-xl border border-border bg-surface-light/35 px-3 py-3">
+                    <h4 className="mb-2 text-xs font-semibold uppercase text-gray-500">Background Summary - {activeBackground.name}</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <p className="mb-1 text-[10px] text-gray-500">Starting Bonuses</p>
+                        <div className="space-y-1">{activeBackground.bonuses.map((bonus) => <p key={bonus.label} className="text-xs text-green-400">+{bonus.label} {bonus.value}</p>)}</div>
+                      </div>
+                      <div>
+                        <p className="mb-1 text-[10px] text-gray-500">Starting Weaknesses</p>
+                        <div className="space-y-1">{activeBackground.weaknesses.map((weakness) => <p key={weakness.label} className="text-xs text-red-400">{weakness.label} {weakness.value}</p>)}</div>
+                      </div>
+                      <div>
+                        <p className="mb-1 text-[10px] text-gray-500">Start Pack</p>
+                        <p className="text-lg font-bold text-white">{formatMoney(activeBackground.funds)}</p>
+                        <p className={`mt-2 inline-flex rounded px-1.5 py-0.5 text-[10px] ${difficultyClass(activeBackground.difficulty)}`}>{activeBackground.difficulty}</p>
+                        <p className="mt-2 text-[10px] text-gray-400">{selectedStartingLevel.name}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-border bg-surface-light/35 px-3 py-3">
+                    <h4 className="mb-2 text-xs font-semibold uppercase text-gray-500">Style Notes</h4>
+                    <div className="grid grid-cols-2 gap-3 text-xs text-gray-400">
+                      <div><p className="font-semibold text-white">{playingStyleProfile.summary}</p><p className="mt-2">{playingStyleProfile.temperament}</p></div>
+                      <div><p className="font-semibold text-white">{cueStyleProfile.summary}</p><p className="mt-2">Potential {startingPotential} with {selectedStartingLevel.name} start.</p></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-surface-light/35 px-3 py-3">
+                  <h4 className="mb-2 text-xs font-semibold uppercase text-gray-500">Attribute Projection</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {attributePreview.map((attribute) => <div key={attribute.label}><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{attribute.label}</span><span className="text-white">{attribute.value}</span></div><ProgressBar value={attribute.value} compact /></div>)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-light/40 px-3 py-2.5">
+        <div className="text-xs text-gray-500">Active save: <span className="text-white">{gameState.player.fullName}</span></div>
+        <div className="flex gap-2"><button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => { if (currentStep > 0) setCurrentStep((step) => step - 1); else resetForm() }}><ChevronLeft className="h-3.5 w-3.5" /> {currentStep > 0 ? 'Back' : 'Reset'}</button>{currentStep < steps.length - 1 ? <button type="button" className="btn-primary px-3 py-2 text-xs" disabled={currentStep === 0 && !canContinueFromIdentity} onClick={continueStep}>Continue <ChevronRight className="h-3.5 w-3.5" /></button> : <button type="button" className="btn-primary px-3 py-2 text-xs" onClick={handleConfirm}>Start Career <ChevronRight className="h-3.5 w-3.5" /></button>}</div>
+      </div>
     </div>
   )
 }
