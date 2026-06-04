@@ -32,6 +32,7 @@ type CanonicalTournamentResultOptions = {
   resultLabel: string
   prizeMoney?: number
   rankingPoints?: number
+  playedRounds?: string[]
   levelBucket?: string
   reportingClass?: string
   isRankingTitle?: boolean
@@ -92,24 +93,36 @@ export function buildCanonicalTournamentResult(
   const finishFlags = getCanonicalFinishFlags(roundReached, resultLabel)
   const zeroOutAwards = isNonCompetitiveTournamentResult(resultLabel)
     && /skipped|high-cost event not entered|entered|travel booked|season ended before completion|completed/i.test(resultLabel)
+  const playedRoundResults = options.playedRounds
+    ?.map((round) => {
+      const match = round.match(/^(.+?):\s+(Won|Lost)\b/i)
+      return match?.[1] && match[2] ? { round: match[1].trim(), result: match[2] } : null
+    })
+    .filter((round): round is { round: string, result: string } => round != null) ?? []
+  const playedRoundWins = playedRoundResults.filter((round) => round.result === 'Won').length
+  const playedRoundLosses = playedRoundResults.filter((round) => round.result === 'Lost').length
+  const playedRoundReached = playedRoundResults.at(-1)?.round ?? roundReached
+  const playedRoundFlags = playedRoundResults.length > 0
+    ? getCanonicalFinishFlags(playedRoundReached, resultLabel)
+    : finishFlags
 
   return {
     tournamentId: options.tournamentId,
     tournamentName: options.tournamentName,
     fieldSize,
-    roundReached,
+    roundReached: playedRoundReached,
     resultLabel,
-    matchesPlayed: roundRecord?.expectedMatches ?? 0,
-    wins: roundRecord?.expectedWins ?? 0,
-    losses: roundRecord?.expectedLosses ?? 0,
-    isTitle: finishFlags.isTitle,
-    isFinal: finishFlags.isFinal,
-    isSemiFinal: finishFlags.isSemiFinal,
-    isQuarterFinal: finishFlags.isQuarterFinal,
-    isDeepRun: finishFlags.isDeepRun,
-    isRankingTitle: finishFlags.isTitle && Boolean(options.isRankingTitle),
-    isMajorTitle: finishFlags.isTitle && Boolean(options.isMajorTitle),
-    isWorldTitle: finishFlags.isTitle && Boolean(options.isWorldTitle),
+    matchesPlayed: playedRoundResults.length > 0 ? playedRoundResults.length : roundRecord?.expectedMatches ?? 0,
+    wins: playedRoundResults.length > 0 ? playedRoundWins : roundRecord?.expectedWins ?? 0,
+    losses: playedRoundResults.length > 0 ? playedRoundLosses : roundRecord?.expectedLosses ?? 0,
+    isTitle: playedRoundFlags.isTitle,
+    isFinal: playedRoundFlags.isFinal,
+    isSemiFinal: playedRoundFlags.isSemiFinal,
+    isQuarterFinal: playedRoundFlags.isQuarterFinal,
+    isDeepRun: playedRoundFlags.isDeepRun,
+    isRankingTitle: playedRoundFlags.isTitle && Boolean(options.isRankingTitle),
+    isMajorTitle: playedRoundFlags.isTitle && Boolean(options.isMajorTitle),
+    isWorldTitle: playedRoundFlags.isTitle && Boolean(options.isWorldTitle),
     prizeMoney: zeroOutAwards ? 0 : (options.prizeMoney ?? 0),
     rankingPoints: zeroOutAwards ? 0 : (options.rankingPoints ?? 0),
     levelBucket: options.levelBucket,

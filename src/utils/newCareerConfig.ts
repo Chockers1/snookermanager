@@ -165,6 +165,59 @@ const STARTING_LEVEL_ATTRIBUTE_PROFILES: Record<NewCareerStartingLevel['stage'],
       'Big Match Nerve': 1,
     },
   },
+  6: {
+    technical: -2,
+    mental: 0,
+    physical: 1,
+    labelOffsets: {
+      Professionalism: 2,
+      'Big Match Nerve': 2,
+      Focus: 1,
+    },
+  },
+  7: {
+    technical: 0,
+    mental: 1,
+    physical: 1,
+    labelOffsets: {
+      Professionalism: 3,
+      'Big Match Nerve': 2,
+      Stamina: 1,
+    },
+  },
+  8: {
+    technical: 3,
+    mental: 3,
+    physical: 2,
+    labelOffsets: {
+      Professionalism: 4,
+      'Big Match Nerve': 3,
+      Consistency: 2,
+    },
+  },
+  9: {
+    technical: 6,
+    mental: 5,
+    physical: 3,
+    labelOffsets: {
+      Professionalism: 5,
+      'Big Match Nerve': 4,
+      Composure: 3,
+      Consistency: 3,
+    },
+  },
+  10: {
+    technical: 9,
+    mental: 7,
+    physical: 4,
+    labelOffsets: {
+      Professionalism: 6,
+      'Big Match Nerve': 5,
+      Composure: 4,
+      Consistency: 4,
+      'Break Building': 2,
+    },
+  },
   14: {
     technical: -7,
     mental: 1,
@@ -181,12 +234,17 @@ const STARTING_LEVEL_ATTRIBUTE_PROFILES: Record<NewCareerStartingLevel['stage'],
 }
 
 const STARTING_LEVEL_OVERALL_CAPS: Record<NewCareerStartingLevel['stage'], number> = {
-  1: 58,
-  2: 63,
-  3: 70,
-  4: 76,
-  5: 81,
-  14: 78,
+  1: 54,
+  2: 58,
+  3: 63,
+  4: 68,
+  5: 72,
+  6: 70,
+  7: 72,
+  8: 74,
+  9: 78,
+  10: 82,
+  14: 68,
 }
 
 const AGE_ATTRIBUTE_PROFILES: AttributeProfile[] = [

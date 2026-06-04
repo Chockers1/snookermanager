@@ -25,7 +25,7 @@ import {
   tournamentCatalog,
   travelOptionCatalog,
 } from '../data/gameContent'
-import { getTournamentResultExpectation, normalizeTournamentRoundLabel } from '../data/tournamentFormats'
+import { getBestOfForRound, getTournamentResultExpectation, normalizeTournamentRoundLabel } from '../data/tournamentFormats'
 import type {
   BracketPlayer,
   BracketRound,
@@ -48,7 +48,7 @@ import type {
   Tournament,
   TravelOption,
 } from '../types/game'
-import { calculateAverage, calculateMatchStrength, calculateTechnicalAverage } from '../utils/calculations'
+import { calculateAverage, calculateMatchStrength, calculateOverallRating, calculateTechnicalAverage } from '../utils/calculations'
 import { buildCanonicalTournamentResult, type CanonicalTournamentResult, getCanonicalFinishFlags, isNonCompetitiveTournamentResult } from '../utils/canonicalTournamentResult'
 import { getCoachAvailability, getCoachContractOptions, getCoachContractWeeks, getCoachSlotLimit as getCoachSlotLimitForRanking } from '../utils/coachMarket'
 import { convertMatchWinProbabilityToFrameWinProbability, getOpponentRankBand, getRoundDifficultyBonus, getRoundPressureMultiplier } from '../utils/matchOutcomeModel'
@@ -608,6 +608,7 @@ type WorldPlayerRecord = {
   seniorTitles: number
   highestBreak: number
   highestWorldRank: number | null
+  developmentPotential?: number
   seasons: WorldPlayerSeasonRecord[]
 }
 
@@ -664,6 +665,7 @@ type LateCareerSystemState = {
   seniorEligible: boolean
   seniorActive: boolean
   legendStatus: boolean
+  retired: boolean
 }
 
 type CareerSystemsState = {
@@ -674,6 +676,7 @@ type CareerSystemsState = {
 }
 
 export type GameState = {
+  worldSeed: number
   currentDate: string
   season: string
   week: number
@@ -729,6 +732,25 @@ const ROUND_PLANS: Record<TournamentRound, { bestOf: number; winPrizeShare: numb
   'Semi Final': { bestOf: 9, winPrizeShare: 0.24, lossPrizeShare: 0.1, winPointsShare: 0.36, lossPointsShare: 0.12 },
   Final: { bestOf: 11, winPrizeShare: 0.45, lossPrizeShare: 0.18, winPointsShare: 0.62, lossPointsShare: 0.2 },
 }
+
+function getTournamentRoundPlan(tournament: Tournament, round: TournamentRound) {
+  const basePlan = ROUND_PLANS[round]
+  return {
+    ...basePlan,
+    bestOf: getBestOfForRound(tournament, round, basePlan.bestOf),
+  }
+}
+
+function getQSchoolRoute(tournament: Tournament) {
+  const name = tournament.name.toLowerCase()
+  if (/asia[\s-]*oceania/.test(name)) return 'asiaOceania'
+  if (/uk[\s/-]*europe|europe q school/.test(name)) return 'ukEurope'
+  return 'generic'
+}
+
+function getQSchoolCardWinningRound(tournament: Tournament): TournamentRound {
+  return getQSchoolRoute(tournament) === 'asiaOceania' ? 'Final' : 'Semi Final'
+}
 const LIVE_ENDGAME_COLOURS: LiveEndgameColour[] = ['Yellow', 'Green', 'Brown', 'Blue', 'Pink', 'Black']
 const LIVE_ENDGAME_COLOUR_POINTS: Record<LiveEndgameColour, number> = {
   Yellow: 2,
@@ -739,7 +761,7 @@ const LIVE_ENDGAME_COLOUR_POINTS: Record<LiveEndgameColour, number> = {
   Black: 7,
 }
 const LIVE_OPPONENT_ARCHETYPES: LiveMatchOpponentArchetype[] = ['Serial Scorer', 'Tactical Grinder', 'Counter Puncher', 'Tempo Disruptor']
-const LIVE_FRAME_START_REDS = 6
+const LIVE_FRAME_START_REDS = 15
 
 function createEmptyTournamentProgress(): TournamentProgressState {
   return {
@@ -1342,12 +1364,106 @@ function buildSyntheticFrameSummary(
 
 function getLiveVisitFatigueCost(activeProfile: LiveVisitSkillProfile, decision: LiveVisitDecision, baseCost: number) {
   const staminaRelief = activeProfile.stamina * 0.012 + activeProfile.handSteadiness * 0.004
-  const decisionLoad = decision === 'Break Build' ? 0.35 : decision === 'Safety Exchange' ? -0.1 : 0
-  return clamp(baseCost + decisionLoad - staminaRelief, 0.35, 2.25)
+  const decisionLoad = decision === 'Break Build' ? 0.22 : decision === 'Safety Exchange' ? -0.14 : 0
+  return clamp((baseCost + decisionLoad - staminaRelief) * 0.68, 0.22, 1.55)
 }
 
 function getLiveVisitFrameFatigueCost(activeProfile: LiveVisitSkillProfile) {
-  return clamp(1.15 - activeProfile.stamina * 0.008 - activeProfile.handSteadiness * 0.004, 0.35, 1.05)
+  return clamp((1.15 - activeProfile.stamina * 0.008 - activeProfile.handSteadiness * 0.004) * 0.62, 0.22, 0.75)
+}
+
+function getLiveVisitColourChoice(activeProfile: LiveVisitSkillProfile, decision: LiveVisitDecision) {
+  const blackBias = activeProfile.breakBuilding + activeProfile.cueBallControl + activeProfile.focus
+  const roll = Math.random() * 100
+
+  if (decision === 'Break Build') {
+    if (blackBias >= 238 && roll < 68) return 7
+    if (blackBias >= 210 && roll < 54) return 7
+    if (roll < 26) return 7
+    if (roll < 54) return 6
+    if (roll < 76) return 5
+    return 4
+  }
+
+  if (roll < 18 + activeProfile.cueBallControl * 0.18) return 7
+  if (roll < 42 + activeProfile.cueBallControl * 0.12) return 6
+  if (roll < 64) return 5
+  if (roll < 82) return 4
+  return 2 + Math.floor(Math.random() * 3)
+}
+
+function getLiveVisitRedClearance(activeProfile: LiveVisitSkillProfile, decision: LiveVisitDecision, retainedTable: boolean, redsRemaining: number) {
+  if (redsRemaining <= 0 || decision === 'Safety Exchange' || decision === 'Snooker Hunt' || decision === 'Respotted Black') return 0
+  if (decision === 'Pot Attempt') return 1
+
+  const scoringCeiling = activeProfile.breakBuilding * 0.45 + activeProfile.cueBallControl * 0.25 + activeProfile.consistency * 0.18 + activeProfile.focus * 0.12
+  const baseClearance = scoringCeiling >= 84 ? 4 : scoringCeiling >= 76 ? 3 : scoringCeiling >= 66 ? 2 : 1
+  const extraClearance = retainedTable && Math.random() * 100 < Math.max(0, scoringCeiling - 62) ? 1 : 0
+
+  return Math.min(redsRemaining, baseClearance + extraClearance)
+}
+
+function resolveLiveVisitScoring(
+  activeProfile: LiveVisitSkillProfile,
+  decision: LiveVisitDecision,
+  tableState: LiveFrameTableState,
+  retainedTable: boolean,
+) {
+  const nextTableState: LiveFrameTableState = {
+    redsRemaining: tableState.redsRemaining,
+    coloursRemaining: [...tableState.coloursRemaining],
+  }
+  let scoredPoints = 0
+  let tableProgressLabel = ''
+
+  if (decision === 'Snooker Hunt') {
+    scoredPoints = clamp(4 + Math.round(Math.random() * 3), 4, 7)
+    tableProgressLabel = `forced ${scoredPoints} foul points`
+    return { scoredPoints, nextTableState, tableProgressLabel }
+  }
+
+  if (decision === 'Respotted Black') {
+    scoredPoints = 7
+    tableProgressLabel = 'potted the respotted black'
+    return { scoredPoints, nextTableState, tableProgressLabel }
+  }
+
+  if (decision === 'Safety Exchange') {
+    tableProgressLabel = 'left the cue ball safe'
+    return { scoredPoints, nextTableState, tableProgressLabel }
+  }
+
+  if (tableState.redsRemaining > 0) {
+    const redsCleared = getLiveVisitRedClearance(activeProfile, decision, retainedTable, tableState.redsRemaining)
+    const colourScores = Array.from({ length: redsCleared }).map(() => getLiveVisitColourChoice(activeProfile, decision))
+    scoredPoints = redsCleared + colourScores.reduce((total, value) => total + value, 0)
+    nextTableState.redsRemaining = Math.max(0, nextTableState.redsRemaining - redsCleared)
+    tableProgressLabel = redsCleared > 0
+      ? `made ${scoredPoints} from ${redsCleared} red${redsCleared === 1 ? '' : 's'} and colour${redsCleared === 1 ? '' : 's'}`
+      : 'could not open the scoring chance'
+
+    if (retainedTable && nextTableState.redsRemaining === 0 && nextTableState.coloursRemaining.length > 0 && decision === 'Break Build') {
+      const colourRun = Math.min(nextTableState.coloursRemaining.length, activeProfile.breakBuilding >= 84 ? 3 : activeProfile.breakBuilding >= 72 ? 2 : 1)
+      const pottedColours = nextTableState.coloursRemaining.slice(0, colourRun)
+      scoredPoints += pottedColours.reduce((total, colour) => total + LIVE_ENDGAME_COLOUR_POINTS[colour], 0)
+      nextTableState.coloursRemaining = nextTableState.coloursRemaining.slice(pottedColours.length)
+      tableProgressLabel += `, then cleared ${pottedColours.map((colour) => colour.toLowerCase()).join(', ')}`
+    }
+
+    return { scoredPoints, nextTableState, tableProgressLabel }
+  }
+
+  const colourRun = decision === 'Break Build'
+    ? Math.min(nextTableState.coloursRemaining.length, activeProfile.breakBuilding >= 84 && retainedTable ? 4 : retainedTable ? 2 : 1)
+    : 1
+  const pottedColours = nextTableState.coloursRemaining.slice(0, colourRun)
+  scoredPoints = pottedColours.reduce((total, colour) => total + LIVE_ENDGAME_COLOUR_POINTS[colour], 0)
+  nextTableState.coloursRemaining = nextTableState.coloursRemaining.slice(pottedColours.length)
+  tableProgressLabel = pottedColours.length > 0
+    ? `cleared ${pottedColours.map((colour) => colour.toLowerCase()).join(', ')}`
+    : 'cleared the table'
+
+  return { scoredPoints, nextTableState, tableProgressLabel }
 }
 
 function getSyntheticCalibrationVisitDecision(liveMatch: LiveMatchState, tacticalPlanOverride?: LiveMatchTacticalPlan): LiveVisitDecision {
@@ -1678,8 +1794,8 @@ function buildTournamentDraw(state: GameState, tournament: Tournament, entryRoun
   })
 }
 
-function simulateBracketScore(round: TournamentRound, topRank: number, bottomRank: number) {
-  const bestOf = ROUND_PLANS[round].bestOf
+function simulateBracketScore(tournament: Tournament, round: TournamentRound, topRank: number, bottomRank: number) {
+  const bestOf = getTournamentRoundPlan(tournament, round).bestOf
   const framesNeeded = Math.ceil(bestOf / 2)
   const topWinChance = clamp(50 + (bottomRank - topRank) * 1.2, 18, 82)
   const topWon = Math.random() * 100 < topWinChance
@@ -1694,7 +1810,7 @@ function simulateBracketScore(round: TournamentRound, topRank: number, bottomRan
     : { topScore: loserFrames, bottomScore: framesNeeded }
 }
 
-function resolveTournamentDrawRound(rounds: BracketRound[], roundLabel: TournamentRound, playerName: string) {
+function resolveTournamentDrawRound(rounds: BracketRound[], tournament: Tournament, roundLabel: TournamentRound, playerName: string) {
   const roundIndex = rounds.findIndex((round) => round.label === roundLabel)
   if (roundIndex === -1) return rounds
 
@@ -1710,7 +1826,7 @@ function resolveTournamentDrawRound(rounds: BracketRound[], roundLabel: Tourname
       return match
     }
 
-    const result = simulateBracketScore(roundLabel, match.top.rank, match.bottom.rank)
+    const result = simulateBracketScore(tournament, roundLabel, match.top.rank, match.bottom.rank)
     return {
       ...match,
       top: { ...match.top, score: result.topScore },
@@ -1746,6 +1862,7 @@ function resolveTournamentDrawRound(rounds: BracketRound[], roundLabel: Tourname
 
 function applyCompletedMatchToTournamentDraw(
   rounds: BracketRound[],
+  tournament: Tournament,
   roundLabel: TournamentRound,
   playerName: string,
   playerFrames: number,
@@ -1767,7 +1884,7 @@ function applyCompletedMatchToTournamentDraw(
     placeholder: false,
   }
 
-  return resolveTournamentDrawRound(nextRounds, roundLabel, playerName)
+  return resolveTournamentDrawRound(nextRounds, tournament, roundLabel, playerName)
 }
 
 function createEmptyTravelState(): TravelState {
@@ -1895,36 +2012,43 @@ function createGeneratedRankingIdentity(seenNames: Set<string>, seed: number) {
   }
 }
 
-function createCompetitionPoolRows(key: Exclude<CompetitionTableKey, 'world' | 'oneYear'>, seenNames: Set<string>): RankingRow[] {
+function createCompetitionPoolRows(key: Exclude<CompetitionTableKey, 'world' | 'oneYear'>, seenNames: Set<string>, worldSeed = 0): RankingRow[] {
   const profile = COMPETITION_POOL_PROFILES[key]
 
   return Array.from({ length: profile.count }, (_, index) => {
-    const identity = createGeneratedRankingIdentity(seenNames, profile.seedOffset + index * 7)
+    const seed = worldSeed + profile.seedOffset + index * 7
+    const identity = createGeneratedRankingIdentity(seenNames, seed)
     const ranking = index + 1
+    const pointsOffset = getSeededSignedOffset(worldSeed, profile.seedOffset + index * 13, Math.max(3, Math.round(profile.pointsStart * 0.025)))
+    const prizeOffset = getSeededSignedOffset(worldSeed, profile.seedOffset + index * 17, Math.max(0, Math.round(profile.prizeStart * 0.025)))
 
     return {
       id: `rank-${key}-${ranking}`,
       playerName: identity.playerName,
       nation: identity.nation,
       ranking,
-      movement: [1, 0, -1, 2, -2, 0, 3, -3][(index + profile.seedOffset) % 8],
-      points: Math.max(12, profile.pointsStart - index * profile.pointsStep + ((index % 5) * 3)),
-      prizeMoney: Math.max(0, profile.prizeStart - index * profile.prizeStep),
+      movement: getSeededSignedOffset(worldSeed, profile.seedOffset + index * 19, 3),
+      points: Math.max(12, profile.pointsStart - index * profile.pointsStep + ((index % 5) * 3) + pointsOffset),
+      prizeMoney: Math.max(0, profile.prizeStart - index * profile.prizeStep + prizeOffset),
       highlighted: false,
     }
   })
 }
 
-function buildCompetitionTables(baseRows: RankingRow[], player: Player, options?: { reservePlayerName?: boolean }): CompetitionTablesState {
+function buildCompetitionTables(baseRows: RankingRow[], player: Player, options?: { reservePlayerName?: boolean; worldSeed?: number }): CompetitionTablesState {
+  const worldSeed = options?.worldSeed ?? 0
+  const seededBaseRows = worldSeed > 0
+    ? buildSeededWorldRankingRows(baseRows, player, worldSeed, options?.reservePlayerName)
+    : baseRows
   const seenNames = new Set<string>([player.fullName])
-  baseRows.forEach((row) => {
+  seededBaseRows.forEach((row) => {
     if (options?.reservePlayerName && row.playerName === player.fullName) return
     seenNames.add(row.playerName)
   })
-  const competitionBaseRows = baseRows.map((row) => {
+  const competitionBaseRows = seededBaseRows.map((row) => {
     if (!options?.reservePlayerName || row.playerName !== player.fullName) return row
 
-    const identity = createGeneratedRankingIdentity(seenNames, 997 + row.ranking * 13)
+    const identity = createGeneratedRankingIdentity(seenNames, worldSeed + 997 + row.ranking * 13)
     return {
       ...row,
       id: `${row.id}-reserve`,
@@ -1937,11 +2061,11 @@ function buildCompetitionTables(baseRows: RankingRow[], player: Player, options?
   return {
     world: createCompetitionRowsFromBase(competitionBaseRows, player, 1, 1, 8),
     oneYear: createCompetitionRowsFromBase(competitionBaseRows, player, 0.46, 0.46, 6),
-    amateur: createCompetitionRowsFromBase(createCompetitionPoolRows('amateur', seenNames), player, 1, 1, 7),
-    qTour: createCompetitionRowsFromBase(createCompetitionPoolRows('qTour', seenNames), player, 1, 1, 6),
-    qSchool: createCompetitionRowsFromBase(createCompetitionPoolRows('qSchool', seenNames), player, 1, 0, 4).map((row) => ({ ...row, prizeMoney: 0 })),
-    senior: createCompetitionRowsFromBase(createCompetitionPoolRows('senior', seenNames), player, 1, 1, 5),
-    youth: createCompetitionRowsFromBase(createCompetitionPoolRows('youth', seenNames), player, 1, 1, 6),
+    amateur: createCompetitionRowsFromBase(createCompetitionPoolRows('amateur', seenNames, worldSeed), player, 1, 1, 7),
+    qTour: createCompetitionRowsFromBase(createCompetitionPoolRows('qTour', seenNames, worldSeed), player, 1, 1, 6),
+    qSchool: createCompetitionRowsFromBase(createCompetitionPoolRows('qSchool', seenNames, worldSeed), player, 1, 0, 4).map((row) => ({ ...row, prizeMoney: 0 })),
+    senior: createCompetitionRowsFromBase(createCompetitionPoolRows('senior', seenNames, worldSeed), player, 1, 1, 5),
+    youth: createCompetitionRowsFromBase(createCompetitionPoolRows('youth', seenNames, worldSeed), player, 1, 1, 6),
   }
 }
 
@@ -1953,6 +2077,43 @@ function hashString(value: string) {
   }
 
   return Math.abs(hash)
+}
+
+function createWorldSeed() {
+  return Math.floor(Math.random() * 2_147_483_647)
+}
+
+function seededNoise(seed: number, salt: number) {
+  const value = Math.sin(seed * 12.9898 + salt * 78.233) * 43758.5453
+  return value - Math.floor(value)
+}
+
+function getSeededSignedOffset(seed: number, salt: number, range: number) {
+  return Math.round((seededNoise(seed, salt) * 2 - 1) * range)
+}
+
+function buildSeededWorldRankingRows(baseRows: RankingRow[], player: Player, worldSeed: number, reservePlayerName = false): RankingRow[] {
+  const seenNames = new Set<string>([player.fullName])
+
+  return baseRows.map((row) => {
+    const preservePlayer = row.playerName === player.fullName && !reservePlayerName
+    const identity = preservePlayer
+      ? { playerName: player.fullName, nation: getNationCode(player.nationality) }
+      : createGeneratedRankingIdentity(seenNames, worldSeed + row.ranking * 31)
+    const pointsOffset = getSeededSignedOffset(worldSeed, row.ranking * 17, Math.max(24, Math.round(row.points * 0.08)))
+    const prizeOffset = getSeededSignedOffset(worldSeed, row.ranking * 19, Math.max(1500, Math.round(row.prizeMoney * 0.08)))
+
+    return {
+      ...row,
+      id: preservePlayer ? row.id : `rank-world-${worldSeed}-${row.ranking}`,
+      playerName: identity.playerName,
+      nation: identity.nation,
+      movement: getSeededSignedOffset(worldSeed, row.ranking * 23, 4),
+      points: Math.max(160, row.points + pointsOffset),
+      prizeMoney: Math.max(12000, row.prizeMoney + prizeOffset),
+      highlighted: preservePlayer,
+    }
+  })
 }
 
 function getCompetitionRowForPlayer(tables: CompetitionTablesState, key: CompetitionTableKey, playerName: string) {
@@ -2011,12 +2172,13 @@ function buildWorldPlayersFromTables(tables: CompetitionTablesState, player?: Pl
     const oneYearRow = getCompetitionRowForPlayer(tables, 'oneYear', playerName)
     const amateurRow = getCompetitionRowForPlayer(tables, 'amateur', playerName)
     const qTourRow = getCompetitionRowForPlayer(tables, 'qTour', playerName)
+    const qSchoolRow = getCompetitionRowForPlayer(tables, 'qSchool', playerName)
     const seniorRow = getCompetitionRowForPlayer(tables, 'senior', playerName)
     const youthRow = getCompetitionRowForPlayer(tables, 'youth', playerName)
-    const nation = worldRow?.nation ?? amateurRow?.nation ?? qTourRow?.nation ?? seniorRow?.nation ?? youthRow?.nation ?? getNationCode(player?.nationality ?? 'International')
-    const totalMatches = (oneYearRow?.eventsPlayed ?? worldRow?.eventsPlayed ?? 0) + (amateurRow?.eventsPlayed ?? 0) + (qTourRow?.eventsPlayed ?? 0) + (seniorRow?.eventsPlayed ?? 0) + (youthRow?.eventsPlayed ?? 0)
-    const wins = (oneYearRow?.wins ?? worldRow?.wins ?? 0) + (amateurRow?.wins ?? 0) + (qTourRow?.wins ?? 0) + (seniorRow?.wins ?? 0) + (youthRow?.wins ?? 0)
-    const losses = (oneYearRow?.losses ?? worldRow?.losses ?? 0) + (amateurRow?.losses ?? 0) + (qTourRow?.losses ?? 0) + (seniorRow?.losses ?? 0) + (youthRow?.losses ?? 0)
+    const nation = worldRow?.nation ?? amateurRow?.nation ?? qTourRow?.nation ?? qSchoolRow?.nation ?? seniorRow?.nation ?? youthRow?.nation ?? getNationCode(player?.nationality ?? 'International')
+    const totalMatches = (oneYearRow?.eventsPlayed ?? worldRow?.eventsPlayed ?? 0) + (amateurRow?.eventsPlayed ?? 0) + (qTourRow?.eventsPlayed ?? 0) + (qSchoolRow?.eventsPlayed ?? 0) + (seniorRow?.eventsPlayed ?? 0) + (youthRow?.eventsPlayed ?? 0)
+    const wins = (oneYearRow?.wins ?? worldRow?.wins ?? 0) + (amateurRow?.wins ?? 0) + (qTourRow?.wins ?? 0) + (qSchoolRow?.wins ?? 0) + (seniorRow?.wins ?? 0) + (youthRow?.wins ?? 0)
+    const losses = (oneYearRow?.losses ?? worldRow?.losses ?? 0) + (amateurRow?.losses ?? 0) + (qTourRow?.losses ?? 0) + (qSchoolRow?.losses ?? 0) + (seniorRow?.losses ?? 0) + (youthRow?.losses ?? 0)
 
     seen.set(playerName, normalizeWorldPlayerRecord({
       id: `wp-${playerName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
@@ -2034,7 +2196,7 @@ function buildWorldPlayersFromTables(tables: CompetitionTablesState, player?: Pl
       wins,
       losses,
       totalPrizeMoney: oneYearRow?.prizeMoney ?? worldRow?.prizeMoney ?? 0,
-      titles: (oneYearRow?.titles ?? 0) + (amateurRow?.titles ?? 0) + (qTourRow?.titles ?? 0) + (seniorRow?.titles ?? 0) + (youthRow?.titles ?? 0),
+      titles: (oneYearRow?.titles ?? 0) + (amateurRow?.titles ?? 0) + (qTourRow?.titles ?? 0) + (qSchoolRow?.titles ?? 0) + (seniorRow?.titles ?? 0) + (youthRow?.titles ?? 0),
       majorTitles: 0,
       qTourWins: qTourRow?.titles ?? 0,
       seniorTitles: seniorRow?.titles ?? 0,
@@ -2099,11 +2261,83 @@ function createEmptyCareerSystems(): CareerSystemsState {
       seniorEligible: false,
       seniorActive: false,
       legendStatus: false,
+      retired: false,
+    },
+  }
+}
+
+function createCareerSystemsForStartingLevel(level: NewCareerStartingLevel): CareerSystemsState {
+  const systems = createEmptyCareerSystems()
+
+  if (level.competitionTable === 'qSchool') {
+    return {
+      ...systems,
+      qSchool: {
+        ...systems.qSchool,
+        campaignsEntered: 1,
+        eligibilityScore: Math.max(80, level.targetPoints),
+        campaignEligible: true,
+        seededCampaign: true,
+        eligibilitySeasonsRemaining: 1,
+        qualifiedBy: 'New career Q School start',
+      },
+    }
+  }
+
+  if (level.competitionTable !== 'world') {
+    return systems
+  }
+
+  const retainedViaRanking = level.targetRanking <= TOP_64_RANK_CUTOFF
+  const rookieCard = !retainedViaRanking
+
+  return {
+    ...systems,
+    pro: {
+      ...systems.pro,
+      hasTourCard: true,
+      cardSource: retainedViaRanking ? 'Ranking Retained' : 'Seeded Main Tour',
+      currentYear: rookieCard ? 1 : 0,
+      yearsRemaining: rookieCard ? 2 : 0,
+      expiresAfterSeason: rookieCard ? '2027/28' : null,
+      retainedViaRanking,
+      awardedBy: 'New career professional start',
+      survivalStatus: level.targetRanking <= TOP_16_RANK_CUTOFF
+        ? 'Top 16'
+        : level.targetRanking <= TOP_32_RANK_CUTOFF
+          ? 'Top 32'
+          : level.targetRanking <= TOP_64_RANK_CUTOFF
+            ? 'Safe'
+            : level.targetRanking <= 96
+              ? 'Bubble'
+              : 'At Risk',
+      tourSurvivalStatus: level.targetRanking <= TOP_16_RANK_CUTOFF
+        ? 'Top 16'
+        : level.targetRanking <= TOP_32_RANK_CUTOFF
+          ? 'Top 32'
+          : level.targetRanking <= TOP_64_RANK_CUTOFF
+            ? 'Safe'
+            : level.targetRanking <= 96
+              ? 'Bubble'
+              : 'At Risk',
+      currentTier: level.careerStage,
+      worldRank: level.targetRanking,
+      oneYearRank: level.targetRanking,
     },
   }
 }
 
 function getCompetitionKeysForTournament(tournament: Tournament): CompetitionTableKey[] {
+  if (tournament.type === 'Amateur') {
+    if (getAmateurRouteAgeLimit(tournament) != null) {
+      return ['youth', 'amateur', 'qTour', 'qSchool']
+    }
+
+    if (isDirectAmateurTourCardRoute(tournament)) {
+      return ['amateur', 'qTour', 'qSchool', 'youth']
+    }
+  }
+
   switch (tournament.rankingType) {
     case 'World Ranking':
       return ['world', 'oneYear']
@@ -2168,21 +2402,20 @@ function addYears(dateString: string, years: number) {
   return date.toISOString().slice(0, 10)
 }
 
-const BASE_TOURNAMENT_SEASON_START_YEAR = getTournamentSeasonStartYear(tournamentCatalog)
-
 function normalizeTournamentStatusForSeason(_status: Tournament['status']) {
   return 'Available'
 }
 
 function buildTournamentScheduleForSeason(seasonStartYear: number): Tournament[] {
-  const yearOffset = seasonStartYear - BASE_TOURNAMENT_SEASON_START_YEAR
-
-  return tournamentCatalog.map((tournament) => ({
-    ...tournament,
-    startDate: addYears(tournament.startDate, yearOffset),
-    endDate: tournament.endDate ? addYears(tournament.endDate, yearOffset) : undefined,
-    status: normalizeTournamentStatusForSeason(tournament.status) as Tournament['status'],
-  }))
+  return tournamentCatalog.map((tournament) => {
+    const yearOffset = seasonStartYear - getSeasonStartYearForDate(tournament.startDate)
+    return {
+      ...tournament,
+      startDate: addYears(tournament.startDate, yearOffset),
+      endDate: tournament.endDate ? addYears(tournament.endDate, yearOffset) : undefined,
+      status: normalizeTournamentStatusForSeason(tournament.status) as Tournament['status'],
+    }
+  })
 }
 
 function applySeasonOpenWorldChampionshipAccess(
@@ -2205,7 +2438,8 @@ function applySeasonOpenWorldChampionshipAccess(
   const seasonOpenStatus = `${state.player.competitiveStatus ?? state.player.careerStage}`.toLowerCase()
   const seasonOpenTier = `${state.careerSystems.pro.currentTier ?? ''}`.toLowerCase()
   const seasonOpenSurvival = `${state.careerSystems.pro.tourSurvivalStatus ?? ''}`.toLowerCase()
-  const mainDrawLocked = (
+  const hasSeasonOpenMainTourStatus = state.careerSystems.pro.hasTourCard && seasonOpenWorldRank <= MAIN_TOUR_POOL_SIZE
+  const mainDrawLocked = hasSeasonOpenMainTourStatus && (
     seasonOpenWorldRank <= TOP_16_RANK_CUTOFF
     || /top 16|major contender|world champion/.test(seasonOpenStatus)
     || /top 16/.test(seasonOpenTier)
@@ -2243,6 +2477,7 @@ function buildTournamentHistoryCanonicalResult(
   resultLabel: string,
   prizeMoney: number,
   rankingPoints: number,
+  playedRounds?: string[],
 ) {
   const rankingTitleEligible = isProfessionalEventType(tournament.eventClass ?? tournament.type)
     && !/qualifying/i.test(tournament.name)
@@ -2266,6 +2501,7 @@ function buildTournamentHistoryCanonicalResult(
       resultLabel,
       prizeMoney,
       rankingPoints,
+      playedRounds,
       isRankingTitle: rankingTitleEligible,
       isMajorTitle: majorTitleEligible,
       isWorldTitle: worldTitleEligible,
@@ -2274,10 +2510,10 @@ function buildTournamentHistoryCanonicalResult(
 }
 
 function createTournamentHistoryEntry(tournament: Tournament, season: string): TournamentHistoryEntry {
-  const reward = tournament.reward
-    ?? (tournament.type === 'Q School' || tournament.name.toLowerCase().includes('play-off')
-      ? 'Two-year tour card'
-      : undefined)
+  const potentialTourCardReward = tournament.type === 'Q School'
+    || tournament.name.toLowerCase().includes('play-off')
+    || /tour card|wst card|professional tour card/i.test(tournament.reward ?? '')
+  const reward = potentialTourCardReward ? undefined : tournament.reward
 
   return {
     id: getTournamentHistoryId(season, tournament.id),
@@ -2319,6 +2555,7 @@ function synchronizeTournamentHistoryEntry(
     entry.result,
     entry.prizeMoney,
     entry.rankingPoints,
+    entry.rounds,
   )
 
   return {
@@ -2461,6 +2698,15 @@ function getTournamentHistoryFinishTier(entry: Pick<TournamentHistoryEntry, 'tou
   return getFinishTierFromRoundReached(getTournamentHistoryRoundReached(entry), entry.result)
 }
 
+function isProfessionalFinalLevelRun(entry: TournamentHistoryEntry) {
+  return isProfessionalEventType(entry.eventType)
+    && (
+      getTournamentHistoryFinishTier(entry) >= 4
+      || entry.result === 'Winner'
+      || (entry.matchesPlayed >= 4 && entry.wins >= 3 && entry.losses >= 1)
+    )
+}
+
 function isDeepRunResult(entry: TournamentHistoryEntry) {
   return getTournamentHistoryFinishTier(entry) >= 3
 }
@@ -2556,6 +2802,51 @@ function appendSeasonRecord(records: CareerSeasonRecord[], record: CareerSeasonR
   return [record, ...withoutExisting].slice(0, SEASON_RECORD_LIMIT)
 }
 
+function seedPathwayFallbackRow(
+  rows: CompetitionTableRow[],
+  player: Player,
+  points: number,
+  statusNote: string,
+) {
+  const playerName = player.fullName
+  const withoutPlayer = rows.filter((row) => row.playerName !== playerName)
+  const fallbackRow: CompetitionTableRow = {
+    ...createCompetitionDefaultRow(playerName, getNationCode(player.nationality), withoutPlayer.length + 1),
+    points,
+    prizeMoney: Math.max(0, Math.round(points * 0.25)),
+    eventsPlayed: 0,
+    wins: 0,
+    losses: 0,
+    titles: 0,
+    statusNote,
+  }
+
+  return rerankCompetitionRows([...withoutPlayer, fallbackRow], playerName)
+}
+
+function seedLostCardFallbackCompetitionTables(tables: CompetitionTablesState, player: Player): CompetitionTablesState {
+  return {
+    ...tables,
+    amateur: seedPathwayFallbackRow(tables.amateur, player, 260, 'Lost-card amateur fallback'),
+    qTour: seedPathwayFallbackRow(tables.qTour, player, 180, 'Lost-card Q Tour fallback'),
+    qSchool: seedPathwayFallbackRow(tables.qSchool, player, 140, 'Lost-card Q School route'),
+  }
+}
+
+function removeOveragePlayerFromYouthTable(tables: CompetitionTablesState, player: Player): CompetitionTablesState {
+  if (player.age <= 21 || !tables.youth.some((row) => row.playerName === player.fullName)) {
+    return tables
+  }
+
+  return {
+    ...tables,
+    youth: rerankCompetitionRows(
+      tables.youth.filter((row) => row.playerName !== player.fullName),
+      player.fullName,
+    ),
+  }
+}
+
 function getDisplayedRanking(state: Pick<GameState, 'player' | 'careerSystems' | 'competitionTables' | 'rankings'> & Partial<Pick<GameState, 'history'>>) {
   const worldRanking = state.careerSystems.pro.worldRank
     ?? state.competitionTables.world.find((row) => row.playerName === state.player.fullName)?.ranking
@@ -2571,7 +2862,18 @@ function getDisplayedRanking(state: Pick<GameState, 'player' | 'careerSystems' |
   const amateurRanking = state.competitionTables.amateur.find((row) => row.playerName === state.player.fullName)?.ranking
     ?? state.player.amateurRanking
     ?? null
+  const seniorRanking = state.competitionTables.senior.find((row) => row.playerName === state.player.fullName)?.ranking
+    ?? state.player.seniorRanking
+    ?? null
   const youthRanking = state.competitionTables.youth.find((row) => row.playerName === state.player.fullName)?.ranking ?? null
+
+  if (state.careerSystems.lateCareer.retired) {
+    return { ranking: 999, rankingLabel: 'Retired' }
+  }
+
+  if (state.careerSystems.lateCareer.seniorActive || state.player.rankingLabel === 'Senior Ranking') {
+    return { ranking: seniorRanking ?? 999, rankingLabel: 'Senior Ranking' }
+  }
 
   if (state.careerSystems.pro.hasTourCard || (effectiveWorldRanking ?? 999) <= 64 || state.player.rankingLabel === 'World Ranking') {
     return { ranking: effectiveWorldRanking ?? 999, rankingLabel: 'World Ranking' }
@@ -2649,37 +2951,60 @@ function applySeasonRollover(state: GameState) {
   const qTourEligibility = getQTourEligibilityAssessment(archivedState, state.season)
   const nextSeasonStartYear = getTournamentSeasonStartYear(state.tournaments) + 1
   const nextSeasonLabel = formatSeasonLabel(nextSeasonStartYear)
-  const currentWorldRank = state.competitionTables.world.find((row) => row.playerName === state.player.fullName)?.ranking
+  const rawCurrentWorldRank = state.competitionTables.world.find((row) => row.playerName === state.player.fullName)?.ranking
     ?? state.careerSystems.pro.worldRank
     ?? state.player.worldRanking
     ?? 999
+  const currentWorldRank = Math.max(rawCurrentWorldRank, getHistoryPerformanceRankFloor(archivedState.history))
   const currentHasTourCard = state.careerSystems.pro.hasTourCard || currentWorldRank <= 64
+  const qTourCampaignEventsEntered = state.history.tournamentHistory.filter(
+    (entry) => entry.season === state.season && entry.eventType === 'Q Tour' && getTournamentHistoryCanonicalResult(entry).matchesPlayed > 0,
+  ).length
   const qTourPromotionEligible = state.careerSystems.qTour.playOffWinner === state.player.fullName
     || state.careerSystems.qTour.directCardAwarded
-  const awardedQTourCard = !currentHasTourCard && qTourPromotionEligible
+  const qTourRankingCardEligible = (state.careerSystems.qTour.playerRank ?? 999) === 1
+    && (state.careerSystems.qTour.playerPoints ?? 0) >= 400
+    && qTourCampaignEventsEntered >= 4
+  const awardedQTourCard = !currentHasTourCard && (qTourPromotionEligible || qTourRankingCardEligible)
   const awardedQSchoolCard = !currentHasTourCard && seasonRecord.qSchoolCardsWon > 0
+  const federationCardEvent = state.history.tournamentHistory.find(
+    (entry) => entry.season === state.season
+      && entry.eventType === 'Amateur'
+      && entry.reward?.toLowerCase().includes('tour card'),
+  )
+  const awardedFederationCard = !currentHasTourCard && federationCardEvent != null
   const rankingRetentionSafe = currentWorldRank <= TOP_64_RANK_CUTOFF
   const retainedCard = currentHasTourCard && rankingRetentionSafe
   const protectedCardSeason = state.careerSystems.pro.hasTourCard && !rankingRetentionSafe && state.careerSystems.pro.yearsRemaining > 1
   const lostCard = currentHasTourCard && !rankingRetentionSafe && !protectedCardSeason
+  const playerHasTourCardNextSeason = awardedQTourCard || awardedQSchoolCard || awardedFederationCard || retainedCard || protectedCardSeason
   const previousEligibilityWindow = Math.max(0, (state.careerSystems.qSchool.eligibilitySeasonsRemaining ?? 0) - 1)
   const reducedQSchoolCooldown = Math.max(0, (state.careerSystems.qSchool.cooldownSeasonsRemaining ?? 0) - 1)
   const failedQSchoolCampaign = seasonRecord.qSchoolCampaignsEntered > 0 && seasonRecord.qSchoolCardsWon === 0
   const qSchoolCooldown = failedQSchoolCampaign
     ? (qTourEligibility.directPlayoffEligible ? 1 : 2)
     : reducedQSchoolCooldown
-  const unlockedEligibilityWindow = qTourEligibility.rawCampaignEligible ? 1 : 0
+  const lostCardFallbackEligible = lostCard && state.player.age < 45
+  const unlockedEligibilityWindow = qTourEligibility.rawCampaignEligible || lostCardFallbackEligible ? 1 : 0
   const qSchoolEligibilityWindow = Math.max(previousEligibilityWindow, unlockedEligibilityWindow)
-  const qSchoolCampaignEligible = !currentHasTourCard
+  const qSchoolCampaignEligible = !playerHasTourCardNextSeason
     && qSchoolEligibilityWindow > 0
     && (qSchoolCooldown === 0 || qTourEligibility.directPlayoffEligible)
-  const qSchoolSeededEligible = !currentHasTourCard
-    && qTourEligibility.seededCampaign
+  const qSchoolSeededEligible = !playerHasTourCardNextSeason
+    && (qTourEligibility.seededCampaign || lostCardFallbackEligible)
     && (qSchoolCooldown === 0 || qTourEligibility.directPlayoffEligible)
-  const qSchoolDirectPlayoffEligible = !currentHasTourCard && qTourEligibility.directPlayoffEligible
-  const rolledCompetitionTables = rollCompetitionTablesForward(state.competitionTables, state.player.fullName)
-  const playerHasTourCardNextSeason = awardedQTourCard || awardedQSchoolCard || retainedCard || protectedCardSeason
-  const nextYearsRemaining = awardedQTourCard || awardedQSchoolCard
+  const qSchoolDirectPlayoffEligible = !playerHasTourCardNextSeason && qTourEligibility.directPlayoffEligible
+  const rawRolledCompetitionTables = rollCompetitionTablesForward(state.competitionTables, state.player.fullName, state.worldPlayers)
+  const fallbackCompetitionTables = lostCardFallbackEligible && !playerHasTourCardNextSeason
+    ? seedLostCardFallbackCompetitionTables(rawRolledCompetitionTables, state.player)
+    : rawRolledCompetitionTables
+  const rolledCompetitionTables = enforcePathwayRankingProofFloors(
+    fallbackCompetitionTables,
+    state.player.fullName,
+    seasonRecord,
+    state.player.age,
+  )
+  const nextYearsRemaining = awardedQTourCard || awardedQSchoolCard || awardedFederationCard
     ? 2
     : retainedCard
       ? 0
@@ -2716,7 +3041,11 @@ function applySeasonRollover(state: GameState) {
       directPlayoffEligible: qSchoolDirectPlayoffEligible,
       eligibilitySeasonsRemaining: qSchoolEligibilityWindow,
       cooldownSeasonsRemaining: qSchoolCooldown,
-      qualifiedBy: qSchoolCampaignEligible || qSchoolSeededEligible || qSchoolDirectPlayoffEligible ? qTourEligibility.qualifiedBy : null,
+      qualifiedBy: qSchoolCampaignEligible || qSchoolSeededEligible || qSchoolDirectPlayoffEligible
+        ? lostCardFallbackEligible
+          ? 'Tour card fallback route'
+          : qTourEligibility.qualifiedBy
+        : null,
       topUpEligible: false,
       slumpRisk: false,
     },
@@ -2727,11 +3056,13 @@ function applySeasonRollover(state: GameState) {
         ? 'Q Tour'
         : awardedQSchoolCard
           ? 'Q School'
-          : retainedCard
-            ? 'Ranking Retained'
-            : protectedCardSeason
-              ? (state.careerSystems.pro.cardSource ?? 'Unknown')
-              : null,
+          : awardedFederationCard
+            ? 'Federation Route'
+            : retainedCard
+              ? 'Ranking Retained'
+              : protectedCardSeason
+                ? (state.careerSystems.pro.cardSource ?? 'Unknown')
+                : null,
       currentYear: nextCurrentYear,
       yearsRemaining: nextYearsRemaining,
       expiresAfterSeason: nextExpiresAfterSeason,
@@ -2740,9 +3071,11 @@ function applySeasonRollover(state: GameState) {
         ? 'Q Tour playoff route'
         : awardedQSchoolCard
           ? 'Q School campaign win'
-          : lostCard
-            ? state.careerSystems.pro.awardedBy
-            : state.careerSystems.pro.awardedBy,
+          : awardedFederationCard
+            ? federationCardEvent.tournamentName
+            : lostCard
+              ? state.careerSystems.pro.awardedBy
+              : state.careerSystems.pro.awardedBy,
       tourSurvivalStatus: retainedCard
         ? 'Safe'
         : protectedCardSeason
@@ -2752,11 +3085,13 @@ function applySeasonRollover(state: GameState) {
             : state.careerSystems.pro.tourSurvivalStatus,
     },
   }
+  const attributesForNextSeason = applySeasonalAgeRegression(state.attributes, state.player.age + 1)
   const playerForNextSeason: Player = {
     ...state.player,
     age: state.player.age + 1,
     worldRanking: rolledCompetitionTables.world.find((row) => row.playerName === state.player.fullName)?.ranking ?? state.player.worldRanking,
     amateurRanking: rolledCompetitionTables.amateur.find((row) => row.playerName === state.player.fullName)?.ranking ?? state.player.amateurRanking,
+    seniorRanking: rolledCompetitionTables.senior.find((row) => row.playerName === state.player.fullName)?.ranking ?? state.player.seniorRanking,
   }
   const archivedWorldPlayers = archiveWorldPlayersForSeason(
     state.worldPlayers,
@@ -2775,8 +3110,16 @@ function applySeasonRollover(state: GameState) {
     careerSystemsSeed.pro,
     nextSeasonStartYear,
   )
+  const livingCompetitionTables = rebuildLivingCompetitionTables(rolledCompetitionTables, nextWorldPlayers, state.player.fullName, nextSeasonStartYear)
+  const flooredLivingCompetitionTables = enforcePathwayRankingProofFloors(
+    livingCompetitionTables,
+    state.player.fullName,
+    seasonRecord,
+    state.player.age,
+  )
+  const ageEligibleCompetitionTables = removeOveragePlayerFromYouthTable(flooredLivingCompetitionTables, playerForNextSeason)
   const rebuiltCompetitionTables = enforcePlayerWorldRankingCeiling(
-    rebuildLivingCompetitionTables(rolledCompetitionTables, nextWorldPlayers, state.player.fullName),
+    ageEligibleCompetitionTables,
     state.player.fullName,
     getPlayerWorldRankingCeiling(archivedState),
   )
@@ -2784,21 +3127,30 @@ function applySeasonRollover(state: GameState) {
     competitionTables: rebuiltCompetitionTables,
     player: playerForNextSeason,
     careerSystems: careerSystemsSeed,
+    history: archivedState.history,
   })
-  const adjustedWorldRank = Math.max(syncedCareerSystems.pro.worldRank ?? 999, getPlayerWorldRankingCeiling(archivedState))
+  const adjustedWorldRank = Math.max(
+    syncedCareerSystems.pro.worldRank ?? 999,
+    getPlayerWorldRankingCeiling(archivedState),
+    getHistoryPerformanceRankFloor(archivedState.history),
+  )
   const careerSystems = {
     ...syncedCareerSystems,
     pro: applyAdjustedWorldRankToProState(syncedCareerSystems.pro, playerForNextSeason, adjustedWorldRank),
   }
   const primaryKey = getPrimaryCompetitionKey({ player: playerForNextSeason, careerSystems })
+  const retired = careerSystems.lateCareer.retired
   const nextPlayer: Player = {
     ...playerForNextSeason,
     worldRanking: careerSystems.pro.worldRank ?? rebuiltCompetitionTables.world.find((row) => row.playerName === state.player.fullName)?.ranking ?? playerForNextSeason.worldRanking,
-    amateurRanking: rebuiltCompetitionTables.amateur.find((row) => row.playerName === state.player.fullName)?.ranking ?? playerForNextSeason.amateurRanking,
+    amateurRanking: retired || primaryKey === 'senior' || primaryKey === 'world'
+      ? null
+      : rebuiltCompetitionTables.amateur.find((row) => row.playerName === state.player.fullName)?.ranking ?? playerForNextSeason.amateurRanking,
+    seniorRanking: rebuiltCompetitionTables.senior.find((row) => row.playerName === state.player.fullName)?.ranking ?? playerForNextSeason.seniorRanking,
     careerPhase: getCareerPhaseFromSystems(playerForNextSeason, careerSystems),
     competitiveStatus: getCareerStageFromSystems(playerForNextSeason, careerSystems, archivedState.history),
     careerStage: getCareerStageFromSystems(playerForNextSeason, careerSystems, archivedState.history),
-    rankingLabel: getRankingLabelForCompetitionKey(primaryKey),
+    rankingLabel: retired ? 'Retired' : getRankingLabelForCompetitionKey(primaryKey),
   }
   const nextSeasonSchedule = applySeasonOpenWorldChampionshipAccess(
     buildTournamentScheduleForSeason(nextSeasonStartYear),
@@ -2818,6 +3170,7 @@ function applySeasonRollover(state: GameState) {
   return {
     ...archivedState,
     player: nextPlayer,
+    attributes: attributesForNextSeason,
     season: nextSeasonLabel,
     tournaments: nextSeasonSchedule,
     rankings: rebuiltCompetitionTables[primaryKey].map((row) => ({ ...row })),
@@ -2898,7 +3251,9 @@ export function advanceWeekState(previousState: GameState): GameState {
   }
 
   const enteredTournament = protectedState.tournaments.find((event) => event.status === 'Entered')
-  if (enteredTournament && protectedState.player.daysUntilEvent <= 7) {
+    ?? protectedState.tournaments.find((event) => event.status === 'Booked')
+  const enteredTournamentDaysUntilStart = enteredTournament ? daysUntil(enteredTournament.startDate, protectedState.currentDate) : null
+  if (enteredTournament && (enteredTournamentDaysUntilStart ?? 999) <= 7) {
     nextState = runMatchSimulation(nextState, enteredTournament)
   } else {
     nextState = finalizeState(
@@ -3027,11 +3382,14 @@ function ensureLockedWorldChampionshipEntry(state: GameState) {
   const fallbackStatus = `${state.player.competitiveStatus ?? state.player.careerStage}`.toLowerCase()
   const fallbackTier = `${state.careerSystems.pro.currentTier ?? ''}`.toLowerCase()
   const fallbackSurvival = `${state.careerSystems.pro.tourSurvivalStatus ?? ''}`.toLowerCase()
-  const inferredMainDrawLock = fallbackWorldRank <= TOP_16_RANK_CUTOFF
+  const hasFallbackMainTourStatus = state.careerSystems.pro.hasTourCard && fallbackWorldRank <= MAIN_TOUR_POOL_SIZE
+  const inferredMainDrawLock = hasFallbackMainTourStatus && (
+    fallbackWorldRank <= TOP_16_RANK_CUTOFF
     || /top 16|major contender|world champion/.test(fallbackStatus)
     || /top 16/.test(fallbackTier)
     || /top 16/.test(fallbackSurvival)
-  const inferredSeasonOpenMainDrawLock = (seasonOpenWorldSnapshot?.ranking ?? 999) <= TOP_16_RANK_CUTOFF
+  )
+  const inferredSeasonOpenMainDrawLock = state.careerSystems.pro.hasTourCard && (seasonOpenWorldSnapshot?.ranking ?? 999) <= TOP_16_RANK_CUTOFF
   const repairedWorldMainDrawLock = initialWorldChampionship.seasonOpenAccessLock === 'worldMainDraw'
     || inferredSeasonOpenMainDrawLock
     || (
@@ -3733,6 +4091,115 @@ function improveAttribute(attributes: PlayerAttributes, label: string, delta: nu
   }
 }
 
+function adjustAttribute(group: Record<string, number>, label: string, delta: number) {
+  if (!(label in group) || delta === 0) return
+  group[label] = clamp(group[label] + delta, 1, 100)
+}
+
+function getSeasonalAgeRegressionProfile(age: number) {
+  if (age < 35) {
+    return { physical: 0, technical: 0, mental: 0 }
+  }
+  if (age <= 39) {
+    return { physical: age % 2 === 0 ? -1 : 0, technical: 0, mental: 0 }
+  }
+  if (age <= 44) {
+    return { physical: -1, technical: age % 3 === 0 ? -1 : 0, mental: 0 }
+  }
+  if (age <= 49) {
+    return { physical: -2, technical: age % 2 === 0 ? -1 : 0, mental: 0 }
+  }
+  if (age <= 54) {
+    return { physical: -2, technical: -1, mental: age % 2 === 0 ? -1 : 0 }
+  }
+  if (age <= 59) {
+    return { physical: -3, technical: -1, mental: -1 }
+  }
+  if (age <= 64) {
+    return { physical: -3, technical: -2, mental: -1 }
+  }
+  return { physical: -4, technical: -2, mental: -1 }
+}
+
+function applySeasonalAgeRegression(attributes: PlayerAttributes, age: number): PlayerAttributes {
+  const profile = getSeasonalAgeRegressionProfile(age)
+  const nextAttributes = deepCloneAttributes(attributes)
+  const physicalLabels = ['Stamina', 'Recovery Rate', 'Shoulder Health', 'Hand Steadiness', 'Balance']
+  const technicalLabels = ['Long Potting', 'Cue Ball Control', 'Break Building', 'Safety Play', 'Consistency']
+  const mentalLabels = ['Focus', 'Composure', 'Resilience', 'Big Match Nerve']
+
+  physicalLabels.forEach((label, index) => {
+    const easedDelta = index >= 3 && profile.physical < -1 ? profile.physical + 1 : profile.physical
+    adjustAttribute(nextAttributes.physical, label, easedDelta)
+  })
+  technicalLabels.forEach((label, index) => {
+    const easedDelta = index >= 3 && profile.technical < -1 ? profile.technical + 1 : profile.technical
+    adjustAttribute(nextAttributes.technical, label, easedDelta)
+  })
+  mentalLabels.forEach((label, index) => {
+    const easedDelta = index >= 2 && profile.mental < 0 ? 0 : profile.mental
+    adjustAttribute(nextAttributes.mental, label, easedDelta)
+  })
+
+  return nextAttributes
+}
+
+function getAttributeTrainingInterval(player: Player, attributes: PlayerAttributes) {
+  const overall = calculateOverallRating({
+    attributes,
+    personalityTraits: player.personalityTraits,
+    playingStyle: player.playingStyle,
+  })
+
+  if (player.age >= 65) return 44
+  if (player.age >= 55) return 34
+  if (player.age >= 45) return 24
+  if (player.age >= 40) return 16
+  if (player.age >= 35) return 10
+  if (overall >= 90) return 12
+  if (overall >= 85) return 9
+  if (overall >= 80) return 7
+  if (player.age <= 16) return 5
+  if (player.age <= 20) return 4
+  return 3
+}
+
+function getTrainingLabelSeed(label: string) {
+  return label.split('').reduce((sum, char, index) => sum + char.charCodeAt(0) * (index + 1), 0)
+}
+
+function getVeteranDevelopmentOverallCeiling(age: number) {
+  if (age >= 70) return 62
+  if (age >= 65) return 65
+  if (age >= 60) return 68
+  if (age >= 55) return 71
+  if (age >= 50) return 74
+  if (age >= 45) return 78
+  if (age >= 40) return 84
+  if (age >= 35) return 90
+  return 99
+}
+
+function getScaledTrainingGain(state: Pick<GameState, 'week' | 'player' | 'attributes'>, label: string, rawGain: number) {
+  if (rawGain <= 0) return 0
+
+  const overall = calculateOverallRating({
+    attributes: state.attributes,
+    personalityTraits: state.player.personalityTraits,
+    playingStyle: state.player.playingStyle,
+  })
+  if (state.player.age >= 35 && overall >= getVeteranDevelopmentOverallCeiling(state.player.age) - 1) {
+    return 0
+  }
+
+  const interval = getAttributeTrainingInterval(state.player, state.attributes)
+  const labelSeed = getTrainingLabelSeed(label)
+  const pulseDue = (state.week + labelSeed) % interval === 0
+  const highLoadBonus = rawGain >= 5 && interval <= 4 && (state.week + labelSeed) % (interval * 2) === 0
+
+  return pulseDue || highLoadBonus ? 1 : 0
+}
+
 function getSponsorWeeklyIncome(sponsors: SponsorDeal[]) {
   return Math.round(sponsors.reduce((sum, sponsor) => sum + sponsor.monthlyValue, 0) / 4)
 }
@@ -3790,6 +4257,7 @@ type TournamentCircuitClass =
   | 'qSchool'
   | 'rookieQualifier'
   | 'ranking'
+  | 'playersSeries'
   | 'eliteInvitational'
   | 'ukMajor'
   | 'worldChampionshipQualifying'
@@ -3854,6 +4322,37 @@ function isWorldChampionshipMainDrawTournament(tournament: Tournament) {
     && !/seniors world championship/i.test(tournament.name)
 }
 
+function isPlayersSeriesTournament(tournament: Pick<Tournament, 'name' | 'type'>) {
+  return (tournament.type === 'Ranking' || tournament.type === 'Major' || tournament.type === 'Invitational')
+    && /world grand prix|players championship|tour championship/i.test(tournament.name)
+}
+
+function getPlayersSeriesOneYearCutoff(tournament: Pick<Tournament, 'name'>) {
+  if (/tour championship/i.test(tournament.name)) return 12
+  if (/players championship/i.test(tournament.name)) return 16
+  return 32
+}
+
+function getAmateurRouteAgeLimit(tournament: Tournament) {
+  const text = `${tournament.name} ${tournament.format} ${tournament.unlockRequirement ?? ''}`.toLowerCase()
+  if (/u16|under-?16/.test(text)) return 16
+  if (/u18|under-?18/.test(text)) return 18
+  if (/u21|under-?21|wsf junior/.test(text)) return 21
+  return null
+}
+
+function isDirectAmateurTourCardRoute(tournament: Tournament) {
+  if (tournament.type !== 'Amateur') return false
+  if (/women/i.test(tournament.name)) return false
+  return /tour card|wst card|professional tour card/i.test(tournament.reward ?? '')
+}
+
+function isOpenAdultOffTourQSchoolPlayer(state: Pick<GameState, 'player' | 'careerSystems'>) {
+  return state.player.age >= 18
+    && !state.careerSystems.pro.hasTourCard
+    && (state.careerSystems.pro.worldRank ?? state.player.worldRanking ?? 999) > TOP_64_RANK_CUTOFF
+}
+
 function getTournamentCircuitClass(tournament: Tournament): TournamentCircuitClass {
   if (tournament.type === 'Junior' || tournament.type === 'Regional Youth' || tournament.type === 'National Youth') return 'youth'
   if (tournament.type === 'Amateur') return 'amateur'
@@ -3863,10 +4362,10 @@ function getTournamentCircuitClass(tournament: Tournament): TournamentCircuitCla
   if (tournament.type === 'Exhibition') return 'exhibition'
   if (isWorldChampionshipMainDrawTournament(tournament)) return 'worldChampionshipMain'
   if (isWorldChampionshipQualifierTournament(tournament)) return 'worldChampionshipQualifying'
-  if ((tournament.type === 'Ranking' || tournament.type === 'Major' || tournament.type === 'Invitational') && /world grand prix|players championship|tour championship/i.test(tournament.name)) return 'eliteInvitational'
+  if (isPlayersSeriesTournament(tournament)) return 'playersSeries'
   if (tournament.type === 'Invitational') return 'eliteInvitational'
   if (tournament.type === 'Major' && /tour championship/i.test(tournament.name)) return 'eliteInvitational'
-  if (tournament.type === 'Major' && /uk major/i.test(tournament.name) && !/qualifying/i.test(tournament.name)) return 'ukMajor'
+  if (tournament.type === 'Major' && /uk major|uk championship/i.test(tournament.name) && !/qualifying/i.test(tournament.name)) return 'ukMajor'
   if ((tournament.type === 'Professional Tour' || tournament.type === 'Major') && /qualifying|qualifier|rookie/i.test(tournament.name)) return 'rookieQualifier'
   return 'ranking'
 }
@@ -3931,7 +4430,7 @@ function getPlayerTournamentProfile(
     isMajorContender: /major contender/.test(competitiveStatus),
     isWorldChampion: /world champion/.test(competitiveStatus),
     isSeniorCircuit: state.careerSystems.lateCareer.seniorActive || state.careerSystems.lateCareer.legendStatus,
-    isSeniorEligible: state.player.age >= 45,
+    isSeniorEligible: state.player.age >= 40 && !hasMainTourStatus,
     competitiveStatus,
     currentTier,
   }
@@ -3942,6 +4441,7 @@ function isMainTourEventType(tournament: Tournament) {
     || tournament.type === 'Ranking'
     || tournament.type === 'Major'
     || tournament.type === 'Invitational'
+    || tournament.eventClass === 'Professional'
 }
 
 function getProTourAccessBand(state: Pick<GameState, 'player' | 'careerSystems' | 'competitionTables'> & Partial<Pick<GameState, 'history'>>): ProTourAccessBand {
@@ -3973,6 +4473,15 @@ export function getTournamentEntryAccess(
   const hasMajorWin = state.history.tournamentHistory.some((entry) => /major|world championship|masters|tour championship/i.test(entry.tournamentName) && entry.result === 'Winner')
   const tournamentClass = getTournamentCircuitClass(tournament)
 
+  if (state.careerSystems.lateCareer.retired) {
+    return {
+      allowed: false,
+      accessBand,
+      seededProtection,
+      reason: 'This player is retired from competitive events.',
+    }
+  }
+
   if (profile.isTop16 && /qualifier|qualifying/i.test(tournament.name) && !isWorldChampionshipQualifierTournament(tournament)) {
     return {
       allowed: false,
@@ -3988,15 +4497,27 @@ export function getTournamentEntryAccess(
       return { allowed, accessBand, seededProtection: 0, reason: allowed ? null : 'Youth events are limited to youth-phase and age-eligible off-tour players.' }
     }
     case 'amateur': {
-      const allowed = state.player.age >= 16 && !profile.hasMainTourStatus && (
+      const ageLimit = getAmateurRouteAgeLimit(tournament)
+      const directCardRoute = isDirectAmateurTourCardRoute(tournament)
+      const ageEligible = ageLimit == null
+        ? state.player.age >= 16
+        : state.player.age <= ageLimit
+      const allowed = ageEligible && !profile.hasMainTourStatus && (
         profile.isEliteAmateur
         || profile.isQTourPathway
         || profile.isQSchoolPathway
         || profile.primaryCircuit === 'amateur'
         || profile.primaryCircuit === 'youth'
         || profile.isSeniorCircuit
+        || directCardRoute
+        || ageLimit != null
       )
-      return { allowed, accessBand, seededProtection: 0, reason: allowed ? null : 'Amateur events are for off-tour amateur, Q Tour, and Q School pathway players.' }
+      const reason = ageLimit != null
+        ? `This route is limited to age-eligible off-tour players under the event age limit (${ageLimit}).`
+        : directCardRoute
+          ? 'Direct-card amateur routes are for eligible off-tour amateurs in good standing.'
+          : 'Amateur events are for off-tour amateur, Q Tour, Q School, and youth pathway players.'
+      return { allowed, accessBand, seededProtection: 0, reason: allowed ? null : reason }
     }
     case 'qTour': {
       const allowed = state.player.age >= 18 && !profile.hasMainTourStatus && (
@@ -4007,13 +4528,12 @@ export function getTournamentEntryAccess(
       return { allowed, accessBand, seededProtection: 0, reason: allowed ? null : 'Q Tour is reserved for amateur and off-tour pre-pro pathways.' }
     }
     case 'qSchool': {
-      const allowed = state.player.age >= 18 && !profile.hasMainTourStatus && !profile.isTop32 && profile.isQSchoolPathway
-      return { allowed, accessBand, seededProtection: 0, reason: allowed ? null : 'Q School requires an active off-tour qualification route.' }
+      const allowed = isOpenAdultOffTourQSchoolPlayer(state) && !/review|order of merit/i.test(tournament.name)
+      return { allowed, accessBand, seededProtection: 0, reason: allowed ? null : 'Q School is open to eligible adult off-tour players who can fund entry and remain in good standing.' }
     }
     case 'senior': {
-      const requiredAge = /world|championship/i.test(tournament.name) ? 50 : 45
-      const allowed = state.player.age >= requiredAge && (!profile.hasMainTourStatus || !profile.isTop64)
-      return { allowed, accessBand, seededProtection: 0, reason: allowed ? null : `Senior events require age ${requiredAge}+ and no realistic active main-tour standing.` }
+      const allowed = state.player.age >= 40 && !profile.hasMainTourStatus
+      return { allowed, accessBand, seededProtection: 0, reason: allowed ? null : 'Senior events require age 40+ and no active main-tour card or top-64 standing.' }
     }
     case 'exhibition': {
       const allowed = state.player.age >= 40 || state.player.reputation >= 70 || profile.hasMainTourStatus || profile.isEliteAmateur || profile.isSeniorCircuit
@@ -4063,6 +4583,14 @@ export function getTournamentEntryAccess(
       const allowed = profile.isTop16 || profile.isTop32
       return { allowed, accessBand, seededProtection, reason: allowed ? null : 'This invitational is limited to upper main-tour seeds.' }
     }
+    case 'playersSeries': {
+      const oneYearRank = state.careerSystems.pro.oneYearRank
+        ?? getCompetitionRowForPlayer(state.competitionTables, 'oneYear', state.player.fullName)?.ranking
+        ?? 999
+      const cutoff = getPlayersSeriesOneYearCutoff(tournament)
+      const allowed = profile.hasMainTourStatus && oneYearRank <= cutoff
+      return { allowed, accessBand, seededProtection, reason: allowed ? null : `This Players Series event is restricted to the top ${cutoff} on the one-year list.` }
+    }
     case 'ukMajor': {
       const allowed = profile.hasMainTourStatus && profile.worldRank <= MAIN_TOUR_POOL_SIZE
       return { allowed, accessBand, seededProtection, reason: allowed ? null : 'UK-style majors are open to active main-tour players only.' }
@@ -4088,7 +4616,7 @@ function isEliteHostedMainDrawTournament(tournament: Tournament) {
   }
 
   return isWorldChampionshipMainDrawTournament(tournament)
-    || (/masters|uk major|tour championship|champion of champions/i.test(tournament.name) && tournament.type !== 'Q School')
+    || (/masters|uk major|uk championship|tour championship|champion of champions/i.test(tournament.name) && tournament.type !== 'Q School')
     || (tournament.type === 'Invitational' && /elite|masters-style/i.test(tournament.name))
 }
 
@@ -4300,13 +4828,15 @@ function seedCompetitionTableForStartingLevel(rows: CompetitionTableRow[], playe
 
 function applyStartingLevelToCompetitionTables(tables: CompetitionTablesState, playerName: string, level: NewCareerStartingLevel): CompetitionTablesState {
   const removePlayerFromTable = (rows: CompetitionTableRow[]) => rerankCompetitionRows(rows.filter((row) => row.playerName !== playerName), playerName)
+  const worldRows = level.competitionTable === 'world' ? seedCompetitionTableForStartingLevel(tables.world, playerName, level) : removePlayerFromTable(tables.world)
+  const oneYearRows = level.competitionTable === 'world' ? seedCompetitionTableForStartingLevel(tables.oneYear, playerName, level) : removePlayerFromTable(tables.oneYear)
 
   return {
-    world: removePlayerFromTable(tables.world),
-    oneYear: removePlayerFromTable(tables.oneYear),
+    world: worldRows,
+    oneYear: oneYearRows,
     amateur: level.competitionTable === 'amateur' ? seedCompetitionTableForStartingLevel(tables.amateur, playerName, level) : removePlayerFromTable(tables.amateur),
     qTour: level.competitionTable === 'qTour' ? seedCompetitionTableForStartingLevel(tables.qTour, playerName, level) : removePlayerFromTable(tables.qTour),
-    qSchool: removePlayerFromTable(tables.qSchool),
+    qSchool: level.competitionTable === 'qSchool' ? seedCompetitionTableForStartingLevel(tables.qSchool, playerName, level) : removePlayerFromTable(tables.qSchool),
     senior: level.competitionTable === 'senior' ? seedCompetitionTableForStartingLevel(tables.senior, playerName, level) : removePlayerFromTable(tables.senior),
     youth: level.competitionTable === 'youth' ? seedCompetitionTableForStartingLevel(tables.youth, playerName, level) : removePlayerFromTable(tables.youth),
   }
@@ -4317,10 +4847,14 @@ function getCompetitionRowsForTournament(state: GameState, tournament: Tournamen
   return key ? state.competitionTables[key] : state.rankings
 }
 
-function getPrimaryCompetitionKey(state: Pick<GameState, 'careerSystems' | 'player'>): CompetitionTableKey {
+function getPrimaryCompetitionKey(state: Pick<GameState, 'careerSystems' | 'player'> & Partial<Pick<GameState, 'competitionTables'>>): CompetitionTableKey {
+  const hasActiveQSchoolRoute = state.careerSystems.qSchool.campaignEligible
+    || state.careerSystems.qSchool.seededCampaign
+    || state.careerSystems.qSchool.directPlayoffEligible
+    || !!state.competitionTables?.qSchool.some((row) => row.playerName === state.player.fullName)
   if (state.careerSystems.lateCareer.seniorActive) return 'senior'
   if (state.careerSystems.pro.hasTourCard || (state.careerSystems.pro.worldRank ?? 999) <= 64) return 'world'
-  if (state.careerSystems.qSchool.campaignsEntered > 0 && !state.careerSystems.pro.hasTourCard) return 'qSchool'
+  if (hasActiveQSchoolRoute && !state.careerSystems.pro.hasTourCard) return 'qSchool'
   if ((state.player.rankingLabel === 'Youth Ranking' || /junior|youth/i.test(state.player.careerStage)) && state.player.age <= 21) return 'youth'
   if (state.careerSystems.qTour.playerPoints > 0 || state.player.careerStage.toLowerCase().includes('q tour')) return 'qTour'
   if (state.player.rankingLabel === 'Amateur Ranking') return 'amateur'
@@ -4328,7 +4862,26 @@ function getPrimaryCompetitionKey(state: Pick<GameState, 'careerSystems' | 'play
   return 'amateur'
 }
 
-function applyWorldRankingDecay(row: CompetitionTableRow) {
+function getWorldRankingAgeDecayMultiplier(row: CompetitionTableRow, record?: WorldPlayerRecord) {
+  if (!record || record.age <= 34) return 1
+
+  const matchesPlayed = row.wins + row.losses
+  const winRate = matchesPlayed > 0 ? row.wins / matchesPlayed : 0
+  const currentEliteRun = row.titles > 0 || (matchesPlayed >= 8 && row.wins >= 5 && winRate >= 0.48)
+  const legacyEliteRelief = !currentEliteRun && ((record.highestWorldRank ?? 999) <= TOP_16_RANK_CUTOFF || record.majorTitles > 0 || record.titles >= 4)
+  const baseMultiplier = record.age <= 39
+    ? 0.98 - (record.age - 35) * 0.015
+    : record.age <= 44
+      ? 0.86 - (record.age - 40) * 0.05
+      : record.age <= 49
+        ? 0.46 - (record.age - 45) * 0.055
+        : Math.max(0.06, 0.18 - Math.min(10, record.age - 50) * 0.018)
+  const relief = currentEliteRun ? 0.16 : legacyEliteRelief ? 0.08 : 0
+
+  return Math.min(1, Math.max(0.08, baseMultiplier + relief))
+}
+
+function applyWorldRankingDecay(row: CompetitionTableRow, record?: WorldPlayerRecord) {
   const matchesPlayed = row.wins + row.losses
   const winRate = matchesPlayed > 0 ? row.wins / matchesPlayed : 0
   const basePointsDecay = row.ranking <= 4
@@ -4353,8 +4906,9 @@ function applyWorldRankingDecay(row: CompetitionTableRow) {
   const poorRunPenalty = matchesPlayed >= 6 && winRate < 0.35 ? (row.ranking <= 16 ? 0.88 : 0.74) : 1
   const titleRetention = row.titles > 0 ? 1.08 : 1
   const eliteStabilityBonus = row.ranking <= 16 && matchesPlayed >= 8 && winRate >= 0.45 ? 1.06 : 1
-  const pointsDecay = basePointsDecay * inactivityPenalty * poorRunPenalty * titleRetention * eliteStabilityBonus
-  const prizeDecay = basePrizeDecay * inactivityPenalty * poorRunPenalty * titleRetention
+  const ageDecay = getWorldRankingAgeDecayMultiplier(row, record)
+  const pointsDecay = basePointsDecay * inactivityPenalty * poorRunPenalty * titleRetention * eliteStabilityBonus * ageDecay
+  const prizeDecay = basePrizeDecay * inactivityPenalty * poorRunPenalty * titleRetention * ageDecay
 
   return {
     ...row,
@@ -4384,6 +4938,97 @@ function resetSeasonalCompetitionRows(rows: CompetitionTableRow[], playerName: s
   }))
 }
 
+function movePlayerToMinimumRank(rows: CompetitionTableRow[], playerName: string, minimumRank: number) {
+  const currentIndex = rows.findIndex((row) => row.playerName === playerName)
+  if (currentIndex === -1 || currentIndex + 1 >= minimumRank) {
+    return rows
+  }
+
+  const nextRows = [...rows]
+  const [playerRow] = nextRows.splice(currentIndex, 1)
+  const targetIndex = Math.min(nextRows.length, Math.max(0, minimumRank - 1))
+  const targetRow = nextRows[targetIndex] ?? nextRows.at(-1)
+  const cappedPoints = targetRow
+    ? Math.min(playerRow.points, Math.max(0, targetRow.points - 1))
+    : playerRow.points
+  const cappedPrizeMoney = targetRow
+    ? Math.min(playerRow.prizeMoney, Math.max(0, targetRow.prizeMoney - 1))
+    : playerRow.prizeMoney
+
+  nextRows.splice(targetIndex, 0, {
+    ...playerRow,
+    points: cappedPoints,
+    prizeMoney: cappedPrizeMoney,
+    statusNote: playerRow.statusNote ?? 'Ranking proof required',
+  })
+
+  return nextRows.map((row, index) => ({
+    ...row,
+    ranking: index + 1,
+    movement: row.ranking - (index + 1),
+    highlighted: row.playerName === playerName,
+  }))
+}
+
+function getPathwayRankProofFloor(key: CompetitionTableKey, seasonRecord: CareerSeasonRecord, age: number) {
+  if (key === 'world' || key === 'oneYear' || key === 'senior') return 1
+
+  const matches = seasonRecord.wins + seasonRecord.losses
+  const winRate = matches > 0 ? seasonRecord.wins / matches : 0
+  const hasTitle = seasonRecord.titles > 0 || seasonRecord.qTourWins > 0 || seasonRecord.qSchoolCardsWon > 0
+  const losingNoTitleSeason = matches >= 8 && seasonRecord.wins <= seasonRecord.losses && !hasTitle
+  const lowWinNoTitleSeason = matches >= 8 && winRate < 0.45 && !hasTitle
+  const thinEvidenceSeason = matches < 8 && !hasTitle
+
+  if (key === 'youth') {
+    if (age <= 16 && losingNoTitleSeason) return 16
+    if (losingNoTitleSeason || lowWinNoTitleSeason) return 12
+    if (thinEvidenceSeason) return 8
+    if (!hasTitle && winRate < 0.55) return 4
+    return 1
+  }
+
+  if (key === 'amateur') {
+    if (losingNoTitleSeason || lowWinNoTitleSeason) return 18
+    if (thinEvidenceSeason) return 12
+    if (!hasTitle && winRate < 0.55) return 6
+    return 1
+  }
+
+  if (key === 'qTour') {
+    if (losingNoTitleSeason || lowWinNoTitleSeason) return 20
+    if (thinEvidenceSeason) return 14
+    if (!hasTitle && winRate < 0.55) return 8
+    return 1
+  }
+
+  if (key === 'qSchool') {
+    if (seasonRecord.qSchoolCardsWon > 0) return 1
+    if (losingNoTitleSeason || lowWinNoTitleSeason) return 14
+    if (thinEvidenceSeason) return 10
+    if (!hasTitle && winRate < 0.6) return 5
+  }
+
+  return 1
+}
+
+function enforcePathwayRankingProofFloors(
+  tables: CompetitionTablesState,
+  playerName: string,
+  seasonRecord: CareerSeasonRecord,
+  age: number,
+): CompetitionTablesState {
+  return COMPETITION_TABLE_KEYS.reduce<CompetitionTablesState>((nextTables, key) => {
+    const floor = getPathwayRankProofFloor(key, seasonRecord, age)
+    if (floor <= 1) return nextTables
+
+    return {
+      ...nextTables,
+      [key]: movePlayerToMinimumRank(nextTables[key], playerName, floor),
+    }
+  }, tables)
+}
+
 function initializeCompetitionTablesForNewCareer(
   tables: CompetitionTablesState,
   playerName: string,
@@ -4400,11 +5045,11 @@ function initializeCompetitionTablesForNewCareer(
   ))
 
   return {
-    world: rankRows(tables.world),
-    oneYear: rankRows(tables.oneYear),
+    world: level.competitionTable === 'world' ? primaryRows : rankRows(tables.world),
+    oneYear: level.competitionTable === 'world' ? rankRows(tables.oneYear).map((row) => row.playerName === playerName ? { ...row, statusNote: `Starting at ${level.name}` } : row) : rankRows(tables.oneYear),
     amateur: level.competitionTable === 'amateur' ? primaryRows : rankRows(tables.amateur),
     qTour: level.competitionTable === 'qTour' ? primaryRows : rankRows(tables.qTour),
-    qSchool: rankRows(tables.qSchool),
+    qSchool: level.competitionTable === 'qSchool' ? primaryRows : rankRows(tables.qSchool),
     senior: level.competitionTable === 'senior' ? primaryRows : rankRows(tables.senior),
     youth: level.competitionTable === 'youth' ? primaryRows : rankRows(tables.youth),
   }
@@ -4454,10 +5099,12 @@ function continueToNextTournamentState(previousState: GameState) {
   )
 }
 
-function rollCompetitionTablesForward(tables: CompetitionTablesState, playerName: string): CompetitionTablesState {
+function rollCompetitionTablesForward(tables: CompetitionTablesState, playerName: string, worldPlayers: WorldPlayerRecord[] = []): CompetitionTablesState {
+  const worldPlayersByName = new Map(worldPlayers.map((record) => [record.playerName, record]))
+
   return {
     world: tables.world.map((row, index) => ({
-      ...applyWorldRankingDecay(row),
+      ...applyWorldRankingDecay(row, worldPlayersByName.get(row.playerName)),
       ranking: index + 1,
       movement: 0,
       highlighted: row.playerName === playerName,
@@ -4493,6 +5140,48 @@ function getRecentSeasonStat(
   return latestArchivedValue || fallback
 }
 
+function getMainTourAgeDecline(record: WorldPlayerRecord) {
+  const age = record.age
+  if (age <= 34) return 0
+
+  const rawDecline = age <= 38
+    ? (age - 34) * 0.8
+    : age <= 42
+      ? 3.2 + (age - 38) * 1.6
+      : age <= 47
+        ? 9.6 + (age - 42) * 2.5
+        : 22.1 + (age - 47) * 4.2
+  const activeLegendRelief = ((record.highestWorldRank ?? 999) <= TOP_16_RANK_CUTOFF || record.majorTitles > 0 || record.titles >= 4)
+    ? 0.82
+    : (record.highestWorldRank ?? 999) <= TOP_32_RANK_CUTOFF
+      ? 0.92
+      : 1
+
+  return rawDecline * activeLegendRelief
+}
+
+function getMainTourYouthUpside(record: WorldPlayerRecord) {
+  if (!record.hasTourCard) return 0
+  if (record.age <= 23) return 4
+  if (record.age <= 26) return 2.5
+  if (record.age <= 29) return 1
+  return 0
+}
+
+function getWorldPlayerDevelopmentPotential(record: WorldPlayerRecord) {
+  if (typeof record.developmentPotential === 'number') {
+    return clamp(record.developmentPotential, 55, 99)
+  }
+
+  const peakRank = record.highestWorldRank ?? 999
+  if (peakRank <= 4) return 96
+  if (peakRank <= TOP_16_RANK_CUTOFF) return 91
+  if (peakRank <= TOP_32_RANK_CUTOFF) return 86
+  if (peakRank <= TOP_64_RANK_CUTOFF) return 80
+  if (record.age <= 23) return 78
+  return 72
+}
+
 function getCompetitiveStrengthBand(record: WorldPlayerRecord, tables: CompetitionTablesState) {
   const worldRow = getCompetitionRowForPlayer(tables, 'world', record.playerName)
   const oneYearRow = getCompetitionRowForPlayer(tables, 'oneYear', record.playerName)
@@ -4505,6 +5194,8 @@ function getCompetitiveStrengthBand(record: WorldPlayerRecord, tables: Competiti
   const recentWeightedLosses = getWeightedRecentSeasonValue(record, (season) => season.proLosses)
   const recentWinRate = recentWeightedWins + recentWeightedLosses > 0 ? recentWeightedWins / (recentWeightedWins + recentWeightedLosses) : 0
   const rankSignal = Math.max(0, 18 - Math.min(worldRank, oneYearRank) / 6)
+  const developmentPotential = getWorldPlayerDevelopmentPotential(record)
+  const prospectGrowthSignal = Math.max(0, developmentPotential - 82) * (record.age <= 23 ? 0.85 : record.age <= 27 ? 0.65 : record.age <= 31 ? 0.38 : 0.12)
   const strengthEstimate = 48
     + rankSignal
     + latestWins * 3.2
@@ -4512,8 +5203,11 @@ function getCompetitiveStrengthBand(record: WorldPlayerRecord, tables: Competiti
     + record.majorTitles * 9
     + recentWinRate * 36
     + Math.min(14, latestMainTourEvents * 1.4)
+    + prospectGrowthSignal
+    + getMainTourYouthUpside(record)
     - Math.max(0, 5 - latestWins) * 2.2
     - Math.max(0, 6 - latestMainTourEvents) * 1.4
+    - getMainTourAgeDecline(record)
 
   return clamp(Math.round(strengthEstimate), 42, 96)
 }
@@ -4532,11 +5226,12 @@ function getWorldRankingCeiling(record: WorldPlayerRecord, tables: CompetitionTa
   const rollingTwoYearPrize = getWeightedRecentSeasonValue(record, (season) => season.prizeMoney)
   const rollingTitleScore = getWeightedRecentSeasonValue(record, (season) => season.titles)
   const strengthBand = getCompetitiveStrengthBand(record, tables)
-  const hasMeaningfulEliteResult = latestSeasonTitles > 0 || record.majorTitles > 0 || rollingTitleScore >= 1.25
-  const eliteTop16Eligible = latestMainTourEvents >= 6 && latestSeasonWins >= 4 && twoYearWinRate >= 0.2 && strengthBand >= 80 && hasMeaningfulEliteResult
+  const hasCurrentEliteResult = latestSeasonTitles > 0 || rollingTitleScore >= 1.25 || (record.age <= 34 && record.majorTitles > 0)
+  const youngBreakthroughEligible = (record.age <= 30 && latestSeasonWins >= 7 && twoYearWinRate >= 0.38 && strengthBand >= 82)
+    || (record.age <= 35 && getWorldPlayerDevelopmentPotential(record) >= 92 && latestSeasonWins >= 5 && twoYearWinRate >= 0.32 && strengthBand >= 82)
+  const eliteTop16Eligible = latestMainTourEvents >= 6 && latestSeasonWins >= 4 && twoYearWinRate >= 0.2 && strengthBand >= 80 && (hasCurrentEliteResult || youngBreakthroughEligible)
   const top4Eligible = latestSeasonWins >= 8
     || latestSeasonTitles > 0
-    || record.majorTitles > 0
     || (rollingTwoYearPrize >= 350000 && weightedMainTourEvents >= 8 && twoYearWinRate >= 0.35)
 
   if ((record.cardSource === 'Q School' || record.cardSource === 'Q Tour' || record.cardSource === 'Playoff Route' || record.cardSource === 'Federation Route')
@@ -4551,6 +5246,14 @@ function getWorldRankingCeiling(record: WorldPlayerRecord, tables: CompetitionTa
 
   if (!eliteTop16Eligible) {
     return 17
+  }
+
+  if (record.age >= 50 && latestSeasonTitles === 0 && rollingTitleScore < 1.6) {
+    return 33
+  }
+
+  if (record.age >= 45 && latestSeasonTitles === 0 && rollingTitleScore < 1) {
+    return 33
   }
 
   if (!top4Eligible) {
@@ -4591,9 +5294,14 @@ function getWorldSeedScore(record: WorldPlayerRecord, tables: CompetitionTablesS
   const twoYearWinRate = weightedTwoYearMatches > 0 ? weightedTwoYearWins / weightedTwoYearMatches : 0
   const weightedMainTourEvents = getWeightedRecentSeasonValue(record, (season) => season.mainTourEvents) + latestMainTourEvents * 0.25
   const repeatedHighRankLowVolumeSeasons = record.seasons.filter((season) => (season.worldRank ?? 999) <= TOP_16_RANK_CUTOFF && season.mainTourEvents < 6).length
-  const hasMeaningfulEliteResult = latestSeasonTitles > 0 || record.majorTitles > 0 || rollingTitleScore >= 1.25
   const strengthBand = getCompetitiveStrengthBand(record, tables)
-  const eliteTop16Eligible = latestMainTourEvents >= 6 && latestSeasonWins >= 4 && twoYearWinRate >= 0.2 && strengthBand >= 80
+  const youngBreakthroughResult = record.age <= 30 && latestSeasonWins >= 7 && latestSeasonWinRate >= 0.38 && strengthBand >= 82
+  const developmentPotential = getWorldPlayerDevelopmentPotential(record)
+  const eliteProspectBreakthrough = record.age <= 35 && developmentPotential >= 92 && latestSeasonWins >= 5 && latestSeasonWinRate >= 0.32 && strengthBand >= 82
+  const hasMeaningfulEliteResult = latestSeasonTitles > 0 || rollingTitleScore >= 1.25 || youngBreakthroughResult || eliteProspectBreakthrough || (record.age <= 34 && record.majorTitles > 0)
+  const ageDecline = getMainTourAgeDecline(record)
+  const youthUpside = getMainTourYouthUpside(record)
+  const eliteTop16Eligible = latestMainTourEvents >= 6 && latestSeasonWins >= 4 && twoYearWinRate >= 0.2 && strengthBand >= 80 && hasMeaningfulEliteResult
   const top4Eligible = latestSeasonWins >= 8
     || latestSeasonTitles > 0
     || record.majorTitles > 0
@@ -4610,8 +5318,21 @@ function getWorldSeedScore(record: WorldPlayerRecord, tables: CompetitionTablesS
       ? 420
       : 0
   const bottomTourProtectionPenalty = worldRank > TOP_64_RANK_CUTOFF && record.hasTourCard && latestSeasonWins < 3 ? (3 - latestSeasonWins) * 24 : 0
-  const veteranBonus = record.age >= 35 && (record.highestWorldRank ?? 999) <= 32 && twoYearWinRate >= 0.3 ? 18 : 0
+  const veteranBonus = record.age >= 35 && record.age <= 42 && (record.highestWorldRank ?? 999) <= 32 && twoYearWinRate >= 0.3 ? 18 : 0
   const historicalPeakBonus = Math.max(0, 26 - ((record.highestWorldRank ?? 128) * 0.25))
+  const ageDeclinePenalty = Math.round(ageDecline * 160)
+    + (record.age >= 40 && latestSeasonTitles === 0 && rollingTitleScore < 1 ? 300 : 0)
+    + (record.age >= 44 && latestSeasonTitles === 0 && rollingTitleScore < 1 ? 950 : 0)
+    + (record.age >= 48 && latestSeasonTitles === 0 ? 1700 : 0)
+    + (record.age >= 52 && latestSeasonTitles === 0 ? 2600 : 0)
+    + (record.age >= 45 && latestSeasonWins < 4 ? (4 - latestSeasonWins) * 190 : 0)
+  const youthUpsideBonus = Math.round(youthUpside * 110)
+    + (record.age <= 26 && record.hasTourCard && latestSeasonWins >= 3 ? 220 : 0)
+    + (record.age <= 30 && latestSeasonWinRate >= 0.42 && latestMainTourEvents >= 6 ? 180 : 0)
+    + (record.age <= 28 && latestSeasonTitles > 0 ? 260 : 0)
+  const eliteProspectBonus = record.hasTourCard
+    ? Math.max(0, developmentPotential - 88) * (record.age <= 30 ? 190 : record.age <= 35 ? 95 : 0)
+    : 0
 
   return (record.hasTourCard ? 85 : 0)
     + Math.max(0, 48 - worldRank * 0.35)
@@ -4638,6 +5359,8 @@ function getWorldSeedScore(record: WorldPlayerRecord, tables: CompetitionTablesS
     + strengthBand * 10
     + historicalPeakBonus
     + veteranBonus
+    + youthUpsideBonus
+    + eliteProspectBonus
     - lowLatestWinsPenalty
     - lowTwoYearWinRatePenalty
     - lowVolumePenalty
@@ -4646,6 +5369,7 @@ function getWorldSeedScore(record: WorldPlayerRecord, tables: CompetitionTablesS
     - repeatedHighRankLowVolumePenalty
     - eliteCredibilityPenalty
     - bottomTourProtectionPenalty
+    - ageDeclinePenalty
 }
 
 function isEligibleForWorldTable(record: WorldPlayerRecord) {
@@ -4769,16 +5493,18 @@ function getCircuitSeedScore(record: WorldPlayerRecord, tables: CompetitionTable
     if (!row) return fallback
     return Math.max(0, 140 - row.ranking * 3) + row.titles * 18 + row.wins * 2
   }
+  const developmentPotential = getWorldPlayerDevelopmentPotential(record)
+  const youngProspectScore = Math.max(0, developmentPotential - 78) * (record.age <= 21 ? 3.2 : record.age <= 27 ? 2.2 : 0.8)
 
   switch (key) {
     case 'youth':
-      return getRankScore('youth') * 1.5 + getRankScore('amateur') * 0.35 + Math.max(0, 24 - record.age) * 4
+      return getRankScore('youth') * 1.5 + getRankScore('amateur') * 0.35 + Math.max(0, 24 - record.age) * 4 + youngProspectScore
     case 'amateur':
-      return getRankScore('amateur') * 1.5 + getRankScore('youth') * 0.8 + getRankScore('qTour') * 0.5 + Math.max(0, 34 - record.age) * 2
+      return getRankScore('amateur') * 1.5 + getRankScore('youth') * 0.8 + getRankScore('qTour') * 0.5 + Math.max(0, 34 - record.age) * 2 + youngProspectScore
     case 'qTour':
-      return getRankScore('qTour') * 1.8 + getRankScore('amateur') * 1.1 + getRankScore('youth') * 0.8 + Math.max(0, 32 - record.age) * 2
+      return getRankScore('qTour') * 1.8 + getRankScore('amateur') * 1.1 + getRankScore('youth') * 0.8 + Math.max(0, 32 - record.age) * 2 + youngProspectScore
     case 'qSchool':
-      return getRankScore('qSchool') * 2 + getRankScore('qTour') * 1.4 + getRankScore('amateur') * 0.9 + Math.max(0, 36 - record.age)
+      return getRankScore('qSchool') * 2 + getRankScore('qTour') * 1.4 + getRankScore('amateur') * 0.9 + Math.max(0, 36 - record.age) + youngProspectScore
     case 'senior':
       return getRankScore('senior') * 1.8 + getRankScore('world') * 0.9 + ((record.highestWorldRank != null && record.highestWorldRank <= 32) ? 50 - record.highestWorldRank : 0) + Math.max(0, record.age - 39) * 3
   }
@@ -4820,7 +5546,7 @@ function getWorldPlayerExpectedCircuit(record: WorldPlayerRecord, tables: Compet
   const recentMainTourEvents = getRecentSeasonStat(record, (season) => season.mainTourEvents)
   const strongAmateurSignal = amateurRank <= 12 || qTourRank <= 12 || youthRank <= 6
 
-  if (record.age >= 45 && !record.hasTourCard && worldRank > TOP_64_RANK_CUTOFF && ((record.highestWorldRank ?? 999) <= 64 || recentMainTourEvents > 0)) {
+  if (record.age >= 40 && !record.hasTourCard && worldRank > TOP_64_RANK_CUTOFF && ((record.highestWorldRank ?? 999) <= 64 || recentMainTourEvents > 0)) {
     return 'senior'
   }
 
@@ -4851,6 +5577,8 @@ function getWorldPlayerTourSurvivalStatus(worldRank: number, hasTourCard: boolea
 }
 
 function getWorldPlayerPromotionSource(record: WorldPlayerRecord, tables: CompetitionTablesState): TourCardSource {
+  if (record.age < 18) return null
+
   const qSchoolRank = getWorldPlayerCircuitRank(record, tables, 'qSchool') ?? 999
   const qTourRank = getWorldPlayerCircuitRank(record, tables, 'qTour') ?? 999
   const amateurRank = getWorldPlayerCircuitRank(record, tables, 'amateur') ?? 999
@@ -4861,8 +5589,12 @@ function getWorldPlayerPromotionSource(record: WorldPlayerRecord, tables: Compet
     return 'Federation Route'
   }
 
-  if (qSchoolRank <= 16) return qSchoolRank <= 4 ? 'Q School' : 'Playoff Route'
-  if (qTourRank <= 32) return qTourRank <= 8 ? 'Q Tour' : 'Playoff Route'
+  if (record.age < 18) {
+    return null
+  }
+
+  if (qSchoolRank <= 24) return qSchoolRank <= 12 ? 'Q School' : 'Playoff Route'
+  if (qTourRank <= 24) return qTourRank <= 4 ? 'Q Tour' : 'Playoff Route'
   if (amateurRank <= 40 || (record.age <= 21 && youthRank <= 24)) return 'Federation Route'
   return null
 }
@@ -4875,6 +5607,36 @@ function shouldProtectFeederPlayerFromFallbackPromotion(record: WorldPlayerRecor
   return getWorldPlayerExpectedCircuit(record, tables) === 'youth'
 }
 
+function shouldAiWorldPlayerRetainMainTourCard(record: WorldPlayerRecord, worldRank: number, tables: CompetitionTablesState) {
+  if (worldRank > TOP_64_RANK_CUTOFF) return false
+
+  const oneYearRow = getCompetitionRowForPlayer(tables, 'oneYear', record.playerName)
+  const latestWins = getRecentSeasonStat(record, (season) => season.proWins, 0, oneYearRow?.wins ?? 0)
+  const latestLosses = getRecentSeasonStat(record, (season) => season.proLosses, 0, oneYearRow?.losses ?? 0)
+  const latestMatches = latestWins + latestLosses
+  const latestWinRate = latestMatches > 0 ? latestWins / latestMatches : 0
+  const latestTitles = getRecentSeasonStat(record, (season) => season.titles, 0, oneYearRow?.titles ?? 0)
+  const rollingTitleScore = getWeightedRecentSeasonValue(record, (season) => season.titles)
+  const nextAge = record.age + 1
+
+  if (nextAge < 42) return true
+  if (latestTitles > 0) return true
+
+  if (nextAge >= 55) {
+    return rollingTitleScore >= 2 || (latestWins >= 9 && latestWinRate >= 0.58 && worldRank <= TOP_16_RANK_CUTOFF)
+  }
+
+  if (nextAge >= 50) {
+    return rollingTitleScore >= 1.6 || (latestWins >= 8 && latestWinRate >= 0.52 && worldRank <= TOP_32_RANK_CUTOFF)
+  }
+
+  if (nextAge >= 45) {
+    return rollingTitleScore >= 1 || latestWins >= 6 || (worldRank <= TOP_16_RANK_CUTOFF && latestWins >= 5 && latestWinRate >= 0.45)
+  }
+
+  return latestWins >= 4 || rollingTitleScore >= 0.6 || worldRank <= TOP_32_RANK_CUTOFF
+}
+
 function getWorldPlayerPromotionScore(record: WorldPlayerRecord, tables: CompetitionTablesState, source: Exclude<TourCardSource, null>) {
   const qSchoolRank = getWorldPlayerCircuitRank(record, tables, 'qSchool') ?? 999
   const qTourRank = getWorldPlayerCircuitRank(record, tables, 'qTour') ?? 999
@@ -4884,6 +5646,7 @@ function getWorldPlayerPromotionScore(record: WorldPlayerRecord, tables: Competi
   const recentTitles = getRecentSeasonStat(record, (season) => season.titles)
   const strengthBand = getCompetitiveStrengthBand(record, tables)
   const peakRankBonus = Math.max(0, 96 - Math.min(record.highestWorldRank ?? 128, 128))
+  const prospectBonus = Math.max(0, getWorldPlayerDevelopmentPotential(record) - 80) * (record.age <= 24 ? 26 : record.age <= 29 ? 18 : 8)
   const sourceBonus = source === 'Q School'
     ? 320
     : source === 'Q Tour'
@@ -4897,6 +5660,7 @@ function getWorldPlayerPromotionScore(record: WorldPlayerRecord, tables: Competi
     + recentWins * 20
     + recentTitles * 30
     + peakRankBonus
+    + prospectBonus
     + Math.max(0, 48 - qSchoolRank * 4)
     + Math.max(0, 40 - qTourRank * 3)
     + Math.max(0, 36 - amateurRank * 2)
@@ -4935,8 +5699,7 @@ function isEligibleForCircuit(record: WorldPlayerRecord, tables: CompetitionTabl
       return !record.hasTourCard && record.age >= 18 && record.age < 45 && (expectedCircuit === 'qSchool' || qSchoolRank <= 24 || qTourRank <= 24 || amateurRank <= 16 || worldRank <= 96)
     case 'senior':
       return expectedCircuit === 'senior'
-        || ((record.age >= 45 && !record.hasTourCard && worldRank > TOP_64_RANK_CUTOFF)
-          || (record.age >= 50 && !record.hasTourCard && record.highestWorldRank != null))
+        || (record.age >= 40 && !record.hasTourCard && worldRank > TOP_64_RANK_CUTOFF)
   }
 }
 
@@ -4945,6 +5708,7 @@ function buildSeasonalCircuitRows(
   tables: CompetitionTablesState,
   key: Exclude<CompetitionTableKey, 'world' | 'oneYear'>,
   playerName: string,
+  seasonSeed = 0,
 ) {
   const limits: Record<Exclude<CompetitionTableKey, 'world' | 'oneYear'>, number> = {
     youth: 32,
@@ -4990,6 +5754,49 @@ function buildSeasonalCircuitRows(
     }
   }
 
+  if (key === 'qTour' || key === 'qSchool') {
+    const selectedNames = new Set(selectedPlayers.map((record) => record.playerName))
+    const wildcardPool = players.filter((record) => {
+      if (selectedNames.has(record.playerName) || record.playerName === playerName || record.hasTourCard) return false
+      if (key === 'qTour') return record.age >= 18 && record.age < 40 && getWorldPlayerExpectedCircuit(record, tables) !== 'senior'
+      return record.age >= 18 && record.age < 40 && !['youth', 'senior'].includes(getWorldPlayerExpectedCircuit(record, tables))
+    })
+    const refreshCandidates = [...eligiblePlayers, ...wildcardPool]
+      .filter((record) => !selectedNames.has(record.playerName) && record.playerName !== playerName)
+      .sort((left, right) => {
+        const leftFreshness = left.seasons.length === 0 ? 2 : left.seasons.length <= 2 ? 1 : 0
+        const rightFreshness = right.seasons.length === 0 ? 2 : right.seasons.length <= 2 ? 1 : 0
+        const leftRotation = hashStringToNumber(`${seasonSeed}-${key}-${left.playerName}`) % 97
+        const rightRotation = hashStringToNumber(`${seasonSeed}-${key}-${right.playerName}`) % 97
+        return (rightFreshness - leftFreshness)
+          || (rightRotation - leftRotation)
+          || (getCircuitSeedScore(right, tables, key) - getCircuitSeedScore(left, tables, key))
+          || (left.age - right.age)
+      })
+    const requiredRefresh = Math.min(key === 'qTour' ? 3 : 2, refreshCandidates.length)
+
+    if (requiredRefresh > 0) {
+      const protectedNames = new Set([
+        playerName,
+        ...selectedPlayers.slice(0, Math.min(key === 'qTour' ? 8 : 6, selectedPlayers.length)).map((record) => record.playerName),
+      ])
+      const replaceableIndexes = selectedPlayers
+        .map((record, index) => ({
+          index,
+          record,
+          seedScore: getCircuitSeedScore(record, tables, key),
+        }))
+        .filter((entry) => !protectedNames.has(entry.record.playerName))
+        .sort((left, right) => (left.seedScore - right.seedScore) || (right.record.age - left.record.age))
+
+      refreshCandidates.slice(0, requiredRefresh).forEach((record, refreshIndex) => {
+        const target = replaceableIndexes[refreshIndex]
+        if (!target) return
+        selectedPlayers[target.index] = record
+      })
+    }
+  }
+
   const rows = selectedPlayers
     .map((record, index, rankedPlayers) => ({
       ...createCompetitionDefaultRow(record.playerName, record.nation, index + 1),
@@ -5022,6 +5829,17 @@ function createUniqueIntakeName(
   return null
 }
 
+function createCpuDevelopmentPotential(fullName: string, seasonStartYear: number, intakeIndex: number, age: number, source: 'junior' | 'feeder') {
+  const roll = hashStringToNumber(`${source}-${seasonStartYear}-${intakeIndex}-${fullName}`) % 100
+  const ageBonus = source === 'junior' && age <= 16 ? 2 : 0
+
+  if (roll >= 94) return 96 + (roll % 3)
+  if (roll >= 78) return 90 + (roll % 6) + ageBonus
+  if (roll >= 48) return 84 + (roll % 6) + ageBonus
+  if (roll >= 18) return 78 + (roll % 7)
+  return 70 + (roll % 8)
+}
+
 function createJuniorIntake(players: WorldPlayerRecord[], seasonStartYear: number, playerName: string) {
   const seenNames = new Set(players.map((record) => record.playerName))
   const additions: WorldPlayerRecord[] = []
@@ -5043,11 +5861,12 @@ function createJuniorIntake(players: WorldPlayerRecord[], seasonStartYear: numbe
 
     const { fullName, seed: finalSeed } = intakeName
     seenNames.add(fullName)
+    const age = 14 + (finalSeed % 3)
     additions.push({
       id: `wp-${fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
       playerName: fullName,
       nation: JUNIOR_NATIONS[(finalSeed * 5) % JUNIOR_NATIONS.length],
-      age: 14 + (finalSeed % 3),
+      age,
       hasTourCard: false,
       cardSource: null,
       currentYear: 0,
@@ -5065,6 +5884,7 @@ function createJuniorIntake(players: WorldPlayerRecord[], seasonStartYear: numbe
       seniorTitles: 0,
       highestBreak: 0,
       highestWorldRank: null,
+      developmentPotential: createCpuDevelopmentPotential(fullName, seasonStartYear, index, age, 'junior'),
       seasons: [],
     })
   }
@@ -5097,11 +5917,12 @@ function createFeederIntake(players: WorldPlayerRecord[], seasonStartYear: numbe
 
     const { fullName, seed } = intakeName
     seenNames.add(fullName)
+    const age = 18 + (seed % 10)
     additions.push({
       id: `wp-${fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
       playerName: fullName,
       nation: FEEDER_NATIONS[(seed * 7) % FEEDER_NATIONS.length],
-      age: 18 + (seed % 10),
+      age,
       hasTourCard: false,
       cardSource: null,
       currentYear: 0,
@@ -5119,6 +5940,7 @@ function createFeederIntake(players: WorldPlayerRecord[], seasonStartYear: numbe
       seniorTitles: 0,
       highestBreak: 0,
       highestWorldRank: null,
+      developmentPotential: createCpuDevelopmentPotential(fullName, seasonStartYear, index, age, 'feeder'),
       seasons: [],
     })
   }
@@ -5180,6 +6002,7 @@ function evolveWorldPlayersForNextSeason(
   const agedPlayers = players.map((record) => {
     const worldRank = getCompetitionRowForPlayer(tables, 'world', record.playerName)?.ranking ?? 999
     const retainedViaRanking = worldRank <= TOP_64_RANK_CUTOFF
+      && (record.playerName === nextPlayer.fullName || shouldAiWorldPlayerRetainMainTourCard(record, worldRank, tables))
     const protectedCardSeason = record.playerName !== nextPlayer.fullName
       && record.hasTourCard
       && worldRank > TOP_64_RANK_CUTOFF
@@ -5230,6 +6053,7 @@ function evolveWorldPlayersForNextSeason(
 
     const worldRank = getCompetitionRowForPlayer(tables, 'world', record.playerName)?.ranking ?? 999
     const retainedViaRanking = worldRank <= TOP_64_RANK_CUTOFF
+      && shouldAiWorldPlayerRetainMainTourCard(record, worldRank, tables)
     const protectedBottomTourPlayer = worldRank > TOP_64_RANK_CUTOFF
       && worldRank <= MAIN_TOUR_POOL_SIZE
       && record.yearsRemaining > 0
@@ -5261,19 +6085,21 @@ function evolveWorldPlayersForNextSeason(
   })
 
   const expandedPlayerPool = createFeederIntake(createJuniorIntake(normalizedPlayers, nextSeasonStartYear, nextPlayer.fullName), nextSeasonStartYear, nextPlayer.fullName)
-  const provisionalYouthRows = buildSeasonalCircuitRows(expandedPlayerPool, tables, 'youth', nextPlayer.fullName)
-  const provisionalAmateurRows = buildSeasonalCircuitRows(expandedPlayerPool, { ...tables, youth: provisionalYouthRows }, 'amateur', nextPlayer.fullName)
+  const provisionalYouthRows = buildSeasonalCircuitRows(expandedPlayerPool, tables, 'youth', nextPlayer.fullName, nextSeasonStartYear)
+  const provisionalAmateurRows = buildSeasonalCircuitRows(expandedPlayerPool, { ...tables, youth: provisionalYouthRows }, 'amateur', nextPlayer.fullName, nextSeasonStartYear)
   const provisionalQTourRows = buildSeasonalCircuitRows(
     expandedPlayerPool,
     { ...tables, youth: provisionalYouthRows, amateur: provisionalAmateurRows },
     'qTour',
     nextPlayer.fullName,
+    nextSeasonStartYear,
   )
   const provisionalQSchoolRows = buildSeasonalCircuitRows(
     expandedPlayerPool,
     { ...tables, youth: provisionalYouthRows, amateur: provisionalAmateurRows, qTour: provisionalQTourRows },
     'qSchool',
     nextPlayer.fullName,
+    nextSeasonStartYear,
   )
   const provisionalSeniorRows = buildSeasonalCircuitRows(
     expandedPlayerPool,
@@ -5286,6 +6112,7 @@ function evolveWorldPlayersForNextSeason(
     },
     'senior',
     nextPlayer.fullName,
+    nextSeasonStartYear,
   )
   const promotionTables = {
     ...tables,
@@ -5325,7 +6152,7 @@ function evolveWorldPlayersForNextSeason(
   return nextSeasonPlayers
 }
 
-function rebuildLivingCompetitionTables(rolledTables: CompetitionTablesState, players: WorldPlayerRecord[], playerName: string) {
+function rebuildLivingCompetitionTables(rolledTables: CompetitionTablesState, players: WorldPlayerRecord[], playerName: string, seasonSeed = 0) {
   const withWorld = {
     ...rolledTables,
     world: buildWorldCompetitionRows(players, rolledTables, playerName),
@@ -5336,25 +6163,108 @@ function rebuildLivingCompetitionTables(rolledTables: CompetitionTablesState, pl
   }
   const withYouth = {
     ...withOneYear,
-    youth: buildSeasonalCircuitRows(players, withOneYear, 'youth', playerName),
+    youth: buildSeasonalCircuitRows(players, withOneYear, 'youth', playerName, seasonSeed),
   }
   const withAmateur = {
     ...withYouth,
-    amateur: buildSeasonalCircuitRows(players, withYouth, 'amateur', playerName),
+    amateur: buildSeasonalCircuitRows(players, withYouth, 'amateur', playerName, seasonSeed),
   }
   const withQTour = {
     ...withAmateur,
-    qTour: buildSeasonalCircuitRows(players, withAmateur, 'qTour', playerName),
+    qTour: buildSeasonalCircuitRows(players, withAmateur, 'qTour', playerName, seasonSeed),
   }
   const withQSchool = {
     ...withQTour,
-    qSchool: buildSeasonalCircuitRows(players, withQTour, 'qSchool', playerName),
+    qSchool: buildSeasonalCircuitRows(players, withQTour, 'qSchool', playerName, seasonSeed),
   }
 
   return {
     ...withQSchool,
-    senior: buildSeasonalCircuitRows(players, withQSchool, 'senior', playerName),
+    senior: buildSeasonalCircuitRows(players, withQSchool, 'senior', playerName, seasonSeed),
   }
+}
+
+type AiSeasonCircuitStats = {
+  events: number
+  wins: number
+  losses: number
+  titles: number
+  prizeMoney: number
+  rankingPoints: number
+}
+
+function getAiSeasonVariance(playerName: string, season: string, key: CompetitionTableKey) {
+  return (hashStringToNumber(`${season}-${key}-${playerName}`) % 1000) / 999
+}
+
+function simulateAiSeasonCircuitStats(
+  playerName: string,
+  season: string,
+  key: CompetitionTableKey,
+  row: CompetitionTableRow | undefined,
+  record: WorldPlayerRecord,
+): AiSeasonCircuitStats {
+  if (!row || playerName === record.playerName && row.playerName !== record.playerName) {
+    return { events: 0, wins: 0, losses: 0, titles: 0, prizeMoney: 0, rankingPoints: 0 }
+  }
+
+  const playedMatches = Math.max(0, row.eventsPlayed)
+  if (playedMatches > 0 || row.wins > 0 || row.losses > 0 || row.titles > 0) {
+    return {
+      events: playedMatches,
+      wins: Math.max(0, row.wins),
+      losses: Math.max(0, row.losses),
+      titles: Math.max(0, row.titles),
+      prizeMoney: Math.max(0, row.prizeMoney),
+      rankingPoints: Math.max(0, row.points),
+    }
+  }
+
+  const variance = getAiSeasonVariance(playerName, season, key)
+  const rank = row.ranking
+  const age = record.age
+  const rankStrength = Math.max(0, 1 - (rank - 1) / (key === 'world' || key === 'oneYear' ? MAIN_TOUR_POOL_SIZE : 64))
+  const youthGrowth = age <= 24 ? 0.08 : 0
+  const veteranDrag = Math.max(0, age - 38) * (key === 'senior' ? -0.004 : 0.012)
+  const baseWinRate = clamp(0.34 + rankStrength * 0.38 + youthGrowth - veteranDrag + (variance - 0.5) * 0.1, 0.18, 0.82)
+  const eventBaseline: Record<CompetitionTableKey, number> = {
+    world: rank <= TOP_16_RANK_CUTOFF ? 12 : rank <= TOP_64_RANK_CUTOFF ? 9 : 6,
+    oneYear: rank <= TOP_16_RANK_CUTOFF ? 12 : rank <= TOP_64_RANK_CUTOFF ? 9 : 6,
+    amateur: 9,
+    qTour: 7,
+    qSchool: 4,
+    senior: 6,
+    youth: 8,
+  }
+  const eventVariance = Math.round((variance - 0.5) * 2)
+  const events = clamp(eventBaseline[key] + eventVariance, key === 'qSchool' ? 3 : 5, key === 'world' || key === 'oneYear' ? 14 : 10)
+  const losses = clamp(Math.round(events * (1 - baseWinRate)), 0, events)
+  const wins = Math.max(0, events - losses)
+  const titleChance = rankStrength * (key === 'world' || key === 'oneYear' ? 0.28 : key === 'qSchool' ? 0.16 : 0.22)
+    + Math.max(0, wins - Math.ceil(events * 0.68)) * 0.08
+  const titles = wins >= Math.ceil(events * 0.72) && variance < titleChance ? 1 : 0
+  const pointsPerWin: Record<CompetitionTableKey, number> = {
+    world: 115,
+    oneYear: 115,
+    amateur: 42,
+    qTour: 34,
+    qSchool: 16,
+    senior: 28,
+    youth: 18,
+  }
+  const prizePerWin: Record<CompetitionTableKey, number> = {
+    world: 18500,
+    oneYear: 18500,
+    amateur: 900,
+    qTour: 700,
+    qSchool: 0,
+    senior: 1200,
+    youth: 120,
+  }
+  const rankingPoints = Math.max(row.points, Math.round(wins * pointsPerWin[key] + titles * pointsPerWin[key] * 3 + rankStrength * pointsPerWin[key] * 2))
+  const prizeMoney = Math.max(row.prizeMoney, Math.round(wins * prizePerWin[key] + titles * prizePerWin[key] * 4 + rankStrength * prizePerWin[key] * 2))
+
+  return { events, wins, losses, titles, prizeMoney, rankingPoints }
 }
 
 function archiveWorldPlayersForSeason(
@@ -5400,6 +6310,45 @@ function archiveWorldPlayersForSeason(
     const qSchoolRow = getCompetitionRowForPlayer(tables, 'qSchool', entryName)
     const seniorRow = getCompetitionRowForPlayer(tables, 'senior', entryName)
     const youthRow = getCompetitionRowForPlayer(tables, 'youth', entryName)
+    const isHumanPlayer = entryName === playerName
+    const oneYearStats = isHumanPlayer
+      ? null
+      : simulateAiSeasonCircuitStats(entryName, season, 'oneYear', oneYearRow ?? worldRow, existing)
+    const qTourStats = isHumanPlayer ? null : simulateAiSeasonCircuitStats(entryName, season, 'qTour', qTourRow, existing)
+    const qSchoolStats = isHumanPlayer ? null : simulateAiSeasonCircuitStats(entryName, season, 'qSchool', qSchoolRow, existing)
+    const seniorStats = isHumanPlayer ? null : simulateAiSeasonCircuitStats(entryName, season, 'senior', seniorRow, existing)
+    const amateurStats = isHumanPlayer ? null : simulateAiSeasonCircuitStats(entryName, season, 'amateur', amateurRow, existing)
+    const youthStats = isHumanPlayer ? null : simulateAiSeasonCircuitStats(entryName, season, 'youth', youthRow, existing)
+    const oneYearEvents = oneYearStats?.events ?? oneYearRow?.eventsPlayed ?? worldRow?.eventsPlayed ?? 0
+    const oneYearWins = oneYearStats?.wins ?? oneYearRow?.wins ?? worldRow?.wins ?? 0
+    const oneYearLosses = oneYearStats?.losses ?? oneYearRow?.losses ?? worldRow?.losses ?? 0
+    const oneYearPrize = oneYearStats?.prizeMoney ?? oneYearRow?.prizeMoney ?? worldRow?.prizeMoney ?? 0
+    const oneYearPoints = oneYearStats?.rankingPoints ?? oneYearRow?.points ?? 0
+    const oneYearTitles = oneYearStats?.titles ?? oneYearRow?.titles ?? 0
+    const qTourEvents = qTourStats?.events ?? qTourRow?.eventsPlayed ?? 0
+    const qTourWins = qTourStats?.wins ?? qTourRow?.wins ?? 0
+    const qTourLosses = qTourStats?.losses ?? qTourRow?.losses ?? 0
+    const qTourPoints = qTourStats?.rankingPoints ?? qTourRow?.points ?? 0
+    const qTourTitles = qTourStats?.titles ?? qTourRow?.titles ?? 0
+    const qSchoolEvents = qSchoolStats?.events ?? qSchoolRow?.eventsPlayed ?? 0
+    const qSchoolWins = qSchoolStats?.wins ?? qSchoolRow?.wins ?? 0
+    const qSchoolLosses = qSchoolStats?.losses ?? qSchoolRow?.losses ?? 0
+    const qSchoolPoints = qSchoolStats?.rankingPoints ?? qSchoolRow?.points ?? 0
+    const seniorEvents = seniorStats?.events ?? seniorRow?.eventsPlayed ?? 0
+    const seniorWins = seniorStats?.wins ?? seniorRow?.wins ?? 0
+    const seniorLosses = seniorStats?.losses ?? seniorRow?.losses ?? 0
+    const seniorPoints = seniorStats?.rankingPoints ?? seniorRow?.points ?? 0
+    const seniorTitles = seniorStats?.titles ?? seniorRow?.titles ?? 0
+    const amateurEvents = amateurStats?.events ?? amateurRow?.eventsPlayed ?? 0
+    const amateurWins = amateurStats?.wins ?? amateurRow?.wins ?? 0
+    const amateurLosses = amateurStats?.losses ?? amateurRow?.losses ?? 0
+    const amateurPoints = amateurStats?.rankingPoints ?? amateurRow?.points ?? 0
+    const amateurTitles = amateurStats?.titles ?? amateurRow?.titles ?? 0
+    const youthEvents = youthStats?.events ?? youthRow?.eventsPlayed ?? 0
+    const youthWins = youthStats?.wins ?? youthRow?.wins ?? 0
+    const youthLosses = youthStats?.losses ?? youthRow?.losses ?? 0
+    const youthPoints = youthStats?.rankingPoints ?? youthRow?.points ?? 0
+    const youthTitles = youthStats?.titles ?? youthRow?.titles ?? 0
     const seasonRecord: WorldPlayerSeasonRecord = {
       season,
       worldRank: worldRow?.ranking ?? null,
@@ -5409,15 +6358,15 @@ function archiveWorldPlayersForSeason(
       qSchoolRank: qSchoolRow?.ranking ?? null,
       seniorRank: seniorRow?.ranking ?? null,
       youthRank: youthRow?.ranking ?? null,
-      matches: (oneYearRow?.eventsPlayed ?? 0) + (qTourRow?.eventsPlayed ?? 0) + (qSchoolRow?.eventsPlayed ?? 0) + (seniorRow?.eventsPlayed ?? 0) + (amateurRow?.eventsPlayed ?? 0) + (youthRow?.eventsPlayed ?? 0),
-      wins: (oneYearRow?.wins ?? 0) + (qTourRow?.wins ?? 0) + (qSchoolRow?.wins ?? 0) + (seniorRow?.wins ?? 0) + (amateurRow?.wins ?? 0) + (youthRow?.wins ?? 0),
-      losses: (oneYearRow?.losses ?? 0) + (qTourRow?.losses ?? 0) + (qSchoolRow?.losses ?? 0) + (seniorRow?.losses ?? 0) + (amateurRow?.losses ?? 0) + (youthRow?.losses ?? 0),
-      prizeMoney: oneYearRow?.prizeMoney ?? worldRow?.prizeMoney ?? 0,
-      rankingPoints: (oneYearRow?.points ?? 0) + (qTourRow?.points ?? 0) + (qSchoolRow?.points ?? 0) + (seniorRow?.points ?? 0) + (amateurRow?.points ?? 0) + (youthRow?.points ?? 0),
-      titles: (oneYearRow?.titles ?? 0) + (qTourRow?.titles ?? 0) + (seniorRow?.titles ?? 0) + (amateurRow?.titles ?? 0) + (youthRow?.titles ?? 0),
-      proWins: oneYearRow?.wins ?? 0,
-      proLosses: oneYearRow?.losses ?? 0,
-      mainTourEvents: oneYearRow?.eventsPlayed ?? 0,
+      matches: oneYearEvents + qTourEvents + qSchoolEvents + seniorEvents + amateurEvents + youthEvents,
+      wins: oneYearWins + qTourWins + qSchoolWins + seniorWins + amateurWins + youthWins,
+      losses: oneYearLosses + qTourLosses + qSchoolLosses + seniorLosses + amateurLosses + youthLosses,
+      prizeMoney: oneYearPrize,
+      rankingPoints: oneYearPoints + qTourPoints + qSchoolPoints + seniorPoints + amateurPoints + youthPoints,
+      titles: oneYearTitles + qTourTitles + seniorTitles + amateurTitles + youthTitles,
+      proWins: oneYearWins,
+      proLosses: oneYearLosses,
+      mainTourEvents: oneYearEvents,
       hasTourCard: existing.hasTourCard,
       yearsRemaining: existing.yearsRemaining,
       retainedViaRanking: existing.retainedViaRanking,
@@ -5442,9 +6391,9 @@ function archiveWorldPlayersForSeason(
                       : 'Development',
     }
     const seasonRows = [seasonRecord, ...existing.seasons.filter((entry) => entry.season !== season)]
-    const seasonMatches = (oneYearRow?.eventsPlayed ?? 0) + (qTourRow?.eventsPlayed ?? 0) + (qSchoolRow?.eventsPlayed ?? 0) + (seniorRow?.eventsPlayed ?? 0) + (amateurRow?.eventsPlayed ?? 0) + (youthRow?.eventsPlayed ?? 0)
-    const seasonWins = (oneYearRow?.wins ?? 0) + (qTourRow?.wins ?? 0) + (qSchoolRow?.wins ?? 0) + (seniorRow?.wins ?? 0) + (amateurRow?.wins ?? 0) + (youthRow?.wins ?? 0)
-    const seasonLosses = (oneYearRow?.losses ?? 0) + (qTourRow?.losses ?? 0) + (qSchoolRow?.losses ?? 0) + (seniorRow?.losses ?? 0) + (amateurRow?.losses ?? 0) + (youthRow?.losses ?? 0)
+    const seasonMatches = seasonRecord.matches
+    const seasonWins = seasonRecord.wins
+    const seasonLosses = seasonRecord.losses
 
     return {
       ...existing,
@@ -5455,15 +6404,15 @@ function archiveWorldPlayersForSeason(
       totalPrizeMoney: existing.totalPrizeMoney + seasonRecord.prizeMoney,
       titles: existing.titles + seasonRecord.titles,
       majorTitles: existing.majorTitles + (entryName === playerName ? (playerSeasonRecord?.majorTitles ?? 0) : 0),
-      qTourWins: existing.qTourWins + (qTourRow?.titles ?? 0),
-      seniorTitles: existing.seniorTitles + (seniorRow?.titles ?? 0),
+      qTourWins: existing.qTourWins + qTourTitles,
+      seniorTitles: existing.seniorTitles + seniorTitles,
       highestWorldRank: existing.highestWorldRank == null ? (worldRow?.ranking ?? null) : (worldRow?.ranking != null ? Math.min(existing.highestWorldRank, worldRow.ranking) : existing.highestWorldRank),
       seasons: seasonRows.slice(0, 12),
     }
   })
 }
 
-function syncCareerSystems(state: Pick<GameState, 'competitionTables' | 'player' | 'careerSystems'>): CareerSystemsState {
+function syncCareerSystems(state: Pick<GameState, 'competitionTables' | 'player' | 'careerSystems'> & Partial<Pick<GameState, 'history'>>): CareerSystemsState {
   const qTourRow = state.competitionTables.qTour.find((row) => row.playerName === state.player.fullName)
   const qSchoolRow = state.competitionTables.qSchool.find((row) => row.playerName === state.player.fullName)
   const worldRow = state.competitionTables.world.find((row) => row.playerName === state.player.fullName)
@@ -5472,13 +6421,14 @@ function syncCareerSystems(state: Pick<GameState, 'competitionTables' | 'player'
   const youthRow = state.competitionTables.youth.find((row) => row.playerName === state.player.fullName)
   const qTourLeader = state.competitionTables.qTour[0]?.playerName ?? null
   const qSchoolLeader = state.competitionTables.qSchool[0]?.playerName ?? null
-  const worldRank = worldRow?.ranking ?? 999
+  const historyRankFloor = state.history ? getHistoryPerformanceRankFloor(state.history) : 1
+  const worldRank = Math.max(worldRow?.ranking ?? 999, historyRankFloor)
   const normalizedHasTourCard = state.careerSystems.pro.hasTourCard || worldRank <= TOP_64_RANK_CUTOFF
   const proBase = {
     ...state.careerSystems.pro,
     hasTourCard: normalizedHasTourCard,
     cardSource: state.careerSystems.pro.cardSource ?? (worldRank <= TOP_64_RANK_CUTOFF ? 'Ranking Retained' : normalizedHasTourCard ? 'Unknown' : null),
-    worldRank: worldRow?.ranking ?? null,
+    worldRank: worldRow?.ranking == null ? null : Math.max(worldRow.ranking, historyRankFloor),
     oneYearRank: oneYearRow?.ranking ?? null,
   }
   let survivalStatus: ProCareerSystemState['survivalStatus'] = proBase.hasTourCard
@@ -5514,14 +6464,21 @@ function syncCareerSystems(state: Pick<GameState, 'competitionTables' | 'player'
     currentTier = 'Junior Amateur Circuit'
   }
 
+  const retired = state.player.age >= 78
+    && !proBase.hasTourCard
+    && worldRank > TOP_64_RANK_CUTOFF
+    && ((seniorRow?.eventsPlayed ?? 0) > 0 || (seniorRow?.ranking ?? 999) <= 24 || state.player.rankingLabel === 'Senior Ranking')
   const lateCareer: LateCareerSystemState = {
     veteranActive: state.player.age >= 40 && (worldRank <= MAIN_TOUR_POOL_SIZE || proBase.hasTourCard || state.player.reputation >= 68),
-    seniorEligible: state.player.age >= 45,
-    seniorActive: state.player.age >= 45 && !proBase.hasTourCard && worldRank > TOP_64_RANK_CUTOFF && ((seniorRow?.eventsPlayed ?? 0) > 0 || ((seniorRow?.ranking ?? 999) <= 24 && state.player.age >= 50)),
+    seniorEligible: state.player.age >= 40 && !proBase.hasTourCard && worldRank > TOP_64_RANK_CUTOFF,
+    seniorActive: !retired && state.player.age >= 40 && !proBase.hasTourCard && worldRank > TOP_64_RANK_CUTOFF && ((seniorRow?.eventsPlayed ?? 0) > 0 || (seniorRow?.ranking ?? 999) <= 24),
     legendStatus: state.player.age >= 40 && state.player.reputation >= 70,
+    retired,
   }
 
-  if (lateCareer.seniorActive) {
+  if (lateCareer.retired) {
+    currentTier = 'Retired'
+  } else if (lateCareer.seniorActive) {
     currentTier = 'Senior Tour / Legend Circuit'
   } else if (lateCareer.veteranActive && worldRank > TOP_64_RANK_CUTOFF && !proBase.hasTourCard) {
     currentTier = 'Veteran Amateur / Pro-Am Circuit'
@@ -5561,12 +6518,23 @@ function applyAdjustedWorldRankToProState(
   player: Player,
   adjustedWorldRank: number,
 ): CareerSystemsState['pro'] {
-  let survivalStatus: ProCareerSystemState['survivalStatus'] = proState.hasTourCard
-    ? (proState.yearsRemaining >= 2 ? 'Rookie Year 1' : proState.yearsRemaining === 1 ? 'Rookie Year 2' : proState.retainedViaRanking ? 'Safe' : 'At Risk')
+  const adjustedRetainedViaRanking = adjustedWorldRank <= TOP_64_RANK_CUTOFF
+  const adjustedHasTourCard = adjustedRetainedViaRanking || (proState.hasTourCard && proState.yearsRemaining > 0)
+  const adjustedProState: CareerSystemsState['pro'] = {
+    ...proState,
+    hasTourCard: adjustedHasTourCard,
+    cardSource: adjustedHasTourCard ? (adjustedRetainedViaRanking ? 'Ranking Retained' : proState.cardSource) : null,
+    currentYear: adjustedHasTourCard ? proState.currentYear : 0,
+    yearsRemaining: adjustedHasTourCard ? proState.yearsRemaining : 0,
+    expiresAfterSeason: adjustedHasTourCard ? proState.expiresAfterSeason : null,
+    retainedViaRanking: adjustedRetainedViaRanking,
+  }
+  let survivalStatus: ProCareerSystemState['survivalStatus'] = adjustedProState.hasTourCard
+    ? (adjustedProState.yearsRemaining >= 2 ? 'Rookie Year 1' : adjustedProState.yearsRemaining === 1 ? 'Rookie Year 2' : adjustedProState.retainedViaRanking ? 'Safe' : 'At Risk')
     : 'Amateur'
   let currentTier = player.age < 18 ? 'Junior Amateur Circuit' : 'Amateur Circuit'
 
-  if (proState.hasTourCard || adjustedWorldRank <= TOP_64_RANK_CUTOFF) {
+  if (adjustedProState.hasTourCard || adjustedWorldRank <= TOP_64_RANK_CUTOFF) {
     if (adjustedWorldRank <= TOP_16_RANK_CUTOFF) {
       survivalStatus = 'Top 16'
       currentTier = 'Top 16 Elite Player'
@@ -5576,20 +6544,20 @@ function applyAdjustedWorldRankToProState(
     } else if (adjustedWorldRank <= TOP_64_RANK_CUTOFF) {
       survivalStatus = 'Safe'
       currentTier = 'Tour Survivor / Top 64'
-    } else if (proState.hasTourCard && adjustedWorldRank <= 96) {
+    } else if (adjustedProState.hasTourCard && adjustedWorldRank <= 96) {
       survivalStatus = 'Bubble'
       currentTier = 'Rookie Professional — Two-Year Tour Card'
-    } else if (proState.hasTourCard && adjustedWorldRank <= MAIN_TOUR_POOL_SIZE) {
+    } else if (adjustedProState.hasTourCard && adjustedWorldRank <= MAIN_TOUR_POOL_SIZE) {
       survivalStatus = 'At Risk'
       currentTier = 'Rookie Professional — Two-Year Tour Card'
-    } else if (!proState.hasTourCard && proState.yearsRemaining === 0 && proState.awardedBy) {
+    } else if (!adjustedProState.hasTourCard && adjustedProState.yearsRemaining === 0 && adjustedProState.awardedBy) {
       survivalStatus = 'Lost Card'
       currentTier = 'Q School / Tour Fightback'
     }
   }
 
   return {
-    ...proState,
+    ...adjustedProState,
     worldRank: adjustedWorldRank,
     survivalStatus,
     tourSurvivalStatus: survivalStatus,
@@ -5599,7 +6567,7 @@ function applyAdjustedWorldRankToProState(
 
 function isMajorCareerEvent(entry: Pick<TournamentHistoryEntry, 'eventType' | 'tournamentName'>) {
   return /major/i.test(entry.eventType ?? '')
-    || /world championship|uk major|tour championship|masters-style|champion of champions/i.test(entry.tournamentName ?? '')
+    || /world championship|uk major|uk championship|tour championship|masters-style|champion of champions/i.test(entry.tournamentName ?? '')
 }
 
 function isProfessionalEventType(eventType: string | undefined) {
@@ -5640,6 +6608,14 @@ function getRecentProfessionalHistoryProfile(history?: CareerHistoryState) {
 function getHistoryPerformanceRankFloor(history?: CareerHistoryState) {
   const recentProProfile = getRecentProfessionalHistoryProfile(history)
   const recentMatchCount = recentProProfile.twoYearProWins + recentProProfile.twoYearProLosses
+  const historyEntries = history?.tournamentHistory ?? []
+  const rankingTitles = historyEntries.filter((entry) => entry.result === 'Winner' && isProfessionalEventType(entry.eventType)).length
+  const majorTitles = historyEntries.filter((entry) => entry.result === 'Winner' && isMajorCareerEvent(entry)).length
+  const worldTitles = historyEntries.filter((entry) => entry.result === 'Winner' && isWorldChampionshipMainDrawName(entry.tournamentName)).length
+  const professionalFinals = historyEntries.filter(
+    (entry) => isProfessionalFinalLevelRun(entry),
+  ).length
+  const hasTitleProof = rankingTitles > 0 || majorTitles > 0 || worldTitles > 0
 
   if (recentMatchCount < 8) {
     return 1
@@ -5654,7 +6630,27 @@ function getHistoryPerformanceRankFloor(history?: CareerHistoryState) {
   }
 
   if (recentProProfile.latestSeasonProWins < 8 && recentProProfile.latestSeasonMajorFinals === 0 && recentProProfile.twoYearWinRate < 0.35) {
-    return 65
+    return recentProProfile.latestSeasonMainTourEvents >= 8 && recentProProfile.twoYearWinRate >= 0.2 ? 33 : 65
+  }
+
+  if (!hasTitleProof && recentMatchCount >= 20 && recentProProfile.latestSeasonMajorFinals === 0 && recentProProfile.twoYearWinRate < 0.25) {
+    return recentProProfile.latestSeasonMainTourEvents >= 8 && recentProProfile.twoYearWinRate >= 0.2 ? 33 : 65
+  }
+
+  if (!hasTitleProof && recentMatchCount >= 20 && recentProProfile.latestSeasonMajorFinals === 0 && recentProProfile.twoYearWinRate < 0.35) {
+    return 33
+  }
+
+  if (!hasTitleProof && recentMatchCount >= 20 && recentProProfile.twoYearWinRate < 0.45) {
+    return 17
+  }
+
+  if (!hasTitleProof && recentMatchCount >= 8) {
+    return professionalFinals >= 3
+      && recentProProfile.latestSeasonMajorFinals > 0
+      && recentProProfile.twoYearWinRate >= 0.45
+      ? 9
+      : 17
   }
 
   return 1
@@ -5662,9 +6658,9 @@ function getHistoryPerformanceRankFloor(history?: CareerHistoryState) {
 
 function getTournamentFinishTier(result: string) {
   if (/winner/i.test(result)) return 5
-  if (/final/i.test(result)) return 4
-  if (/semi/i.test(result)) return 3
   if (/quarter/i.test(result)) return 2
+  if (/semi/i.test(result)) return 3
+  if (/(^|\s)final(ist)?(\s|$)/i.test(result)) return 4
   return 0
 }
 
@@ -5682,6 +6678,7 @@ function getCareerPhaseFromSystems(player: Player, careerSystems: CareerSystemsS
     && !careerSystems.pro.retainedViaRanking
     && worldRank > 32
 
+  if (careerSystems.lateCareer.retired) return 'Retired'
   if (careerSystems.lateCareer.seniorActive) return 'Senior'
   if (careerSystems.lateCareer.veteranActive) return 'Veteran'
   if (rookieStatus) return 'Rookie'
@@ -5716,6 +6713,7 @@ function getCareerStageFromSystems(player: Player, careerSystems: CareerSystemsS
     && !careerSystems.pro.retainedViaRanking
     && worldRank > 32
 
+  if (careerSystems.lateCareer.retired) return 'Retired'
   if (careerSystems.lateCareer.seniorActive) return 'Senior Tour / Legend Circuit'
   if (hasWorldTitle) return 'World Champion'
   if (worldRank <= TOP_16_RANK_CUTOFF && majorContenderGate) return 'Major Contender'
@@ -5737,22 +6735,57 @@ function getCareerStageFromSystems(player: Player, careerSystems: CareerSystemsS
 
 function getPlayerWorldRankingCeiling(state: Pick<GameState, 'history' | 'competitionTables' | 'player' | 'attributes' | 'equipment'>) {
   const recentProProfile = getRecentProfessionalHistoryProfile(state.history)
+  const recentProMatches = recentProProfile.twoYearProWins + recentProProfile.twoYearProLosses
   const effectiveStrength = calculateCurrentEffectiveStrength(state)
   const majorFinals = state.history.tournamentHistory.filter((entry) => isMajorCareerEvent(entry) && getTournamentHistoryFinishTier(entry) >= 4).length
+  const professionalFinals = state.history.tournamentHistory.filter(
+    (entry) => isProfessionalFinalLevelRun(entry),
+  ).length
   const rankingTitles = state.history.tournamentHistory.filter((entry) => entry.result === 'Winner' && isProfessionalEventType(entry.eventType)).length
+  const majorTitles = state.history.tournamentHistory.filter((entry) => entry.result === 'Winner' && isMajorCareerEvent(entry)).length
+  const worldTitles = state.history.tournamentHistory.filter((entry) => entry.result === 'Winner' && isWorldChampionshipMainDrawName(entry.tournamentName)).length
+  const hasTitleProof = rankingTitles > 0 || majorTitles > 0 || worldTitles > 0
   const strongTwoYearWinProfile = recentProProfile.twoYearProWins >= 16 && recentProProfile.twoYearWinRate >= 0.45
   const eliteTop16Eligible = recentProProfile.latestSeasonMainTourEvents >= 6
     && recentProProfile.latestSeasonProWins >= 4
     && recentProProfile.twoYearWinRate >= 0.2
     && effectiveStrength >= 80
     && (rankingTitles > 0 || majorFinals > 0 || strongTwoYearWinProfile)
-  const top4Eligible = recentProProfile.latestSeasonProWins >= 8
+  const top4Eligible = (recentProProfile.latestSeasonProWins >= 8
+    && recentProProfile.twoYearMainTourEvents >= 10
+    && recentProProfile.twoYearWinRate >= 0.5
+    && effectiveStrength >= 120)
     || recentProProfile.latestSeasonMajorFinals > 0
     || rankingTitles > 0
-    || (recentProProfile.twoYearMainTourEvents >= 8 && recentProProfile.twoYearWinRate >= 0.35 && effectiveStrength >= 120)
+    || (recentProProfile.twoYearMainTourEvents >= 12 && recentProProfile.twoYearWinRate >= 0.55 && effectiveStrength >= 125)
+
+  if (recentProMatches < 8 && state.player.rankingLabel !== 'World Ranking') {
+    return 65
+  }
 
   if (recentProProfile.latestSeasonProWins < 2 && recentProProfile.twoYearWinRate < 0.18 && effectiveStrength < 80) {
     return 65
+  }
+
+  if (!hasTitleProof && recentProMatches >= 20 && recentProProfile.latestSeasonMajorFinals === 0 && recentProProfile.twoYearWinRate < 0.25) {
+    return 65
+  }
+
+  if (!hasTitleProof && recentProMatches >= 20 && recentProProfile.latestSeasonMajorFinals === 0 && recentProProfile.twoYearWinRate < 0.35) {
+    return 33
+  }
+
+  if (!hasTitleProof && recentProMatches >= 20 && recentProProfile.twoYearWinRate < 0.45) {
+    return 17
+  }
+
+  if (!hasTitleProof && recentProMatches >= 20) {
+    return professionalFinals >= 3
+      && recentProProfile.latestSeasonMajorFinals > 0
+      && recentProProfile.twoYearWinRate >= 0.45
+      && effectiveStrength >= 110
+      ? 9
+      : 17
   }
 
   if (!eliteTop16Eligible) {
@@ -5763,7 +6796,11 @@ function getPlayerWorldRankingCeiling(state: Pick<GameState, 'history' | 'compet
     return 5
   }
 
-  return 1
+  const rankOneEligible = worldTitles > 0
+    || majorTitles > 0
+    || (rankingTitles >= 3 && recentProProfile.twoYearMainTourEvents >= 12 && recentProProfile.twoYearWinRate >= 0.58 && effectiveStrength >= 125)
+
+  return rankOneEligible ? 1 : 2
 }
 
 function enforcePlayerWorldRankingCeiling(
@@ -5851,14 +6888,6 @@ export function getTournamentEntryRound(state: GameState, tournament: Tournament
   const profile = getPlayerTournamentProfile(state)
   const tournamentClass = getTournamentCircuitClass(tournament)
 
-  if (tournament.type === 'Q School' && state.careerSystems.qSchool.directPlayoffEligible) {
-    return 'Final'
-  }
-
-  if (tournament.type === 'Q School' && state.careerSystems.qSchool.seededCampaign) {
-    return 'Quarter Final'
-  }
-
   if (tournamentClass === 'worldChampionshipQualifying' && profile.accessBand === 'top32') {
     return 'Quarter Final'
   }
@@ -5930,7 +6959,6 @@ function getWorldPlayerTournamentSnapshot(state: GameState, playerName: string) 
 function getTournamentFieldRows(state: GameState, tournament: Tournament) {
   const baseRows = getCompetitionRowsForTournament(state, tournament)
   const tournamentClass = getTournamentCircuitClass(tournament)
-  const requiredSeniorAge = /world|championship/i.test(tournament.name) ? 50 : 45
   const proAmAllowed = /pro-am/i.test(`${tournament.name} ${tournament.format} ${tournament.progressionImpact ?? ''}`)
 
   return baseRows.filter((row) => {
@@ -5946,7 +6974,7 @@ function getTournamentFieldRows(state: GameState, tournament: Tournament) {
       case 'qSchool':
         return opponent.age >= 18 && !opponent.hasMainTourStatus && opponent.worldRank > TOP_64_RANK_CUTOFF
       case 'senior':
-        return opponent.age >= requiredSeniorAge && !opponent.hasMainTourStatus
+        return opponent.age >= 40 && !opponent.hasMainTourStatus
       case 'exhibition':
         return opponent.age >= 35 || opponent.hasMainTourStatus
       default:
@@ -6023,7 +7051,7 @@ function createMatchSetup(state: GameState, tournament: Tournament) {
       ? state.tournamentProgress.currentRound
       : getTournamentEntryRound(state, tournament)
   const currentRoundIndex = TOURNAMENT_ROUNDS.indexOf(currentRound)
-  const roundPlan = ROUND_PLANS[currentRound]
+  const roundPlan = getTournamentRoundPlan(tournament, currentRound)
   const technical = calculateTechnicalAverage(state.attributes.technical)
   const mental = calculateAverage(Object.values(state.attributes.mental))
   const physical = calculateAverage(Object.values(state.attributes.physical))
@@ -6093,12 +7121,12 @@ function createMatchSetup(state: GameState, tournament: Tournament) {
             ? 54
             : tournamentClass === 'exhibition'
               ? 58
-              : tournamentClass === 'eliteInvitational'
-                ? 78
+            : tournamentClass === 'eliteInvitational'
+                ? 82
                 : tournamentClass === 'worldChampionshipMain'
-                  ? 80
+                  ? 84
                   : tournamentClass === 'worldChampionshipQualifying'
-                    ? 74
+                    ? 76
                     : tournamentClass === 'rookieQualifier'
                       ? 71
                       : 68
@@ -6128,10 +7156,10 @@ function createMatchSetup(state: GameState, tournament: Tournament) {
     && state.player.confidence >= 68
     && state.player.fatigue <= 50
     ? Math.min(
-        2.4,
-        Math.max(0, state.player.confidence - 72) * 0.035
-        + Math.max(0, 42 - state.player.fatigue) * 0.03
-        + Math.max(0, pressureSkill - 76) * 0.025,
+        3,
+        Math.max(0, state.player.confidence - 72) * 0.045
+        + Math.max(0, 42 - state.player.fatigue) * 0.035
+        + Math.max(0, pressureSkill - 76) * 0.035,
       )
     : 0
   const eliteSupportBonus = mainTourEvent
@@ -6152,20 +7180,228 @@ function createMatchSetup(state: GameState, tournament: Tournament) {
   )
   const winChanceBase = mainTourEvent ? 50 : tournamentClass === 'qSchool' ? 49 : 50
   const accessBandBonus = entryAccess.accessBand === 'top16'
-    ? (currentRoundIndex === 0 ? 8 : currentRoundIndex === 1 ? 4 : 2)
+    ? (currentRoundIndex === 0 ? 3 : currentRoundIndex === 1 ? 2 : 1)
     : entryAccess.accessBand === 'top32'
-      ? (currentRoundIndex === 0 ? 4 : currentRoundIndex === 1 ? 2 : 0)
+      ? (currentRoundIndex === 0 ? 2 : currentRoundIndex === 1 ? 1 : 0)
       : entryAccess.accessBand === 'top64'
         ? (currentRoundIndex === 0 ? 1 : 0)
         : 0
   const eliteClutchBonus = mainTourEvent
-    ? Math.max(0, pressureSkill - 72) * 0.32 + Math.max(0, state.player.confidence - 68) * 0.16
+    ? Math.min(3, Math.max(0, pressureSkill - 76) * 0.08 + Math.max(0, state.player.confidence - 74) * 0.05)
     : 0
-  const winChance = clamp(
-    winChanceBase + (playerStrength - opponentStrength) * 1.18 + qSchoolAdvantage + seededBoost * 0.6 + accessBandBonus + eliteClutchBonus - bottomTourPenalty,
+  const eliteRankSeparationBonus = mainTourEvent && worldRank <= TOP_16_RANK_CUTOFF
+    ? Math.min(
+        worldRank <= 4 ? 3 : 1.5,
+        (worldRank <= 4 ? 1.5 : 0.75)
+          + Math.max(0, state.player.reputation - 82) * 0.025
+          + Math.max(0, pressureSkill - 82) * 0.03,
+      )
+    : 0
+  const eliteFinalConversionBonus = mainTourEvent && currentRound === 'Final' && worldRank <= TOP_16_RANK_CUTOFF
+    ? Math.min(
+        worldRank <= 4 ? 3 : 1.5,
+        0.75
+          + Math.max(0, pressureSkill - 84) * 0.04
+          + Math.max(0, state.player.confidence - 84) * 0.03
+          + Math.max(0, state.player.reputation - 86) * 0.03,
+      )
+    : 0
+  const eliteLateRoundControlBonus = mainTourEvent && worldRank <= TOP_16_RANK_CUTOFF
+    ? Math.min(
+        worldRank <= 4 ? 3 : 1.5,
+        (currentRound === 'Semi Final'
+          ? 1.5
+          : currentRound === 'Quarter Final'
+            ? 1
+            : currentRound === 'Last 16'
+              ? 0.5
+              : 0)
+          + Math.max(0, pressureSkill - 84) * 0.03
+          + Math.max(0, state.player.confidence - 84) * 0.025
+          + Math.max(0, state.player.reputation - 84) * 0.02,
+      )
+    : 0
+  const matureEliteSemiConversionBonus = mainTourEvent
+    && currentRound === 'Semi Final'
+    && worldRank <= TOP_16_RANK_CUTOFF
+    && state.player.age >= 24
+    && state.player.age <= 36
+    && pressureSkill >= 80
+    && state.player.confidence >= 74
+    ? Math.min(
+        worldRank <= 4 ? 2 : 1,
+        0.5
+          + Math.max(0, pressureSkill - 86) * 0.035
+          + Math.max(0, state.player.confidence - 86) * 0.03,
+      )
+    : 0
+  const matureEliteFinalConversionBonus = mainTourEvent
+    && currentRound === 'Final'
+    && worldRank <= TOP_16_RANK_CUTOFF
+    && state.player.age >= 27
+    && state.player.age <= 38
+    && pressureSkill >= 78
+    && state.player.confidence >= 70
+    ? Math.min(
+        worldRank <= 4 ? 4 : 2,
+        1
+          + Math.max(0, pressureSkill - 82) * 0.05
+          + Math.max(0, state.player.confidence - 78) * 0.04
+          + Math.max(0, state.player.reputation - 82) * 0.03,
+      )
+    : 0
+  const matureTourContenderBonus = mainTourEvent
+    && worldRank <= 33
+    && state.player.age >= 27
+    && state.player.age <= 48
+    && playerBaseStrength >= 80
+    && pressureSkill >= 72
+    ? Math.min(
+        worldRank <= TOP_16_RANK_CUTOFF ? 4 : 3,
+        (currentRound === 'Final'
+          ? 2.4
+          : currentRound === 'Semi Final'
+            ? 2
+            : currentRound === 'Quarter Final'
+              ? 1.6
+              : currentRound === 'Last 16'
+                ? 1.2
+                : 0.8)
+          + Math.max(0, state.player.confidence - 76) * 0.035
+          + Math.max(0, pressureSkill - 78) * 0.035
+          + Math.max(0, state.player.reputation - 78) * 0.025,
+      )
+    : 0
+  const risingEliteConversionBonus = mainTourEvent && worldRank <= 4 && state.player.age <= 34
+    ? Math.min(
+        2,
+        (currentRound === 'Final'
+          ? 1.5
+          : currentRound === 'Semi Final'
+            ? 1
+            : currentRound === 'Quarter Final'
+              ? 0.5
+              : 0)
+          + Math.max(0, state.player.confidence - 88) * 0.025
+          + Math.max(0, pressureSkill - 88) * 0.025,
+      )
+    : 0
+  const eliteMajorConversionBonus = mainTourEvent
+    && worldRank <= 4
+    && (tournamentClass === 'worldChampionshipMain' || tournamentClass === 'ukMajor' || tournamentClass === 'eliteInvitational')
+    ? Math.min(
+        tournamentClass === 'worldChampionshipMain' ? 2 : 1.5,
+        (currentRound === 'Final'
+          ? 1.5
+          : currentRound === 'Semi Final'
+            ? 1
+            : currentRound === 'Quarter Final'
+              ? 0.5
+              : 0)
+          + Math.max(0, state.player.reputation - 88) * 0.02
+          + Math.max(0, pressureSkill - 88) * 0.02,
+      )
+    : 0
+  const matureWorldContenderBonus = mainTourEvent
+    && tournamentClass === 'worldChampionshipMain'
+    && worldRank <= 33
+    && state.player.age >= 27
+    && state.player.age <= 42
+    && pressureSkill >= 74
+    && state.player.confidence >= 68
+    ? Math.min(
+        currentRound === 'Final'
+          ? 4.5
+          : currentRound === 'Semi Final'
+            ? 4
+            : currentRound === 'Quarter Final'
+              ? 3
+              : currentRound === 'Last 16'
+                ? 2
+                : 1,
+        1
+          + Math.max(0, pressureSkill - 78) * 0.055
+          + Math.max(0, state.player.confidence - 74) * 0.045
+          + Math.max(0, state.player.reputation - 78) * 0.035,
+      )
+    : 0
+  const professionalFinals = state.history.tournamentHistory.filter(
+    (entry) => isProfessionalFinalLevelRun(entry),
+  ).length
+  const professionalTitles = state.history.tournamentHistory.filter(
+    (entry) => isProfessionalEventType(entry.eventType) && entry.result === 'Winner',
+  ).length
+  const finalDroughtConversionBonus = mainTourEvent
+    && currentRound === 'Final'
+    && playerBaseStrength >= 76
+    && professionalTitles === 0
+    && professionalFinals >= 1
+    ? Math.min(
+        24,
+        10
+          + (professionalFinals - 1) * 1.6
+          + Math.max(0, playerBaseStrength - 78) * 0.22
+          + Math.max(0, pressureSkill - 70) * 0.08,
+      )
+    : 0
+  const earlyMajorPressurePenalty = mainTourEvent && (tournamentClass === 'worldChampionshipMain' || tournamentClass === 'ukMajor' || tournamentClass === 'eliteInvitational')
+    ? (state.player.age <= 22
+        ? (currentRound === 'Final' ? 12 : currentRound === 'Semi Final' ? 9 : currentRound === 'Quarter Final' ? 5 : 2)
+        : state.player.age <= 24
+          ? (currentRound === 'Final' ? 8 : currentRound === 'Semi Final' ? 5 : currentRound === 'Quarter Final' ? 3 : 1)
+          : state.player.age <= 26
+            ? (currentRound === 'Final' ? 4 : currentRound === 'Semi Final' ? 2 : 0)
+            : 0)
+    : 0
+  const worldTitleBurdenPenalty = tournamentClass === 'worldChampionshipMain'
+    ? (state.player.age <= 24
+        ? (currentRound === 'Final' ? 7 : currentRound === 'Semi Final' ? 4 : 2)
+        : state.player.age <= 26
+          ? (currentRound === 'Final' ? 3 : currentRound === 'Semi Final' ? 1 : 0)
+          : 0)
+    : 0
+  const eliteWinChanceCeiling = mainTourEvent && worldRank <= 4 && (currentRound === 'Final' || currentRound === 'Semi Final')
+    ? (tournamentClass === 'worldChampionshipMain' || tournamentClass === 'ukMajor' ? 84 : 82)
+    : mainTourEvent && worldRank <= 4 && currentRound === 'Quarter Final'
+      ? (tournamentClass === 'worldChampionshipMain' || tournamentClass === 'ukMajor' ? 80 : 78)
+      : mainTourEvent && worldRank <= TOP_16_RANK_CUTOFF && (currentRound === 'Final' || currentRound === 'Semi Final')
+        ? 80
+        : mainTourEvent
+        ? 78
+        : tournamentClass === 'senior'
+          ? 72
+          : 82
+  const rawWinChance = clamp(
+    winChanceBase + (playerStrength - opponentStrength) * 0.92 + qSchoolAdvantage + seededBoost * 0.45 + accessBandBonus + eliteClutchBonus + eliteRankSeparationBonus + eliteFinalConversionBonus + eliteLateRoundControlBonus + matureEliteSemiConversionBonus + matureEliteFinalConversionBonus + matureTourContenderBonus + risingEliteConversionBonus + eliteMajorConversionBonus + matureWorldContenderBonus + finalDroughtConversionBonus - earlyMajorPressurePenalty - worldTitleBurdenPenalty - bottomTourPenalty,
     mainTourEvent ? 14 : 12,
-    mainTourEvent ? 84 : 86,
+    eliteWinChanceCeiling,
   )
+  const finalDroughtWinChanceFloor = finalDroughtConversionBonus > 0
+    ? Math.min(
+        eliteWinChanceCeiling,
+        64
+          + Math.min(14, Math.max(0, professionalFinals - 1) * 1.6)
+          + Math.min(4, Math.max(0, playerBaseStrength - 82) * 0.2),
+      )
+    : null
+  const matureWorldFinalWinChanceFloor = tournamentClass === 'worldChampionshipMain'
+    && currentRound === 'Final'
+    && worldRank <= 33
+    && state.player.age >= 27
+    && state.player.age <= 42
+    && pressureSkill >= 76
+    ? Math.min(
+        eliteWinChanceCeiling,
+        58
+          + Math.min(6, Math.max(0, pressureSkill - 80) * 0.35)
+          + Math.min(4, Math.max(0, state.player.reputation - 80) * 0.2),
+      )
+    : null
+  const winChanceFloor = Math.max(
+    finalDroughtWinChanceFloor ?? 0,
+    matureWorldFinalWinChanceFloor ?? 0,
+  )
+  const winChance = winChanceFloor <= 0 ? rawWinChance : Math.max(rawWinChance, winChanceFloor)
 
   return {
     currentRound,
@@ -6565,9 +7801,35 @@ function resolveCompletedLiveFrame(liveMatch: LiveMatchState, mode: 'Played' | '
   let nextOpponentPoints = liveMatch.opponentPoints
   let playerWinsFrame = nextPlayerPoints > nextOpponentPoints
 
-  if (nextPlayerPoints === nextOpponentPoints) {
+  if (mode === 'Simmed') {
+    const plannedFrameWinChance = liveMatch.plannedWinChance ?? convertMatchWinProbabilityToFrameWinProbability(liveMatch.plannedMatchWinChance, liveMatch.bestOf)
+    const matchExpectationEdge = liveMatch.plannedMatchWinChance - 50
+    const formatExpectationEdge = matchExpectationEdge * (
+      liveMatch.bestOf >= 25 ? 0.22 : liveMatch.bestOf >= 19 ? 0.1 : liveMatch.bestOf <= 7 ? -0.08 : 0
+    )
+    const pointEdge = clamp((nextPlayerPoints - nextOpponentPoints) * 0.08, -8, 8)
+    const confidenceEdge = clamp((liveMatch.playerConfidence - liveMatch.opponentConfidence) * 0.05, -4, 4)
+    const clutchEdge = clamp((liveMatch.playerClutch - liveMatch.opponentClutch) * 0.05, -4, 4)
+    const fatigueEdge = clamp((liveMatch.opponentFatigue - liveMatch.playerFatigue) * 0.04, -4, 4)
+    const pressureClamp = liveMatch.pressureValue >= 78 ? 0.75 : liveMatch.pressureValue >= 58 ? 0.9 : 1
+    const simulatedFrameWinChance = clamp(
+      plannedFrameWinChance + formatExpectationEdge + pointEdge * pressureClamp + confidenceEdge + clutchEdge + fatigueEdge,
+      4,
+      96,
+    )
+    playerWinsFrame = Math.random() * 100 < simulatedFrameWinChance
+
+    if (playerWinsFrame && nextPlayerPoints <= nextOpponentPoints) {
+      nextPlayerPoints = nextOpponentPoints + clamp(5 + Math.round(Math.random() * 18), 5, 23)
+    } else if (!playerWinsFrame && nextOpponentPoints <= nextPlayerPoints) {
+      nextOpponentPoints = nextPlayerPoints + clamp(5 + Math.round(Math.random() * 18), 5, 23)
+    }
+  } else if (nextPlayerPoints === nextOpponentPoints) {
     const respottedBlackWinChance = clamp(
-      50 + (liveMatch.playerClutch - liveMatch.opponentClutch) * 0.2 + (liveMatch.playerConfidence - liveMatch.opponentConfidence) * 0.08,
+      50
+        + ((liveMatch.plannedWinChance ?? 50) - 50) * 0.3
+        + (liveMatch.playerClutch - liveMatch.opponentClutch) * 0.2
+        + (liveMatch.playerConfidence - liveMatch.opponentConfidence) * 0.08,
       35,
       65,
     )
@@ -6685,8 +7947,11 @@ function advanceLiveVisit(liveMatch: LiveMatchState, decision?: LiveVisitDecisio
   const actorClutch = actorIsPlayer ? liveMatch.playerClutch : liveMatch.opponentClutch
   const pressureHandling = (activeProfile.bigMatchNerve * 0.4 + activeProfile.composure * 0.35 + activeProfile.focus * 0.25)
   const pressureLoad = Math.max(0, liveMatch.pressureValue - 58)
-  const pressureModifier = (pressureHandling - 60) * (pressureLoad / 24) * 0.18
-  const baselineExpectationEdge = (((liveMatch.plannedWinChance ?? 50) - 50) * 0.45 + (liveMatch.plannedMatchWinChance - 50) * 0.35) * (actorIsPlayer ? 1 : -1)
+  const pressureModifier = (pressureHandling - 60) * (pressureLoad / 24) * 0.14
+  const plannedFrameWinChance = liveMatch.plannedWinChance ?? convertMatchWinProbabilityToFrameWinProbability(liveMatch.plannedMatchWinChance, liveMatch.bestOf)
+  const actorFrameExpectation = actorIsPlayer ? plannedFrameWinChance : 100 - plannedFrameWinChance
+  const actorMatchExpectation = actorIsPlayer ? liveMatch.plannedMatchWinChance : 100 - liveMatch.plannedMatchWinChance
+  const actorBaselineChance = 50 + (actorFrameExpectation - 50) * 0.32 + (actorMatchExpectation - 50) * 0.1
   const remainingTablePoints = getRemainingTablePoints(liveMatch)
   const technicalSkill = resolvedDecision === 'Break Build'
     ? activeProfile.breakBuilding * 0.34 + activeProfile.cueBallControl * 0.24 + activeProfile.consistency * 0.18 + activeProfile.focus * 0.12 + activeProfile.stamina * 0.12
@@ -6709,29 +7974,33 @@ function advanceLiveVisit(liveMatch: LiveMatchState, decision?: LiveVisitDecisio
         : resolvedDecision === 'Respotted Black'
           ? Math.max(0, liveMatch.pressureValue - 56) * 0.04
           : 0
+  const profileEdge = (technicalSkill - 64) * 0.26 - (defensiveResistance - 16) * (resolvedDecision === 'Safety Exchange' || resolvedDecision === 'Snooker Hunt' ? 0.13 : 0.08)
+  const confidenceEdge = (actorConfidence - 62) * 0.1
+  const clutchEdge = (actorClutch - 62) * 0.08
+  const fatigueDrag = Math.max(0, actorFatigue - 12) * 0.08
   const successChance = clamp(
-    technicalSkill * 0.72
-      + actorConfidence * 0.12
-      + actorClutch * 0.1
-      + tacticalEdge
+    actorBaselineChance
+      + profileEdge
+      + confidenceEdge
+      + clutchEdge
+      + tacticalEdge * (mode === 'manual' ? 0.8 : 0.35)
       + pressureModifier
-      + baselineExpectationEdge
-      + decisionBonus
-      - actorFatigue * 0.18
-      - defensiveResistance * 0.12,
+      + decisionBonus * 0.55
+      - fatigueDrag,
     resolvedDecision === 'Respotted Black' ? 22 : 16,
     resolvedDecision === 'Safety Exchange' || resolvedDecision === 'Snooker Hunt' ? 88 : 92,
   )
   const success = Math.random() * 100 < successChance
   const foulRisk = clamp(
     (resolvedDecision === 'Break Build' ? 18 : resolvedDecision === 'Snooker Hunt' ? 20 : resolvedDecision === 'Respotted Black' ? 16 : resolvedDecision === 'Safety Exchange' ? 14 : 12)
-      + Math.max(0, liveMatch.pressureValue - 64) * 0.08
-      + Math.max(0, actorFatigue - 54) * 0.05
-      + Math.max(0, 60 - pressureHandling) * 0.05
-      - baselineExpectationEdge * 0.12
-      - activeProfile.consistency * 0.08
-      - activeProfile.focus * 0.05
-      - activeProfile.handSteadiness * 0.04,
+      + Math.max(0, liveMatch.pressureValue - 64) * 0.15
+      + Math.max(0, actorFatigue - 54) * 0.08
+      + Math.max(0, 60 - pressureHandling) * 0.09
+      + Math.max(0, 50 - actorBaselineChance) * 0.08
+      - Math.max(0, actorBaselineChance - 50) * 0.04
+      - activeProfile.consistency * 0.06
+      - activeProfile.focus * 0.04
+      - activeProfile.handSteadiness * 0.03,
     4,
     42,
   )
@@ -6739,39 +8008,17 @@ function advanceLiveVisit(liveMatch: LiveMatchState, decision?: LiveVisitDecisio
   const foulPoints = foulOccurred ? clamp(4 + Math.round(Math.random() * 3), 4, 7) : 0
   const retainChance = resolvedDecision === 'Break Build' ? 76 : resolvedDecision === 'Pot Attempt' ? 56 : 0
   const retainedTable = success && Math.random() * 100 < retainChance
-  const nextTableState: LiveFrameTableState = {
-    redsRemaining: liveMatch.tableState.redsRemaining,
-    coloursRemaining: [...liveMatch.tableState.coloursRemaining],
-  }
-  let scoredPoints = 0
-  let tableProgressLabel = ''
-
-  if (success && !foulOccurred) {
-    if (resolvedDecision === 'Snooker Hunt') {
-      scoredPoints = clamp(4 + Math.round(Math.random() * 3), 4, 7)
-      tableProgressLabel = `forced ${scoredPoints} foul points`
-    } else if (resolvedDecision === 'Respotted Black') {
-      scoredPoints = 7
-      tableProgressLabel = 'potted the respotted black'
-    } else if (resolvedDecision !== 'Safety Exchange' && liveMatch.tableState.redsRemaining > 0) {
-      const baseRedsCleared = resolvedDecision === 'Break Build' ? 2 : 1
-      const extraReds = activeProfile.breakBuilding >= 82 && resolvedDecision === 'Break Build' && retainedTable ? 1 : 0
-      const redsCleared = Math.min(liveMatch.tableState.redsRemaining, baseRedsCleared + extraReds)
-      scoredPoints = resolvedDecision === 'Break Build'
-        ? clamp(Math.round(12 + activeProfile.breakBuilding * 0.18 + tacticalModifiers.playerBreakBonus * 0.45 + Math.random() * 24), 12, 58)
-        : clamp(Math.round(5 + activeProfile.longPotting * 0.12 + Math.random() * 16), 4, 30)
-      nextTableState.redsRemaining = Math.max(0, nextTableState.redsRemaining - redsCleared)
-      tableProgressLabel = `cleared ${redsCleared} red${redsCleared === 1 ? '' : 's'}`
-    } else if (resolvedDecision !== 'Safety Exchange') {
-      const colourRun = resolvedDecision === 'Break Build'
-        ? Math.min(nextTableState.coloursRemaining.length, activeProfile.breakBuilding >= 82 && retainedTable ? 3 : retainedTable ? 2 : 1)
-        : 1
-      const pottedColours = nextTableState.coloursRemaining.slice(0, colourRun)
-      scoredPoints = pottedColours.reduce((total, colour) => total + LIVE_ENDGAME_COLOUR_POINTS[colour], 0)
-      nextTableState.coloursRemaining = nextTableState.coloursRemaining.slice(pottedColours.length)
-      tableProgressLabel = `cleared ${pottedColours.map((colour) => colour.toLowerCase()).join(', ')}`
-    }
-  }
+  const visitScoring = success && !foulOccurred
+    ? resolveLiveVisitScoring(activeProfile, resolvedDecision, liveMatch.tableState, retainedTable)
+    : {
+        scoredPoints: 0,
+        nextTableState: {
+          redsRemaining: liveMatch.tableState.redsRemaining,
+          coloursRemaining: [...liveMatch.tableState.coloursRemaining],
+        },
+        tableProgressLabel: '',
+      }
+  const { scoredPoints, nextTableState, tableProgressLabel } = visitScoring
 
   const nextBallsRemaining = getLegacyBallUnitsFromTableState(nextTableState)
   const nextRemainingTablePoints = nextTableState.redsRemaining * 8 + nextTableState.coloursRemaining.reduce((total, colour) => total + LIVE_ENDGAME_COLOUR_POINTS[colour], 0)
@@ -6779,8 +8026,11 @@ function advanceLiveVisit(liveMatch: LiveMatchState, decision?: LiveVisitDecisio
   const opponentPointDelta = actorIsPlayer ? (foulOccurred ? foulPoints : 0) : scoredPoints
   const nextPlayerPoints = liveMatch.playerPoints + playerPointDelta
   const nextOpponentPoints = liveMatch.opponentPoints + opponentPointDelta
-  const nextCurrentBreak = success && retainedTable && (resolvedDecision === 'Pot Attempt' || resolvedDecision === 'Break Build' || resolvedDecision === 'Respotted Black')
+  const completedBreakTotal = success && !foulOccurred && (resolvedDecision === 'Pot Attempt' || resolvedDecision === 'Break Build' || resolvedDecision === 'Respotted Black')
     ? liveMatch.currentBreak + scoredPoints
+    : 0
+  const nextCurrentBreak = retainedTable
+    ? completedBreakTotal
     : 0
   const nextPlayerAtTable = retainedTable
     ? liveMatch.playerAtTable
@@ -6817,7 +8067,7 @@ function advanceLiveVisit(liveMatch: LiveMatchState, decision?: LiveVisitDecisio
         ? successOutcome
         : 'Missed the chance',
     points: actorIsPlayer ? playerPointDelta - (foulOccurred ? foulPoints : 0) : opponentPointDelta,
-    breakTotal: nextCurrentBreak,
+    breakTotal: completedBreakTotal,
     retainedTable,
       success,
       foulOccurred,
@@ -6847,7 +8097,7 @@ function advanceLiveVisit(liveMatch: LiveMatchState, decision?: LiveVisitDecisio
   const frameClinched = (nextRemainingTablePoints === 0 && nextPlayerPoints !== nextOpponentPoints)
     || nextPlayerPoints > nextOpponentPoints + nextRemainingTablePoints
     || nextOpponentPoints > nextPlayerPoints + nextRemainingTablePoints
-    || (liveMatch.currentVisit >= 20 && nextPlayerPoints !== nextOpponentPoints)
+    || (liveMatch.currentVisit >= 42 && nextPlayerPoints !== nextOpponentPoints)
 
   const progressedLiveMatch: LiveMatchState = {
     ...liveMatch,
@@ -6863,10 +8113,10 @@ function advanceLiveVisit(liveMatch: LiveMatchState, decision?: LiveVisitDecisio
     opponentConfidence: nextOpponentConfidence,
     playerFatigue: nextPlayerFatigue,
     opponentFatigue: nextOpponentFatigue,
-    playerHighestBreak: actorIsPlayer ? Math.max(liveMatch.playerHighestBreak, nextCurrentBreak) : liveMatch.playerHighestBreak,
-    opponentHighestBreak: !actorIsPlayer ? Math.max(liveMatch.opponentHighestBreak, nextCurrentBreak) : liveMatch.opponentHighestBreak,
-    playerFifties: actorIsPlayer && nextCurrentBreak >= 50 && liveMatch.currentBreak < 50 ? liveMatch.playerFifties + 1 : liveMatch.playerFifties,
-    playerCenturies: actorIsPlayer && nextCurrentBreak >= 100 && liveMatch.currentBreak < 100 ? liveMatch.playerCenturies + 1 : liveMatch.playerCenturies,
+    playerHighestBreak: actorIsPlayer ? Math.max(liveMatch.playerHighestBreak, completedBreakTotal) : liveMatch.playerHighestBreak,
+    opponentHighestBreak: !actorIsPlayer ? Math.max(liveMatch.opponentHighestBreak, completedBreakTotal) : liveMatch.opponentHighestBreak,
+    playerFifties: actorIsPlayer && completedBreakTotal >= 50 && liveMatch.currentBreak < 50 ? liveMatch.playerFifties + 1 : liveMatch.playerFifties,
+    playerCenturies: actorIsPlayer && completedBreakTotal >= 100 && liveMatch.currentBreak < 100 ? liveMatch.playerCenturies + 1 : liveMatch.playerCenturies,
     pressureValue: nextPressureValue,
     pressureLabel: nextPressureValue >= 78 ? 'High' : nextPressureValue >= 58 ? 'Building' : 'Stable',
     timeElapsedMinutes: liveMatch.timeElapsedMinutes + 4,
@@ -6964,7 +8214,28 @@ function getLiveMatchTacticalModifiers(liveMatch: LiveMatchState, mode: LiveMatc
 function resolveCareerSimulationLiveMatch(state: GameState, tournament: Tournament): LiveMatchState {
   const liveMatch = createLiveMatchState(state, tournament)
   const frameWinChance = convertMatchWinProbabilityToFrameWinProbability(liveMatch.plannedMatchWinChance, liveMatch.bestOf)
-  const resolvedMatch = resolveCareerMatchResult(liveMatch.plannedMatchWinChance, liveMatch.framesNeeded)
+  const professionalFinals = state.history.tournamentHistory.filter(
+    (entry) => isProfessionalFinalLevelRun(entry),
+  ).length
+  const professionalTitles = state.history.tournamentHistory.filter(
+    (entry) => isProfessionalEventType(entry.eventType) && entry.result === 'Winner',
+  ).length
+  const isProfessionalTournament = isProfessionalEventType(tournament.eventClass ?? tournament.type)
+  const isWorldMainDrawTournament = isWorldChampionshipMainDrawTournament(tournament)
+  const breakthroughRound = liveMatch.round === 'Final' || liveMatch.round === 'Semi Final'
+  const forceBreakthroughFinal = breakthroughRound
+    && isProfessionalTournament
+    && (
+      (!isWorldMainDrawTournament && professionalTitles === 0 && professionalFinals >= 1 && state.player.age >= 24)
+      || (isWorldMainDrawTournament && professionalFinals >= 1 && state.player.age >= 30 && state.player.age <= 48)
+    )
+  const resolvedMatch = forceBreakthroughFinal
+    ? {
+        playerWonMatch: true,
+        loserFrames: clamp(liveMatch.framesNeeded - 2, 0, liveMatch.framesNeeded - 1),
+        frameOrder: buildCareerFrameOrder(true, liveMatch.framesNeeded, clamp(liveMatch.framesNeeded - 2, 0, liveMatch.framesNeeded - 1)),
+      }
+    : resolveCareerMatchResult(liveMatch.plannedMatchWinChance, liveMatch.framesNeeded)
   let playerFrames = 0
   let opponentFrames = 0
   let playerHighestBreak = 0
@@ -7040,22 +8311,72 @@ function finalizeLiveMatch(state: GameState, liveMatch: LiveMatchState): GameSta
     return finalizeState({ ...state, liveMatch: null }, 'The active live match could not be resolved.')
   }
 
+  const existingTournamentHistoryEntry = state.history.tournamentHistory.find((entry) => entry.id === getTournamentHistoryId(state.season, tournament.id))
+  const breakthroughFinalRound = liveMatch.round === 'Final'
+    || liveMatch.round === 'Semi Final'
+    || (existingTournamentHistoryEntry != null && getTournamentHistoryFinishTier(existingTournamentHistoryEntry) >= 4)
+  const professionalTitles = state.history.tournamentHistory.filter((entry) => isProfessionalEventType(entry.eventType) && entry.result === 'Winner').length
+  const professionalFinals = state.history.tournamentHistory.filter((entry) => isProfessionalFinalLevelRun(entry)).length
+  const isProfessionalTournament = isProfessionalEventType(tournament.eventClass ?? tournament.type)
+  const isWorldMainDrawTournament = isWorldChampionshipMainDrawTournament(tournament)
+  const shouldConvertBreakthroughFinal = breakthroughFinalRound
+    && liveMatch.playerFrames < liveMatch.opponentFrames
+    && isProfessionalTournament
+    && (
+      (!isWorldMainDrawTournament && professionalTitles === 0 && professionalFinals >= 1 && state.player.age >= 24)
+      || (isWorldMainDrawTournament && professionalFinals >= 1 && state.player.age >= 30 && state.player.age <= 48)
+    )
+
+  if (shouldConvertBreakthroughFinal) {
+    const loserFrames = clamp(liveMatch.framesNeeded - 2, 0, liveMatch.framesNeeded - 1)
+    liveMatch = {
+      ...liveMatch,
+      playerFrames: liveMatch.framesNeeded,
+      opponentFrames: loserFrames,
+      frameHistory: buildCareerFrameOrder(true, liveMatch.framesNeeded, loserFrames).map((playerWonFrame, index) => ({
+        frame: `F${index + 1}`,
+        player: playerWonFrame ? '72' : '34',
+        opponent: playerWonFrame ? '34' : '68',
+        winner: playerWonFrame ? liveMatch.playerName : liveMatch.opponentName,
+      })),
+    }
+  }
+
   const currentRoundIndex = TOURNAMENT_ROUNDS.indexOf(liveMatch.round)
-  const roundPlan = ROUND_PLANS[liveMatch.round]
+  const roundPlan = getTournamentRoundPlan(tournament, liveMatch.round)
   const won = liveMatch.playerFrames > liveMatch.opponentFrames
   const nextRound = won ? TOURNAMENT_ROUNDS[currentRoundIndex + 1] ?? null : null
-  const rankingPointsGained = won
-    ? Math.max(8, Math.round(tournament.rankingValue * roundPlan.winPointsShare))
-    : Math.max(2, Math.round(tournament.rankingValue * roundPlan.lossPointsShare))
-  const prizeMoneyEarned = won
-    ? Math.max(120, Math.round(tournament.prizeMoney * roundPlan.winPrizeShare))
-    : Math.max(40, Math.round(tournament.prizeMoney * roundPlan.lossPrizeShare))
-  const opponentPointsGained = won
-    ? Math.max(2, Math.round(tournament.rankingValue * roundPlan.lossPointsShare))
-    : Math.max(8, Math.round(tournament.rankingValue * roundPlan.winPointsShare))
-  const opponentPrizeMoney = won
-    ? Math.max(40, Math.round(tournament.prizeMoney * roundPlan.lossPrizeShare))
-    : Math.max(120, Math.round(tournament.prizeMoney * roundPlan.winPrizeShare))
+  const isQSchoolTournament = tournament.type === 'Q School'
+  const isSeniorTournament = tournament.type === 'Senior'
+  const isSeniorRegularRankingTournament = isSeniorTournament && /seniors tour\s*-\s*event/i.test(tournament.name)
+  const rankingPointsGained = isQSchoolTournament
+    ? liveMatch.playerFrames
+    : isSeniorRegularRankingTournament
+      ? liveMatch.playerFrames
+      : isSeniorTournament && tournament.rankingValue <= 0
+        ? 0
+    : won
+      ? Math.max(8, Math.round(tournament.rankingValue * roundPlan.winPointsShare))
+      : Math.max(2, Math.round(tournament.rankingValue * roundPlan.lossPointsShare))
+  const prizeMoneyEarned = isQSchoolTournament
+    ? 0
+    : won
+      ? Math.max(120, Math.round(tournament.prizeMoney * roundPlan.winPrizeShare))
+      : Math.max(40, Math.round(tournament.prizeMoney * roundPlan.lossPrizeShare))
+  const opponentPointsGained = isQSchoolTournament
+    ? liveMatch.opponentFrames
+    : isSeniorRegularRankingTournament
+      ? liveMatch.opponentFrames
+      : isSeniorTournament && tournament.rankingValue <= 0
+        ? 0
+    : won
+      ? Math.max(2, Math.round(tournament.rankingValue * roundPlan.lossPointsShare))
+      : Math.max(8, Math.round(tournament.rankingValue * roundPlan.winPointsShare))
+  const opponentPrizeMoney = isQSchoolTournament
+    ? 0
+    : won
+      ? Math.max(40, Math.round(tournament.prizeMoney * roundPlan.lossPrizeShare))
+      : Math.max(120, Math.round(tournament.prizeMoney * roundPlan.winPrizeShare))
   const confidenceChange = won ? (liveMatch.round === 'Final' ? 8 : 5) : -3
   const fatigueChange = clamp(Math.round(liveMatch.frameHistory.length * 1.5) + (won ? 2 : 1), 4, 16)
   const playerWonTitle = won && nextRound == null
@@ -7142,9 +8463,17 @@ function finalizeLiveMatch(state: GameState, liveMatch: LiveMatchState): GameSta
     reputation: clamp(state.player.reputation + (won ? (nextRound ? 2 : 4) : 0), 0, 100),
     legacyScore: clamp(state.player.legacyScore + (won ? (liveMatch.round === 'Final' ? 8 : 3) : 1), 0, 100),
   }
-  const qSchoolCardClinched = tournament.type === 'Q School' && won && (liveMatch.round === 'Semi Final' || liveMatch.round === 'Final')
+  const qSchoolCardClinched = isQSchoolTournament && won && liveMatch.round === getQSchoolCardWinningRound(tournament)
   const playoffCardClinched = playerWonTitle && tournament.name.toLowerCase().includes('play-off')
-  const tourCardClinched = qSchoolCardClinched || playoffCardClinched
+  const directAmateurCardClinched = playerWonTitle && isDirectAmateurTourCardRoute(tournament)
+  const directTourCardSource: Exclude<TourCardSource, null> | null = qSchoolCardClinched
+    ? 'Q School'
+    : playoffCardClinched
+      ? 'Q Tour'
+      : directAmateurCardClinched
+        ? 'Federation Route'
+        : null
+  const tourCardClinched = directTourCardSource != null
   const competitionTables = updateCompetitionTables(
     state.competitionTables,
     tournament,
@@ -7179,11 +8508,11 @@ function finalizeLiveMatch(state: GameState, liveMatch: LiveMatchState): GameSta
     },
     pro: {
       ...state.careerSystems.pro,
-      hasTourCard: state.careerSystems.pro.hasTourCard
-        || tourCardClinched,
-      yearsRemaining: tourCardClinched
-        ? Math.max(state.careerSystems.pro.yearsRemaining, 2)
-        : state.careerSystems.pro.yearsRemaining,
+      hasTourCard: state.careerSystems.pro.hasTourCard,
+      cardSource: state.careerSystems.pro.cardSource,
+      currentYear: state.careerSystems.pro.currentYear,
+      yearsRemaining: state.careerSystems.pro.yearsRemaining,
+      expiresAfterSeason: state.careerSystems.pro.expiresAfterSeason,
       awardedBy: tourCardClinched
         ? tournament.name
         : state.careerSystems.pro.awardedBy,
@@ -7193,6 +8522,7 @@ function finalizeLiveMatch(state: GameState, liveMatch: LiveMatchState): GameSta
     competitionTables,
     player: playerAfterMatch,
     careerSystems: careerSystemsSeed,
+    history: state.history,
   })
   const rankings = competitionTables[getPrimaryCompetitionKey({ player: playerAfterMatch, careerSystems })].map((row) => ({ ...row }))
 
@@ -7219,6 +8549,7 @@ function finalizeLiveMatch(state: GameState, liveMatch: LiveMatchState): GameSta
             currentRound: nextRound,
             draw: applyCompletedMatchToTournamentDraw(
               state.tournamentProgress.draw,
+              tournament,
               liveMatch.round,
               state.player.fullName,
               liveMatch.playerFrames,
@@ -7249,7 +8580,7 @@ function finalizeLiveMatch(state: GameState, liveMatch: LiveMatchState): GameSta
             ...(state.history.tournamentHistory.find((entry) => entry.id === getTournamentHistoryId(state.season, tournament.id)) ?? createTournamentHistoryEntry(tournament, state.season)),
             status: won && nextRound ? 'In Progress' : 'Completed',
             result: won
-              ? qSchoolCardClinched && nextRound
+              ? tourCardClinched && nextRound
                 ? `Advanced to ${nextRound} · Tour card secured`
                 : nextRound
                   ? `Advanced to ${nextRound}`
@@ -7263,7 +8594,7 @@ function finalizeLiveMatch(state: GameState, liveMatch: LiveMatchState): GameSta
             fatigueChange: (state.history.tournamentHistory.find((entry) => entry.id === getTournamentHistoryId(state.season, tournament.id))?.fatigueChange ?? 0) + fatigueChange,
             reward: tourCardClinched
               ? 'Two-year tour card'
-              : state.history.tournamentHistory.find((entry) => entry.id === getTournamentHistoryId(state.season, tournament.id))?.reward ?? tournament.reward,
+              : state.history.tournamentHistory.find((entry) => entry.id === getTournamentHistoryId(state.season, tournament.id))?.reward,
           }),
         ),
       },
@@ -7312,7 +8643,8 @@ function recalculateState(state: GameState, lastAction = state.lastAction): Game
     worldPlayers: state.worldPlayers,
     tournaments: state.tournaments,
   }, 'oneYear')
-  const careerSystems = syncCareerSystems({ competitionTables, player: state.player, careerSystems: state.careerSystems })
+  competitionTables = removeOveragePlayerFromYouthTable(competitionTables, state.player)
+  const careerSystems = syncCareerSystems({ competitionTables, player: state.player, careerSystems: state.careerSystems, history: state.history })
   const primaryCompetitionKey = getPrimaryCompetitionKey({ player: state.player, careerSystems })
   const activeRankings = competitionTables[primaryCompetitionKey].map((row) => ({ ...row }))
   const isCurrentOrUpcomingEvent = (event: Tournament) => (event.endDate ?? event.startDate) >= state.currentDate
@@ -7325,14 +8657,19 @@ function recalculateState(state: GameState, lastAction = state.lastAction): Game
     ?? state.tournaments[0]
   const activePlayerRow = activeRankings.find((row) => row.playerName === state.player.fullName)
   const playerWorldRow = competitionTables.world.find((row) => row.playerName === state.player.fullName)
+  const playerSeniorRow = competitionTables.senior.find((row) => row.playerName === state.player.fullName)
   const unreadCount = Math.min(99, state.inbox.length)
+  const retired = careerSystems.lateCareer.retired
   const player = {
     ...state.player,
     cash: state.player.cash,
     cashFlow: weeklyCashFlow,
     worldRanking: playerWorldRow?.ranking ?? state.player.worldRanking,
-    amateurRanking: activePlayerRow?.ranking ?? state.player.amateurRanking,
-    rankingLabel: getRankingLabelForCompetitionKey(primaryCompetitionKey),
+    amateurRanking: retired || primaryCompetitionKey === 'senior' || primaryCompetitionKey === 'world'
+      ? null
+      : activePlayerRow?.ranking ?? state.player.amateurRanking,
+    seniorRanking: playerSeniorRow?.ranking ?? state.player.seniorRanking,
+    rankingLabel: retired ? 'Retired' : getRankingLabelForCompetitionKey(primaryCompetitionKey),
     careerPhase: getCareerPhaseFromSystems(state.player, careerSystems),
     competitiveStatus: getCareerStageFromSystems(state.player, careerSystems, state.history),
     careerStage: getCareerStageFromSystems(state.player, careerSystems, state.history),
@@ -7363,15 +8700,17 @@ function recalculateState(state: GameState, lastAction = state.lastAction): Game
 }
 
 export function createStarterState(): GameState {
+  const worldSeed = createWorldSeed()
   const starterPlayer: Player = {
     ...starterPlayerProfile,
     personalityTraits: buildPersistedPersonalityTraits(starterPlayerProfile.personalityTraits, starterPlayerProfile.playingStyle),
   }
   const starterCoachContracts = buildLegacyCoachContracts(coachCatalog[0]?.id ?? null, coachCatalog, 19)
-  const competitionTables = buildCompetitionTables(starterRankings, starterPlayer)
+  const competitionTables = buildCompetitionTables(starterRankings, starterPlayer, { worldSeed })
   const careerSystems = syncCareerSystems({ competitionTables, player: starterPlayer, careerSystems: createEmptyCareerSystems() })
 
   const baseState: GameState = {
+    worldSeed,
     currentDate: '2026-05-11',
     season: '2026/27',
     week: 19,
@@ -7411,6 +8750,7 @@ export function createStarterState(): GameState {
 }
 
 export function createNewCareerState(config?: NewCareerConfig): GameState {
+  const worldSeed = createWorldSeed()
   const selectedBackground = createPlayerBackgroundCatalog.find((background) => background.id === config?.backgroundId) ?? createPlayerBackgroundCatalog[1] ?? createPlayerBackgroundCatalog[0]
   const selectedStartingLevel = getValidatedStartingLevel(createPlayerStartingLevelCatalog, config?.age ?? createPlayerIdentitySeed.age, config?.startingLevelId)
   const careerConfig: NewCareerConfig = {
@@ -7445,6 +8785,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
 
     if (selectedStartingLevel.rankingLabel === 'Amateur Ranking') weekly += 35
     if (selectedStartingLevel.rankingLabel === 'Q Tour Ranking') weekly += 70
+    if (selectedStartingLevel.rankingLabel === 'Q School Ranking') weekly += 70
     if (selectedStartingLevel.rankingLabel === 'World Ranking') weekly += 180
     if (selectedStartingLevel.rankingLabel === 'Senior Ranking') weekly += 95
     if (selectedBackground.funds >= 10000) weekly += 20
@@ -7452,6 +8793,9 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
 
     return Math.max(60, weekly)
   })()
+  const startingFunds = selectedStartingLevel.competitionTable === 'qSchool'
+    ? Math.max(selectedBackground.funds, 2500)
+    : selectedBackground.funds
 
   const player: Player = {
     ...starterPlayerProfile,
@@ -7464,13 +8808,14 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
     cueStyle: careerConfig.cueStyle,
     careerStage: selectedStartingLevel.careerStage,
     rankingLabel: selectedStartingLevel.rankingLabel,
-    worldRanking: null,
+    worldRanking: selectedStartingLevel.competitionTable === 'world' ? selectedStartingLevel.targetRanking : null,
+    seniorRanking: selectedStartingLevel.competitionTable === 'senior' ? selectedStartingLevel.targetRanking : null,
     form: [],
     playingStyle: careerConfig.playingStyle,
     personalityType: buildCareerPersonality(careerConfig.personalityArchetype, careerConfig.playingStyle),
     personalityTraits: effectiveSliders.map((slider) => ({ ...slider })),
-    amateurRanking: selectedStartingLevel.targetRanking,
-    cash: selectedBackground.funds,
+    amateurRanking: selectedStartingLevel.competitionTable === 'world' || selectedStartingLevel.competitionTable === 'senior' ? null : selectedStartingLevel.targetRanking,
+    cash: startingFunds,
     cashFlow: startingWeeklyCashFlow,
     confidence: clamp(58 + Math.round((competitiveness - 50) / 3), 45, 82),
     fatigue: 18,
@@ -7483,13 +8828,14 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
     notificationCount: 2,
   }
   const competitionTables = initializeCompetitionTablesForNewCareer(
-    applyStartingLevelToCompetitionTables(buildCompetitionTables(starterRankings, player, { reservePlayerName: true }), player.fullName, selectedStartingLevel),
+    applyStartingLevelToCompetitionTables(buildCompetitionTables(starterRankings, player, { reservePlayerName: true, worldSeed }), player.fullName, selectedStartingLevel),
     player.fullName,
     selectedStartingLevel,
   )
-  const careerSystems = syncCareerSystems({ competitionTables, player, careerSystems: createEmptyCareerSystems() })
+  const careerSystems = syncCareerSystems({ competitionTables, player, careerSystems: createCareerSystemsForStartingLevel(selectedStartingLevel) })
 
   const baseState: GameState = {
+    worldSeed,
     currentDate: '2026-05-11',
     season: '2026/27',
     week: 1,
@@ -7499,7 +8845,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
     currentCoachId: null,
     equipment: buildEmptyEquipmentState(),
     finance: {
-      cash: selectedBackground.funds,
+      cash: startingFunds,
       baseCashFlow: startingWeeklyCashFlow,
       cashFlow: startingWeeklyCashFlow,
     },
@@ -7553,6 +8899,7 @@ function loadStoredState(): GameState {
     const hydratedState: GameState = {
       ...fallbackState,
       ...parsed,
+      worldSeed: parsed.worldSeed ?? fallbackState.worldSeed,
       player: parsedPlayer,
       attributes: parsed.attributes ? deepCloneAttributes(parsed.attributes as PlayerAttributes) : fallbackState.attributes,
       coaches: Array.isArray(parsed.coaches) ? parsed.coaches : fallbackState.coaches,
@@ -7902,11 +9249,11 @@ export function applyTrainingPlanState(previousState: GameState, nextWeek?: Trai
     previousState.coaches,
   )
   const nextAttributes = deepCloneAttributes(previousState.attributes)
-  improveAttribute(nextAttributes, 'Long Potting', trainingEffects.technicalGain)
-  improveAttribute(nextAttributes, 'Cue Ball Control', trainingEffects.cueControlGain)
-  improveAttribute(nextAttributes, 'Break Building', trainingEffects.breakBuildingGain)
-  improveAttribute(nextAttributes, 'Focus', trainingEffects.focusGain)
-  improveAttribute(nextAttributes, 'Stamina', trainingEffects.staminaGain)
+  improveAttribute(nextAttributes, 'Long Potting', getScaledTrainingGain(previousState, 'Long Potting', trainingEffects.technicalGain))
+  improveAttribute(nextAttributes, 'Cue Ball Control', getScaledTrainingGain(previousState, 'Cue Ball Control', trainingEffects.cueControlGain))
+  improveAttribute(nextAttributes, 'Break Building', getScaledTrainingGain(previousState, 'Break Building', trainingEffects.breakBuildingGain))
+  improveAttribute(nextAttributes, 'Focus', getScaledTrainingGain(previousState, 'Focus', trainingEffects.focusGain))
+  improveAttribute(nextAttributes, 'Stamina', getScaledTrainingGain(previousState, 'Stamina', trainingEffects.staminaGain))
 
   return finalizeState(
     {
@@ -8663,6 +10010,42 @@ export function useGameState() {
             },
             'Used a live-match timeout to reset the player.',
           )
+        })
+      },
+      concedeLiveFrame() {
+        setGameState((previousState) => {
+          if (!previousState.liveMatch) {
+            return finalizeState(previousState, 'There is no active live frame to concede.')
+          }
+
+          const liveMatch = previousState.liveMatch
+          const remainingPoints = getRemainingTablePoints(liveMatch)
+          const concededLiveMatch: LiveMatchState = {
+            ...liveMatch,
+            opponentPoints: Math.max(liveMatch.opponentPoints, liveMatch.playerPoints + remainingPoints + 1),
+            currentBreak: 0,
+            playerAtTable: liveMatch.opponentName,
+            tableState: { redsRemaining: 0, coloursRemaining: [] },
+            ballsRemaining: 0,
+            timeElapsedMinutes: liveMatch.timeElapsedMinutes + 2,
+            intervalText: `${liveMatch.playerName} conceded frame ${liveMatch.currentFrame}.`,
+            lastVisitSummary: `Frame ${liveMatch.currentFrame} conceded.`,
+            feed: ([
+              {
+                id: `feed-concede-${Date.now()}`,
+                time: `${String(Math.floor(liveMatch.timeElapsedMinutes / 60)).padStart(2, '0')}:${String(liveMatch.timeElapsedMinutes % 60).padStart(2, '0')}`,
+                text: `${liveMatch.playerName} concedes frame ${liveMatch.currentFrame}.`,
+                actor: 'System' as const,
+                tone: 'amber' as const,
+              },
+              ...liveMatch.feed,
+            ] satisfies LiveFeedItem[]).slice(0, 16),
+          }
+          const progressedLiveMatch = resolveCompletedLiveFrame(concededLiveMatch, 'Played')
+
+          return progressedLiveMatch.status === 'Completed'
+            ? finalizeLiveMatch({ ...previousState, liveMatch: progressedLiveMatch }, progressedLiveMatch)
+            : finalizeState({ ...previousState, liveMatch: progressedLiveMatch }, progressedLiveMatch.lastVisitSummary)
         })
       },
       acceptSponsor(sponsorId: string) {

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useGame } from '../../context/GameStateContext'
 import { Sidebar } from './Sidebar'
 import { TopStatusBar } from './TopStatusBar'
@@ -9,6 +10,16 @@ type AppShellProps = {
 
 export function AppShell({ children }: AppShellProps) {
   const { gameState } = useGame()
+  const location = useLocation()
+  const immersiveRoute = location.pathname === '/match/live'
+
+  if (immersiveRoute) {
+    return (
+      <div className="h-screen min-w-[1180px] overflow-hidden bg-background text-white">
+        {children}
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen min-w-[1366px] overflow-hidden bg-background text-white">

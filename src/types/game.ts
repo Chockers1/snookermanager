@@ -16,6 +16,7 @@ export type Player = {
   rankingLabel: string
   worldRanking?: number | null
   amateurRanking?: number | null
+  seniorRanking?: number | null
   cash: number
   cashFlow: number
   form: string[]
@@ -259,8 +260,8 @@ export type NewCareerStartingLevel = {
   description: string
   careerStage: string
   rankingLabel: string
-  competitionTable: 'youth' | 'amateur' | 'qTour' | 'senior'
-  stage: 1 | 2 | 3 | 4 | 5 | 14
+  competitionTable: 'youth' | 'amateur' | 'qTour' | 'qSchool' | 'world' | 'senior'
+  stage: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 14
   minAge: number
   maxAge: number
   targetRanking: number

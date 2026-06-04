@@ -33,9 +33,11 @@ function getAgePotentialBonus(age?: number) {
   if (age <= 24) return 5
   if (age <= 29) return 4
   if (age <= 34) return 2
-  if (age <= 39) return 0
-  if (age <= 49) return -2
-  return -5
+  if (age <= 39) return -1
+  if (age <= 44) return -3
+  if (age <= 49) return -5
+  if (age <= 59) return -8
+  return -12
 }
 
 function getAgePotentialFloor(age: number | undefined, overallRating: number) {
@@ -45,7 +47,20 @@ function getAgePotentialFloor(age: number | undefined, overallRating: number) {
   if (age <= 18) return Math.max(84, overallRating + 28)
   if (age <= 21) return Math.max(78, overallRating + 18)
   if (age <= 24) return Math.max(72, overallRating + 13)
+  if (age >= 35) return overallRating
   return overallRating + 1
+}
+
+function getAgePotentialCeiling(age: number | undefined, overallRating: number) {
+  if (age == null) return 99
+  if (age <= 34) return 99
+  if (age <= 39) return Math.max(overallRating, Math.min(94, overallRating + 4))
+  if (age <= 44) return Math.max(overallRating, Math.min(88, overallRating + 2))
+  if (age <= 49) return Math.max(overallRating, Math.min(82, overallRating + 1))
+  if (age <= 54) return Math.max(overallRating, Math.min(76, overallRating))
+  if (age <= 59) return Math.max(overallRating, Math.min(72, overallRating))
+  if (age <= 64) return Math.max(overallRating, Math.min(68, overallRating))
+  return Math.max(overallRating, Math.min(64, overallRating))
 }
 
 function getPersonalityKeywordBonus(personalityType?: string) {
@@ -112,7 +127,10 @@ export function calculatePotentialRatingFromProfile(params: {
     getPlayingStyleRatingBonus(playingStyle) +
     getPersonalityKeywordBonus(personalityType)
 
-  return clamp(Math.max(overallRating + 1, potential, getAgePotentialFloor(age, overallRating)), overallRating, 99)
+  const ceiling = getAgePotentialCeiling(age, overallRating)
+  const minimumPotential = age != null && age >= 35 ? overallRating : overallRating + 1
+  const rawPotential = Math.max(minimumPotential, potential, getAgePotentialFloor(age, overallRating))
+  return clamp(Math.min(rawPotential, ceiling), overallRating, ceiling)
 }
 
 export function calculateOverallRating(params: {

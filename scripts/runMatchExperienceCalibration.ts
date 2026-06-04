@@ -990,7 +990,7 @@ function getEndUserMatchFeelVerdict(
   const confidenceRows = summaries.filter((summary) => summary.matchup === 'High Confidence Underdog vs Low Confidence Favourite')
   const tiredFavouriteRows = summaries.filter((summary) => summary.matchup === 'Tired Favourite vs Fresh Underdog')
   const equalYouthBo35 = summaries.find((summary) => summary.matchup === 'Equal Youth vs Equal Youth' && summary.bestOf === 35)
-  const worldFinalScenario = scenarios.find((scenario) => scenario.label === 'World final deciding session')
+  const worldFinalScenario = scenarios.find((scenario) => scenario.label.includes('World final deciding session'))
   const shortUpsetRate = average(summaries.filter((summary) => summary.bestOf <= 7).map((summary) => summary.upsetRate))
   const longUpsetRate = average(summaries.filter((summary) => summary.bestOf >= 25).map((summary) => summary.upsetRate))
   const validFormatDiagnostics = formatDiagnostics.filter((diagnostic) => diagnostic.valid).length
