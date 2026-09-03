@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, Route, Trophy } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 import { buildTournamentDrawData } from '../utils/liveRouteData'
 
 function difficultyClass(difficulty: 'Moderate' | 'Challenging' | 'Very Tough') {

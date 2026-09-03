@@ -1,118 +1,66 @@
 # 30-Year E2E All Starts + CPU/World Report
 
-Generated: 2026-06-04
+Generated: 2026-09-03
+Deterministic seed: `20260903`
 
 ## Scope
 
-- Ran 12 starting points for 30 seasons each.
-- Covered user careers from club junior through youth, amateur, Q Tour, Q School, rookie/bottom tour, top 64, top 32, top 16, and senior masters.
-- Checked user lifecycle, promotion/relegation, tour-card fallback, senior-only restriction, CPU player churn, CPU overall/potential movement, world roster size, event volume, match counts, ranking/title/world outputs, and warning flags.
-- Production build passed before the matrix run.
+- Ran all 12 supported starting points for 30 seasons each with middle coaching/equipment support.
+- Used the same date, eligibility, travel, match, ranking, finance, progression, and season-rollover state functions as the UI.
+- Audited human results plus CPU development, ranking movement, tour-card churn, intake, retirement, naming, and match volume.
 
 ## Headline
 
-- All 12 scenarios completed 30 seasons / 1,835 simulated weeks with 0 hard issues.
-- No top-level balance warnings, status-integrity warnings, or tournament warning flags were triggered in the refreshed JSON reports.
-- CPU/world simulation is active: 128 active main-tour card holders were maintained every season, CPU players gained/lost cards, new players entered, and CPU overall/potential changed year to year.
-- Senior retirement now works: the senior start stayed senior-only until age 78, then entered 0 events in the final two seasons and finished age 80 as Retired.
-- Main remaining calibration concern: several non-elite starts now underperform their expected win probability by roughly 4-9 percentage points, so the previous overpowered problem has swung conservative in some paths.
+- 12/12 scenarios completed all 30 seasons: 360 seasons, 4,289 tournament entries, and 6,678 matches.
+- Hard simulation issues: **0**.
+- Balance/status warnings: **0** after using final-round modeled probability for final-conversion checks.
+- Only **4 of 11** non-senior careers became World Champion and reached No. 1, down from 11 of 11.
+- The four World-title breakthroughs arrived at ages **30, 35, 39, and 43**. No age-22 titles remain.
+- The largest positive actual-versus-modeled win-rate gap is **+0.8 percentage points**, down from +8.3.
+- Rankings move both ways: the 11 non-senior paths recorded **107 improving and 109 declining** season-to-season moves.
+- The representative CPU audit recorded **148 explicit retired players**, **0 invalid lifecycle seasons**, and **0 active zero-match players** across all 30 seasons.
+- Generated CPU names remain natural two-part names; no artificial single-letter suffixes were found.
 
 ## Scenario Outcomes
 
-| Start | Events | Events/Season | Matches | Expected Win % | Actual Win % | Avg Player Str | Avg Opp Str | Titles | Ranking Titles | Majors | World Wins | World Entries | Best World | Best Rank | Final Rank | Final Status | Warnings |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---|---:|
-| Age 12 Club Junior | 278 | 9.3 | 353 | 25.3 | 21.2 | 64.8 | 91.4 | 0 | 0 | 0 | 0 | 0 | No main draw win | 33 | 33 | Tour Survivor / Top 64 | 0 |
-| Age 13 Regional Youth | 299 | 10.0 | 418 | 28.3 | 28.5 | 69.7 | 92.8 | 0 | 0 | 0 | 0 | 0 | No main draw win | 33 | 33 | Tour Survivor / Top 64 | 0 |
-| Age 15 National Youth | 369 | 12.3 | 517 | 35.9 | 31.5 | 73.6 | 93.1 | 1 | 1 | 0 | 0 | 13 | Quarter-final | 1 | 33 | Tour Survivor / Top 64 | 0 |
-| Age 17 Elite Amateur | 331 | 11.0 | 445 | 35.8 | 27.2 | 78.3 | 95.5 | 0 | 0 | 0 | 0 | 7 | Quarter-final | 17 | 33 | Tour Survivor / Top 64 | 0 |
-| Age 18 Q Tour | 375 | 12.5 | 546 | 38.9 | 34.8 | 77.0 | 95.5 | 4 | 2 | 2 | 0 | 15 | Final | 17 | 17 | Top 32 Professional | 0 |
-| Age 18 Q School | 312 | 10.4 | 420 | 36.2 | 27.1 | 77.8 | 95.3 | 0 | 0 | 0 | 0 | 6 | Quarter-final | 17 | 65 | Bottom Tour / At Risk | 0 |
-| Age 18 Rookie Pro | 367 | 12.2 | 515 | 39.2 | 32.4 | 76.9 | 95.6 | 0 | 0 | 0 | 0 | 16 | Quarter-final | 17 | 97 | Bottom Tour / At Risk | 0 |
-| Age 18 Bottom Tour | 345 | 11.5 | 474 | 37.9 | 31.2 | 77.8 | 96.0 | 2 | 2 | 0 | 0 | 14 | Semi-final | 17 | 33 | Tour Survivor / Top 64 | 0 |
-| Age 19 Top 64 | 319 | 10.6 | 457 | 39.8 | 34.4 | 78.3 | 96.0 | 3 | 1 | 1 | 0 | 14 | Quarter-final | 9 | 17 | Top 32 Professional | 0 |
-| Age 20 Top 32 | 403 | 13.4 | 592 | 41.7 | 36.7 | 79.3 | 96.0 | 1 | 1 | 1 | 1 | 24 | Winner | 1 | 33 | World Champion | 0 |
-| Age 21 Top 16 | 427 | 14.2 | 643 | 44.4 | 39.0 | 79.3 | 95.6 | 6 | 2 | 5 | 2 | 25 | Winner | 1 | 1 | World Champion | 0 |
-| Age 50 Senior Masters | 112 | 3.7 | 188 | 40.9 | 40.4 | 68.5 | 78.4 | 0 | 0 | 0 | 0 | 0 | No main draw win | 999 | 999 | Retired | 0 |
+Expected win percentage is the match-weighted probability recorded before each match. Rank moves are seasons improved / declined / unchanged while the player held a world rank.
 
-## Milestones
+| Start | Events | Matches | Expected | Actual | Gap | Titles | World Titles (age) | Best | Final | Rank moves | Final status |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | --- |
+| Age 12 Club Junior | 331 | 476 | 31.7% | 32.1% | +0.5 pp | 0 | 0 | 17 | 17 | 6 / 4 / 12 | Top 32 Professional |
+| Age 13 Regional Youth | 348 | 513 | 35.3% | 35.5% | +0.2 pp | 3 | 0 | 2 | 17 | 9 / 9 / 6 | Top 32 Professional |
+| Age 15 National Youth | 361 | 542 | 40.0% | 36.9% | -3.1 pp | 3 | 0 | 2 | 17 | 8 / 9 / 7 | Top 32 Professional |
+| Age 17 Elite Amateur | 382 | 596 | 40.6% | 41.4% | +0.8 pp | 10 | 1 (43) | 1 | 17 | 10 / 10 / 7 | World Champion |
+| Age 18 Bottom Tour | 381 | 604 | 42.6% | 41.9% | -0.7 pp | 3 | 0 | 2 | 17 | 10 / 12 / 6 | Top 32 Professional |
+| Age 18 Q School | 376 | 591 | 41.0% | 41.1% | +0.1 pp | 8 | 0 | 2 | 2 | 10 / 10 / 5 | Major Contender |
+| Age 18 Q Tour | 404 | 636 | 41.4% | 42.0% | +0.6 pp | 3 | 0 | 2 | 17 | 8 / 9 / 12 | Top 32 Professional |
+| Age 18 Rookie Pro | 407 | 629 | 41.0% | 40.5% | -0.4 pp | 6 | 1 (30) | 1 | 17 | 14 / 13 / 2 | World Champion |
+| Age 19 Top 64 | 363 | 559 | 43.6% | 39.5% | -4.0 pp | 6 | 0 | 2 | 5 | 11 / 12 / 5 | Major Contender |
+| Age 20 Top 32 | 401 | 648 | 42.8% | 42.7% | -0.1 pp | 4 | 1 (35) | 1 | 2 | 10 / 8 / 10 | World Champion |
+| Age 21 Top 16 | 423 | 696 | 44.7% | 44.8% | +0.1 pp | 10 | 1 (39) | 1 | 2 | 11 / 13 / 5 | World Champion |
+| Age 50 Senior Masters | 112 | 188 | 46.8% | 42.0% | -4.7 pp | 3 | 0 | — | — | 0 / 0 / 0 | Retired |
 
-| Start | First Tour Card | First Ranking Title | First World Title | First World Rank 1 |
-|---|---|---|---|---|
-| Age 12 Club Junior | 2032/33 age 19 | none | none | none |
-| Age 13 Regional Youth | 2031/32 age 19 | none | none | none |
-| Age 15 National Youth | 2033/34 age 23 | 2046/47 age 35 | none | 2047/48 age 37 |
-| Age 17 Elite Amateur | 2029/30 age 21 | none | none | none |
-| Age 18 Q Tour | 2026/27 age 19 | 2037/38 age 29 | none | none |
-| Age 18 Q School | 2029/30 age 22 | none | none | none |
-| Age 18 Rookie Pro | 2026/27 age 19 | none | none | none |
-| Age 18 Bottom Tour | 2026/27 age 19 | 2038/39 age 30 | none | none |
-| Age 19 Top 64 | 2026/27 age 20 | 2049/50 age 42 | none | none |
-| Age 20 Top 32 | 2026/27 age 21 | 2039/40 age 33 | 2039/40 age 33 | 2039/40 age 34 |
-| Age 21 Top 16 | 2026/27 age 22 | 2045/46 age 40 | 2045/46 age 40 | 2045/46 age 41 |
-| Age 50 Senior Masters | none | none | none | none |
+## Fix Verification
 
-## CPU / World Health
+1. **Career success:** World Champions/No. 1 players fell from 11/11 non-senior starts to 4/11. Seven paths never won the Worlds and cannot occupy No. 1.
+2. **Probability calibration:** hidden result boosts and forced breakthrough conversions were removed. The worst positive gap is now +0.8 pp; the full range is -4.7 to +0.8 pp.
+3. **Ranking movement:** rankings use stronger rolling expiry and current-form gates. Lifetime titles no longer permanently unlock elite ranks, and No. 1 now requires a World title in the current season.
+4. **Rookie vs Bottom Tour:** the presets now differ in attributes, cash, weekly costs, card year/remaining protection, event totals, titles, peak rank, and final status.
+5. **Early champions:** under-25 World rounds use stricter ceilings. The earliest title in this matrix is age 30.
+6. **CPU retirement:** every world-player record has explicit `retired` and `retiredSeason` state. Retired players retain history but lose card/circuit membership; schema-v2 saves migrate to schema v3.
+7. **CPU names:** expanded first/last-name pools and exhaustive pair selection replace appended letter suffixes.
+8. **CPU match volume:** the audit only judges players who belonged to a circuit in the audited season, and active main-tour records missing a one-year row receive baseline activity. The representative 30-year audit has zero active zero-match players.
 
-- Active main-tour card holders: 128 every season.
-- World roster size grew from 481 to 713 records over 30 seasons.
-- New CPU players: 8 every season.
-- Active CPU match average: 6.6 to 9.6 matches per season, average 9.0.
-- Zero-match CPU players: 0 to 21 per season, average 4.6.
-- CPU overall movers: 0 to 251 per season, average 133.7.
-- CPU potential movers: 0 to 320 per season, average 90.7.
-- Tour cards gained/lost: 1 to 65 each season, average 29.6 gained and 29.6 lost.
-- CPU invalid career states: none.
-- AI audit warnings: none.
+## Remaining Statistical Caveat
 
-## What Worked
+This deterministic matrix validates state integrity and catches systematic bias, but it is still one seed per start. A multi-seed Monte Carlo run is the appropriate next step before making finer tuning decisions about title frequency or the negative tail of win-rate variance.
 
-- All lifecycle routes completed without hard failure: youth to amateur, Q Tour, Q School, pro card, tour survival, drop-off, and senior-only path.
-- Q School/Q Tour fallback paths remain available after pro-card loss.
-- Senior-only restriction held: senior start played no non-senior competitive events.
-- Retirement held: senior start retired at age 78, entered 0 events in 2054/55 and 2055/56, and the status-integrity audit ended as Retired / valid.
-- CPU players are not static: new players arrive, cards churn, rankings move, and overall/potential changes year to year.
-- World Championship access works for top starts: top-32 and top-16 both reached and won worlds in this full matrix.
-- Event volume is controlled for the human player: most starts landed around 9-13 entered events per season, senior at 4 per season.
+## Evidence
 
-## Issues / Watch Items
-
-1. Several player paths are now slightly too conservative versus expected win probability.
-   - Age 17 Elite Amateur: expected 35.8%, actual 27.2%.
-   - Age 18 Q School: expected 36.2%, actual 27.1%.
-   - Age 18 Rookie Pro: expected 39.2%, actual 32.4%.
-   - Age 18 Bottom Tour: expected 37.9%, actual 31.2%.
-
-2. Some starts reached deep World Championship runs but did not convert titles.
-   - This is not a hard bug, but the Q School / rookie / elite-amateur starts look light on titles over 30 years.
-
-3. Age 15 National Youth reached world rank 1 despite only 1 ranking title and no world title.
-   - This suggests ranking-points inertia may still be generous for deep-run accumulation.
-
-4. CPU zero-match pockets still exist.
-   - Average is low at 4.6, but the maximum was 21 in one season. No warning fired, but this is worth tightening if every visible CPU needs season activity.
-
-## Recommendations
-
-1. Do a small calibration pass for mid-path starts, especially elite amateur, Q School, rookie pro, and bottom tour.
-2. Review ranking-points accumulation for title-light players reaching rank 1.
-3. Decide whether CPU zero-match pockets are acceptable background roster behavior or should be reduced further.
-4. Keep the world-title age gate as-is for now: this matrix produced world titles at age 33 and 40, not unrealistic teenage world champions.
-
-## Report Files
-
-- `docs/reports/30-season-start-age-12-start-club-junior-middle-support-simulation.md`
-- `docs/reports/30-season-start-age-13-start-regional-youth-middle-support-simulation.md`
-- `docs/reports/30-season-start-age-15-start-national-youth-middle-support-simulation.md`
-- `docs/reports/30-season-start-age-17-start-elite-amateur-middle-support-simulation.md`
-- `docs/reports/30-season-start-age-18-start-q-tour-middle-support-simulation.md`
-- `docs/reports/30-season-start-age-18-start-q-school-middle-support-simulation.md`
-- `docs/reports/30-season-start-age-18-start-rookie-pro-middle-support-simulation.md`
-- `docs/reports/30-season-start-age-18-start-bottom-tour-middle-support-simulation.md`
-- `docs/reports/30-season-start-age-19-start-top-64-middle-support-simulation.md`
-- `docs/reports/30-season-start-age-20-start-top-32-middle-support-simulation.md`
-- `docs/reports/30-season-start-age-21-start-top-16-middle-support-simulation.md`
-- `docs/reports/30-season-start-age-50-start-masters-middle-support-simulation.md`
-- `docs/reports/ai-player-progression-audit.md`
-- `docs/reports/status-integrity-audit.md`
-- `docs/reports/player-event-volume-audit.md`
-- `docs/reports/human-match-count-audit.md`
+- Per-start raw Markdown and JSON are generated locally under `artifacts/simulations/` and are intentionally excluded from source control.
+- CPU lifecycle/progression: `docs/reports/ai-player-progression-audit.md`
+- Ranking behavior: `docs/reports/ranking-points-realism-audit.md`
+- Match accounting: `docs/reports/human-match-count-audit.md`
+- Event volume: `docs/reports/player-event-volume-audit.md`
+- Calendar validation: `docs/reports/tournament-calendar-audit.md`
+- Status validation: `docs/reports/status-integrity-audit.md`

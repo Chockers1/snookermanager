@@ -42,6 +42,7 @@ export const appRoutes: AppRoute[] = [
   { path: '/mental', label: 'Mental State', section: 'Support' },
   { path: '/health', label: 'Health Centre', section: 'Support' },
   { path: '/season-review', label: 'Season Review', section: 'Support' },
+  { path: '/saves', label: 'Save Manager', section: 'Career' },
 ]
 
 export const sidebarGroups = [
@@ -51,6 +52,7 @@ export const sidebarGroups = [
       { label: 'Dashboard', path: '/' },
       { label: 'New Career', path: '/new-career' },
       { label: 'Inbox', path: '/inbox' },
+      { label: 'Save Manager', path: '/saves' },
     ],
   },
   {

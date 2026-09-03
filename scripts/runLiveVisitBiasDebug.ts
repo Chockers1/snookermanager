@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { getSimulationOutputDirectories } from './simulationOutput'
 
 import {
   simulateSyntheticLiveVisitMatch,
@@ -92,7 +93,7 @@ const DETERMINISTIC_SEED = 240514
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const workspaceRoot = path.resolve(__dirname, '..')
-const reportsDir = path.join(workspaceRoot, 'docs', 'reports')
+const reportsDir = getSimulationOutputDirectories(workspaceRoot).artifacts
 const markdownPath = path.join(reportsDir, 'live-visit-bias-debug.md')
 
 const CASES: BiasCaseConfig[] = [

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Award, ChevronRight, ShieldCheck, SignalHigh, TrendingUp, Trophy, Zap } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 import { buildMatchResultData } from '../utils/liveRouteData'
 import { formatMoney } from '../utils/formatters'
 
@@ -100,8 +100,8 @@ export function MatchResultPage() {
 
       <div className={`card overflow-hidden border ${playerWon ? 'border-green-600/30' : 'border-red-600/30'}`}>
         <div className={`p-6 ${playerWon ? 'bg-gradient-to-r from-green-600/10 via-transparent to-transparent' : 'bg-gradient-to-r from-red-600/10 via-transparent to-transparent'}`}>
-          <div className="flex items-center justify-between gap-5">
-            <div className="flex min-w-0 items-center gap-5">
+          <div className="flex flex-col items-center justify-between gap-5 lg:flex-row">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-5">
               <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 ${playerWon ? 'border-green-500 bg-green-600/20 text-green-400' : 'border-border bg-surface-light text-white'} text-xl font-bold`}>{getInitials(playerName)}</div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">{playerWon ? <Trophy className="h-4 w-4 text-amber-400" /> : null}<p className="truncate text-lg font-bold text-white">{playerName}</p></div>
@@ -114,7 +114,7 @@ export function MatchResultPage() {
               <div><p className="text-2xl font-bold text-gray-500">-</p><p className="mt-1 text-[10px] text-gray-500">{matchSummary?.actualResult ?? latestMatch.result}</p></div>
               <p className={`text-5xl font-bold ${!playerWon ? 'text-red-400' : 'text-white'}`}>{opponentFrames}</p>
             </div>
-            <div className="flex min-w-0 items-center gap-5">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-5">
               <div className="min-w-0 text-right">
                 <p className="truncate text-lg font-bold text-white">{opponentName}</p>
                 <p className="text-xs text-gray-400">Opponent ranking #{latestMatch.opponentRanking}</p>
@@ -126,7 +126,7 @@ export function MatchResultPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         {impactMetrics.map((metric) => (
           <div key={metric.label} className="card card-body text-center">
             <metric.icon className="mx-auto mb-1 h-3.5 w-3.5 text-gray-500" />
@@ -137,8 +137,19 @@ export function MatchResultPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-4 space-y-4">
+      <div className="flex flex-wrap justify-center gap-3 rounded-xl border border-border/70 bg-surface/70 p-4">
+        <button type="button" onClick={() => navigate(getPostMatchRoute(latestMatch.round))} className="btn-primary text-xs"><Trophy className="h-3.5 w-3.5" /> Continue Tournament <ChevronRight className="h-3.5 w-3.5" /></button>
+        <button type="button" onClick={() => navigate('/training/report')} className="btn-secondary text-xs">Review Training</button>
+        <button type="button" onClick={() => navigate('/tournaments/draw')} className="btn-secondary text-xs">View Draw</button>
+      </div>
+
+      <details className="group card overflow-hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-white hover:bg-surface-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500">
+          <span><span className="text-green-400">More analysis</span><span className="ml-2 text-xs font-normal text-gray-400">Stats, frames, equipment and coaching detail</span></span>
+          <ChevronRight className="h-4 w-4 text-gray-400 transition-transform group-open:rotate-90" />
+        </summary>
+        <div className="grid grid-cols-12 gap-4 border-t border-border p-4">
+        <div className="col-span-12 space-y-4 lg:col-span-4">
           <div className="card">
             <div className="card-header"><h3 className="text-sm font-semibold text-white">Match Stats</h3></div>
             <div className="card-body">
@@ -179,7 +190,7 @@ export function MatchResultPage() {
           </div>
         </div>
 
-        <div className="col-span-4 space-y-4">
+        <div className="col-span-12 space-y-4 lg:col-span-4">
           <div className="card">
             <div className="card-header"><h3 className="text-sm font-semibold text-white">Frame by Frame</h3></div>
             <div className="card-body space-y-1">
@@ -223,7 +234,7 @@ export function MatchResultPage() {
           </div>
         </div>
 
-        <div className="col-span-4 space-y-4">
+        <div className="col-span-12 space-y-4 lg:col-span-4">
           {matchSummary ? (
             <div className="card card-body">
               <h3 className="mb-2 text-xs font-semibold text-white">Match Summary</h3>
@@ -270,13 +281,8 @@ export function MatchResultPage() {
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="flex justify-center gap-3 pt-3">
-        <button type="button" onClick={() => navigate('/training/report')} className="btn-secondary text-xs">Review Training</button>
-        <button type="button" onClick={() => navigate('/tournaments/draw')} className="btn-secondary text-xs">View Draw</button>
-        <button type="button" onClick={() => navigate(getPostMatchRoute(latestMatch.round))} className="btn-primary text-xs"><Trophy className="h-3.5 w-3.5" /> Continue Tournament <ChevronRight className="h-3.5 w-3.5" /></button>
-      </div>
+        </div>
+      </details>
     </div>
   )
 }

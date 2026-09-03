@@ -8,7 +8,7 @@ import {
   travelOptionCatalog,
   treatmentOptionCatalog,
 } from '../data/catalogs'
-import type { GameState } from '../hooks/useGameState'
+import { getNextEligibleTournament, getTournamentEntryAccess, type GameState } from '../hooks/useGameState'
 import type {
   BracketRound,
   CoachFeedbackGroup,
@@ -89,11 +89,7 @@ function getCanonicalHistoryTotals(state: GameState) {
 }
 
 function getActiveTournament(state: GameState) {
-  return (
-    state.tournaments.find((item) => item.status === 'Entered') ??
-    state.tournaments.find((item) => item.status === 'Booked' || item.status === 'Available' || item.status === 'High Cost') ??
-    state.tournaments[0]
-  )
+  return getNextEligibleTournament(state)
 }
 
 function getPreviewTournamentClass(tournament: Tournament | undefined) {
@@ -481,6 +477,7 @@ export function buildFinanceData(state: GameState) {
   const coachCost = state.coachContracts.reduce((sum, contract) => sum + contract.weeklyCost, 0)
   const travelCost = Object.values(state.travel.bookings).reduce((sum, booking) => sum + booking.totalCost, 0)
   const equipmentCost = state.maintenance.history.reduce((sum, item) => sum + item.cost, 0)
+  const recordedExpenseCost = state.finance.ledger.reduce((sum, item) => sum + (item.type === 'Expense' ? Math.abs(item.amount) : 0), 0)
   const financeChart = trend.map((point, index) => {
     const previousCash = index > 0 ? trend[index - 1].cash : point.cash - state.finance.cashFlow
     const delta = point.cash - previousCash
@@ -491,7 +488,7 @@ export function buildFinanceData(state: GameState) {
     }
   })
   const totalIncomeValue = sponsorIncome + prizeIncome + Math.max(0, state.finance.cashFlow * 4)
-  const totalExpenseValue = coachCost * 4 + travelCost + equipmentCost + Math.max(0, -state.finance.cashFlow * 4)
+  const totalExpenseValue = coachCost * 4 + travelCost + equipmentCost + recordedExpenseCost + Math.max(0, -state.finance.cashFlow * 4)
   const incomeBreakdownRaw = [
     { label: 'Sponsors', value: sponsorIncome },
     { label: 'Prize Money', value: prizeIncome },
@@ -501,6 +498,7 @@ export function buildFinanceData(state: GameState) {
     { label: 'Coach Costs', value: coachCost * 4 },
     { label: 'Travel', value: travelCost },
     { label: 'Maintenance', value: equipmentCost },
+    { label: 'Recorded Expenses', value: recordedExpenseCost },
     { label: 'Operating Cost', value: Math.max(0, -state.finance.cashFlow * 4) },
   ].filter((item) => item.value > 0)
   const incomeBreakdown = incomeBreakdownRaw.map((item, index) => ({
@@ -520,7 +518,11 @@ export function buildFinanceData(state: GameState) {
     { label: 'Equipment', amount: equipmentCost, max: 35 },
     { label: 'Reserve', amount: Math.max(0, state.player.cash - totalExpenseValue), max: 80 },
   ].map((item) => ({ ...item, current: clamp(Math.round((item.amount / totalBudget) * 100), 0, item.max) }))
-  const tournamentPlanner = state.tournaments.slice(0, 4).map((tournament) => ({
+  const tournamentPlanner = state.tournaments
+    .filter((tournament) => getTournamentEntryAccess(state, tournament).allowed && new Date(tournament.endDate ?? tournament.startDate).getTime() >= new Date(state.currentDate).getTime())
+    .sort((left, right) => new Date(left.startDate).getTime() - new Date(right.startDate).getTime())
+    .slice(0, 4)
+    .map((tournament) => ({
     id: tournament.id,
     event: tournament.name,
     location: tournament.location,
@@ -839,13 +841,13 @@ export function buildMatchResultData(state: GameState) {
       label: 'Cue Condition',
       highlight: cue.name,
       condition: cueState?.condition ?? cue.condition,
-      detail: `Current familiarity is ${cueState?.familiarity ?? cue.familiarity}%, which shaped table confidence through the match.`,
+      detail: `${Math.max(1, cueState?.familiarity ?? cue.familiarity)}% familiarity influenced touch and positional confidence.`,
     },
     {
       label: 'Tip & Contact',
       highlight: tip.name,
       condition: cueState?.tipCondition ?? 70,
-      detail: `Tip setup helped miscues stay under control with ${tip.miscueReduction} miscues prevented on the current profile.`,
+      detail: `Tip setup provides a ${tip.miscueReduction}% control rating for reducing miscues under pressure.`,
     },
     {
       label: 'Chalk Reliability',
@@ -1340,7 +1342,7 @@ export function buildTournamentHubData(state: GameState) {
         loser: result.result === 'Won' ? result.opponentName : state.player.fullName,
         score: `${result.playerFrames}-${result.opponentFrames}`,
       }))
-    : state.matches.slice(0, 3).map((match) => ({
+    : state.matches.filter((match) => match.tournamentId === activeTournament?.id).slice(0, 3).map((match) => ({
         id: match.id,
         round: match.round,
         winner: match.result === 'Won' ? state.player.fullName : match.opponentName,
@@ -1364,7 +1366,11 @@ export function buildTournamentHubData(state: GameState) {
     { label: 'Hold confidence above 70', current: state.player.confidence >= 70 ? 1 : 0, target: 1, reward: 8, status: state.player.confidence >= 70 ? 'Met' : 'Needs work' },
   ]
   const notes = [
-    state.lastAction,
+    activeTournament
+      ? activeTournament.status === 'Entered'
+        ? `Entry confirmed for ${activeTournament.name}.`
+        : `Entry is still required for ${activeTournament.name}.`
+      : 'Select an eligible tournament to begin planning.',
     activeTournament ? `${activeTournament.name} carries ${activeTournament.rankingValue} ranking points.` : 'No active tournament selected.',
     state.player.fatigue >= 60 ? 'Fatigue is the main tournament risk.' : 'Condition is stable enough to push for the next round.',
   ]

@@ -17,7 +17,8 @@ import {
   Zap,
 } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
+import { getTournamentPlayability } from '../hooks/useGameState'
 import { buildMatchPreviewData } from '../utils/liveRouteData'
 import { formatMoney } from '../utils/formatters'
 
@@ -115,6 +116,7 @@ export function MatchPreviewPage() {
   } = buildMatchPreviewData(gameState)
   const playerRank = gameState.player.amateurRanking ?? gameState.player.worldRanking
   const activeLiveMatch = gameState.liveMatch?.status === 'In Progress' ? gameState.liveMatch : null
+  const playability = activeTournament ? getTournamentPlayability(gameState, activeTournament) : null
   const opponentName = nextOpponent?.playerName ?? 'Opponent TBD'
   const opponentRank = nextOpponent?.ranking
   const readinessScore = getReadinessScore(gameState.player.confidence, gameState.player.fatigue, cueFamiliarity, pressureLevel)
@@ -134,6 +136,10 @@ export function MatchPreviewPage() {
       return
     }
     if (!activeTournament?.id) return
+    if (!playability?.canPlay) {
+      navigate(playability?.travelBooked === false && (playability.daysUntilStart ?? 0) <= 7 ? '/travel' : '/tournaments/hub')
+      return
+    }
     startLiveMatch(activeTournament.id)
     navigate('/match/live')
   }
@@ -427,7 +433,7 @@ export function MatchPreviewPage() {
           <button type="button" onClick={() => navigate('/training')} className="btn-secondary px-3 py-2 text-xs">Adjust Training</button>
           <button type="button" onClick={() => navigate('/equipment/chalk-tips')} className="btn-secondary px-3 py-2 text-xs">Change Equipment</button>
           <button type="button" onClick={handleStartMatch} className="btn-primary px-4 py-2 text-xs">
-            {activeLiveMatch ? 'Resume Match' : 'Start Match'} <ChevronRight className="h-3.5 w-3.5" />
+            {activeLiveMatch ? 'Resume Match' : playability?.canPlay ? 'Start Match' : !playability?.travelBooked && (playability?.daysUntilStart ?? 0) <= 7 ? 'Book Travel' : 'Tournament Hub'} <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>

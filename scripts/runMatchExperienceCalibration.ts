@@ -1,11 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { getSimulationOutputDirectories } from './simulationOutput'
 
 import {
   simulateSyntheticLiveVisitMatch,
   type ConstructedLiveVisitProfile,
-  type SyntheticLiveVisitFrameSummary,
   type SyntheticLiveVisitMatchResult,
 } from '../src/hooks/useGameState'
 import type { PlayerAttributes } from '../src/types/game'
@@ -234,8 +234,9 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const workspaceRoot = path.resolve(__dirname, '..')
 const reportsDir = path.join(workspaceRoot, 'docs', 'reports')
+const artifactsDir = getSimulationOutputDirectories(workspaceRoot).artifacts
 const markdownPath = path.join(reportsDir, 'match-experience-calibration.md')
-const csvPath = path.join(reportsDir, 'match-experience-calibration.csv')
+const csvPath = path.join(artifactsDir, 'match-experience-calibration.csv')
 
 function formatPercent(value: number) {
   return `${value.toFixed(1)}%`
@@ -623,7 +624,6 @@ function getTopReasons(sample: SampleReport) {
   const reasons: string[] = []
   const playerWon = sample.result.playerWon
   const winnerLabel = playerWon ? 'Player' : 'Opponent'
-  const factorOrder = [...sample.impacts].sort((left, right) => Math.abs(right.impact) - Math.abs(left.impact))
   const winnerFactor = playerWon
     ? [...sample.impacts].sort((left, right) => right.impact - left.impact)[0] ?? null
     : [...sample.impacts].sort((left, right) => left.impact - right.impact)[0] ?? null
@@ -1417,6 +1417,7 @@ function main() {
   const recommendations = getRecommendedChanges(warnings)
 
   fs.mkdirSync(reportsDir, { recursive: true })
+  fs.mkdirSync(artifactsDir, { recursive: true })
   fs.writeFileSync(markdownPath, buildMarkdown(summaries, scenarioSummaries, samples, warnings, recommendations))
   fs.writeFileSync(csvPath, buildCsv(matchRows, scenarioRows))
   console.log(`Wrote match experience calibration report to ${markdownPath}`)

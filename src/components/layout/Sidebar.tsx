@@ -1,7 +1,8 @@
-import { BookOpen, Brain, Calendar, Dumbbell, Handshake, HeartPulse, LayoutDashboard, Mail, Medal, PoundSterling, Swords, Target, TrendingUp, Trophy, User, UserPlus, Users, Wrench } from 'lucide-react'
+import { BookOpen, Brain, Calendar, Dumbbell, Handshake, HeartPulse, LayoutDashboard, Mail, Medal, PoundSterling, Save, Swords, Target, TrendingUp, Trophy, User, UserPlus, Users, Wrench } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import clsx from 'clsx'
-import { useGame } from '../../context/GameStateContext'
+import { useGame } from '../../context/useGame'
+import { getNextEligibleTournament } from '../../hooks/useGameState'
 import { sidebarGroups } from '../../utils/routing'
 
 const iconMap: Record<string, typeof LayoutDashboard> = {
@@ -23,12 +24,12 @@ const iconMap: Record<string, typeof LayoutDashboard> = {
   Mental: Brain,
   Health: HeartPulse,
   'Season Review': BookOpen,
+  'Save Manager': Save,
 }
 
 export function Sidebar() {
   const { gameState } = useGame()
-  const nextEvent = gameState.tournaments.find((event) => event.status === 'Entered')
-    ?? gameState.tournaments.find((event) => event.status === 'Booked' || event.status === 'Available' || event.status === 'High Cost')
+  const nextEvent = getNextEligibleTournament(gameState)
     ?? gameState.tournaments[0]
 
   return (

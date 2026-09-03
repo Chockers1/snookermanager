@@ -26,7 +26,7 @@ import {
   YAxis,
 } from 'recharts'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 import { buildFinanceData } from '../utils/liveRouteData'
 import { formatMoney } from '../utils/formatters'
 
@@ -57,10 +57,17 @@ const incomeColors = ['#22c55e', '#16a34a', '#3b82f6', '#38bdf8']
 const expenseColors = ['#ef4444', '#f97316', '#fbbf24', '#64748b']
 
 export function FinancePage() {
-  const { gameState } = useGame()
+  const { gameState, updateBudgetTargets, recordFinanceExpense } = useGame()
   const navigate = useNavigate()
   const { incomeBreakdown, expenseBreakdown, budgetAllocation, tournamentPlanner, forecastCards, financialIndicators } = buildFinanceData(gameState)
   const [financeAction, setFinanceAction] = useState<FinanceActionMode>('budget')
+  const [budgetEditorOpen, setBudgetEditorOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [expenseEditorOpen, setExpenseEditorOpen] = useState(false)
+  const [expenseDescription, setExpenseDescription] = useState('')
+  const [expenseCategory, setExpenseCategory] = useState('Other')
+  const [expenseAmount, setExpenseAmount] = useState('')
+  const [budgetTargets, setBudgetTargets] = useState<Record<string, number>>(() => ({ ...gameState.finance.budgetTargets }))
 
   const weeklyCashChange = gameState.finance.cashFlow
   const monthlySurplus = weeklyCashChange * 4
@@ -70,6 +77,7 @@ export function FinancePage() {
   const coachWeeklyCost = gameState.coachContracts.reduce((sum, contract) => sum + contract.weeklyCost, 0)
   const travelSpend = Object.values(gameState.travel.bookings).reduce((sum, booking) => sum + booking.totalCost, 0)
   const equipmentSpend = gameState.maintenance.history.reduce((sum, item) => sum + item.cost, 0)
+  const recordedExpenseSpend = gameState.finance.ledger.reduce((sum, item) => sum + (item.type === 'Expense' ? Math.abs(item.amount) : 0), 0)
   const prizeIncome = gameState.matches.reduce((sum, match) => sum + match.prizeMoneyEarned, 0)
   const currentMonthIncome = incomeBreakdown.reduce((sum, item) => sum + item.value, 0)
   const currentMonthExpenses = expenseBreakdown.reduce((sum, item) => sum + item.value, 0)
@@ -78,7 +86,7 @@ export function FinancePage() {
   const planningBudget = Math.max(currentMonthExpenses, budgetAllocation.reduce((sum, item) => sum + item.amount, 0), 1)
   const weeksElapsed = Math.max(1, gameState.week)
   const ytdIncome = prizeIncome + sponsorWeeklyIncome * weeksElapsed + Math.max(0, gameState.finance.baseCashFlow) * weeksElapsed
-  const ytdExpenses = coachWeeklyCost * weeksElapsed + travelSpend + equipmentSpend + Math.max(0, -gameState.finance.baseCashFlow) * weeksElapsed
+  const ytdExpenses = coachWeeklyCost * weeksElapsed + travelSpend + equipmentSpend + recordedExpenseSpend + Math.max(0, -gameState.finance.baseCashFlow) * weeksElapsed
   const ytdNet = ytdIncome - ytdExpenses
   const savingsTarget = gameState.player.cash >= 20000 ? 25000 : gameState.player.cash >= 10000 ? 15000 : 5000
   const savingsProgress = Math.min(100, Math.round((gameState.player.cash / savingsTarget) * 100))
@@ -89,6 +97,7 @@ export function FinancePage() {
   ]
 
   const recentTransactions = [
+    ...gameState.finance.ledger.map((transaction) => ({ ...transaction, status: 'Completed' })),
     ...gameState.matches
       .filter((match) => match.prizeMoneyEarned > 0)
       .map((match) => {
@@ -159,6 +168,47 @@ export function FinancePage() {
     cost: monthlyBurnRate > 0 ? `Monthly burn rate is ${formatMoney(monthlyBurnRate)} at the current pace.` : 'Spending is currently under control with no live monthly burn.',
   }[financeAction]
 
+  function getBudgetLimit(label: string, amount: number, maximumShare: number) {
+    return budgetTargets[label] ?? Math.max(amount, Math.round((planningBudget * maximumShare) / 100))
+  }
+
+  function saveBudgetTargets() {
+    updateBudgetTargets(budgetTargets)
+    setBudgetEditorOpen(false)
+    setFinanceAction('budget')
+  }
+
+  function saveExpense() {
+    recordFinanceExpense(expenseDescription, expenseCategory, Number(expenseAmount))
+    if (expenseDescription.trim() && Number(expenseAmount) > 0 && Number(expenseAmount) <= gameState.player.cash) {
+      setExpenseEditorOpen(false)
+      setExpenseDescription('')
+      setExpenseAmount('')
+    }
+  }
+
+  function exportFinanceReport() {
+    const rows = [
+      ['Snooker Manager Finance Report'],
+      ['Date', gameState.currentDate],
+      ['Current balance', gameState.player.cash],
+      ['Monthly income', currentMonthIncome],
+      ['Monthly expenses', currentMonthExpenses],
+      ['Monthly net', currentMonthNet],
+      [],
+      ['Transaction date', 'Description', 'Category', 'Type', 'Amount', 'Status'],
+      ...recentTransactions.map((transaction) => [transaction.date, transaction.description, transaction.category, transaction.type, transaction.amount, transaction.status]),
+    ]
+    const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `snooker-finance-${gameState.currentDate}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    setFinanceAction('cashflow')
+  }
+
   return (
     <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
       <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface/85 px-4 py-3">
@@ -167,7 +217,7 @@ export function FinancePage() {
           <p className="mt-1 truncate text-xs text-gray-400">Track your financial health and budget performance for the team.</p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <button type="button" className="btn-secondary px-3 py-1.5 text-[11px]" onClick={() => setFinanceAction('cashflow')}><Download className="h-3.5 w-3.5" /> Export</button>
+          <button type="button" className="btn-secondary px-3 py-1.5 text-[11px]" onClick={exportFinanceReport}><Download className="h-3.5 w-3.5" /> Export</button>
           <button type="button" className="btn-primary px-3 py-1.5 text-[11px]" onClick={() => navigate('/sponsorship')}><Plus className="h-3.5 w-3.5" /> Add Funds</button>
         </div>
       </div>
@@ -214,7 +264,7 @@ export function FinancePage() {
             </div>
           </div>
           <div className="card-body h-full min-h-0 p-3">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
               <BarChart data={monthlyComparisonData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke="#203449" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
@@ -239,7 +289,7 @@ export function FinancePage() {
                 </div>
                 <div className="min-h-0">
                   {group.items.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
                       <PieChart>
                         <Pie data={group.items} dataKey="value" nameKey="label" innerRadius={28} outerRadius={44} paddingAngle={2} stroke="none">
                           {group.items.map((item, index) => <Cell key={item.label} fill={group.colors[index % group.colors.length]} />)}
@@ -307,7 +357,7 @@ export function FinancePage() {
               </div>
               <div className="flex-1 space-y-2 overflow-auto pr-1 scrollbar-thin">
                 {budgetAllocation.map((item) => {
-                  const budgetLimit = Math.max(item.amount, Math.round((planningBudget * item.max) / 100))
+                  const budgetLimit = getBudgetLimit(item.label, item.amount, item.max)
                   const remaining = budgetLimit - item.amount
 
                   return (
@@ -323,7 +373,7 @@ export function FinancePage() {
                   )
                 })}
               </div>
-              <button type="button" className="btn-secondary w-full justify-center py-2 text-[11px]" onClick={() => setFinanceAction('budget')}>Manage Budget</button>
+              <button type="button" className="btn-secondary w-full justify-center py-2 text-[11px]" onClick={() => setBudgetEditorOpen(true)}>Manage Budget</button>
             </div>
           </div>
 
@@ -372,14 +422,56 @@ export function FinancePage() {
             <div className="flex items-center gap-2"><Landmark className="h-3.5 w-3.5 text-green-400" /><p className="metric-label">Quick Actions</p></div>
             <div className="mt-3 grid grid-cols-4 gap-2">
               <button type="button" className="btn-secondary justify-center px-2 py-2 text-[10px]" onClick={() => navigate('/sponsorship')}><Coins className="h-3.5 w-3.5" /> Add Income</button>
-              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[10px]" onClick={() => setFinanceAction('cost')}><TrendingDown className="h-3.5 w-3.5" /> Add Expense</button>
-              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[10px]" onClick={() => setFinanceAction('budget')}><Wallet className="h-3.5 w-3.5" /> Transfer Funds</button>
-              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[10px]" onClick={() => navigate('/calendar')}><CalendarDays className="h-3.5 w-3.5" /> View Reports</button>
+              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[10px]" onClick={() => setExpenseEditorOpen(true)}><TrendingDown className="h-3.5 w-3.5" /> Add Expense</button>
+              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[10px]" onClick={() => setBudgetEditorOpen(true)}><Wallet className="h-3.5 w-3.5" /> Transfer Funds</button>
+              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[10px]" onClick={() => setReportOpen(true)}><CalendarDays className="h-3.5 w-3.5" /> View Reports</button>
             </div>
             <p className="mt-2 truncate text-[10px] text-gray-400">{financialIndicators.stability.status}</p>
           </div>
         </div>
       </div>
+
+      {budgetEditorOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" role="dialog" aria-modal="true" aria-labelledby="budget-editor-title">
+          <div className="card w-full max-w-lg p-5 shadow-2xl">
+            <h2 id="budget-editor-title" className="text-lg font-semibold text-white">Monthly Budget Manager</h2>
+            <p className="mt-1 text-xs text-gray-400">Move your planned funds between categories. This changes planning limits, not your cash balance.</p>
+            <div className="mt-4 space-y-3">
+              {budgetAllocation.map((item) => (
+                <label key={item.label} className="grid grid-cols-[1fr_8rem] items-center gap-3 text-sm text-gray-300">
+                  <span>{item.label}<span className="ml-2 text-xs text-gray-500">Spent {formatMoney(item.amount)}</span></span>
+                  <input className="rounded border border-border bg-surface-light px-2 py-1.5 text-right text-white" type="number" min={item.amount} step={100} value={getBudgetLimit(item.label, item.amount, item.max)} onChange={(event) => setBudgetTargets((current) => ({ ...current, [item.label]: Math.max(item.amount, Number(event.target.value) || 0) }))} />
+                </label>
+              ))}
+            </div>
+            <div className="mt-5 flex justify-end gap-2"><button type="button" className="btn-secondary" onClick={() => setBudgetEditorOpen(false)}>Cancel</button><button type="button" className="btn-primary" onClick={saveBudgetTargets}>Save Allocation</button></div>
+          </div>
+        </div>
+      ) : null}
+
+      {reportOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" role="dialog" aria-modal="true" aria-labelledby="finance-report-title">
+          <div className="card w-full max-w-xl p-5 shadow-2xl">
+            <h2 id="finance-report-title" className="text-lg font-semibold text-white">Season Finance Report</h2>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm"><div className="rounded-lg bg-surface-light p-3 text-gray-400">YTD income<p className="mt-1 text-xl font-bold text-green-400">{formatMoney(ytdIncome)}</p></div><div className="rounded-lg bg-surface-light p-3 text-gray-400">YTD expenses<p className="mt-1 text-xl font-bold text-red-400">{formatMoney(ytdExpenses)}</p></div><div className="rounded-lg bg-surface-light p-3 text-gray-400">Net position<p className={ytdNet >= 0 ? 'mt-1 text-xl font-bold text-green-400' : 'mt-1 text-xl font-bold text-red-400'}>{formatSignedMoney(ytdNet)}</p></div><div className="rounded-lg bg-surface-light p-3 text-gray-400">Projected month end<p className="mt-1 text-xl font-bold text-white">{formatMoney(projectedMonthEnd)}</p></div></div>
+            <div className="mt-5 flex justify-end gap-2"><button type="button" className="btn-secondary" onClick={() => setReportOpen(false)}>Close</button><button type="button" className="btn-primary" onClick={exportFinanceReport}><Download className="h-4 w-4" /> Export CSV</button></div>
+          </div>
+        </div>
+      ) : null}
+
+      {expenseEditorOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" role="dialog" aria-modal="true" aria-labelledby="expense-editor-title">
+          <div className="card w-full max-w-md p-5 shadow-2xl">
+            <h2 id="expense-editor-title" className="text-lg font-semibold text-white">Record Expense</h2>
+            <div className="mt-4 space-y-3">
+              <label className="block text-xs text-gray-400">Description<input className="mt-1 w-full rounded border border-border bg-surface-light px-3 py-2 text-sm text-white" value={expenseDescription} onChange={(event) => setExpenseDescription(event.target.value)} placeholder="Practice table rental" /></label>
+              <label className="block text-xs text-gray-400">Category<select className="mt-1 w-full rounded border border-border bg-surface-light px-3 py-2 text-sm text-white" value={expenseCategory} onChange={(event) => setExpenseCategory(event.target.value)}><option>Competition</option><option>Coaching</option><option>Equipment</option><option>Travel</option><option>Other</option></select></label>
+              <label className="block text-xs text-gray-400">Amount<input className="mt-1 w-full rounded border border-border bg-surface-light px-3 py-2 text-sm text-white" type="number" min={1} max={gameState.player.cash} value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} /></label>
+            </div>
+            <div className="mt-5 flex justify-end gap-2"><button type="button" className="btn-secondary" onClick={() => setExpenseEditorOpen(false)}>Cancel</button><button type="button" className="btn-primary" onClick={saveExpense}>Record Expense</button></div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

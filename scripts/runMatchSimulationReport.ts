@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { getSimulationOutputDirectories } from './simulationOutput'
 
 import type { PlayerAttributes } from '../src/types/game'
 import {
@@ -68,7 +69,7 @@ type SimulationRow = {
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const workspaceRoot = path.resolve(__dirname, '..')
-const reportsDir = path.join(workspaceRoot, 'docs', 'reports')
+const reportsDir = getSimulationOutputDirectories(workspaceRoot).artifacts
 const reportPath = path.join(reportsDir, 'match-simulation-100.md')
 
 const TECHNICAL_KEYS = ['Long Potting', 'Break Building', 'Cue Ball Control', 'Safety Play', 'Consistency'] as const

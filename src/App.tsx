@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
+import { AppErrorBoundary } from './components/errors/AppErrorBoundary'
 
 const DashboardPage = lazy(() => import('./routes/DashboardPage').then((module) => ({ default: module.DashboardPage })))
 const NewCareerPage = lazy(() => import('./routes/NewCareerPage').then((module) => ({ default: module.NewCareerPage })))
@@ -13,6 +14,10 @@ const CoachMarketPage = lazy(() => import('./routes/CoachMarketPage').then((modu
 const CoachProfilePage = lazy(() => import('./routes/CoachProfilePage').then((module) => ({ default: module.CoachProfilePage })))
 const FinancePage = lazy(() => import('./routes/FinancePage').then((module) => ({ default: module.FinancePage })))
 const CueShopPage = lazy(() => import('./routes/CueShopPage').then((module) => ({ default: module.CueShopPage })))
+const ChalkTipPage = lazy(() => import('./routes/ChalkTipPage').then((module) => ({ default: module.ChalkTipPage })))
+const EquipmentCasesPage = lazy(() => import('./routes/EquipmentCasesPage').then((module) => ({ default: module.EquipmentCasesPage })))
+const EquipmentMaintenancePage = lazy(() => import('./routes/EquipmentMaintenancePage').then((module) => ({ default: module.EquipmentMaintenancePage })))
+const TableSetupPage = lazy(() => import('./routes/TableSetupPage').then((module) => ({ default: module.TableSetupPage })))
 const TournamentCalendarPage = lazy(() => import('./routes/TournamentCalendarPage').then((module) => ({ default: module.TournamentCalendarPage })))
 const TravelPlannerPage = lazy(() => import('./routes/TravelPlannerPage').then((module) => ({ default: module.TravelPlannerPage })))
 const TournamentHubPage = lazy(() => import('./routes/TournamentHubPage').then((module) => ({ default: module.TournamentHubPage })))
@@ -27,6 +32,8 @@ const InboxPage = lazy(() => import('./routes/InboxPage').then((module) => ({ de
 const MentalStatePage = lazy(() => import('./routes/MentalStatePage').then((module) => ({ default: module.MentalStatePage })))
 const HealthCentrePage = lazy(() => import('./routes/HealthCentrePage').then((module) => ({ default: module.HealthCentrePage })))
 const SeasonReviewPage = lazy(() => import('./routes/SeasonReviewPage').then((module) => ({ default: module.SeasonReviewPage })))
+const SaveManagerPage = lazy(() => import('./routes/SaveManagerPage').then((module) => ({ default: module.SaveManagerPage })))
+const NotFoundPage = lazy(() => import('./routes/PlaceholderPage').then((module) => ({ default: module.NotFoundPage })))
 
 function RouteLoadingFallback() {
   return (
@@ -36,12 +43,11 @@ function RouteLoadingFallback() {
   )
 }
 
-export default function App() {
+export function AppRoutes() {
   return (
-    <BrowserRouter>
-      <AppShell>
-        <Suspense fallback={<RouteLoadingFallback />}>
-          <Routes>
+    <AppShell>
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/new-career" element={<NewCareerPage />} />
             <Route path="/career/progression" element={<CareerProgressionPage />} />
@@ -53,10 +59,10 @@ export default function App() {
             <Route path="/staff/coaches/:id" element={<CoachProfilePage />} />
             <Route path="/finance" element={<FinancePage />} />
             <Route path="/equipment/cues" element={<CueShopPage />} />
-            <Route path="/equipment/chalk-tips" element={<CueShopPage />} />
-            <Route path="/equipment/cases" element={<CueShopPage />} />
-            <Route path="/equipment/maintenance" element={<CueShopPage />} />
-            <Route path="/equipment/table-setup" element={<CueShopPage />} />
+            <Route path="/equipment/chalk-tips" element={<ChalkTipPage />} />
+            <Route path="/equipment/cases" element={<EquipmentCasesPage />} />
+            <Route path="/equipment/maintenance" element={<EquipmentMaintenancePage />} />
+            <Route path="/equipment/table-setup" element={<TableSetupPage />} />
             <Route path="/calendar" element={<TournamentCalendarPage />} />
             <Route path="/travel" element={<TravelPlannerPage />} />
             <Route path="/tournaments/hub" element={<TournamentHubPage />} />
@@ -71,9 +77,20 @@ export default function App() {
             <Route path="/mental" element={<MentalStatePage />} />
             <Route path="/health" element={<HealthCentrePage />} />
             <Route path="/season-review" element={<SeasonReviewPage />} />
-          </Routes>
-        </Suspense>
-      </AppShell>
+            <Route path="/saves" element={<SaveManagerPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
+    </AppShell>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppErrorBoundary>
+        <AppRoutes />
+      </AppErrorBoundary>
     </BrowserRouter>
   )
 }

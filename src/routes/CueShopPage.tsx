@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Check, ShieldCheck, ShoppingCart, SlidersHorizontal } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 import { caseCatalog, chalkCatalog, cueMarketplaceCatalog, maintenanceActionCatalog, tableSetupCatalog, tipCatalog } from '../data/catalogs'
 import { formatMoney } from '../utils/formatters'
 

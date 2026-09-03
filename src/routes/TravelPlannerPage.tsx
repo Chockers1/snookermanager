@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BedDouble, BriefcaseBusiness, Clock3, Plane, Train } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
+import { getNextEligibleTournament } from '../hooks/useGameState'
 import { hotelOptionCatalog, travelOptionCatalog } from '../data/catalogs'
 import { formatMoney } from '../utils/formatters'
 
@@ -26,19 +27,31 @@ function moneyHealth(value: number) {
 }
 
 export function TravelPlannerPage() {
+  const { gameState } = useGame()
+  const activeEvent = getNextEligibleTournament(gameState)
+  const existingBooking = activeEvent ? gameState.travel.bookings[activeEvent.id] : undefined
+  return <TravelPlannerContent key={`${activeEvent?.id ?? 'none'}-${existingBooking?.travelOptionId ?? 'none'}-${existingBooking?.hotelOptionId ?? 'none'}`} />
+}
+
+function formatArrivalTime(eventStartDate: string | undefined, catalogArrivalTime: string) {
+  if (!eventStartDate) return catalogArrivalTime
+  const arrivalDate = new Date(`${eventStartDate}T12:00:00`)
+  if (Number.isNaN(arrivalDate.getTime())) return catalogArrivalTime
+  arrivalDate.setDate(arrivalDate.getDate() - 1)
+  const dateLabel = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).format(arrivalDate)
+  const timeLabel = catalogArrivalTime.split('•')[1]?.trim() ?? '12:00'
+  return `${dateLabel} • ${timeLabel}`
+}
+
+function TravelPlannerContent() {
   const navigate = useNavigate()
   const { gameState, bookTravel } = useGame()
-  const activeEvent = gameState.tournaments.find((item) => item.status === 'Entered') ?? gameState.tournaments.find((item) => item.status === 'Booked' || item.status === 'Available' || item.status === 'High Cost') ?? gameState.tournaments[0]
+  const activeEvent = getNextEligibleTournament(gameState)
   const existingBooking = activeEvent ? gameState.travel.bookings[activeEvent.id] : undefined
   const [selectedTravelId, setSelectedTravelId] = useState(existingBooking?.travelOptionId ?? travelOptionCatalog.find((option) => option.selected)?.id ?? travelOptionCatalog[0].id)
   const [selectedHotelId, setSelectedHotelId] = useState(existingBooking?.hotelOptionId ?? hotelOptionCatalog.find((option) => option.selected)?.id ?? hotelOptionCatalog[0].id)
   const selectedTravel = travelOptionCatalog.find((option) => option.id === selectedTravelId) ?? travelOptionCatalog[0]
   const selectedHotel = hotelOptionCatalog.find((option) => option.id === selectedHotelId) ?? hotelOptionCatalog[0]
-
-  useEffect(() => {
-    setSelectedTravelId(existingBooking?.travelOptionId ?? travelOptionCatalog.find((option) => option.selected)?.id ?? travelOptionCatalog[0].id)
-    setSelectedHotelId(existingBooking?.hotelOptionId ?? hotelOptionCatalog.find((option) => option.selected)?.id ?? hotelOptionCatalog[0].id)
-  }, [activeEvent?.id, existingBooking?.hotelOptionId, existingBooking?.travelOptionId])
 
   const tripBreakdown = [
     { label: 'Travel', amount: selectedTravel.cost },
@@ -101,7 +114,7 @@ export function TravelPlannerPage() {
                   <button key={option.id} type="button" onClick={() => setSelectedTravelId(option.id)} className={`grid w-full grid-cols-[1.3fr_0.55fr_0.85fr_0.7fr_0.7fr] items-center gap-3 rounded-lg border p-3 text-left transition ${selected ? 'border-green-600/30 bg-green-600/10' : 'border-transparent bg-surface-light/50 hover:bg-surface-light'}`}>
                     <div className="flex min-w-0 items-center gap-3">
                       <div className={`rounded-lg border p-2 ${selected ? 'border-green-600/40 text-green-400' : 'border-border text-gray-500'}`}><Icon className="h-4 w-4" /></div>
-                      <div className="min-w-0"><p className="truncate text-sm font-medium text-white">{option.name}</p><p className="text-[10px] text-gray-400">Arrival {option.arrivalTime}</p></div>
+                      <div className="min-w-0"><p className="truncate text-sm font-medium text-white">{option.name}</p><p className="text-[10px] text-gray-400">Arrival {formatArrivalTime(activeEvent?.startDate, option.arrivalTime)}</p></div>
                     </div>
                     <div><p className="text-[9px] text-gray-500">Cost</p><p className="text-xs text-white">{formatMoney(option.cost)}</p></div>
                     <div><p className="text-[9px] text-gray-500">Fatigue</p><p className={option.fatigueLabel === 'High' ? 'text-xs text-red-400' : option.fatigueLabel === 'Medium' ? 'text-xs text-amber-400' : 'text-xs text-green-400'}>{option.fatigueLabel}</p><ProgressBar value={option.fatigueValue} tone={fatigueTone(option.fatigueLabel)} compact /></div>

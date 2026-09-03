@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Activity, BarChart3, ChevronRight, HeartPulse, Shield, Sparkles, Star, TrendingDown, TrendingUp } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 import { calculateOverallRating, calculatePotentialRating } from '../utils/calculations'
 
 type AttributeGroup = 'technical' | 'mental' | 'physical'

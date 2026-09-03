@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BadgeCheck, Check, ChevronRight, Handshake } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 import { buildSponsorshipOffersData } from '../utils/liveRouteData'
 import { formatMoney } from '../utils/formatters'
 
@@ -23,14 +23,21 @@ export function SponsorshipOffersPage() {
   const { gameState, acceptSponsor, rejectSponsor } = useGame()
   const { currentSlots, brandMetrics, sponsorCapacity, activeRevenue } = buildSponsorshipOffersData(gameState)
   const availableOffers = useMemo(() => gameState.sponsorOffers.filter((offer) => offer.status === 'Available'), [gameState.sponsorOffers])
+  const [filter, setFilter] = useState<'All' | 'Ready' | 'Low Risk'>('All')
+  const [compareOffers, setCompareOffers] = useState(false)
   const [selectedOfferId, setSelectedOfferId] = useState(availableOffers[0]?.id ?? '')
   const sponsorSlotsFull = gameState.sponsors.length >= sponsorCapacity
-  const selectedOffer = availableOffers.find((offer) => offer.id === selectedOfferId) ?? availableOffers[0] ?? null
+  const filteredOffers = availableOffers.filter((offer) => {
+    if (filter === 'Ready') return getOfferStatus(offer, gameState.player.reputation, sponsorSlotsFull).canAccept
+    if (filter === 'Low Risk') return offer.risk === 'Low Risk'
+    return true
+  })
+  const selectedOffer = filteredOffers.find((offer) => offer.id === selectedOfferId) ?? filteredOffers[0] ?? null
   const selectedOfferStatus = selectedOffer ? getOfferStatus(selectedOffer, gameState.player.reputation, sponsorSlotsFull) : null
 
-  useEffect(() => {
-    if (selectedOfferId && !availableOffers.some((offer) => offer.id === selectedOfferId)) setSelectedOfferId(availableOffers[0]?.id ?? '')
-  }, [availableOffers, selectedOfferId])
+  function cycleFilter() {
+    setFilter((current) => current === 'All' ? 'Ready' : current === 'Ready' ? 'Low Risk' : 'All')
+  }
 
   if (availableOffers.length === 0) {
     return (
@@ -66,8 +73,8 @@ export function SponsorshipOffersPage() {
             <p className="mt-1 truncate text-xs text-gray-400">Manage endorsements and commercial partnerships.</p>
           </div>
           <div className="flex shrink-0 gap-2">
-            <button type="button" className="btn-secondary px-3 py-2 text-xs">Compare Offers</button>
-            <button type="button" className="btn-secondary px-3 py-2 text-xs">Filters</button>
+            <button type="button" className={compareOffers ? 'btn-primary px-3 py-2 text-xs' : 'btn-secondary px-3 py-2 text-xs'} onClick={() => setCompareOffers((current) => !current)}>{compareOffers ? 'Close Comparison' : 'Compare Offers'}</button>
+            <button type="button" className={filter === 'All' ? 'btn-secondary px-3 py-2 text-xs' : 'btn-primary px-3 py-2 text-xs'} onClick={cycleFilter}>Filter: {filter}</button>
           </div>
         </div>
       </div>
@@ -107,9 +114,9 @@ export function SponsorshipOffersPage() {
         </div>
 
         <div className="col-span-9 card min-h-0 flex h-full flex-col overflow-hidden">
-          <div className="card-header px-3 py-2"><h3 className="text-sm font-semibold text-white">Available Offers</h3></div>
+          <div className="card-header px-3 py-2"><h3 className="text-sm font-semibold text-white">Available Offers</h3><span className="text-[10px] text-gray-500">{filteredOffers.length} shown</span></div>
           <div className="card-body flex h-full min-h-0 flex-col gap-2 overflow-auto px-3 py-3 scrollbar-thin">
-            {availableOffers.map((offer) => {
+            {filteredOffers.map((offer) => {
               const status = getOfferStatus(offer, gameState.player.reputation, sponsorSlotsFull)
 
               return (
@@ -150,10 +157,21 @@ export function SponsorshipOffersPage() {
                 </button>
               )
             })}
+            {filteredOffers.length === 0 ? <div className="flex h-full items-center justify-center text-sm text-gray-400">No offers match this filter.</div> : null}
           </div>
         </div>
 
-        {selectedOffer ? (
+        {compareOffers && filteredOffers.length > 0 ? (
+          <div className="col-span-12 card min-h-0 overflow-auto">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-surface text-gray-500"><tr><th className="px-3 py-2 text-left">Sponsor</th><th className="px-3 py-2 text-right">Monthly</th><th className="px-3 py-2 text-right">Brand Fit</th><th className="px-3 py-2 text-right">Minimum Rep</th><th className="px-3 py-2 text-right">Risk</th><th className="px-3 py-2 text-right">Status</th></tr></thead>
+              <tbody>{filteredOffers.map((offer) => {
+                const status = getOfferStatus(offer, gameState.player.reputation, sponsorSlotsFull)
+                return <tr key={offer.id} className="border-t border-border/60"><td className="px-3 py-2 font-medium text-white">{offer.name}</td><td className="px-3 py-2 text-right text-green-400">{formatMoney(offer.monthlyValue)}</td><td className="px-3 py-2 text-right text-white">{offer.brandFit}%</td><td className="px-3 py-2 text-right text-white">{offer.minimumReputation}</td><td className="px-3 py-2 text-right text-gray-300">{offer.risk}</td><td className={status.canAccept ? 'px-3 py-2 text-right text-green-400' : 'px-3 py-2 text-right text-amber-400'}>{status.label}</td></tr>
+              })}</tbody>
+            </table>
+          </div>
+        ) : selectedOffer ? (
           <>
             <div className="col-span-8 card min-h-0 flex h-full flex-col overflow-hidden">
               <div className="card-header px-3 py-2"><h3 className="text-sm font-semibold text-white">Selected Offer</h3><span className={`rounded px-2 py-0.5 text-[10px] ${riskClass(selectedOffer.risk)}`}>{selectedOffer.risk}</span></div>

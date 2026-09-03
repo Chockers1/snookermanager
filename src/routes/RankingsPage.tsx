@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Minus, Target, TrendingDown, TrendingUp } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
+import { getNextEligibleTournament } from '../hooks/useGameState'
 import type { PlayerAttributes } from '../types/game'
 import { calculateOverallRating, calculatePotentialRating } from '../utils/calculations'
 import { formatMoney } from '../utils/formatters'
@@ -263,7 +264,7 @@ export function RankingsPage() {
     }
   })
   const playerRow = activeRowsWithRatings.find((row) => row.playerName === gameState.player.fullName) ?? activeRowsWithRatings[0]
-  const nextTournament = gameState.tournaments.find((item) => item.status === 'Entered') ?? gameState.tournaments.find((item) => item.status === 'Booked' || item.status === 'Available' || item.status === 'High Cost') ?? gameState.tournaments[0]
+  const nextTournament = getNextEligibleTournament(gameState)
   const nextTarget = activeRowsWithRatings.find((row) => row.ranking === Math.max(1, (playerRow?.ranking ?? 2) - 1))
   const rankingSources = gameState.matches.slice(0, 4).map((match) => ({
     label: `${match.round} vs ${match.opponentName}`,
@@ -398,7 +399,7 @@ export function RankingsPage() {
           <div className="card min-h-0 flex h-full flex-col overflow-hidden">
             <div className="card-header px-3 py-2"><h3 className="text-sm font-semibold text-white">Ranking Movement</h3></div>
             <div className="card-body h-full min-h-0 px-2 py-2">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
                 <LineChart data={rankingMomentum}>
                   <CartesianGrid stroke="#203449" vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />

@@ -1,7 +1,8 @@
 import { Bell, CalendarClock, Mail, Settings, TrendingDown, TrendingUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { Player } from '../../types/game'
-import { useGame } from '../../context/GameStateContext'
+import { useGame } from '../../context/useGame'
+import { getNextEligibleTournament } from '../../hooks/useGameState'
 import { formatMoney } from '../../utils/formatters'
 
 type TopStatusBarProps = {
@@ -16,14 +17,12 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
     ?? player.worldRanking
     ?? player.amateurRanking
   const rankingMovement = playerRankingRow?.movement ?? 0
-  const nextEvent = gameState.tournaments.find((event) => event.status === 'Entered')
-    ?? gameState.tournaments.find((event) => event.status === 'Booked' || event.status === 'Available' || event.status === 'High Cost')
-    ?? gameState.tournaments[0]
+  const nextEvent = getNextEligibleTournament(gameState)
   const inboxCount = gameState.inbox.length
   const notificationCount = Math.max(player.notificationCount, inboxCount)
 
   return (
-    <header className="flex h-14 shrink-0 items-center overflow-hidden border-b border-border bg-sidebar px-4">
+    <header className="scrollbar-thin flex h-14 shrink-0 items-center overflow-x-auto border-b border-border bg-sidebar pl-14 pr-3 lg:px-4">
       <div className="flex min-w-0 shrink-0 items-center gap-2 border-r border-border pr-4">
         <button
           type="button"
@@ -93,16 +92,16 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
       </button>
 
       <div className="ml-auto flex shrink-0 items-center gap-2 pl-3">
-        <button type="button" onClick={() => navigate('/inbox')} className="relative p-1.5 text-gray-400 transition-colors hover:text-white">
-          <Mail className="h-4 w-4" />
+        <button type="button" aria-label={`Open inbox (${inboxCount} messages)`} title="Inbox" onClick={() => navigate('/inbox')} className="relative p-1.5 text-gray-400 transition-colors hover:text-white">
+          <Mail aria-hidden="true" className="h-4 w-4" />
           <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-green-600 px-1 text-[8px] font-bold text-white">{inboxCount}</span>
         </button>
-        <button type="button" onClick={() => navigate('/inbox')} className="relative p-1.5 text-gray-400 transition-colors hover:text-white">
-          <Bell className="h-4 w-4" />
+        <button type="button" aria-label={`Open notifications (${notificationCount})`} title="Notifications" onClick={() => navigate('/inbox')} className="relative p-1.5 text-gray-400 transition-colors hover:text-white">
+          <Bell aria-hidden="true" className="h-4 w-4" />
           <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-bold text-white">{notificationCount}</span>
         </button>
-        <button type="button" onClick={() => navigate('/new-career')} className="p-1.5 text-gray-400 transition-colors hover:text-white">
-          <Settings className="h-4 w-4" />
+        <button type="button" aria-label="Career setup" title="Career setup" onClick={() => navigate('/new-career')} className="p-1.5 text-gray-400 transition-colors hover:text-white">
+          <Settings aria-hidden="true" className="h-4 w-4" />
         </button>
       </div>
     </header>

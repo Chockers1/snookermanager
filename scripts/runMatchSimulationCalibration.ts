@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { getSimulationOutputDirectories } from './simulationOutput'
 
 import {
   CALIBRATION_FORMATS,
@@ -63,8 +64,9 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const workspaceRoot = path.resolve(__dirname, '..')
 const reportsDir = path.join(workspaceRoot, 'docs', 'reports')
+const artifactsDir = getSimulationOutputDirectories(workspaceRoot).artifacts
 const markdownPath = path.join(reportsDir, 'match-simulation-calibration.md')
-const csvPath = path.join(reportsDir, 'match-simulation-calibration.csv')
+const csvPath = path.join(artifactsDir, 'match-simulation-calibration.csv')
 
 function formatPercent(value: number) {
   return `${value.toFixed(1)}%`
@@ -312,6 +314,7 @@ function buildCsv(rows: CsvRow[]) {
 function main() {
   const { summaryRows, csvRows } = buildCalibrationData()
   fs.mkdirSync(reportsDir, { recursive: true })
+  fs.mkdirSync(artifactsDir, { recursive: true })
   fs.writeFileSync(markdownPath, buildMarkdown(summaryRows))
   fs.writeFileSync(csvPath, buildCsv(csvRows))
   console.log(`Wrote calibration summary to ${markdownPath}`)

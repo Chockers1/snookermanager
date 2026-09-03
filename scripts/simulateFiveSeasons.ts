@@ -20,6 +20,7 @@ import {
   acceptSponsorState,
   advanceWeekState,
   applyTrainingPlanState,
+  bookTravelState,
   buyChalkState,
   buyCueState,
   buyTipState,
@@ -32,8 +33,10 @@ import {
   getTournamentEntryRound,
   hireCoachState,
   scheduleTreatmentState,
+  simulateTournamentMatchState,
   type GameState,
   type TournamentRound,
+  withdrawTournamentState,
 } from '../src/hooks/useGameState'
 import {
   chalkCatalog,
@@ -56,6 +59,7 @@ import {
 } from '../src/utils/calculations'
 import { getExpectedWinRateBand, getExpectedWinRateTier, getOpponentRankBand, type ExpectedWinRateTier, type OpponentRankBand } from '../src/utils/matchOutcomeModel'
 import { getValidatedStartingLevel } from '../src/utils/newCareerConfig'
+import { getSimulationOutputDirectories, writeSimulationArtifacts } from './simulationOutput'
 
 type CircuitSnapshot = Record<'world' | 'youth' | 'amateur' | 'qTour' | 'qSchool' | 'senior', string[]>
 
@@ -532,6 +536,8 @@ type PlayerSnapshotRow = {
   nationality: string | null
   careerPhase: string
   competitiveStatus: string
+  retired: boolean
+  retiredSeason: string | null
   isHumanPlayer: boolean
   isOnMainTour: boolean
   isTourCardHolder: boolean
@@ -793,6 +799,8 @@ type SeasonAuditSummary = {
   activeAiAverageSeasonMatches: number
   activeAiZeroMatchPlayers: number
   newAiPlayers: number
+  retiredAiPlayers: number
+  totalRetiredAiPlayers: number
   aiOverallMovers: number
   aiPotentialMovers: number
   top16AverageAge: number
@@ -1015,40 +1023,6 @@ function getCompetitionLevelLabel(level: CompetitionLevelKey) {
   }
 }
 
-function getCompetitionLevelLabelForSnapshot(level: CompetitionLevelKey) {
-  switch (level) {
-    case 'overall':
-      return 'totalRecord'
-    case 'youth':
-      return 'youthRecord'
-    case 'amateur':
-      return 'amateurRecord'
-    case 'qTour':
-      return 'qTourRecord'
-    case 'qSchool':
-      return 'qSchoolRecord'
-    case 'rookieBottomQualifiers':
-    case 'proQualifying':
-      return 'proQualifierRecord'
-    case 'rankingEvents':
-      return 'rankingEventRecord'
-    case 'majors':
-      return 'majorRecord'
-    case 'worldQualifying':
-      return 'worldQualifyingRecord'
-    case 'worldMainDraw':
-      return 'worldMainDrawRecord'
-    case 'playersSeries':
-      return 'playersSeriesRecord'
-    case 'invitationals':
-      return 'invitationalRecord'
-    case 'senior':
-      return 'seniorRecord'
-    case 'exhibition':
-      return 'exhibitionRecord'
-  }
-}
-
 function getCareerPhaseKey(phase: string | null | undefined): CareerPhaseKey {
   const value = (phase ?? '').toLowerCase()
   if (value.includes('youth')) return 'Youth phase'
@@ -1262,8 +1236,10 @@ function addDaysToDateString(dateString: string, days: number) {
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const workspaceRoot = path.resolve(__dirname, '..')
-const reportsDir = path.join(workspaceRoot, 'docs', 'reports')
-const playerSnapshotsDir = path.join(reportsDir, 'player-snapshots')
+const simulationOutput = getSimulationOutputDirectories(workspaceRoot)
+const reportsDir = simulationOutput.artifacts
+const canonicalReportsDir = simulationOutput.canonicalReports
+const playerSnapshotsDir = simulationOutput.playerSnapshots
 const worldAccessDebugPath = path.join(reportsDir, 'world-access-debug.md')
 const worldAccessDebugJsonPath = path.join(reportsDir, 'world-access-debug.json')
 const eliteEventSelectionDebugPath = path.join(reportsDir, 'elite-event-selection-debug.md')
@@ -1361,8 +1337,6 @@ function createSupportMetricAccumulator(): SupportMetricAccumulator {
     deciderPressureSum: 0,
   }
 }
-
-const OPPONENT_RANK_BANDS: OpponentRankBand[] = ['Top 16', 'Top 32', 'Top 64', '65-128', 'Q Tour/amateur', 'youth']
 
 function createEmptyOpponentRankBandCounts(): OpponentRankBandCounts {
   return {
@@ -1522,7 +1496,7 @@ function applySupportProfileState(state: GameState, profile: ManagedSupportProfi
     || state.player.morale < 60
   const equipmentBonus = hasMatchWeek ? getEquipmentPreparationBonus(state) : 0
 
-  let nextState = applySupportTrainingPulse(state, profile)
+  const nextState = applySupportTrainingPulse(state, profile)
   const nextPlayer = { ...nextState.player }
 
   if (nextState.trainingAppliedWeek === nextState.week) {
@@ -3826,6 +3800,18 @@ function getCorrectedAiLifecycleState(record: NonNullable<GameState['worldPlayer
   let correctedIsOnMainTour = record.hasTourCard && (worldRank ?? 999) <= 128
   let correctedIsTourCardHolder = record.hasTourCard
 
+  if (record.retired) {
+    return {
+      competitiveStatus: 'Retired',
+      actualCircuit: 'retired',
+      isOnMainTour: false,
+      isTourCardHolder: false,
+      tourCardSource: null,
+      lifecycleCorrectionApplied: false,
+      lifecycleReasons: [],
+    }
+  }
+
   const activeProtection = record.hasTourCard && record.yearsRemaining > 0 && !record.retainedViaRanking
   const expiredCard = !record.retainedViaRanking && (!record.hasTourCard || record.yearsRemaining <= 0)
 
@@ -4488,7 +4474,7 @@ function buildSeasonReport(
       endedOn: seasonRecord.endedOn,
     },
     playerAtSeasonOpen: normalizeSnapshotForReportedRank(snapshotPlayer(openingState), seasonRecord.openingRankingLabel, seasonRecord.openingRanking, openingState.history),
-    playerAtNextSeasonOpen: normalizeSnapshotForReportedRank(snapshotPlayer(nextSeasonState), seasonRecord.closingRankingLabel, seasonRecord.closingRanking, nextSeasonState.history),
+    playerAtNextSeasonOpen: snapshotPlayer(nextSeasonState),
     finance: {
       openingCash: openingState.player.cash,
       closingCash: nextSeasonState.player.cash,
@@ -4854,10 +4840,6 @@ function getCompetitionRankForPlayer(state: GameState, key: keyof CircuitSnapsho
   return state.competitionTables[key].find((row) => row.playerName === playerName)?.ranking ?? null
 }
 
-function getWorldPlayerRecord(state: GameState, playerName: string) {
-  return state.worldPlayers.find((record) => record.playerName === playerName) ?? null
-}
-
 function getActualCircuit(worldRank: number | null, qSchoolRank: number | null, qTourRank: number | null, amateurRank: number | null, seniorRank: number | null, age: number, isOnMainTour: boolean) {
   if (isOnMainTour && (worldRank ?? 999) <= 128) return 'mainTour'
   if (seniorRank != null) return 'senior'
@@ -4877,6 +4859,7 @@ function getExpectedCircuit(age: number, worldRank: number | null, qSchoolRank: 
 }
 
 function getAiCareerPhase(age: number, isOnMainTour: boolean, actualCircuit: string) {
+  if (actualCircuit === 'retired') return 'Retired'
   if (age >= 40) return 'Veteran'
   if (age <= 21 && actualCircuit === 'youth') return 'Youth'
   if (isOnMainTour) return age <= 24 ? 'Rookie' : 'Established'
@@ -4885,6 +4868,7 @@ function getAiCareerPhase(age: number, isOnMainTour: boolean, actualCircuit: str
 
 function getAiCompetitiveStatus(record: NonNullable<GameState['worldPlayers'][number]>, worldRank: number | null, isOnMainTour: boolean, actualCircuit: string) {
   const rank = worldRank ?? 999
+  if (record.retired || actualCircuit === 'retired') return 'Retired'
   if (actualCircuit === 'senior') return 'Senior Tour / Legend Circuit'
   if (rank <= 16 && record.majorTitles > 0) return 'Major Contender'
   if (rank <= 16) return 'Top 16 Elite Player'
@@ -5090,6 +5074,7 @@ function buildHumanSnapshotRow(
   seasonReport: SeasonReport,
   completedSeasons: SeasonReport[],
 ): PlayerSnapshotRow {
+  const isRetired = nextSeasonState.careerSystems.lateCareer.retired
   const technicalAverage = calculateTechnicalAverage(nextSeasonState.attributes.technical)
   const mentalAverage = Math.round(calculateAverage(Object.values(nextSeasonState.attributes.mental)))
   const physicalAverage = Math.round(calculateAverage(Object.values(nextSeasonState.attributes.physical)))
@@ -5142,7 +5127,7 @@ function buildHumanSnapshotRow(
     worldRank: seasonOpenWorldRank,
     oneYearRank: seasonReport.pathway.seasonOpen.oneYearRank,
     fatigue: seasonReport.playerAtSeasonOpen.fatigue,
-  }, seasonReport, openingState, nextSeasonState)
+  }, seasonReport, openingState)
   const rowBase: Omit<PlayerSnapshotRow, 'warningFlags' | 'validTourStatus' | 'validEventAccess' | 'invalidAccessReason' | 'invalidStateReasons'> = {
     season,
     playerId: `human-${nextSeasonState.player.fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
@@ -5151,6 +5136,8 @@ function buildHumanSnapshotRow(
     nationality: nextSeasonState.player.nationality,
     careerPhase: seasonReport.playerAtNextSeasonOpen.careerPhase,
     competitiveStatus: seasonReport.playerAtNextSeasonOpen.competitiveStatus,
+    retired: isRetired,
+    retiredSeason: isRetired ? season : null,
     isHumanPlayer: true,
     isOnMainTour: seasonReport.pathway.nextSeasonOpen.hasTourCard,
     isTourCardHolder: seasonReport.pathway.nextSeasonOpen.hasTourCard,
@@ -5243,7 +5230,7 @@ function buildHumanSnapshotRow(
     expectedCircuit: getExpectedCircuit(seasonReport.playerAtNextSeasonOpen.age, worldRank, seasonReport.pathway.nextSeasonOpen.qSchoolRank, seasonReport.pathway.nextSeasonOpen.qTourRank, seasonReport.pathway.nextSeasonOpen.amateurRank, bestWorldRank, seasonReport.pathway.nextSeasonOpen.hasTourCard),
     actualCircuit,
   }
-  const warningFlags = buildWarningFlags(rowBase, nextSeasonState.history.seasonRecords.map((record) => ({ competitiveStatus: seasonReport.playerAtNextSeasonOpen.competitiveStatus })))
+  const warningFlags = buildWarningFlags(rowBase, nextSeasonState.history.seasonRecords.map(() => ({ competitiveStatus: seasonReport.playerAtNextSeasonOpen.competitiveStatus })))
   const invalidStateReasons = getInvalidStateReasons(rowBase, warningFlags)
   return {
     ...rowBase,
@@ -5261,6 +5248,15 @@ function buildAiSnapshotRow(
   record: NonNullable<GameState['worldPlayers'][number]>,
 ): PlayerSnapshotRow {
   const seasonRecord = record.seasons.find((entry) => entry.season === season) ?? record.seasons[0]
+  const seasonHadCircuitMembership = Boolean(seasonRecord && [
+    seasonRecord.worldRank,
+    seasonRecord.oneYearRank,
+    seasonRecord.amateurRank,
+    seasonRecord.qTourRank,
+    seasonRecord.qSchoolRank,
+    seasonRecord.seniorRank,
+    seasonRecord.youthRank,
+  ].some((rank) => rank != null))
   const aiTwoYearSummary = getAiTwoYearSummary(record, season)
   const worldRank = getCompetitionRankForPlayer(nextSeasonState, 'world', record.playerName)
   const oneYearRank = getCompetitionRankForPlayer(nextSeasonState, 'oneYear', record.playerName)
@@ -5274,7 +5270,7 @@ function buildAiSnapshotRow(
   const lifecycleState = getCorrectedAiLifecycleState(record, worldRank, baseActualCircuit)
   const isOnMainTour = lifecycleState.isOnMainTour
   const actualCircuit = lifecycleState.actualCircuit
-  const expectedCircuit = getExpectedCircuit(record.age, worldRank, qSchoolRank, qTourRank, amateurRank, record.highestWorldRank, isOnMainTour)
+  const expectedCircuit = record.retired ? 'retired' : getExpectedCircuit(record.age, worldRank, qSchoolRank, qTourRank, amateurRank, record.highestWorldRank, isOnMainTour)
   const ability = estimateAiAbilityMetrics(record, worldRank)
   const stalledReason = (ability.potential ?? 0) >= 85 && record.age >= 24 && record.age <= 34 && (record.highestWorldRank ?? 999) > 64
     ? getAiStallReason(record, aiTwoYearSummary, { age: record.age, confidence: ability.confidence, fatigue: ability.fatigue, actualCircuit, isOnMainTour })
@@ -5303,6 +5299,8 @@ function buildAiSnapshotRow(
     nationality: record.nation,
     careerPhase: getAiCareerPhase(record.age, isOnMainTour, actualCircuit),
     competitiveStatus: lifecycleState.competitiveStatus ?? getAiCompetitiveStatus(record, worldRank, isOnMainTour, actualCircuit),
+    retired: record.retired,
+    retiredSeason: record.retiredSeason,
     isHumanPlayer: false,
     isOnMainTour,
     isTourCardHolder: lifecycleState.isTourCardHolder,
@@ -5332,9 +5330,9 @@ function buildAiSnapshotRow(
     confidence: ability.confidence,
     fatigue: ability.fatigue,
     reputation: ability.reputation,
-    seasonMatches: seasonRecord?.matches ?? null,
-    seasonWins: seasonRecord?.wins ?? null,
-    seasonLosses: seasonRecord?.losses ?? null,
+    seasonMatches: seasonHadCircuitMembership ? (seasonRecord?.matches ?? 0) : null,
+    seasonWins: seasonHadCircuitMembership ? (seasonRecord?.wins ?? 0) : null,
+    seasonLosses: seasonHadCircuitMembership ? (seasonRecord?.losses ?? 0) : null,
     seasonWinPercentage: seasonRecord && (seasonRecord.wins + seasonRecord.losses) > 0 ? (seasonRecord.wins / (seasonRecord.wins + seasonRecord.losses)) * 100 : null,
     seasonTitles: seasonRecord?.titles ?? null,
     seasonMajorTitles: null,
@@ -5714,14 +5712,6 @@ function getWorldOutcomePlausibility(profile: ManagedSupportProfile, worldTitles
   return worldTitles <= 2
 }
 
-function getEventVolumePlausibility(profile: ManagedSupportProfile, report: SimulationReport) {
-  const metrics = report.supportMetrics
-  if (!metrics) return false
-  const lowEventWarnings = buildSupportComparisonWarnings([report]).filter((warning) => /events without fatigue reason|ranking events without fatigue reason/i.test(warning))
-  const threshold = profile === 'worst' ? 6 : 8
-  return metrics.averageProEventsAfterTurningPro >= threshold && lowEventWarnings.length === 0
-}
-
 function getEventVolumeThreshold(profile: ManagedSupportProfile) {
   return profile === 'worst' ? 6 : 8
 }
@@ -5744,10 +5734,7 @@ function loadRepeatedSeedThresholdSummary() {
   }
 }
 
-function buildRealismVerdictEntry(
-  report: SimulationReport,
-  repeatedSeedThresholdSummary: ReturnType<typeof loadRepeatedSeedThresholdSummary>,
-) {
+function buildRealismVerdictEntry(report: SimulationReport) {
   const metrics = report.supportMetrics
   if (!metrics) return null
   const profile = metrics.supportProfile
@@ -5755,22 +5742,11 @@ function buildRealismVerdictEntry(
   const titleSummary = buildTitleSummary(allTournaments)
   const proRecord = combineCompetitionRecords('Professional', metrics.recordByLevel, ['rookieBottomQualifiers', 'proQualifying', 'rankingEvents', 'majors', 'worldQualifying', 'worldMainDraw', 'playersSeries', 'invitationals'])
   const profileWarnings = buildSupportComparisonWarnings([report])
-  const lowEventWarnings = profileWarnings.filter((warning) => /events without fatigue reason|ranking events without fatigue reason/i.test(warning))
   const nonEventWarnings = profileWarnings.filter((warning) => !/events without fatigue reason|ranking events without fatigue reason/i.test(warning))
   const targetBand = getProfileWinRateTarget(profile)
-  const eventVolumeThreshold = getEventVolumeThreshold(profile)
-  const singleRunEventVolumePass = metrics.averageProEventsAfterTurningPro >= eventVolumeThreshold
-  const aggregateEventVolumePass = profile === 'best'
-    && (repeatedSeedThresholdSummary.maxProEventsAfterTurningPro ?? 0) >= 8
-    && !repeatedSeedThresholdSummary.hasThresholdWarnings
   const rankPlausible = getProfileRankPlausibility(profile, metrics.finalWorldRank)
   const proWinPlausible = proRecord.winPercentage >= targetBand.min && proRecord.winPercentage <= targetBand.max
   const titlePlausible = getProfileTitlePlausibility(profile, titleSummary.totalTitles)
-  const eventVolumeAssessment = aggregateEventVolumePass
-    ? 'yes'
-    : singleRunEventVolumePass
-      ? (lowEventWarnings.length > 0 ? 'watch' : 'yes')
-      : 'no'
   const worldOutcomePlausible = getWorldOutcomePlausibility(profile, titleSummary.worldTitles, metrics.finalCompetitiveStatus)
   const matchConcern = !rankPlausible
     ? 'rank outcome still looks off'
@@ -5899,19 +5875,23 @@ function buildRankingPointsRealismAuditMarkdown(report: SimulationReport) {
 }
 
 function writeTournamentCalendarAudit(report: SimulationReport) {
-  fs.writeFileSync(path.join(reportsDir, 'tournament-calendar-audit.md'), buildTournamentCalendarAuditMarkdown(report))
+  fs.mkdirSync(canonicalReportsDir, { recursive: true })
+  fs.writeFileSync(path.join(canonicalReportsDir, 'tournament-calendar-audit.md'), buildTournamentCalendarAuditMarkdown(report))
 }
 
 function writeTournamentFormatAudit(report: SimulationReport) {
-  fs.writeFileSync(path.join(reportsDir, 'tournament-format-audit.md'), buildTournamentFormatAuditMarkdown(report))
+  fs.mkdirSync(canonicalReportsDir, { recursive: true })
+  fs.writeFileSync(path.join(canonicalReportsDir, 'tournament-format-audit.md'), buildTournamentFormatAuditMarkdown(report))
 }
 
 function writePlayerEventVolumeAudit(report: SimulationReport, rowsBySeason: Map<string, PlayerSnapshotRow[]>) {
-  fs.writeFileSync(path.join(reportsDir, 'player-event-volume-audit.md'), buildPlayerEventVolumeAuditMarkdown(report, rowsBySeason))
+  fs.mkdirSync(canonicalReportsDir, { recursive: true })
+  fs.writeFileSync(path.join(canonicalReportsDir, 'player-event-volume-audit.md'), buildPlayerEventVolumeAuditMarkdown(report, rowsBySeason))
 }
 
 function writeRankingPointsRealismAudit(report: SimulationReport) {
-  fs.writeFileSync(path.join(reportsDir, 'ranking-points-realism-audit.md'), buildRankingPointsRealismAuditMarkdown(report))
+  fs.mkdirSync(canonicalReportsDir, { recursive: true })
+  fs.writeFileSync(path.join(canonicalReportsDir, 'ranking-points-realism-audit.md'), buildRankingPointsRealismAuditMarkdown(report))
 }
 
 function buildSeasonAuditSummary(season: string, rows: PlayerSnapshotRow[], previousRows: PlayerSnapshotRow[] | null): SeasonAuditSummary {
@@ -5960,19 +5940,23 @@ function buildSeasonAuditSummary(season: string, rows: PlayerSnapshotRow[], prev
     .slice(0, 10)
     .map((row) => `${row.name}: ${[row.invalidAccessReason, ...row.invalidStateReasons].filter(Boolean).join(', ') || 'invalid state'}`)
   const warnings: string[] = []
-  const activeAiRows = aiRows.filter((row) => row.isOnMainTour
+  const activeAiRows = aiRows.filter((row) => !row.retired && (
+    row.isOnMainTour
     || row.qTourRank != null
     || row.qSchoolRank != null
     || row.amateurRank != null
     || row.youthRank != null
-    || row.seniorRank != null)
+    || row.seniorRank != null
+  ))
   const activeAiAverageSeasonMatches = activeAiRows.length > 0
     ? activeAiRows.reduce((sum, row) => sum + (row.seasonMatches ?? 0), 0) / activeAiRows.length
     : 0
-  const activeAiZeroMatchPlayers = activeAiRows.filter((row) => (row.seasonMatches ?? 0) === 0).length
+  const activeAiZeroMatchPlayers = activeAiRows.filter((row) => row.seasonMatches != null && row.seasonMatches === 0).length
   const newAiPlayers = previousRows
     ? aiRows.filter((row) => !previousRows.some((previous) => previous.name === row.name)).length
     : aiRows.filter((row) => row.age <= 18 && row.careerMatches <= (row.seasonMatches ?? 0)).length
+  const retiredAiPlayers = aiRows.filter((row) => row.retired && !previousByName.get(row.name)?.retired).length
+  const totalRetiredAiPlayers = aiRows.filter((row) => row.retired).length
   const aiOverallMovers = previousRows
     ? aiRows.filter((row) => {
         const previous = previousByName.get(row.name)
@@ -6005,13 +5989,6 @@ function buildSeasonAuditSummary(season: string, rows: PlayerSnapshotRow[], prev
   })) warnings.push('dropped player did not appear in feeder pool')
   if (aiRows.some((row) => row.warningFlags.includes('rookie-pro-stuck'))) warnings.push('AI rookie status persisted beyond two-year card protection')
   if (previousRows) {
-    const previousYouth = new Set(previousRows.filter((row) => !row.isHumanPlayer && row.actualCircuit === 'youth').map((row) => row.name))
-    const currentYouthEntrants = aiRows.filter((row) => row.actualCircuit === 'youth' && !previousYouth.has(row.name))
-
-    const previousQTour = new Set(previousRows.filter((row) => !row.isHumanPlayer && row.actualCircuit === 'qTour').map((row) => row.name))
-    const currentQTour = new Set(aiRows.filter((row) => row.actualCircuit === 'qTour').map((row) => row.name))
-    const qTourChurn = [...currentQTour].filter((name) => !previousQTour.has(name)).length + [...previousQTour].filter((name) => !currentQTour.has(name)).length
-
     const previousQSchool = new Set(previousRows.filter((row) => !row.isHumanPlayer && row.actualCircuit === 'qSchool').map((row) => row.name))
     const currentQSchool = new Set(aiRows.filter((row) => row.actualCircuit === 'qSchool').map((row) => row.name))
     const qSchoolChurn = [...currentQSchool].filter((name) => !previousQSchool.has(name)).length + [...previousQSchool].filter((name) => !currentQSchool.has(name)).length
@@ -6024,6 +6001,8 @@ function buildSeasonAuditSummary(season: string, rows: PlayerSnapshotRow[], prev
     activeAiAverageSeasonMatches,
     activeAiZeroMatchPlayers,
     newAiPlayers,
+    retiredAiPlayers,
+    totalRetiredAiPlayers,
     aiOverallMovers,
     aiPotentialMovers,
     top16AverageAge: top16.length > 0 ? top16.reduce((sum, row) => sum + row.age, 0) / top16.length : 0,
@@ -6063,6 +6042,7 @@ function buildAiAuditMarkdown(report: SimulationReport, summaries: SeasonAuditSu
     lines.push(`- Total active main-tour players: ${summary.activeMainTourPlayers}`)
     lines.push(`- Active AI season match average / zero-match players: ${formatAverageOrNa(summary.activeAiAverageSeasonMatches)} / ${summary.activeAiZeroMatchPlayers}`)
     lines.push(`- New AI players / overall movers / potential movers: ${summary.newAiPlayers} / ${summary.aiOverallMovers} / ${summary.aiPotentialMovers}`)
+    lines.push(`- AI retirements this season / total retired records: ${summary.retiredAiPlayers} / ${summary.totalRetiredAiPlayers}`)
     lines.push(`- Top 16 average age / overall / potential: ${formatAverageOrNa(summary.top16AverageAge)} / ${formatAverageOrNa(summary.top16AverageOverall)} / ${formatAverageOrNa(summary.top16AveragePotential)}`)
     lines.push(`- Top 64 average age / overall / potential: ${formatAverageOrNa(summary.top64AverageAge)} / ${formatAverageOrNa(summary.top64AverageOverall)} / ${formatAverageOrNa(summary.top64AveragePotential)}`)
     lines.push(`- Players gaining tour cards: ${summary.gainedTourCards.join(', ') || 'none'}`)
@@ -6086,7 +6066,8 @@ function buildAiAuditMarkdown(report: SimulationReport, summaries: SeasonAuditSu
 
 function writeAiPlayerProgressionAudit(report: SimulationReport, summaries: SeasonAuditSummary[]) {
   fs.mkdirSync(reportsDir, { recursive: true })
-  fs.writeFileSync(path.join(reportsDir, 'ai-player-progression-audit.md'), buildAiAuditMarkdown(report, summaries))
+  fs.mkdirSync(canonicalReportsDir, { recursive: true })
+  fs.writeFileSync(path.join(canonicalReportsDir, 'ai-player-progression-audit.md'), buildAiAuditMarkdown(report, summaries))
 }
 
 function formatNameList(names: string[], totalCount?: number) {
@@ -6164,11 +6145,13 @@ function buildHumanMatchCountAuditMarkdown(report: SimulationReport) {
 }
 
 function writeHumanMatchCountAudit(report: SimulationReport) {
-  fs.writeFileSync(path.join(reportsDir, 'human-match-count-audit.md'), buildHumanMatchCountAuditMarkdown(report))
+  fs.mkdirSync(canonicalReportsDir, { recursive: true })
+  fs.writeFileSync(path.join(canonicalReportsDir, 'human-match-count-audit.md'), buildHumanMatchCountAuditMarkdown(report))
 }
 
 function writeStatusIntegrityAudit(report: SimulationReport) {
-  fs.writeFileSync(path.join(reportsDir, 'status-integrity-audit.md'), buildStatusIntegrityAuditMarkdown(report))
+  fs.mkdirSync(canonicalReportsDir, { recursive: true })
+  fs.writeFileSync(path.join(canonicalReportsDir, 'status-integrity-audit.md'), buildStatusIntegrityAuditMarkdown(report))
 }
 
 function appendStatusIntegrityAuditSection(lines: string[], audit: StatusIntegrityAudit) {
@@ -6725,7 +6708,6 @@ function buildBalanceWarnings(report: SimulationReport, finalState: GameState) {
   const pathwayRecord = getPathwayRecord(metrics.recordByLevel)
   const worldMainDrawRecord = getCompetitionLevelRecord(metrics.recordByLevel, 'worldMainDraw')
   const worldQualifyingRecord = getCompetitionLevelRecord(metrics.recordByLevel, 'worldQualifying')
-  const qualifierRecord = combineCompetitionRecords('Qualifiers', metrics.recordByLevel, ['rookieBottomQualifiers', 'proQualifying', 'worldQualifying'])
   const rankingQualifierRecord = buildTournamentSubsetRecord('Ranking Qualifying', allTournaments, (tournament) => tournament.countedInRankingQualifierRecord)
   const rankingMainDrawRecord = buildTournamentSubsetRecord('Ranking Main Draw', allTournaments, (tournament) => tournament.countedInRankingMainDrawRecord)
   const rankingQuarterFinalPlusRecord = buildTournamentSubsetRecord('Ranking QF+', allTournaments, (tournament) => tournament.countedInRankingQuarterFinalPlusRecord)
@@ -6988,12 +6970,12 @@ function buildBalanceWarnings(report: SimulationReport, finalState: GameState) {
   }
 
   if (
-    metrics.finalsReached >= 18
-    && rankingMainDrawRecord.averageWinProbability != null
-    && metrics.finalWinPercentage + 25 < rankingMainDrawRecord.averageWinProbability
+    metrics.finalsReached >= 30
+    && rankingFinalRecord.averageWinProbability != null
+    && metrics.finalWinPercentage + 25 < rankingFinalRecord.averageWinProbability
     && pressureSkill >= 58
   ) {
-    warnings.push(`Final conversion looks too weak for the underlying win model: finals ${metrics.finalsReached}, final win ${formatPercent(metrics.finalWinPercentage)}, normal expected win ${formatPercent(rankingMainDrawRecord.averageWinProbability)}.`)
+    warnings.push(`Final conversion looks too weak for the underlying win model: finals ${metrics.finalsReached}, final win ${formatPercent(metrics.finalWinPercentage)}, modeled final win ${formatPercent(rankingFinalRecord.averageWinProbability)}.`)
   }
 
   if (majorRecord.matches >= 100 && majorRecord.winPercentage > 55 && titleSummary.majorTitles === 0) {
@@ -7133,7 +7115,7 @@ function buildSupportComparisonMarkdown(reports: SimulationReport[]) {
   lines.push('## Match Engine Verdict')
   lines.push('')
   for (const report of orderedReports) {
-    const verdict = buildRealismVerdictEntry(report, repeatedSeedThresholdSummary)
+    const verdict = buildRealismVerdictEntry(report)
     if (!verdict) continue
     lines.push(`### ${verdict.profile}`)
     lines.push(`- rank outcome plausible: ${verdict.rankPlausible ? 'yes' : 'no'}`)
@@ -7767,7 +7749,6 @@ function buildHumanEventVolumeMetrics(
   row: Pick<PlayerSnapshotRow, 'age' | 'actualCircuit' | 'competitiveStatus' | 'isOnMainTour' | 'isTourCardHolder' | 'tourCardSource' | 'tourCardYear' | 'yearsRemaining' | 'worldRank' | 'oneYearRank' | 'fatigue'>,
   seasonReport: SeasonReport,
   openingState: GameState,
-  _nextSeasonState: GameState,
 ) {
   const eligibleCandidates = openingState.tournaments
     .map((tournament) => ({ tournament, classification: getTournamentClassification(tournament) }))
@@ -7858,6 +7839,15 @@ function buildAiEventVolumeMetrics(
 }
 
 function main() {
+  const seedArg = process.argv.find((arg) => arg.startsWith('--seed='))
+  const skipPlayerSnapshots = process.argv.includes('--skip-player-snapshots')
+  const skipSharedAudits = process.argv.includes('--skip-shared-audits')
+  const requestedSeed = Number.parseInt(seedArg?.split('=')[1] ?? '20260903', 10)
+  let randomState = (Number.isFinite(requestedSeed) ? requestedSeed : 20260903) >>> 0
+  Math.random = () => {
+    randomState = (randomState * 1_664_525 + 1_013_904_223) >>> 0
+    return randomState / 4_294_967_296
+  }
   const seasonsArg = process.argv.find((arg) => arg.startsWith('--seasons='))
   const supportProfileArg = process.argv.find((arg) => arg.startsWith('--support-profile='))
   const stopAfterSeasonArg = process.argv.find((arg) => arg.startsWith('--stop-after-season='))
@@ -7895,7 +7885,7 @@ function main() {
             : customStartingScenario
               ? `${customScenarioLabel ?? `Custom start age ${customStartAge ?? 'default'}${customStartingLevelId ? ` (${customStartingLevelId})` : ''}`} (${supportProfileDescription})`
               : 'Starter-save passive simulation'
-  const reportBaseName = managedYouthScenario
+  const reportBaseNameRoot = managedYouthScenario
     ? getSupportReportBaseName(seasonsRequested, managedSupportProfile)
     : focusedRookieProScenario
       ? `${seasonsRequested}-season-rookie-pro-21-${getSupportProfileDisplayName(managedSupportProfile)}-support-simulation`
@@ -7908,6 +7898,7 @@ function main() {
             : customStartingScenario
               ? `${seasonsRequested}-season-start-age-${customStartAge ?? 'default'}-${customStartingLevelId ?? 'validated'}-${getSupportProfileDisplayName(managedSupportProfile)}-support-simulation`
               : `${seasonsRequested}-season-simulation`
+  const reportBaseName = seedArg ? `${reportBaseNameRoot}-seed-${requestedSeed}` : reportBaseNameRoot
   let state = (managedYouthScenario
     ? createNewCareerState({
         fullName: createPlayerIdentitySeed.name,
@@ -7995,11 +7986,55 @@ function main() {
       recordSupportSnapshot(supportMetricsAccumulator, supportedState)
     }
 
-    const advancedState = advanceWeekState(supportedState)
-    recordWeeklyFinanceDelta(currentSeasonFinance, state, advancedState)
-    if (managedScenario) {
-      recordMatchMetrics(supportMetricsAccumulator, supportedState, advancedState)
+    let eventResolvedState = supportedState
+    const enteredTournament = eventResolvedState.tournaments.find((tournament) => tournament.status === 'Entered')
+    const enteredTournamentDaysUntilStart = enteredTournament ? daysUntil(enteredTournament.startDate, eventResolvedState.currentDate) : null
+    if (enteredTournament && enteredTournamentDaysUntilStart != null && enteredTournamentDaysUntilStart > 0 && enteredTournamentDaysUntilStart <= 7) {
+      eventResolvedState = {
+        ...eventResolvedState,
+        currentDate: enteredTournament.startDate,
+      }
     }
+    let tournamentRoundGuard = 0
+    while (tournamentRoundGuard < 10) {
+      const activeEnteredTournament = eventResolvedState.tournaments.find((tournament) => tournament.status === 'Entered')
+      if (!activeEnteredTournament || daysUntil(activeEnteredTournament.startDate, eventResolvedState.currentDate) > 0) break
+
+      if (daysUntil(activeEnteredTournament.endDate ?? activeEnteredTournament.startDate, eventResolvedState.currentDate) < 0) {
+        eventResolvedState = withdrawTournamentState(eventResolvedState, activeEnteredTournament.id)
+        break
+      }
+
+      const entryAccess = getTournamentEntryAccess(eventResolvedState, activeEnteredTournament)
+      if (!entryAccess.allowed) {
+        const withdrawnState = withdrawTournamentState(eventResolvedState, activeEnteredTournament.id)
+        recordCashDelta(currentSeasonFinance, 'tournamentEntryFees', eventResolvedState, withdrawnState)
+        eventResolvedState = withdrawnState
+        break
+      }
+
+      if (!eventResolvedState.travel.bookings[activeEnteredTournament.id]) {
+        const bookedState = bookTravelState(eventResolvedState, activeEnteredTournament.id)
+        recordCashDelta(currentSeasonFinance, 'travelHotelCosts', eventResolvedState, bookedState)
+        eventResolvedState = bookedState
+      }
+
+      const preMatchState = eventResolvedState
+      const simulatedState = simulateTournamentMatchState(eventResolvedState, activeEnteredTournament.id)
+      const matchWasAdded = simulatedState.matches[0]?.id !== preMatchState.matches[0]?.id
+      if (!matchWasAdded) {
+        seasonIssues.add(`${archivedSeason}: ${activeEnteredTournament.name} could not simulate after travel was booked: ${simulatedState.lastAction}`)
+        break
+      }
+
+      recordCashDelta(currentSeasonFinance, 'prizeMoney', preMatchState, simulatedState)
+      if (managedScenario) recordMatchMetrics(supportMetricsAccumulator, preMatchState, simulatedState)
+      eventResolvedState = simulatedState
+      tournamentRoundGuard += 1
+    }
+
+    const advancedState = advanceWeekState(eventResolvedState)
+    recordWeeklyFinanceDelta(currentSeasonFinance, eventResolvedState, advancedState)
     weeksSimulated += 1
 
     if (advancedState.player.cash < 0) {
@@ -8015,7 +8050,7 @@ function main() {
     if (advancedState.season !== archivedSeason) {
       const seasonReport = buildSeasonReport(archivedSeason, openingState, advancedState, previousCircuits, currentSeasonFinance)
       const snapshotRows = buildSeasonPlayerSnapshotRows(archivedSeason, openingState, advancedState, seasonReport, [...seasons, seasonReport])
-      writeSeasonPlayerSnapshots(archivedSeason, snapshotRows)
+      if (!skipPlayerSnapshots) writeSeasonPlayerSnapshots(archivedSeason, snapshotRows)
       seasonSnapshotRowsBySeason.set(archivedSeason, snapshotRows)
       seasonAuditSummaries.push(buildSeasonAuditSummary(archivedSeason, snapshotRows, previousSnapshotRows))
       previousSnapshotRows = snapshotRows
@@ -8144,26 +8179,26 @@ function main() {
   report.statusIntegrityAudit = buildStatusIntegrityAudit(report, state)
   report.balanceWarnings = buildBalanceWarnings(report, state)
 
-  fs.mkdirSync(reportsDir, { recursive: true })
-  fs.writeFileSync(path.join(reportsDir, `${reportBaseName}.json`), JSON.stringify(report, null, 2))
-  fs.writeFileSync(path.join(reportsDir, `${reportBaseName}.md`), buildMarkdown(report))
-  writeAiPlayerProgressionAudit(report, seasonAuditSummaries)
-  writeTournamentFormatAudit(report)
-  writeTournamentCalendarAudit(report)
-  writePlayerEventVolumeAudit(report, seasonSnapshotRowsBySeason)
-  writeRankingPointsRealismAudit(report)
-  writeHumanMatchCountAudit(report)
-  writeStatusIntegrityAudit(report)
-  writeWorldAccessDebugStore(worldAccessDebugStore)
-  if (managedYouthScenario && managedSupportProfile === 'best') {
-    writeEliteEventSelectionDebug(report, eliteEventSelectionDebugStore)
+  writeSimulationArtifacts(reportsDir, reportBaseName, report, buildMarkdown(report))
+  if (!skipSharedAudits) {
+    writeAiPlayerProgressionAudit(report, seasonAuditSummaries)
+    writeTournamentFormatAudit(report)
+    writeTournamentCalendarAudit(report)
+    writePlayerEventVolumeAudit(report, seasonSnapshotRowsBySeason)
+    writeRankingPointsRealismAudit(report)
+    writeHumanMatchCountAudit(report)
+    writeStatusIntegrityAudit(report)
+    writeWorldAccessDebugStore(worldAccessDebugStore)
+    if (managedYouthScenario && managedSupportProfile === 'best') {
+      writeEliteEventSelectionDebug(report, eliteEventSelectionDebugStore)
+    }
   }
   const comparisonReportPath = managedYouthScenario ? writeSupportComparisonReportIfReady(seasonsRequested) : null
 
   console.log(JSON.stringify({
-    reportPath: path.join('docs', 'reports', `${reportBaseName}.md`),
-    jsonPath: path.join('docs', 'reports', `${reportBaseName}.json`),
-    comparisonReportPath: comparisonReportPath ? path.join('docs', 'reports', path.basename(comparisonReportPath)) : null,
+    reportPath: path.join('artifacts', 'simulations', `${reportBaseName}.md`),
+    jsonPath: path.join('artifacts', 'simulations', `${reportBaseName}.json`),
+    comparisonReportPath: comparisonReportPath ? path.join('artifacts', 'simulations', path.basename(comparisonReportPath)) : null,
     scenario: report.scenario,
     seasonsCompleted: report.seasonsCompleted,
     weeksSimulated: report.weeksSimulated,

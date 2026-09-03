@@ -1,23 +1,22 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Activity,
   BarChart3,
-  Bell,
   Brain,
   CalendarDays,
+  ChevronDown,
   CircleDot,
   Eye,
-  Gauge,
-  Handshake,
   Menu,
+  MoreHorizontal,
   Shield,
   Target,
   Zap,
 } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 
 type LiveMatchViewState = NonNullable<ReturnType<typeof useGame>['gameState']['liveMatch']>
 type LiveVisitDecision = Parameters<ReturnType<typeof useGame>['playLiveVisit']>[0]
@@ -39,7 +38,6 @@ type ShotMoment = {
 }
 
 const COLOUR_POINTS: Record<string, number> = { Yellow: 2, Green: 3, Brown: 4, Blue: 5, Pink: 6, Black: 7 }
-const TABLE_COLOURS = ['Yellow', 'Green', 'Brown', 'Blue', 'Pink', 'Black'] as const
 const BALL_COLOURS: Record<string, string> = {
   Yellow: 'bg-yellow-400',
   Green: 'bg-green-500',
@@ -319,34 +317,6 @@ function SnookerTable({ liveMatch, moment }: { liveMatch: LiveMatchViewState; mo
   )
 }
 
-function TableOverview({ liveMatch }: { liveMatch: LiveMatchViewState }) {
-  return (
-    <div className="rounded-lg border border-border bg-surface/80 p-3">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-xs font-bold uppercase text-white">Table Overview</p>
-        <p className="text-[10px] text-gray-400">{getFramePhase(liveMatch)}</p>
-      </div>
-      <div className="flex flex-wrap gap-1">
-        {Array.from({ length: liveMatch.tableState.redsRemaining }).map((_, index) => <span key={index} className="h-2.5 w-2.5 rounded-full bg-red-600" />)}
-        <span className="ml-2 text-xs font-bold text-white">{liveMatch.tableState.redsRemaining}</span>
-        <span className="text-xs text-gray-400">Reds</span>
-      </div>
-      <div className="mt-4 grid grid-cols-6 gap-2">
-        {TABLE_COLOURS.map((colour) => {
-          const active = liveMatch.tableState.redsRemaining > 0 || liveMatch.tableState.coloursRemaining.includes(colour)
-          return (
-            <div key={colour} className="text-center">
-              <div className={`mx-auto h-4 w-4 rounded-full border border-white/20 ${BALL_COLOURS[colour]} ${active ? '' : 'opacity-25'}`} />
-              <p className="mt-1 text-[10px] text-gray-400">{COLOUR_POINTS[colour]}</p>
-              <p className="truncate text-[9px] text-gray-500">{colour}</p>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 function LastShot({ liveMatch, moment }: { liveMatch: LiveMatchViewState; moment: ShotMoment }) {
   const last = liveMatch.visitHistory[0]
   return (
@@ -371,27 +341,52 @@ function LastShot({ liveMatch, moment }: { liveMatch: LiveMatchViewState; moment
   )
 }
 
-function isFinalRound(round: string) {
-  return round.trim().toLowerCase() === 'final'
-}
-
 export function LiveMatchPage() {
   const {
     gameState,
     playLiveVisit,
     simulateLiveVisit,
+    simulateLiveFrame,
+    simulateLiveMatch,
     applyLiveCoachCue,
     concedeLiveFrame,
     updateLiveMatchTactics,
   } = useGame()
   const navigate = useNavigate()
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [concedeConfirmationOpen, setConcedeConfirmationOpen] = useState(false)
   const liveMatch = gameState.liveMatch
   const tournament = liveMatch ? gameState.tournaments.find((item) => item.id === liveMatch.tournamentId) : null
   const tournamentName = tournament?.name ?? 'Live Match'
 
   useEffect(() => {
-    if (liveMatch?.status === 'Completed') navigate(isFinalRound(liveMatch.round) ? '/rankings?from=final' : '/tournaments/hub', { replace: true })
+    if (liveMatch?.status === 'Completed') navigate('/match/result', { replace: true })
   }, [liveMatch?.status, navigate])
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!liveMatch || event.altKey || event.ctrlKey || event.metaKey) return
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return
+      if (event.key.toLowerCase() === 'd') {
+        setDetailsOpen((open) => !open)
+        return
+      }
+      if (liveMatch.playerAtTable !== liveMatch.playerName) {
+        if (event.key === '1' || event.key === 'Enter') simulateLiveVisit()
+        return
+      }
+      const recommended = buildShotMoment(liveMatch, true).shotType
+      const needsSnookers = areSnookersRequired(liveMatch.opponentPoints - liveMatch.playerPoints, getRemainingTablePoints(liveMatch)) && liveMatch.tableState.redsRemaining === 0
+      const available: LiveVisitDecision[] = needsSnookers
+        ? ['Snooker Hunt', 'Safety Exchange', 'Pot Attempt', 'Break Build']
+        : ['Pot Attempt', 'Safety Exchange', 'Break Build']
+      const ordered = [recommended, ...available.filter((decision) => decision !== recommended)]
+      const index = Number(event.key) - 1
+      if (index >= 0 && index < ordered.length) playLiveVisit(ordered[index])
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [liveMatch, playLiveVisit, simulateLiveVisit])
 
   if (!liveMatch) {
     return (
@@ -417,219 +412,148 @@ export function LiveMatchPage() {
   const decisionOptions: LiveVisitDecision[] = playerNeedsSnookers
     ? ['Snooker Hunt', 'Safety Exchange', 'Pot Attempt', 'Break Build']
     : ['Pot Attempt', 'Safety Exchange', 'Break Build']
+  const orderedDecisions = activeDecision
+    ? [activeDecision, ...decisionOptions.filter((decision) => decision !== activeDecision)]
+    : decisionOptions
+  const alternativeDecisions = orderedDecisions.slice(1)
+  const recommendationReason = moment.recommendation === 'Safe'
+    ? `The pot is only ${moment.potChance}%. A safety keeps the miss risk under control.`
+    : moment.recommendation === 'Snooker'
+      ? 'You need foul points. Prioritise a difficult escape over the low-value pot.'
+      : moment.recommendation === 'Build'
+        ? `${moment.positionChance}% position chance makes this the best route to extend the break.`
+        : `${moment.potChance}% pot chance gives you the clearest scoring opportunity.`
 
   return (
-    <div className="flex h-screen min-h-[700px] flex-col overflow-hidden bg-[#050b12] p-3 text-white">
-      <div className="mb-2 grid grid-cols-[210px_minmax(0,1fr)_210px] items-center gap-3">
-        <div className="flex items-center gap-3">
-          <div>
-            <p className="text-2xl font-black uppercase leading-none tracking-wide">Snooker</p>
-            <p className="text-xs font-bold uppercase text-green-400">Career Manager</p>
-          </div>
-          <button type="button" onClick={() => navigate('/tournaments/hub')} className="rounded-lg border border-border bg-surface-light p-2 text-gray-300 hover:text-white">
-            <Menu className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="min-w-0 text-center">
-          <h1 className="truncate text-xl font-black uppercase tracking-wide">{tournamentName} - {liveMatch.round}</h1>
-          <p className="mt-1 flex items-center justify-center gap-2 truncate text-xs text-gray-400">
-            <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{liveMatch.startedAt} - {tournament?.type ?? 'Match'} - {liveMatch.round} - Best of {liveMatch.bestOf} Frames - {tournament?.location ?? liveMatch.table}</span>
+    <div className="min-h-screen overflow-auto bg-[#050b12] p-3 text-white sm:p-4">
+      <header className="mx-auto flex max-w-[1500px] items-center gap-3 rounded-xl border border-border bg-surface/85 px-3 py-2.5">
+        <button type="button" aria-label="Return to Tournament Hub" onClick={() => navigate('/tournaments/hub')} className="rounded-lg border border-border bg-surface-light p-2 text-gray-300 transition hover:border-green-500/50 hover:text-white">
+          <Menu aria-hidden="true" className="h-5 w-5" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-sm font-bold text-white sm:text-base">{tournamentName} · {liveMatch.round}</h1>
+          <p className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-gray-400">
+            <CalendarDays aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Best of {liveMatch.bestOf} · {tournament?.location ?? liveMatch.table} · {duration}</span>
           </p>
         </div>
-        <div className="flex justify-end gap-3 text-gray-400">
-          <Bell className="h-5 w-5" />
-          <Gauge className="h-5 w-5" />
+        <div className="hidden items-center gap-3 text-right sm:flex">
+          <div><p className="text-[10px] uppercase text-gray-500">Frame</p><p className="font-bold">{liveMatch.currentFrame}</p></div>
+          <div><p className="text-[10px] uppercase text-gray-500">On table</p><p className="max-w-32 truncate text-sm font-semibold text-green-300">{getShortName(liveMatch.playerAtTable)}</p></div>
         </div>
-      </div>
+      </header>
 
-      <div className="mb-2 grid grid-cols-[1fr_230px_1fr] gap-2">
+      <div className="mx-auto mt-3 grid max-w-[1500px] gap-2 lg:grid-cols-[1fr_190px_1fr]">
         <PlayerPanel name={liveMatch.playerName} score={liveMatch.playerPoints} frames={liveMatch.playerFrames} role={gameState.player.competitiveStatus ?? gameState.player.careerStage} atTable={atTableIsPlayer} tone="green" />
-        <div className="rounded-lg border border-border bg-surface/90 px-4 py-2 text-center">
-          <p className="text-xs font-bold uppercase text-gray-400">Frame {liveMatch.currentFrame}</p>
-          <div className="mt-1 flex items-center justify-center gap-4">
+        <div className="order-first rounded-lg border border-border bg-surface/90 px-4 py-2 text-center lg:order-none">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Match score</p>
+          <div className="mt-1 flex items-center justify-center gap-3">
             <span className="text-3xl font-black text-green-400">{liveMatch.playerFrames}</span>
             <span className="text-xs uppercase text-gray-500">vs</span>
             <span className="text-3xl font-black text-red-300">{liveMatch.opponentFrames}</span>
           </div>
-          <p className="mt-1 text-[10px] text-gray-500">{duration} - {liveMatch.framesRemainingText}</p>
+          <p className="text-[10px] text-gray-500">{liveMatch.framesRemainingText}</p>
         </div>
         <PlayerPanel name={liveMatch.opponentName} score={liveMatch.opponentPoints} frames={liveMatch.opponentFrames} role={`${liveMatch.opponentArchetype} - #${liveMatch.opponentRanking}`} atTable={!atTableIsPlayer} tone="red" />
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[200px_minmax(520px,1fr)_266px] gap-2">
-        <aside className="flex min-h-0 flex-col gap-2">
-          <div className="rounded-lg border border-border bg-surface/85 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-bold uppercase text-white">Shot Info</p>
-              <CircleDot className="h-4 w-4 text-gray-500" />
-            </div>
-            <div className="space-y-2">
-              {shotRows.map(([label, value, tone]) => (
-                <div key={label} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="text-gray-400">{label}</span>
-                  <span className={`font-bold ${tone}`}>{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-border bg-surface/85 p-3">
-            <p className="mb-3 text-xs font-bold uppercase text-white">Player Status</p>
-            <div className="space-y-3">
-              <div>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">Confidence</span><span>{pct(liveMatch.playerConfidence)}</span></div>
-                <ProgressBar value={liveMatch.playerConfidence} compact />
-              </div>
-              <div>
-                <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">Fatigue</span><span>{pct(liveMatch.playerFatigue)}</span></div>
-                <ProgressBar value={liveMatch.playerFatigue} tone="amber" compact />
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-400">Focus</span>
-                <span className={liveMatch.mentalFocus === 'Composed' ? 'text-green-400' : liveMatch.mentalFocus === 'Confident' ? 'text-amber-400' : 'text-blue-300'}>{liveMatch.mentalFocus}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-border bg-surface/85 p-3">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-xs font-bold uppercase text-white">Tactics</p>
-              <Brain className="h-4 w-4 text-amber-300" />
-            </div>
-            <div className="space-y-3">
-              <TacticButtonGroup<LiveTacticalPlan>
-                label="Plan"
-                value={liveMatch.tacticalPlan}
-                options={['Attack', 'Balanced', 'Safety']}
-                onChange={(tacticalPlan) => updateLiveMatchTactics({ tacticalPlan })}
-              />
-              <TacticButtonGroup<LiveMentalFocus>
-                label="Focus"
-                value={liveMatch.mentalFocus}
-                options={['Composed', 'Confident', 'Counter']}
-                onChange={(mentalFocus) => updateLiveMatchTactics({ mentalFocus })}
-              />
-              <TacticButtonGroup<LiveTempo>
-                label="Tempo"
-                value={liveMatch.tempo}
-                options={['Steady', 'Quick']}
-                onChange={(tempo) => updateLiveMatchTactics({ tempo })}
-              />
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-border bg-surface/85 p-3">
-            <p className="text-xs font-bold uppercase text-white">Shot Timer</p>
-            <div className="mx-auto mt-3 flex h-24 w-24 items-center justify-center rounded-full border-4 border-green-500/60 bg-green-500/10 text-center shadow-[inset_0_0_20px_rgba(34,197,94,0.2)]">
-              <div>
-                <p className="text-3xl font-black">{liveMatch.shotClock}</p>
-                <p className="text-[10px] text-gray-400">Seconds</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 rounded-lg border border-border bg-surface/85 p-3">
-            <p className="mb-2 text-xs font-bold uppercase text-white">Live Commentary</p>
-            <div className="max-h-full space-y-2 overflow-y-auto pr-1 text-[11px] scrollbar-thin">
-              {liveMatch.feed.slice(0, 6).map((feed) => (
-                <div key={feed.id} className="grid grid-cols-[34px_minmax(0,1fr)] gap-2">
-                  <span className="text-gray-500">{feed.time}</span>
-                  <span className={feed.tone === 'green' ? 'text-green-300' : feed.tone === 'red' ? 'text-red-300' : feed.tone === 'amber' ? 'text-amber-300' : 'text-gray-300'}>{feed.text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </aside>
-
-        <main className="grid min-h-0 grid-rows-[minmax(0,1fr)_92px] gap-2">
+      <main className="mx-auto mt-3 grid max-w-[1500px] gap-3 xl:grid-cols-[minmax(0,1fr)_370px]">
+        <div className="min-w-0">
           <SnookerTable liveMatch={liveMatch} moment={moment} />
+          <div aria-live="polite" className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface/75 px-3 py-2 text-xs">
+            <span className="truncate text-gray-300">{liveMatch.feed[0]?.text ?? 'The table is ready.'}</span>
+            <span className="shrink-0 text-gray-500">{getFramePhase(liveMatch)} · {getRemainingTablePoints(liveMatch)} pts left</span>
+          </div>
+        </div>
 
-          <div className="grid grid-cols-6 gap-2">
-            {!atTableIsPlayer ? (
-              <button
-                type="button"
-                onClick={() => simulateLiveVisit()}
-                className="col-span-3 rounded-lg border border-amber-400/50 bg-amber-500/15 px-3 py-3 text-left transition-colors hover:border-amber-300"
-              >
-                <div className="flex items-center gap-3">
-                  <Eye className="h-6 w-6 text-amber-300" />
-                  <div>
-                    <p className="text-sm font-black uppercase">Watch Visit</p>
-                    <p className="text-[10px] text-gray-400">{liveMatch.opponentName} at table</p>
-                  </div>
-                </div>
-              </button>
-            ) : decisionOptions.map((decision) => {
-              const copy = getDecisionButtonCopy(decision)
-              const Icon = copy.icon
-              const selected = activeDecision === decision
-              return (
-                <button
-                  key={decision}
-                  type="button"
-                  onClick={() => playLiveVisit(decision)}
-                  className={`rounded-lg border px-3 py-3 text-left transition-colors ${selected ? 'border-green-500 bg-green-600/25' : 'border-border bg-surface/90 hover:border-green-500/60'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className="h-6 w-6 text-green-300" />
-                    <div>
-                      <p className="text-sm font-black uppercase">{copy.title}</p>
-                      <p className="text-[10px] text-gray-400">{copy.hint}</p>
-                    </div>
-                  </div>
+        <aside className="rounded-xl border border-border bg-surface/90 p-4 shadow-panel">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">{atTableIsPlayer ? 'Your turn' : 'Opponent at table'}</p>
+              <h2 className="mt-1 text-xl font-bold">{atTableIsPlayer ? `${moment.targetBall} is on` : `${liveMatch.opponentName}'s visit`}</h2>
+            </div>
+            <div className="rounded-lg border border-border bg-black/20 px-3 py-2 text-center">
+              <p className="text-[9px] uppercase text-gray-500">Break</p>
+              <p className="text-xl font-black text-green-400">{liveMatch.currentBreak}</p>
+            </div>
+          </div>
+
+          {atTableIsPlayer && activeDecision ? (() => {
+            const copy = getDecisionButtonCopy(activeDecision)
+            const Icon = copy.icon
+            return (
+              <>
+                <p className="mt-3 text-sm leading-relaxed text-gray-300">{recommendationReason}</p>
+                <button type="button" onClick={() => playLiveVisit(activeDecision)} className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-lg border border-green-400/60 bg-green-600 px-4 py-3 text-left transition hover:bg-green-500">
+                  <Icon aria-hidden="true" className="h-6 w-6" />
+                  <span className="min-w-0 flex-1"><span className="block font-bold">{copy.title}</span><span className="block text-xs text-green-50/80">Recommended · {copy.hint}</span></span>
+                  <kbd className="rounded border border-white/25 bg-black/15 px-2 py-1 text-xs">1</kbd>
                 </button>
-              )
-            })}
-            <button type="button" onClick={() => applyLiveCoachCue()} className="rounded-lg border border-border bg-surface/90 px-3 py-3 text-left hover:border-amber-400/60">
-              <div className="flex items-center gap-3">
-                <Brain className="h-6 w-6 text-amber-300" />
-                <div>
-                  <p className="text-sm font-black uppercase">Change Tactic</p>
-                  <p className="text-[10px] text-gray-400">Coach cue</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                  {alternativeDecisions.map((decision, index) => {
+                    const alternative = getDecisionButtonCopy(decision)
+                    const AlternativeIcon = alternative.icon
+                    return <button key={decision} type="button" onClick={() => playLiveVisit(decision)} className="flex min-h-11 items-center gap-3 rounded-lg border border-border bg-surface-light/70 px-3 py-2 text-left transition hover:border-green-500/50"><AlternativeIcon aria-hidden="true" className="h-4 w-4 text-gray-400" /><span className="flex-1 text-sm font-semibold">{alternative.title}</span><kbd className="text-[10px] text-gray-500">{index + 2}</kbd></button>
+                  })}
                 </div>
-              </div>
-            </button>
-            <button type="button" onClick={() => concedeLiveFrame()} className="rounded-lg border border-border bg-surface/90 px-3 py-3 text-left hover:border-red-400/60">
-              <div className="flex items-center gap-3">
-                <Handshake className="h-6 w-6 text-red-300" />
-                <div>
-                  <p className="text-sm font-black uppercase">Concede Frame</p>
-                  <p className="text-[10px] text-gray-400">Forfeit this frame</p>
-                </div>
-              </div>
-            </button>
-          </div>
-        </main>
+              </>
+            )
+          })() : (
+            <>
+              <p className="mt-3 text-sm text-gray-300">Continue when you are ready to see how the visit unfolds.</p>
+              <button type="button" onClick={() => simulateLiveVisit()} className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-lg border border-amber-400/50 bg-amber-500/15 px-4 py-3 text-left transition hover:border-amber-300">
+                <Eye aria-hidden="true" className="h-6 w-6 text-amber-300" /><span className="flex-1"><span className="block font-bold">Continue visit</span><span className="block text-xs text-gray-400">See the opponent's outcome</span></span><kbd className="text-xs text-gray-500">1</kbd>
+              </button>
+            </>
+          )}
 
-        <aside className="flex min-h-0 flex-col gap-2">
-          <TableOverview liveMatch={liveMatch} />
-
-          <div className="rounded-lg border border-border bg-surface/85 p-3">
-            <p className="text-xs font-bold uppercase text-white">Break</p>
-            <div className="mt-3 grid grid-cols-3 divide-x divide-border text-center">
-              <div><p className="text-[10px] text-gray-500">Break</p><p className="text-2xl font-black text-green-400">{liveMatch.currentBreak}</p></div>
-              <div><p className="text-[10px] text-gray-500">Run</p><p className="text-2xl font-black">{liveMatch.currentVisit}</p></div>
-              <div><p className="text-[10px] text-gray-500">High</p><p className="text-2xl font-black">{liveMatch.playerHighestBreak}</p></div>
+          <div className="mt-5 border-t border-border pt-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Match speed</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <button type="button" onClick={() => simulateLiveVisit()} className="rounded-lg border border-border bg-black/20 px-2 py-2 text-xs font-semibold hover:border-green-500/50">Sim Visit</button>
+              <button type="button" onClick={() => simulateLiveFrame()} className="rounded-lg border border-border bg-black/20 px-2 py-2 text-xs font-semibold hover:border-green-500/50">Sim Frame</button>
+              <button type="button" onClick={() => simulateLiveMatch()} className="rounded-lg border border-border bg-black/20 px-2 py-2 text-xs font-semibold hover:border-green-500/50">Sim Match</button>
             </div>
           </div>
 
-          <LastShot liveMatch={liveMatch} moment={moment} />
-
-          <div className="rounded-lg border border-border bg-surface/85 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-bold uppercase text-white">Match Momentum</p>
-              <Zap className="h-4 w-4 text-green-400" />
-            </div>
-            <MomentumStrip liveMatch={liveMatch} />
-            <div className="mt-2 flex justify-between text-[10px] text-gray-400">
-              <span>{getShortName(liveMatch.playerName)}</span>
-              <span>{getShortName(liveMatch.opponentName)}</span>
-            </div>
-          </div>
-
+          <button type="button" aria-expanded={detailsOpen} onClick={() => setDetailsOpen((open) => !open)} className="mt-4 flex w-full items-center justify-between rounded-lg border border-border px-3 py-2 text-sm font-semibold text-gray-300 hover:text-white">
+            <span>Details and tactics <kbd className="ml-1 text-[10px] font-normal text-gray-500">D</kbd></span><ChevronDown aria-hidden="true" className={`h-4 w-4 transition ${detailsOpen ? 'rotate-180' : ''}`} />
+          </button>
+          <button type="button" onClick={() => setConcedeConfirmationOpen(true)} className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs text-gray-500 transition hover:bg-red-500/10 hover:text-red-300"><MoreHorizontal aria-hidden="true" className="h-4 w-4" /> Concede frame</button>
         </aside>
-      </div>
+      </main>
+
+      {detailsOpen ? (
+        <section className="mx-auto mt-3 grid max-w-[1500px] gap-3 rounded-xl border border-border bg-surface/75 p-3 lg:grid-cols-3">
+          <div className="rounded-lg bg-black/15 p-3">
+            <h3 className="text-xs font-bold uppercase text-white">Shot and status</h3>
+            <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-2">
+              {shotRows.map(([label, value, tone]) => <div key={label} className="flex justify-between gap-2 text-xs"><span className="text-gray-400">{label}</span><span className={`font-bold ${tone}`}>{value}</span></div>)}
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">Confidence</span><span>{pct(liveMatch.playerConfidence)}</span></div><ProgressBar value={liveMatch.playerConfidence} compact /></div>
+              <div><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">Fatigue</span><span>{pct(liveMatch.playerFatigue)}</span></div><ProgressBar value={liveMatch.playerFatigue} tone="amber" compact /></div>
+            </div>
+          </div>
+          <div className="rounded-lg bg-black/15 p-3">
+            <div className="flex items-center justify-between"><h3 className="text-xs font-bold uppercase text-white">Tactics</h3><Brain aria-hidden="true" className="h-4 w-4 text-amber-300" /></div>
+            <div className="mt-3 space-y-3">
+              <TacticButtonGroup<LiveTacticalPlan> label="Plan" value={liveMatch.tacticalPlan} options={['Attack', 'Balanced', 'Safety']} onChange={(tacticalPlan) => updateLiveMatchTactics({ tacticalPlan })} />
+              <TacticButtonGroup<LiveMentalFocus> label="Focus" value={liveMatch.mentalFocus} options={['Composed', 'Confident', 'Counter']} onChange={(mentalFocus) => updateLiveMatchTactics({ mentalFocus })} />
+              <TacticButtonGroup<LiveTempo> label="Tempo" value={liveMatch.tempo} options={['Steady', 'Quick']} onChange={(tempo) => updateLiveMatchTactics({ tempo })} />
+              <button type="button" onClick={() => applyLiveCoachCue()} className="w-full rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-200 hover:border-amber-400/60">Ask coach for a cue</button>
+            </div>
+          </div>
+          <div className="rounded-lg bg-black/15 p-3">
+            <div className="flex items-center justify-between"><h3 className="text-xs font-bold uppercase text-white">Match detail</h3><Zap aria-hidden="true" className="h-4 w-4 text-green-400" /></div>
+            <div className="mt-3 max-h-32 space-y-2 overflow-y-auto pr-1 text-[11px] scrollbar-thin">{liveMatch.feed.slice(0, 6).map((feed) => <div key={feed.id} className="grid grid-cols-[34px_minmax(0,1fr)] gap-2"><span className="text-gray-500">{feed.time}</span><span className={feed.tone === 'green' ? 'text-green-300' : feed.tone === 'red' ? 'text-red-300' : feed.tone === 'amber' ? 'text-amber-300' : 'text-gray-300'}>{feed.text}</span></div>)}</div>
+            <div className="mt-3"><MomentumStrip liveMatch={liveMatch} /><div className="mt-1 flex justify-between text-[10px] text-gray-500"><span>{getShortName(liveMatch.playerName)}</span><span>{getShortName(liveMatch.opponentName)}</span></div></div>
+            <div className="mt-3"><LastShot liveMatch={liveMatch} moment={moment} /></div>
+          </div>
+        </section>
+      ) : null}
+
+      {concedeConfirmationOpen ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-labelledby="concede-title"><div className="w-full max-w-sm rounded-xl border border-red-500/35 bg-surface p-5 shadow-2xl"><h2 id="concede-title" className="text-lg font-bold">Concede this frame?</h2><p className="mt-2 text-sm text-gray-400">Your opponent will be awarded the frame. This cannot be undone.</p><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setConcedeConfirmationOpen(false)} className="btn-secondary">Keep playing</button><button type="button" onClick={() => { setConcedeConfirmationOpen(false); concedeLiveFrame() }} className="rounded-lg border border-red-500/50 bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/25">Concede frame</button></div></div></div> : null}
     </div>
   )
 }

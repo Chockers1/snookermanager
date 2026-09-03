@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { Activity, AlertTriangle, BrainCircuit, HeartPulse, ShieldAlert, Target } from 'lucide-react'
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 
 const metricIcons = [Activity, HeartPulse, BrainCircuit, Activity, ShieldAlert, Target]
 
@@ -136,7 +136,7 @@ export function TrainingReportPage() {
             <div className="card">
               <div className="card-header"><h3 className="text-sm font-semibold text-white">Training Load</h3></div>
               <div className="card-body h-[230px]">
-                <ResponsiveContainer>
+                <ResponsiveContainer minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
                   <LineChart data={trainingLoadChart}>
                     <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} width={30} />
@@ -151,7 +151,7 @@ export function TrainingReportPage() {
             <div className="card">
               <div className="card-header"><h3 className="text-sm font-semibold text-white">Category Gains</h3></div>
               <div className="card-body h-[230px]">
-                <ResponsiveContainer>
+                <ResponsiveContainer minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
                   <BarChart data={trainingCategoryGains}>
                     <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} width={30} />

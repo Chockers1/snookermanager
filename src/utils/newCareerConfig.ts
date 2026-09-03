@@ -409,6 +409,18 @@ export function buildNewCareerAttributes(options: {
   const effectiveSliders = applyPlayingStyleToSliders(sliders, playingStyle)
 
   applyAttributeProfile(attributes, STARTING_LEVEL_ATTRIBUTE_PROFILES[startingLevel.stage])
+  if (startingLevel.id === 'start-bottom-tour') {
+    applyAttributeProfile(attributes, {
+      technical: -3,
+      mental: -2,
+      physical: -1,
+      labelOffsets: {
+        Confidence: -2,
+        Consistency: -2,
+        'Big Match Nerve': -2,
+      },
+    })
+  }
   applyAttributeProfile(attributes, getAgeAttributeProfile(age))
   background.bonuses.forEach((bonus) => adjustAttribute(attributes, bonus.label, bonus.value))
   background.weaknesses.forEach((weakness) => adjustAttribute(attributes, weakness.label, weakness.value))

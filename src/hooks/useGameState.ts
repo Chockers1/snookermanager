@@ -55,6 +55,10 @@ import { convertMatchWinProbabilityToFrameWinProbability, getOpponentRankBand, g
 import { applyPlayingStyleToSliders, buildCareerPersonality, buildNewCareerAttributes, getValidatedStartingLevel } from '../utils/newCareerConfig'
 import { SIMULATION_MODE, type SimulationMode } from '../utils/simulationMode'
 import { buildAutoTrainingPlan, calculateTrainingEffects, normalizeTrainingPlan } from '../utils/trainingPlan'
+import { shouldRetireCpuPlayer as evaluateCpuRetirement } from '../game/cpuLifecycle'
+import { evaluateTournamentPlayability, getTournamentDateValue, selectNextEligibleTournament, type TournamentPlayability } from '../game/tournamentScheduling'
+import { ACTIVE_SAVE_KEY, readSaveSlotIndex, SAVE_SLOT_PREFIX, type SaveSlotSummary, writeSaveSlotIndex } from '../game/saveStorage'
+import { getProTourAccessBand as getRankAccessBandFromWorldRank, getSeededProtection as getSeededProtectionForBand, type ProTourAccessBand } from '../game/rankingPolicy'
 
 type CueConditionState = {
   condition: number
@@ -82,6 +86,17 @@ type FinanceState = {
   cash: number
   baseCashFlow: number
   cashFlow: number
+  budgetTargets: Record<string, number>
+  ledger: FinanceTransaction[]
+}
+
+export type FinanceTransaction = {
+  id: string
+  date: string
+  description: string
+  category: string
+  amount: number
+  type: 'Income' | 'Expense'
 }
 
 type TravelBookingState = {
@@ -609,6 +624,8 @@ type WorldPlayerRecord = {
   highestBreak: number
   highestWorldRank: number | null
   developmentPotential?: number
+  retired: boolean
+  retiredSeason: string | null
   seasons: WorldPlayerSeasonRecord[]
 }
 
@@ -676,6 +693,7 @@ type CareerSystemsState = {
 }
 
 export type GameState = {
+  schemaVersion: number
   worldSeed: number
   currentDate: string
   season: string
@@ -706,15 +724,22 @@ export type GameState = {
   lastAction: string
 }
 
-const STORAGE_KEY = 'snooker-career-manager-state-v1'
+export const SAVE_SCHEMA_VERSION = 3
+const STORAGE_KEY = ACTIVE_SAVE_KEY
 const TOURNAMENT_ROUNDS: TournamentRound[] = ['Last 16', 'Quarter Final', 'Semi Final', 'Final']
 const HISTORY_LIMIT = 40
 const MATCH_LOG_LIMIT = 240
-const JUNIOR_FIRST_NAMES = ['Luca', 'Noah', 'Arlo', 'Mika', 'Toby', 'Evan', 'Rory', 'Jude', 'Finn', 'Kai']
-const JUNIOR_LAST_NAMES = ['Mercer', 'Sloan', 'Hale', 'Bennett', 'Cross', 'Mori', 'Dawes', 'Pryce', 'Vale', 'Keane']
+const JUNIOR_FIRST_NAMES = [
+  'Luca', 'Noah', 'Arlo', 'Mika', 'Toby', 'Evan', 'Rory', 'Jude', 'Finn', 'Kai', 'Aiden', 'Ben', 'Caleb', 'Dev', 'Eli', 'Hugo',
+  'Ivo', 'Jonah', 'Kian', 'Louis', 'Milo', 'Nico', 'Owen', 'Pavel', 'Ren', 'Sacha', 'Theo', 'Victor', 'Will', 'Yuri', 'Zhen', 'Mateo',
+]
+const JUNIOR_LAST_NAMES = [
+  'Mercer', 'Sloan', 'Hale', 'Bennett', 'Cross', 'Mori', 'Dawes', 'Pryce', 'Vale', 'Keane', 'Aoki', 'Bauer', 'Chen', 'Dubois', 'Evans', 'Fischer',
+  'Garcia', 'Huang', 'Ito', 'Jones', 'Khan', 'Larsen', 'Martin', 'Novak', 'Ortega', 'Park', 'Quinn', 'Rossi', 'Singh', 'Tan', 'Usman', 'Wilson',
+]
 const JUNIOR_NATIONS = ['ENG', 'CHN', 'SCO', 'WAL', 'BEL', 'IRL', 'THA', 'AUS']
-const FEEDER_FIRST_NAMES = ['Mason', 'Leo', 'Owen', 'Isaac', 'Felix', 'Harvey', 'Ethan', 'Adam', 'Lewis', 'Cian']
-const FEEDER_LAST_NAMES = ['Turner', 'Nash', 'Walsh', 'Frost', 'Reeve', 'Bell', 'Cairn', 'Flint', 'Pike', 'Arden']
+const FEEDER_FIRST_NAMES = ['Mason', 'Leo', 'Owen', 'Isaac', 'Felix', 'Harvey', 'Ethan', 'Adam', 'Lewis', 'Cian', 'Daniel', 'George', 'Henry', 'Jack', 'Leon', 'Max', 'Nathan', 'Oscar', 'Ruben', 'Sam', 'Tom', 'Wei', 'Xavi', 'Yann', 'Zaid']
+const FEEDER_LAST_NAMES = ['Turner', 'Nash', 'Walsh', 'Frost', 'Reeve', 'Bell', 'Cairn', 'Flint', 'Pike', 'Arden', 'Brooks', 'Clarke', 'Diaz', 'Ellis', 'Ford', 'Green', 'Hill', 'Ibrahim', 'Jensen', 'Kim', 'Lopez', 'Moore', 'Nguyen', 'Owens', 'Price']
 const FEEDER_NATIONS = ['ENG', 'SCO', 'WAL', 'IRL', 'NIR', 'BEL', 'GER', 'NED', 'POL', 'AUS']
 const TOURNAMENT_HISTORY_LIMIT = 240
 const SEASON_RECORD_LIMIT = 12
@@ -1414,7 +1439,7 @@ function resolveLiveVisitScoring(
     coloursRemaining: [...tableState.coloursRemaining],
   }
   let scoredPoints = 0
-  let tableProgressLabel = ''
+  let tableProgressLabel: string
 
   if (decision === 'Snooker Hunt') {
     scoredPoints = clamp(4 + Math.round(Math.random() * 3), 4, 7)
@@ -2153,6 +2178,8 @@ function normalizeWorldPlayerRecord(record: WorldPlayerRecord, tables: Competiti
     expiresAfterSeason: record.expiresAfterSeason ?? null,
     retainedViaRanking: typeof record.retainedViaRanking === 'boolean' ? record.retainedViaRanking : worldRank <= TOP_64_RANK_CUTOFF,
     tourSurvivalStatus: record.tourSurvivalStatus ?? (worldRank <= TOP_16_RANK_CUTOFF ? 'Top 16' : worldRank <= TOP_32_RANK_CUTOFF ? 'Top 32' : worldRank <= TOP_64_RANK_CUTOFF ? 'Safe' : defaultHasTourCard ? 'At Risk' : 'Amateur'),
+    retired: typeof record.retired === 'boolean' ? record.retired : false,
+    retiredSeason: record.retiredSeason ?? null,
   }
 }
 
@@ -2202,6 +2229,8 @@ function buildWorldPlayersFromTables(tables: CompetitionTablesState, player?: Pl
       seniorTitles: seniorRow?.titles ?? 0,
       highestBreak: 0,
       highestWorldRank: worldRow?.ranking ?? null,
+      retired: false,
+      retiredSeason: null,
       seasons: [],
     }, tables, player))
   })
@@ -2290,6 +2319,7 @@ function createCareerSystemsForStartingLevel(level: NewCareerStartingLevel): Car
 
   const retainedViaRanking = level.targetRanking <= TOP_64_RANK_CUTOFF
   const rookieCard = !retainedViaRanking
+  const bottomTourStart = level.id === 'start-bottom-tour'
 
   return {
     ...systems,
@@ -2297,9 +2327,9 @@ function createCareerSystemsForStartingLevel(level: NewCareerStartingLevel): Car
       ...systems.pro,
       hasTourCard: true,
       cardSource: retainedViaRanking ? 'Ranking Retained' : 'Seeded Main Tour',
-      currentYear: rookieCard ? 1 : 0,
-      yearsRemaining: rookieCard ? 2 : 0,
-      expiresAfterSeason: rookieCard ? '2027/28' : null,
+      currentYear: rookieCard ? (bottomTourStart ? 2 : 1) : 0,
+      yearsRemaining: rookieCard ? (bottomTourStart ? 1 : 2) : 0,
+      expiresAfterSeason: rookieCard ? (bottomTourStart ? '2026/27' : '2027/28') : null,
       retainedViaRanking,
       awardedBy: 'New career professional start',
       survivalStatus: level.targetRanking <= TOP_16_RANK_CUTOFF
@@ -2402,7 +2432,7 @@ function addYears(dateString: string, years: number) {
   return date.toISOString().slice(0, 10)
 }
 
-function normalizeTournamentStatusForSeason(_status: Tournament['status']) {
+function normalizeTournamentStatusForSeason() {
   return 'Available'
 }
 
@@ -2413,7 +2443,7 @@ function buildTournamentScheduleForSeason(seasonStartYear: number): Tournament[]
       ...tournament,
       startDate: addYears(tournament.startDate, yearOffset),
       endDate: tournament.endDate ? addYears(tournament.endDate, yearOffset) : undefined,
-      status: normalizeTournamentStatusForSeason(tournament.status) as Tournament['status'],
+      status: normalizeTournamentStatusForSeason() as Tournament['status'],
     }
   })
 }
@@ -3118,10 +3148,19 @@ function applySeasonRollover(state: GameState) {
     state.player.age,
   )
   const ageEligibleCompetitionTables = removeOveragePlayerFromYouthTable(flooredLivingCompetitionTables, playerForNextSeason)
+  const currentSeasonWorldTitle = archivedState.history.tournamentHistory.some(
+    (entry) => entry.season === state.season
+      && entry.result === 'Winner'
+      && isWorldChampionshipMainDrawName(entry.tournamentName),
+  )
+  const playerWorldRankingCeiling = Math.max(
+    getPlayerWorldRankingCeiling(archivedState),
+    currentSeasonWorldTitle ? 1 : 2,
+  )
   const rebuiltCompetitionTables = enforcePlayerWorldRankingCeiling(
     ageEligibleCompetitionTables,
     state.player.fullName,
-    getPlayerWorldRankingCeiling(archivedState),
+    playerWorldRankingCeiling,
   )
   const syncedCareerSystems = syncCareerSystems({
     competitionTables: rebuiltCompetitionTables,
@@ -3131,7 +3170,7 @@ function applySeasonRollover(state: GameState) {
   })
   const adjustedWorldRank = Math.max(
     syncedCareerSystems.pro.worldRank ?? 999,
-    getPlayerWorldRankingCeiling(archivedState),
+    playerWorldRankingCeiling,
     getHistoryPerformanceRankFloor(archivedState.history),
   )
   const careerSystems = {
@@ -3166,17 +3205,31 @@ function applySeasonRollover(state: GameState) {
         : null,
     },
   )
+  const verifiedWorldRank = currentSeasonWorldTitle
+    ? (nextPlayer.worldRanking ?? 999)
+    : Math.max(2, nextPlayer.worldRanking ?? 999)
+  const verifiedPlayer = {
+    ...nextPlayer,
+    worldRanking: verifiedWorldRank,
+  }
+  const verifiedCareerSystems = {
+    ...careerSystems,
+    pro: {
+      ...careerSystems.pro,
+      worldRank: verifiedWorldRank,
+    },
+  }
 
   return {
     ...archivedState,
-    player: nextPlayer,
+    player: verifiedPlayer,
     attributes: attributesForNextSeason,
     season: nextSeasonLabel,
     tournaments: nextSeasonSchedule,
     rankings: rebuiltCompetitionTables[primaryKey].map((row) => ({ ...row })),
     competitionTables: rebuiltCompetitionTables,
     worldPlayers: nextWorldPlayers,
-    careerSystems,
+    careerSystems: verifiedCareerSystems,
     tournamentProgress: createEmptyTournamentProgress(),
     travel: createEmptyTravelState(),
     history: {
@@ -3254,7 +3307,27 @@ export function advanceWeekState(previousState: GameState): GameState {
     ?? protectedState.tournaments.find((event) => event.status === 'Booked')
   const enteredTournamentDaysUntilStart = enteredTournament ? daysUntil(enteredTournament.startDate, protectedState.currentDate) : null
   if (enteredTournament && (enteredTournamentDaysUntilStart ?? 999) <= 7) {
-    nextState = runMatchSimulation(nextState, enteredTournament)
+    nextState = finalizeState(
+      {
+        ...nextState,
+        inbox: [
+          createInboxMessage(
+            {
+              sender: 'Tournament Office',
+              subject: `${enteredTournament.name} is ready`,
+              preview: `The event week has arrived. Confirm travel and start the match from the Tournament Hub. No match will be played automatically.`,
+              priority: 'High',
+              actionLabel: 'Open Tournament Hub',
+              actionRoute: '/tournaments/hub',
+            },
+            'Today',
+          ),
+          ...nextState.inbox,
+        ].slice(0, 18),
+      },
+      `Advanced to ${enteredTournament.name} event week. Book travel and start the match when ready.`,
+      `${enteredTournament.name} ready`,
+    )
   } else {
     nextState = finalizeState(
       {
@@ -3296,6 +3369,21 @@ export function enterTournamentState(previousState: GameState, tournamentId: str
   if (!tournament) return previousState
   if (tournament.status === 'Entered') {
     return finalizeState(previousState, `${tournament.name} is already entered.`)
+  }
+
+  if (!ENTERABLE_TOURNAMENT_STATUSES.has(tournament.status)) {
+    return finalizeState(previousState, `${tournament.name} can no longer be entered.`)
+  }
+
+  const currentDateValue = getTournamentDateValue(previousState.currentDate)
+  const tournamentEndValue = getTournamentDateValue(tournament.endDate ?? tournament.startDate)
+  if (currentDateValue > tournamentEndValue) {
+    return finalizeState(previousState, `${tournament.name} has already finished.`)
+  }
+
+  const existingEntry = previousState.tournaments.find((item) => item.id !== tournamentId && item.status === 'Entered')
+  if (existingEntry) {
+    return finalizeState(previousState, `Withdraw from or finish ${existingEntry.name} before entering another event.`)
   }
 
   const entryAccess = getTournamentEntryAccess(previousState, tournament)
@@ -3860,6 +3948,80 @@ function getTripCost(travelOption: TravelOption, hotelOption: HotelOption) {
   return travelOption.cost + hotelOption.cost + 20 + 35
 }
 
+export function bookTravelState(previousState: GameState, tournamentId?: string, travelOptionId?: string, hotelOptionId?: string) {
+  const tournament = previousState.tournaments.find((item) => item.id === tournamentId) ?? previousState.tournaments.find((item) => item.status === 'Entered')
+  if (!tournament) return finalizeState(previousState, 'Enter a tournament before booking travel.')
+  if (tournament.status !== 'Entered') return finalizeState(previousState, `Enter ${tournament.name} before booking its travel.`)
+
+  const entryAccess = getTournamentEntryAccess(previousState, tournament)
+  if (!entryAccess.allowed || getTournamentDateValue(previousState.currentDate) > getTournamentDateValue(tournament.endDate ?? tournament.startDate)) {
+    return finalizeState(previousState, entryAccess.reason ?? `${tournament.name} has already finished.`)
+  }
+
+  const travelOption = getTravelOption(travelOptionId)
+  const hotelOption = getHotelOption(hotelOptionId)
+  const totalCost = getTripCost(travelOption, hotelOption)
+  const existingBooking = previousState.travel.bookings[tournament.id]
+  const delta = totalCost - (existingBooking?.totalCost ?? 0)
+  if (previousState.player.cash < delta) return finalizeState(previousState, `Not enough cash to lock the ${travelOption.name} and ${hotelOption.name} package.`)
+
+  return finalizeState(
+    {
+      ...previousState,
+      player: {
+        ...previousState.player,
+        cash: previousState.player.cash - delta,
+        fatigue: clamp(previousState.player.fatigue - Math.round((100 - travelOption.fatigueValue) / 25), 0, 100),
+        confidence: clamp(previousState.player.confidence + Math.round(hotelOption.preparationValue / 40), 0, 100),
+      },
+      travel: {
+        bookings: {
+          ...previousState.travel.bookings,
+          [tournament.id]: {
+            tournamentId: tournament.id,
+            travelOptionId: travelOption.id,
+            hotelOptionId: hotelOption.id,
+            totalCost,
+            bookedWeek: previousState.week,
+            bookedDate: previousState.currentDate,
+          },
+        },
+      },
+      history: {
+        ...previousState.history,
+        tournamentHistory: upsertTournamentHistoryEntry(
+          previousState.history.tournamentHistory,
+          synchronizeTournamentHistoryEntry(
+            tournament,
+            {
+              ...(previousState.history.tournamentHistory.find((entry) => entry.id === getTournamentHistoryId(previousState.season, tournament.id)) ?? createTournamentHistoryEntry(tournament, previousState.season)),
+              status: 'Entered',
+              result: 'Travel booked',
+              bookedTravelCost: totalCost,
+            },
+          ),
+        ),
+      },
+      inbox: [
+        createInboxMessage(
+          {
+            sender: 'Travel Desk',
+            subject: `${tournament.name} travel booked`,
+            preview: `${travelOption.name} and ${hotelOption.name} are now locked in for £${totalCost}. Match-day readiness has improved.`,
+            priority: 'Medium',
+            actionLabel: 'Review Travel',
+            actionRoute: '/travel',
+          },
+          'Today',
+        ),
+        ...previousState.inbox,
+      ].slice(0, 18),
+    },
+    `Booked travel for ${tournament.name}.`,
+    'Travel Booking',
+  )
+}
+
 function getTravelBooking(state: GameState, tournamentId: string) {
   return state.travel.bookings[tournamentId] ?? null
 }
@@ -4248,8 +4410,6 @@ function getPlayerProfessionalStatusNote(state: Pick<GameState, 'player' | 'care
   }
 }
 
-type ProTourAccessBand = 'top16' | 'top32' | 'top64' | 'bottomTour' | 'offTour'
-
 type TournamentCircuitClass =
   | 'youth'
   | 'amateur'
@@ -4293,14 +4453,6 @@ type TournamentEntryAccess = {
   accessBand: ProTourAccessBand
   seededProtection: number
   reason: string | null
-}
-
-function getRankAccessBandFromWorldRank(worldRank: number, hasTourCard: boolean): ProTourAccessBand {
-  if (worldRank <= TOP_16_RANK_CUTOFF) return 'top16'
-  if (worldRank <= TOP_32_RANK_CUTOFF) return 'top32'
-  if (worldRank <= TOP_64_RANK_CUTOFF) return 'top64'
-  if (worldRank <= MAIN_TOUR_POOL_SIZE && hasTourCard) return 'bottomTour'
-  return 'offTour'
 }
 
 function getWorldRankForAccess(state: Pick<GameState, 'player' | 'careerSystems' | 'competitionTables'> & Partial<Pick<GameState, 'history'>>) {
@@ -4448,19 +4600,6 @@ function getProTourAccessBand(state: Pick<GameState, 'player' | 'careerSystems' 
   const worldRank = getWorldRankForAccess(state)
 
   return getRankAccessBandFromWorldRank(worldRank, state.careerSystems.pro.hasTourCard)
-}
-
-function getSeededProtectionForBand(accessBand: ProTourAccessBand) {
-  switch (accessBand) {
-    case 'top16':
-      return 3
-    case 'top32':
-      return 2
-    case 'top64':
-      return 1
-    default:
-      return 0
-  }
 }
 
 export function getTournamentEntryAccess(
@@ -4634,6 +4773,118 @@ export function getTournamentEntryCashRequirement(
   }
 
   return tournament.entryFee
+}
+
+export function withdrawTournamentState(previousState: GameState, tournamentId: string): GameState {
+  const tournament = previousState.tournaments.find((item) => item.id === tournamentId)
+  if (!tournament || tournament.status !== 'Entered') {
+    return finalizeState(previousState, 'There is no active entry to withdraw.')
+  }
+  if (previousState.liveMatch?.tournamentId === tournamentId && previousState.liveMatch.status === 'In Progress') {
+    return finalizeState(previousState, 'Finish the live match before withdrawing from this event.')
+  }
+  if (previousState.tournamentProgress.tournamentId === tournamentId && previousState.tournamentProgress.completedRounds.length > 0) {
+    return finalizeState(previousState, 'This event has already started and can no longer be withdrawn from.')
+  }
+
+  const cashRequirement = getTournamentEntryCashRequirement(previousState, tournament)
+  const daysUntilStart = Math.ceil((getTournamentDateValue(tournament.startDate) - getTournamentDateValue(previousState.currentDate)) / 86_400_000)
+  const entryRefund = daysUntilStart >= 7 ? Math.round(cashRequirement * 0.75) : 0
+  const travelRefund = daysUntilStart >= 7 ? Math.round((previousState.travel.bookings[tournamentId]?.totalCost ?? 0) * 0.5) : 0
+  const totalRefund = entryRefund + travelRefund
+
+  return finalizeState({
+    ...previousState,
+    player: { ...previousState.player, cash: previousState.player.cash + totalRefund },
+    tournaments: previousState.tournaments.map((item) => item.id === tournamentId ? { ...item, status: 'Available' } : item),
+    travel: { bookings: Object.fromEntries(Object.entries(previousState.travel.bookings).filter(([id]) => id !== tournamentId)) },
+    tournamentProgress: previousState.tournamentProgress.tournamentId === tournamentId ? createEmptyTournamentProgress() : previousState.tournamentProgress,
+    liveMatch: previousState.liveMatch?.tournamentId === tournamentId ? null : previousState.liveMatch,
+    history: {
+      ...previousState.history,
+      tournamentHistory: previousState.history.tournamentHistory.filter((entry) => entry.tournamentId !== tournamentId || entry.season !== previousState.season),
+    },
+  }, totalRefund > 0 ? `Withdrew from ${tournament.name}; £${totalRefund} was refunded.` : `Withdrew from ${tournament.name}; the late cancellation was non-refundable.`, 'Tournament Withdrawal')
+}
+
+const ENTERABLE_TOURNAMENT_STATUSES = new Set<Tournament['status']>(['Booked', 'Available', 'High Cost'])
+
+export function getNextEligibleTournament(state: GameState) {
+  return selectNextEligibleTournament(state, getTournamentEntryAccess)
+}
+
+export type { TournamentPlayability }
+
+export function getTournamentPlayability(state: GameState, tournament: Tournament): TournamentPlayability {
+  return evaluateTournamentPlayability(state, tournament, getTournamentEntryAccess)
+}
+
+function isDateInsideTournament(dateValue: string | undefined, tournament: Tournament) {
+  if (!dateValue) return true
+  const playedOn = getTournamentDateValue(dateValue)
+  return playedOn >= getTournamentDateValue(tournament.startDate)
+    && playedOn <= getTournamentDateValue(tournament.endDate ?? tournament.startDate)
+}
+
+export function repairGameState(state: GameState): GameState {
+  const currentDateValue = getTournamentDateValue(state.currentDate)
+  const invalidMatchIds = new Set(
+    state.matches
+      .filter((match) => {
+        const tournament = state.tournaments.find((event) => event.id === match.tournamentId)
+        if (!tournament) return false
+        if (match.playedOn) return !isDateInsideTournament(match.playedOn, tournament)
+        return getTournamentDateValue(state.currentDate) < getTournamentDateValue(tournament.startDate)
+      })
+      .map((match) => match.id),
+  )
+  const invalidTournamentIds = new Set(
+    state.matches
+      .filter((match) => invalidMatchIds.has(match.id))
+      .map((match) => match.tournamentId)
+      .filter((id): id is string => Boolean(id)),
+  )
+  const repairedTournaments = state.tournaments.map((tournament) => {
+    const eventEnded = getTournamentDateValue(tournament.endDate ?? tournament.startDate) < currentDateValue
+    const invalidEntry = tournament.status === 'Entered' && (!getTournamentEntryAccess(state, tournament).allowed || eventEnded)
+    const invalidHistory = invalidTournamentIds.has(tournament.id)
+    if (!invalidEntry && !invalidHistory) return tournament
+    return {
+      ...tournament,
+      status: (eventEnded ? 'Skipped' : 'Available') as Tournament['status'],
+    }
+  })
+  const activeProgressTournament = repairedTournaments.find((tournament) => tournament.id === state.tournamentProgress.tournamentId)
+  const keepProgress = Boolean(activeProgressTournament?.status === 'Entered' && getTournamentEntryAccess(state, activeProgressTournament).allowed)
+  const keepLiveMatch = Boolean(state.liveMatch && state.liveMatch.status === 'Completed' && !invalidTournamentIds.has(state.liveMatch.tournamentId))
+    || Boolean(state.liveMatch && keepProgress && state.liveMatch.tournamentId === activeProgressTournament?.id)
+
+  return {
+    ...state,
+    schemaVersion: SAVE_SCHEMA_VERSION,
+    tournaments: repairedTournaments,
+    matches: state.matches.filter((match) => !invalidMatchIds.has(match.id)),
+    worldPlayers: normalizeWorldPlayers(state.worldPlayers, state.competitionTables, state.player),
+    travel: {
+      bookings: Object.fromEntries(Object.entries(state.travel.bookings).filter(([tournamentId]) => {
+        const tournament = repairedTournaments.find((event) => event.id === tournamentId)
+        return Boolean(tournament && getTournamentEntryAccess(state, tournament).allowed)
+      })),
+    },
+    tournamentProgress: keepProgress ? state.tournamentProgress : createEmptyTournamentProgress(),
+    liveMatch: keepLiveMatch ? state.liveMatch : null,
+    history: {
+      ...state.history,
+      matchLog: state.history.matchLog.filter((entry) => {
+        const tournament = repairedTournaments.find((event) => event.id === entry.tournamentId)
+        return tournament ? isDateInsideTournament(entry.date, tournament) : true
+      }),
+      tournamentHistory: state.history.tournamentHistory.filter((entry) => !invalidTournamentIds.has(entry.tournamentId)),
+    },
+    lastAction: invalidMatchIds.size > 0 || repairedTournaments.some((tournament, index) => tournament.status !== state.tournaments[index]?.status)
+      ? 'Save upgraded: repaired invalid tournament entries and out-of-date match records.'
+      : state.lastAction,
+  }
 }
 
 function shouldPlayerBeInWorldTable(state: Pick<GameState, 'player' | 'careerSystems' | 'competitionTables' | 'tournaments'>) {
@@ -4885,27 +5136,27 @@ function applyWorldRankingDecay(row: CompetitionTableRow, record?: WorldPlayerRe
   const matchesPlayed = row.wins + row.losses
   const winRate = matchesPlayed > 0 ? row.wins / matchesPlayed : 0
   const basePointsDecay = row.ranking <= 4
-    ? 0.94
+    ? 0.6
     : row.ranking <= 16
-      ? 0.9
+      ? 0.56
       : row.ranking <= 32
-        ? 0.86
+        ? 0.52
         : row.ranking <= 64
-          ? 0.8
-          : 0.68
+          ? 0.48
+          : 0.42
   const basePrizeDecay = row.ranking <= 4
-    ? 0.92
+    ? 0.58
     : row.ranking <= 16
-      ? 0.88
+      ? 0.54
       : row.ranking <= 32
-        ? 0.84
+        ? 0.5
         : row.ranking <= 64
-          ? 0.76
-          : 0.62
+          ? 0.46
+          : 0.4
   const inactivityPenalty = matchesPlayed < 6 ? (row.ranking <= 16 ? 0.92 : 0.78) : 1
   const poorRunPenalty = matchesPlayed >= 6 && winRate < 0.35 ? (row.ranking <= 16 ? 0.88 : 0.74) : 1
-  const titleRetention = row.titles > 0 ? 1.08 : 1
-  const eliteStabilityBonus = row.ranking <= 16 && matchesPlayed >= 8 && winRate >= 0.45 ? 1.06 : 1
+  const titleRetention = row.titles > 0 ? 1.04 : 1
+  const eliteStabilityBonus = row.ranking <= 16 && matchesPlayed >= 8 && winRate >= 0.5 ? 1.02 : 1
   const ageDecay = getWorldRankingAgeDecayMultiplier(row, record)
   const pointsDecay = basePointsDecay * inactivityPenalty * poorRunPenalty * titleRetention * eliteStabilityBonus * ageDecay
   const prizeDecay = basePrizeDecay * inactivityPenalty * poorRunPenalty * titleRetention * ageDecay
@@ -5055,22 +5306,18 @@ function initializeCompetitionTablesForNewCareer(
   }
 }
 
-function getNextUpcomingTournament(state: Pick<GameState, 'tournaments' | 'currentDate'>) {
-  const isCurrentOrUpcomingEvent = (event: Tournament) => (event.endDate ?? event.startDate) >= state.currentDate
-
-  return state.tournaments.find((event) => event.status === 'Entered' && isCurrentOrUpcomingEvent(event))
-    ?? state.tournaments.find((event) => (event.status === 'Booked' || event.status === 'Available' || event.status === 'High Cost') && isCurrentOrUpcomingEvent(event))
-    ?? state.tournaments[0]
+function getNextUpcomingTournament(state: GameState) {
+  return getNextEligibleTournament(state)
 }
 
-function continueToNextTournamentState(previousState: GameState) {
+export function continueToNextTournamentState(previousState: GameState) {
   const initialTarget = getNextUpcomingTournament(previousState)
   if (!initialTarget) {
     return finalizeState(previousState, 'No upcoming tournament is available to advance toward.')
   }
 
-  if ((previousState.player.daysUntilEvent ?? 0) <= 7) {
-    return finalizeState(previousState, `${initialTarget.name} is already within the current tournament week.`)
+  if (getTournamentDateValue(previousState.currentDate) >= getTournamentDateValue(initialTarget.startDate)) {
+    return finalizeState(previousState, `${initialTarget.name} has reached its start date.`)
   }
 
   let nextState = previousState
@@ -5079,13 +5326,22 @@ function continueToNextTournamentState(previousState: GameState) {
   while (iterations < 52) {
     const target = getNextUpcomingTournament(nextState)
     if (!target) break
-    if ((nextState.player.daysUntilEvent ?? 0) <= 7) break
+    if (getTournamentDateValue(nextState.currentDate) >= getTournamentDateValue(target.startDate)) break
+
+    const daysToTarget = daysUntil(target.startDate, nextState.currentDate)
+    if (daysToTarget > 0 && daysToTarget < 7) {
+      nextState = {
+        ...nextState,
+        currentDate: target.startDate,
+      }
+      break
+    }
 
     nextState = advanceWeekState(nextState)
     iterations += 1
 
     if (nextState.liveMatch?.status === 'In Progress') break
-    if (target.id !== getNextUpcomingTournament(nextState)?.id && (nextState.player.daysUntilEvent ?? 0) <= 7) break
+    if (target.id !== getNextUpcomingTournament(nextState)?.id && getTournamentDateValue(nextState.currentDate) >= getTournamentDateValue(target.startDate)) break
   }
 
   const arrivedTarget = getNextUpcomingTournament(nextState)
@@ -5095,7 +5351,7 @@ function continueToNextTournamentState(previousState: GameState) {
 
   return finalizeState(
     nextState,
-    `Advanced ${iterations} week${iterations === 1 ? '' : 's'} to the ${arrivedTarget.name} tournament week.`,
+    `Advanced ${iterations} week${iterations === 1 ? '' : 's'} to the ${arrivedTarget.name} tournament week.${getTournamentPlayability(nextState, arrivedTarget).travelBooked ? ' Start the match from the Tournament Hub when ready.' : ' Book travel before starting the match.'}`,
   )
 }
 
@@ -5226,13 +5482,13 @@ function getWorldRankingCeiling(record: WorldPlayerRecord, tables: CompetitionTa
   const rollingTwoYearPrize = getWeightedRecentSeasonValue(record, (season) => season.prizeMoney)
   const rollingTitleScore = getWeightedRecentSeasonValue(record, (season) => season.titles)
   const strengthBand = getCompetitiveStrengthBand(record, tables)
-  const hasCurrentEliteResult = latestSeasonTitles > 0 || rollingTitleScore >= 1.25 || (record.age <= 34 && record.majorTitles > 0)
+  const hasCurrentEliteResult = latestSeasonTitles > 0 || rollingTitleScore >= 1.25
   const youngBreakthroughEligible = (record.age <= 30 && latestSeasonWins >= 7 && twoYearWinRate >= 0.38 && strengthBand >= 82)
     || (record.age <= 35 && getWorldPlayerDevelopmentPotential(record) >= 92 && latestSeasonWins >= 5 && twoYearWinRate >= 0.32 && strengthBand >= 82)
   const eliteTop16Eligible = latestMainTourEvents >= 6 && latestSeasonWins >= 4 && twoYearWinRate >= 0.2 && strengthBand >= 80 && (hasCurrentEliteResult || youngBreakthroughEligible)
-  const top4Eligible = latestSeasonWins >= 8
-    || latestSeasonTitles > 0
-    || (rollingTwoYearPrize >= 350000 && weightedMainTourEvents >= 8 && twoYearWinRate >= 0.35)
+  const top4Eligible = (latestSeasonWins >= 9 && twoYearWinRate >= 0.45)
+    || latestSeasonTitles >= 2
+    || (latestSeasonTitles > 0 && rollingTwoYearPrize >= 350000 && weightedMainTourEvents >= 8 && twoYearWinRate >= 0.4)
 
   if ((record.cardSource === 'Q School' || record.cardSource === 'Q Tour' || record.cardSource === 'Playoff Route' || record.cardSource === 'Federation Route')
     && record.currentYear <= 1
@@ -5298,14 +5554,13 @@ function getWorldSeedScore(record: WorldPlayerRecord, tables: CompetitionTablesS
   const youngBreakthroughResult = record.age <= 30 && latestSeasonWins >= 7 && latestSeasonWinRate >= 0.38 && strengthBand >= 82
   const developmentPotential = getWorldPlayerDevelopmentPotential(record)
   const eliteProspectBreakthrough = record.age <= 35 && developmentPotential >= 92 && latestSeasonWins >= 5 && latestSeasonWinRate >= 0.32 && strengthBand >= 82
-  const hasMeaningfulEliteResult = latestSeasonTitles > 0 || rollingTitleScore >= 1.25 || youngBreakthroughResult || eliteProspectBreakthrough || (record.age <= 34 && record.majorTitles > 0)
+  const hasMeaningfulEliteResult = latestSeasonTitles > 0 || rollingTitleScore >= 1.25 || youngBreakthroughResult || eliteProspectBreakthrough
   const ageDecline = getMainTourAgeDecline(record)
   const youthUpside = getMainTourYouthUpside(record)
   const eliteTop16Eligible = latestMainTourEvents >= 6 && latestSeasonWins >= 4 && twoYearWinRate >= 0.2 && strengthBand >= 80 && hasMeaningfulEliteResult
-  const top4Eligible = latestSeasonWins >= 8
-    || latestSeasonTitles > 0
-    || record.majorTitles > 0
-    || (rollingTwoYearPrize >= 220000 && weightedMainTourEvents >= 8)
+  const top4Eligible = (latestSeasonWins >= 9 && latestSeasonWinRate >= 0.45)
+    || latestSeasonTitles >= 2
+    || (latestSeasonTitles > 0 && rollingTwoYearPrize >= 300000 && weightedMainTourEvents >= 8 && twoYearWinRate >= 0.4)
   const lowLatestWinsPenalty = latestSeasonWins < 4 ? (4 - latestSeasonWins) * 95 : 0
   const lowTwoYearWinRatePenalty = twoYearWinRate < 0.2 ? Math.round((0.2 - twoYearWinRate) * 900) : 0
   const lowVolumePenalty = latestMainTourEvents < 6 ? (6 - latestMainTourEvents) * 72 : 0
@@ -5319,7 +5574,6 @@ function getWorldSeedScore(record: WorldPlayerRecord, tables: CompetitionTablesS
       : 0
   const bottomTourProtectionPenalty = worldRank > TOP_64_RANK_CUTOFF && record.hasTourCard && latestSeasonWins < 3 ? (3 - latestSeasonWins) * 24 : 0
   const veteranBonus = record.age >= 35 && record.age <= 42 && (record.highestWorldRank ?? 999) <= 32 && twoYearWinRate >= 0.3 ? 18 : 0
-  const historicalPeakBonus = Math.max(0, 26 - ((record.highestWorldRank ?? 128) * 0.25))
   const ageDeclinePenalty = Math.round(ageDecline * 160)
     + (record.age >= 40 && latestSeasonTitles === 0 && rollingTitleScore < 1 ? 300 : 0)
     + (record.age >= 44 && latestSeasonTitles === 0 && rollingTitleScore < 1 ? 950 : 0)
@@ -5347,8 +5601,8 @@ function getWorldSeedScore(record: WorldPlayerRecord, tables: CompetitionTablesS
     + latestMainTourEvents * 12
     + weightedMainTourEvents * 6
     + latestSeasonTitles * 220
-    + record.majorTitles * 250
-    + record.titles * 10
+    + record.majorTitles * 20
+    + record.titles * 3
     + rollingTwoYearPrize * 0.004
     + rollingRankScore * 1.8
     + rollingTitleScore * 120
@@ -5357,7 +5611,6 @@ function getWorldSeedScore(record: WorldPlayerRecord, tables: CompetitionTablesS
     + Math.round(twoYearWinRate * 320)
     + Math.round(winRate * 100)
     + strengthBand * 10
-    + historicalPeakBonus
     + veteranBonus
     + youthUpsideBonus
     + eliteProspectBonus
@@ -5373,7 +5626,7 @@ function getWorldSeedScore(record: WorldPlayerRecord, tables: CompetitionTablesS
 }
 
 function isEligibleForWorldTable(record: WorldPlayerRecord) {
-  return record.hasTourCard || record.retainedViaRanking
+  return !record.retired && (record.hasTourCard || record.retainedViaRanking)
 }
 
 function buildWorldCompetitionRows(players: WorldPlayerRecord[], tables: CompetitionTablesState, playerName: string) {
@@ -5538,6 +5791,8 @@ function getWorldPlayerCircuitRank(record: WorldPlayerRecord, tables: Competitio
 }
 
 function getWorldPlayerExpectedCircuit(record: WorldPlayerRecord, tables: CompetitionTablesState) {
+  if (record.retired) return 'retired'
+
   const worldRank = getWorldPlayerCircuitRank(record, tables, 'world') ?? 999
   const qTourRank = getWorldPlayerCircuitRank(record, tables, 'qTour') ?? 999
   const qSchoolRank = getWorldPlayerCircuitRank(record, tables, 'qSchool') ?? 999
@@ -5577,7 +5832,7 @@ function getWorldPlayerTourSurvivalStatus(worldRank: number, hasTourCard: boolea
 }
 
 function getWorldPlayerPromotionSource(record: WorldPlayerRecord, tables: CompetitionTablesState): TourCardSource {
-  if (record.age < 18) return null
+  if (record.retired || record.age < 18) return null
 
   const qSchoolRank = getWorldPlayerCircuitRank(record, tables, 'qSchool') ?? 999
   const qTourRank = getWorldPlayerCircuitRank(record, tables, 'qTour') ?? 999
@@ -5608,6 +5863,7 @@ function shouldProtectFeederPlayerFromFallbackPromotion(record: WorldPlayerRecor
 }
 
 function shouldAiWorldPlayerRetainMainTourCard(record: WorldPlayerRecord, worldRank: number, tables: CompetitionTablesState) {
+  if (record.retired) return false
   if (worldRank > TOP_64_RANK_CUTOFF) return false
 
   const oneYearRow = getCompetitionRowForPlayer(tables, 'oneYear', record.playerName)
@@ -5681,6 +5937,8 @@ function awardWorldPlayerTourCard(record: WorldPlayerRecord, source: Exclude<Tou
 }
 
 function isEligibleForCircuit(record: WorldPlayerRecord, tables: CompetitionTablesState, key: Exclude<CompetitionTableKey, 'world' | 'oneYear'>) {
+  if (record.retired) return false
+
   const youthRank = getWorldPlayerCircuitRank(record, tables, 'youth') ?? 999
   const amateurRank = getWorldPlayerCircuitRank(record, tables, 'amateur') ?? 999
   const qTourRank = getWorldPlayerCircuitRank(record, tables, 'qTour') ?? 999
@@ -5721,7 +5979,7 @@ function buildSeasonalCircuitRows(
   const eligiblePlayers = players
     .filter((record) => isEligibleForCircuit(record, tables, key))
     .sort((left, right) => getCircuitSeedScore(right, tables, key) - getCircuitSeedScore(left, tables, key))
-  let selectedPlayers = eligiblePlayers.slice(0, limits[key])
+  const selectedPlayers = eligiblePlayers.slice(0, limits[key])
 
   if (key === 'youth') {
     const newcomerPool = eligiblePlayers.filter((record) => record.seasons.length === 0 && record.age <= 16)
@@ -5816,10 +6074,15 @@ function createUniqueIntakeName(
   getFirstIndex: (seed: number) => number,
   getLastIndex: (seed: number) => number,
 ) {
-  for (let attempt = 0; attempt < 260; attempt += 1) {
+  const firstOffset = getFirstIndex(baseSeed) % firstNames.length
+  const lastOffset = getLastIndex(baseSeed) % lastNames.length
+  const combinations = firstNames.length * lastNames.length
+
+  for (let attempt = 0; attempt < combinations; attempt += 1) {
+    const firstIndex = (firstOffset + attempt) % firstNames.length
+    const lastIndex = (lastOffset + Math.floor(attempt / firstNames.length)) % lastNames.length
     const seed = baseSeed + attempt * 23
-    const suffix = attempt === 0 ? '' : attempt <= 26 ? ` ${String.fromCharCode(64 + attempt)}` : ` ${attempt - 26}`
-    const fullName = `${firstNames[getFirstIndex(seed) % firstNames.length]} ${lastNames[getLastIndex(seed) % lastNames.length]}${suffix}`
+    const fullName = `${firstNames[firstIndex]} ${lastNames[lastIndex]}`
 
     if (!seenNames.has(fullName) && fullName !== playerName) {
       return { fullName, seed }
@@ -5885,6 +6148,8 @@ function createJuniorIntake(players: WorldPlayerRecord[], seasonStartYear: numbe
       highestBreak: 0,
       highestWorldRank: null,
       developmentPotential: createCpuDevelopmentPotential(fullName, seasonStartYear, index, age, 'junior'),
+      retired: false,
+      retiredSeason: null,
       seasons: [],
     })
   }
@@ -5941,6 +6206,8 @@ function createFeederIntake(players: WorldPlayerRecord[], seasonStartYear: numbe
       highestBreak: 0,
       highestWorldRank: null,
       developmentPotential: createCpuDevelopmentPotential(fullName, seasonStartYear, index, age, 'feeder'),
+      retired: false,
+      retiredSeason: null,
       seasons: [],
     })
   }
@@ -5984,11 +6251,29 @@ function createFeederIntake(players: WorldPlayerRecord[], seasonStartYear: numbe
       seniorTitles: 0,
       highestBreak: 0,
       highestWorldRank: 24 + (seed % 24),
+      retired: false,
+      retiredSeason: null,
       seasons: [],
     })
   }
 
   return [...players, ...additions]
+}
+
+function shouldRetireCpuPlayer(record: WorldPlayerRecord, tables: CompetitionTablesState, nextAge: number) {
+  const worldRank = getWorldPlayerCircuitRank(record, tables, 'world') ?? 999
+  const recentWins = getRecentSeasonStat(record, (season) => season.proWins)
+  const recentLosses = getRecentSeasonStat(record, (season) => season.proLosses)
+  const recentTitles = getRecentSeasonStat(record, (season) => season.titles)
+  return evaluateCpuRetirement({
+    alreadyRetired: record.retired,
+    nextAge,
+    hasTourCard: record.hasTourCard,
+    worldRank,
+    recentWins,
+    recentLosses,
+    recentTitles,
+  })
 }
 
 function evolveWorldPlayersForNextSeason(
@@ -6000,55 +6285,82 @@ function evolveWorldPlayersForNextSeason(
   nextSeasonStartYear: number,
 ) {
   const agedPlayers = players.map((record) => {
+    const isHumanPlayer = record.playerName === nextPlayer.fullName
+    const nextAge = isHumanPlayer ? nextPlayer.age : record.age + 1
+    const retired = !isHumanPlayer && shouldRetireCpuPlayer(record, tables, nextAge)
     const worldRank = getCompetitionRowForPlayer(tables, 'world', record.playerName)?.ranking ?? 999
-    const retainedViaRanking = worldRank <= TOP_64_RANK_CUTOFF
-      && (record.playerName === nextPlayer.fullName || shouldAiWorldPlayerRetainMainTourCard(record, worldRank, tables))
-    const protectedCardSeason = record.playerName !== nextPlayer.fullName
+    const retainedViaRanking = !retired && worldRank <= TOP_64_RANK_CUTOFF
+      && (isHumanPlayer || shouldAiWorldPlayerRetainMainTourCard(record, worldRank, tables))
+    const protectedCardSeason = !retired && !isHumanPlayer
       && record.hasTourCard
       && worldRank > TOP_64_RANK_CUTOFF
       && worldRank <= MAIN_TOUR_POOL_SIZE
       && record.yearsRemaining > 1
-    const nextYearsRemaining = record.playerName === nextPlayer.fullName
+    const nextYearsRemaining = isHumanPlayer
       ? playerProState.yearsRemaining
       : protectedCardSeason
         ? Math.max(0, record.yearsRemaining - 1)
         : 0
-    const hasTourCard = record.playerName === nextPlayer.fullName
+    const hasTourCard = retired
+      ? false
+      : isHumanPlayer
       ? playerHasTourCard
       : retainedViaRanking || protectedCardSeason
 
     return {
       ...record,
-      age: record.playerName === nextPlayer.fullName ? nextPlayer.age : record.age + 1,
+      age: nextAge,
       hasTourCard,
-      cardSource: record.playerName === nextPlayer.fullName
+      cardSource: retired
+        ? null
+        : isHumanPlayer
         ? playerProState.cardSource
         : retainedViaRanking
           ? 'Ranking Retained'
           : hasTourCard
             ? (record.cardSource ?? 'Seeded Main Tour')
             : null,
-      currentYear: record.playerName === nextPlayer.fullName
+      currentYear: retired
+        ? 0
+        : isHumanPlayer
         ? playerProState.currentYear
         : hasTourCard && nextYearsRemaining > 0
           ? Math.min(2, Math.max(1, record.currentYear + 1))
           : 0,
       yearsRemaining: nextYearsRemaining,
-      expiresAfterSeason: record.playerName === nextPlayer.fullName
+      expiresAfterSeason: retired
+        ? null
+        : isHumanPlayer
         ? playerProState.expiresAfterSeason
         : hasTourCard && nextYearsRemaining > 0
           ? formatSeasonLabel(nextSeasonStartYear + nextYearsRemaining - 1)
           : null,
-      retainedViaRanking: record.playerName === nextPlayer.fullName ? playerProState.retainedViaRanking : retainedViaRanking,
-      tourSurvivalStatus: record.playerName === nextPlayer.fullName
+      retainedViaRanking: retired ? false : isHumanPlayer ? playerProState.retainedViaRanking : retainedViaRanking,
+      tourSurvivalStatus: retired
+        ? 'Amateur'
+        : isHumanPlayer
         ? playerProState.tourSurvivalStatus
         : getWorldPlayerTourSurvivalStatus(worldRank, hasTourCard, retainedViaRanking, nextYearsRemaining),
+      retired,
+      retiredSeason: retired ? (record.retiredSeason ?? formatSeasonLabel(nextSeasonStartYear)) : null,
     }
   })
 
   const normalizedPlayers = agedPlayers.map((record) => {
     if (record.playerName === nextPlayer.fullName) {
       return record
+    }
+    if (record.retired) {
+      return {
+        ...record,
+        hasTourCard: false,
+        cardSource: null,
+        currentYear: 0,
+        yearsRemaining: 0,
+        expiresAfterSeason: null,
+        retainedViaRanking: false,
+        tourSurvivalStatus: 'Amateur' as const,
+      }
     }
 
     const worldRank = getCompetitionRowForPlayer(tables, 'world', record.playerName)?.ranking ?? 999
@@ -6122,10 +6434,10 @@ function evolveWorldPlayersForNextSeason(
     qSchool: provisionalQSchoolRows,
     senior: provisionalSeniorRows,
   }
-  const activeMainTourPlayers = expandedPlayerPool.filter((record) => record.hasTourCard)
+  const activeMainTourPlayers = expandedPlayerPool.filter((record) => !record.retired && record.hasTourCard)
   const openSlots = Math.max(0, MAIN_TOUR_POOL_SIZE - activeMainTourPlayers.length)
   const promotedPlayers = expandedPlayerPool
-    .filter((record) => record.playerName !== nextPlayer.fullName && !record.hasTourCard)
+    .filter((record) => record.playerName !== nextPlayer.fullName && !record.retired && !record.hasTourCard)
     .map((record) => ({ record, source: getWorldPlayerPromotionSource(record, promotionTables) }))
     .filter((entry): entry is { record: WorldPlayerRecord, source: Exclude<TourCardSource, null> } => entry.source != null)
     .sort((left, right) => getWorldPlayerPromotionScore(right.record, promotionTables, right.source) - getWorldPlayerPromotionScore(left.record, promotionTables, left.source))
@@ -6134,7 +6446,7 @@ function evolveWorldPlayersForNextSeason(
   const remainingOpenSlots = Math.max(0, openSlots - promotedPlayers.length)
   const promotedNames = new Set(promotedPlayers.map((record) => record.playerName))
   const fallbackPromotions = expandedPlayerPool
-    .filter((record) => record.playerName !== nextPlayer.fullName && !record.hasTourCard && !promotedNames.has(record.playerName))
+    .filter((record) => record.playerName !== nextPlayer.fullName && !record.retired && !record.hasTourCard && !promotedNames.has(record.playerName))
     .filter((record) => getWorldPlayerExpectedCircuit(record, promotionTables) !== 'senior')
     .filter((record) => !shouldProtectFeederPlayerFromFallbackPromotion(record, promotionTables))
     .sort((left, right) => getWorldPlayerPromotionScore(right, promotionTables, 'Federation Route') - getWorldPlayerPromotionScore(left, promotionTables, 'Federation Route'))
@@ -6204,24 +6516,28 @@ function simulateAiSeasonCircuitStats(
   row: CompetitionTableRow | undefined,
   record: WorldPlayerRecord,
 ): AiSeasonCircuitStats {
-  if (!row || playerName === record.playerName && row.playerName !== record.playerName) {
+  const effectiveRow = row ?? (key === 'oneYear' && record.hasTourCard && !record.retired
+    ? createCompetitionDefaultRow(playerName, record.nation, record.highestWorldRank ?? MAIN_TOUR_POOL_SIZE)
+    : undefined)
+
+  if (!effectiveRow) {
     return { events: 0, wins: 0, losses: 0, titles: 0, prizeMoney: 0, rankingPoints: 0 }
   }
 
-  const playedMatches = Math.max(0, row.eventsPlayed)
-  if (playedMatches > 0 || row.wins > 0 || row.losses > 0 || row.titles > 0) {
+  const playedMatches = Math.max(0, effectiveRow.eventsPlayed)
+  if (playedMatches > 0 || effectiveRow.wins > 0 || effectiveRow.losses > 0 || effectiveRow.titles > 0) {
     return {
       events: playedMatches,
-      wins: Math.max(0, row.wins),
-      losses: Math.max(0, row.losses),
-      titles: Math.max(0, row.titles),
-      prizeMoney: Math.max(0, row.prizeMoney),
-      rankingPoints: Math.max(0, row.points),
+      wins: Math.max(0, effectiveRow.wins),
+      losses: Math.max(0, effectiveRow.losses),
+      titles: Math.max(0, effectiveRow.titles),
+      prizeMoney: Math.max(0, effectiveRow.prizeMoney),
+      rankingPoints: Math.max(0, effectiveRow.points),
     }
   }
 
   const variance = getAiSeasonVariance(playerName, season, key)
-  const rank = row.ranking
+  const rank = effectiveRow.ranking
   const age = record.age
   const rankStrength = Math.max(0, 1 - (rank - 1) / (key === 'world' || key === 'oneYear' ? MAIN_TOUR_POOL_SIZE : 64))
   const youthGrowth = age <= 24 ? 0.08 : 0
@@ -6261,8 +6577,8 @@ function simulateAiSeasonCircuitStats(
     senior: 1200,
     youth: 120,
   }
-  const rankingPoints = Math.max(row.points, Math.round(wins * pointsPerWin[key] + titles * pointsPerWin[key] * 3 + rankStrength * pointsPerWin[key] * 2))
-  const prizeMoney = Math.max(row.prizeMoney, Math.round(wins * prizePerWin[key] + titles * prizePerWin[key] * 4 + rankStrength * prizePerWin[key] * 2))
+  const rankingPoints = Math.max(effectiveRow.points, Math.round(wins * pointsPerWin[key] + titles * pointsPerWin[key] * 3 + rankStrength * pointsPerWin[key] * 2))
+  const prizeMoney = Math.max(effectiveRow.prizeMoney, Math.round(wins * prizePerWin[key] + titles * prizePerWin[key] * 4 + rankStrength * prizePerWin[key] * 2))
 
   return { events, wins, losses, titles, prizeMoney, rankingPoints }
 }
@@ -6301,6 +6617,8 @@ function archiveWorldPlayersForSeason(
       expiresAfterSeason: null,
       retainedViaRanking: false,
       tourSurvivalStatus: 'Amateur',
+      retired: false,
+      retiredSeason: null,
       seasons: [],
     }, tables, player)
     const worldRow = getCompetitionRowForPlayer(tables, 'world', entryName)
@@ -6374,6 +6692,8 @@ function archiveWorldPlayersForSeason(
       tourSurvivalStatus: existing.tourSurvivalStatus,
       status: entryName === playerName
         ? playerStatus
+        : existing.retired
+          ? 'Retired'
         : seniorRow != null
           ? 'Senior'
           : youthRow != null && existing.age <= 21
@@ -6598,6 +6918,9 @@ function getRecentProfessionalHistoryProfile(history?: CareerHistoryState) {
     latestSeasonProLosses,
     latestSeasonMainTourEvents: latestEntries.length,
     latestSeasonMajorFinals: latestEntries.filter((entry) => isMajorCareerEvent(entry) && getTournamentFinishTier(entry.result) >= 4).length,
+    latestSeasonRankingTitles: latestEntries.filter((entry) => entry.result === 'Winner' && isProfessionalEventType(entry.eventType)).length,
+    latestSeasonMajorTitles: latestEntries.filter((entry) => entry.result === 'Winner' && isMajorCareerEvent(entry)).length,
+    latestSeasonWorldTitles: latestEntries.filter((entry) => entry.result === 'Winner' && isWorldChampionshipMainDrawName(entry.tournamentName)).length,
     twoYearProWins,
     twoYearProLosses,
     twoYearMainTourEvents: twoYearEntries.length,
@@ -6651,6 +6974,18 @@ function getHistoryPerformanceRankFloor(history?: CareerHistoryState) {
       && recentProProfile.twoYearWinRate >= 0.45
       ? 9
       : 17
+  }
+
+  if (recentProProfile.latestSeasonProWins < 8
+    && recentProProfile.latestSeasonMajorFinals === 0
+    && recentProProfile.twoYearWinRate < 0.45) {
+    return 17
+  }
+
+  if (recentProProfile.latestSeasonProWins < 10
+    && recentProProfile.latestSeasonMajorFinals === 0
+    && recentProProfile.twoYearWinRate < 0.5) {
+    return 5
   }
 
   return 1
@@ -6737,7 +7072,6 @@ function getPlayerWorldRankingCeiling(state: Pick<GameState, 'history' | 'compet
   const recentProProfile = getRecentProfessionalHistoryProfile(state.history)
   const recentProMatches = recentProProfile.twoYearProWins + recentProProfile.twoYearProLosses
   const effectiveStrength = calculateCurrentEffectiveStrength(state)
-  const majorFinals = state.history.tournamentHistory.filter((entry) => isMajorCareerEvent(entry) && getTournamentHistoryFinishTier(entry) >= 4).length
   const professionalFinals = state.history.tournamentHistory.filter(
     (entry) => isProfessionalFinalLevelRun(entry),
   ).length
@@ -6746,17 +7080,20 @@ function getPlayerWorldRankingCeiling(state: Pick<GameState, 'history' | 'compet
   const worldTitles = state.history.tournamentHistory.filter((entry) => entry.result === 'Winner' && isWorldChampionshipMainDrawName(entry.tournamentName)).length
   const hasTitleProof = rankingTitles > 0 || majorTitles > 0 || worldTitles > 0
   const strongTwoYearWinProfile = recentProProfile.twoYearProWins >= 16 && recentProProfile.twoYearWinRate >= 0.45
+  const recentTitleProof = recentProProfile.latestSeasonRankingTitles > 0
+    || recentProProfile.latestSeasonMajorTitles > 0
+    || recentProProfile.latestSeasonWorldTitles > 0
   const eliteTop16Eligible = recentProProfile.latestSeasonMainTourEvents >= 6
     && recentProProfile.latestSeasonProWins >= 4
-    && recentProProfile.twoYearWinRate >= 0.2
+    && recentProProfile.twoYearWinRate >= 0.3
     && effectiveStrength >= 80
-    && (rankingTitles > 0 || majorFinals > 0 || strongTwoYearWinProfile)
+    && (recentTitleProof || recentProProfile.latestSeasonMajorFinals > 0 || strongTwoYearWinProfile)
   const top4Eligible = (recentProProfile.latestSeasonProWins >= 8
     && recentProProfile.twoYearMainTourEvents >= 10
     && recentProProfile.twoYearWinRate >= 0.5
     && effectiveStrength >= 120)
     || recentProProfile.latestSeasonMajorFinals > 0
-    || rankingTitles > 0
+    || recentTitleProof
     || (recentProProfile.twoYearMainTourEvents >= 12 && recentProProfile.twoYearWinRate >= 0.55 && effectiveStrength >= 125)
 
   if (recentProMatches < 8 && state.player.rankingLabel !== 'World Ranking') {
@@ -6796,9 +7133,10 @@ function getPlayerWorldRankingCeiling(state: Pick<GameState, 'history' | 'compet
     return 5
   }
 
-  const rankOneEligible = worldTitles > 0
-    || majorTitles > 0
-    || (rankingTitles >= 3 && recentProProfile.twoYearMainTourEvents >= 12 && recentProProfile.twoYearWinRate >= 0.58 && effectiveStrength >= 125)
+  // No. 1 is a current achievement, not a permanent reward for lifetime titles.
+  // Other elite seasons can reach No. 2; winning the current season's Worlds is
+  // the explicit proof required to occupy the top ranking slot.
+  const rankOneEligible = recentProProfile.latestSeasonWorldTitles > 0
 
   return rankOneEligible ? 1 : 2
 }
@@ -7124,7 +7462,7 @@ function createMatchSetup(state: GameState, tournament: Tournament) {
             : tournamentClass === 'eliteInvitational'
                 ? 82
                 : tournamentClass === 'worldChampionshipMain'
-                  ? 84
+                  ? 88
                   : tournamentClass === 'worldChampionshipQualifying'
                     ? 76
                     : tournamentClass === 'rookieQualifier'
@@ -7332,6 +7670,7 @@ function createMatchSetup(state: GameState, tournament: Tournament) {
     (entry) => isProfessionalEventType(entry.eventType) && entry.result === 'Winner',
   ).length
   const finalDroughtConversionBonus = mainTourEvent
+    && tournamentClass !== 'worldChampionshipMain'
     && currentRound === 'Final'
     && playerBaseStrength >= 76
     && professionalTitles === 0
@@ -7360,19 +7699,44 @@ function createMatchSetup(state: GameState, tournament: Tournament) {
           ? (currentRound === 'Final' ? 3 : currentRound === 'Semi Final' ? 1 : 0)
           : 0)
     : 0
-  const eliteWinChanceCeiling = mainTourEvent && worldRank <= 4 && (currentRound === 'Final' || currentRound === 'Semi Final')
-    ? (tournamentClass === 'worldChampionshipMain' || tournamentClass === 'ukMajor' ? 84 : 82)
+  const worldChampionshipDifficultyPenalty = tournamentClass === 'worldChampionshipMain'
+    ? (currentRound === 'Final'
+        ? 18
+        : currentRound === 'Semi Final'
+          ? 15
+          : currentRound === 'Quarter Final'
+            ? 12
+            : currentRound === 'Last 16'
+              ? 10
+              : 8)
+    : 0
+  const baseWinChanceCeiling = mainTourEvent && worldRank <= 4 && (currentRound === 'Final' || currentRound === 'Semi Final')
+    ? (tournamentClass === 'worldChampionshipMain' ? 68 : tournamentClass === 'ukMajor' ? 84 : 82)
     : mainTourEvent && worldRank <= 4 && currentRound === 'Quarter Final'
-      ? (tournamentClass === 'worldChampionshipMain' || tournamentClass === 'ukMajor' ? 80 : 78)
+      ? (tournamentClass === 'worldChampionshipMain' ? 68 : tournamentClass === 'ukMajor' ? 80 : 78)
       : mainTourEvent && worldRank <= TOP_16_RANK_CUTOFF && (currentRound === 'Final' || currentRound === 'Semi Final')
-        ? 80
+        ? (tournamentClass === 'worldChampionshipMain' ? 66 : 80)
         : mainTourEvent
         ? 78
         : tournamentClass === 'senior'
           ? 72
           : 82
+  const youngWorldChampionshipCeiling = tournamentClass === 'worldChampionshipMain' && state.player.age <= 24
+    ? (currentRound === 'Final'
+        ? 18
+        : currentRound === 'Semi Final'
+          ? 22
+          : currentRound === 'Quarter Final'
+            ? 28
+            : currentRound === 'Last 16'
+              ? 35
+              : 40)
+    : null
+  const eliteWinChanceCeiling = youngWorldChampionshipCeiling == null
+    ? baseWinChanceCeiling
+    : Math.min(baseWinChanceCeiling, youngWorldChampionshipCeiling)
   const rawWinChance = clamp(
-    winChanceBase + (playerStrength - opponentStrength) * 0.92 + qSchoolAdvantage + seededBoost * 0.45 + accessBandBonus + eliteClutchBonus + eliteRankSeparationBonus + eliteFinalConversionBonus + eliteLateRoundControlBonus + matureEliteSemiConversionBonus + matureEliteFinalConversionBonus + matureTourContenderBonus + risingEliteConversionBonus + eliteMajorConversionBonus + matureWorldContenderBonus + finalDroughtConversionBonus - earlyMajorPressurePenalty - worldTitleBurdenPenalty - bottomTourPenalty,
+    winChanceBase + (playerStrength - opponentStrength) * 0.92 + qSchoolAdvantage + seededBoost * 0.45 + accessBandBonus + eliteClutchBonus + eliteRankSeparationBonus + eliteFinalConversionBonus + eliteLateRoundControlBonus + matureEliteSemiConversionBonus + matureEliteFinalConversionBonus + matureTourContenderBonus + risingEliteConversionBonus + eliteMajorConversionBonus + matureWorldContenderBonus + finalDroughtConversionBonus - earlyMajorPressurePenalty - worldTitleBurdenPenalty - worldChampionshipDifficultyPenalty - bottomTourPenalty,
     mainTourEvent ? 14 : 12,
     eliteWinChanceCeiling,
   )
@@ -7384,22 +7748,8 @@ function createMatchSetup(state: GameState, tournament: Tournament) {
           + Math.min(4, Math.max(0, playerBaseStrength - 82) * 0.2),
       )
     : null
-  const matureWorldFinalWinChanceFloor = tournamentClass === 'worldChampionshipMain'
-    && currentRound === 'Final'
-    && worldRank <= 33
-    && state.player.age >= 27
-    && state.player.age <= 42
-    && pressureSkill >= 76
-    ? Math.min(
-        eliteWinChanceCeiling,
-        58
-          + Math.min(6, Math.max(0, pressureSkill - 80) * 0.35)
-          + Math.min(4, Math.max(0, state.player.reputation - 80) * 0.2),
-      )
-    : null
   const winChanceFloor = Math.max(
     finalDroughtWinChanceFloor ?? 0,
-    matureWorldFinalWinChanceFloor ?? 0,
   )
   const winChance = winChanceFloor <= 0 ? rawWinChance : Math.max(rawWinChance, winChanceFloor)
 
@@ -8214,28 +8564,7 @@ function getLiveMatchTacticalModifiers(liveMatch: LiveMatchState, mode: LiveMatc
 function resolveCareerSimulationLiveMatch(state: GameState, tournament: Tournament): LiveMatchState {
   const liveMatch = createLiveMatchState(state, tournament)
   const frameWinChance = convertMatchWinProbabilityToFrameWinProbability(liveMatch.plannedMatchWinChance, liveMatch.bestOf)
-  const professionalFinals = state.history.tournamentHistory.filter(
-    (entry) => isProfessionalFinalLevelRun(entry),
-  ).length
-  const professionalTitles = state.history.tournamentHistory.filter(
-    (entry) => isProfessionalEventType(entry.eventType) && entry.result === 'Winner',
-  ).length
-  const isProfessionalTournament = isProfessionalEventType(tournament.eventClass ?? tournament.type)
-  const isWorldMainDrawTournament = isWorldChampionshipMainDrawTournament(tournament)
-  const breakthroughRound = liveMatch.round === 'Final' || liveMatch.round === 'Semi Final'
-  const forceBreakthroughFinal = breakthroughRound
-    && isProfessionalTournament
-    && (
-      (!isWorldMainDrawTournament && professionalTitles === 0 && professionalFinals >= 1 && state.player.age >= 24)
-      || (isWorldMainDrawTournament && professionalFinals >= 1 && state.player.age >= 30 && state.player.age <= 48)
-    )
-  const resolvedMatch = forceBreakthroughFinal
-    ? {
-        playerWonMatch: true,
-        loserFrames: clamp(liveMatch.framesNeeded - 2, 0, liveMatch.framesNeeded - 1),
-        frameOrder: buildCareerFrameOrder(true, liveMatch.framesNeeded, clamp(liveMatch.framesNeeded - 2, 0, liveMatch.framesNeeded - 1)),
-      }
-    : resolveCareerMatchResult(liveMatch.plannedMatchWinChance, liveMatch.framesNeeded)
+  const resolvedMatch = resolveCareerMatchResult(liveMatch.plannedMatchWinChance, liveMatch.framesNeeded)
   let playerFrames = 0
   let opponentFrames = 0
   let playerHighestBreak = 0
@@ -8311,37 +8640,6 @@ function finalizeLiveMatch(state: GameState, liveMatch: LiveMatchState): GameSta
     return finalizeState({ ...state, liveMatch: null }, 'The active live match could not be resolved.')
   }
 
-  const existingTournamentHistoryEntry = state.history.tournamentHistory.find((entry) => entry.id === getTournamentHistoryId(state.season, tournament.id))
-  const breakthroughFinalRound = liveMatch.round === 'Final'
-    || liveMatch.round === 'Semi Final'
-    || (existingTournamentHistoryEntry != null && getTournamentHistoryFinishTier(existingTournamentHistoryEntry) >= 4)
-  const professionalTitles = state.history.tournamentHistory.filter((entry) => isProfessionalEventType(entry.eventType) && entry.result === 'Winner').length
-  const professionalFinals = state.history.tournamentHistory.filter((entry) => isProfessionalFinalLevelRun(entry)).length
-  const isProfessionalTournament = isProfessionalEventType(tournament.eventClass ?? tournament.type)
-  const isWorldMainDrawTournament = isWorldChampionshipMainDrawTournament(tournament)
-  const shouldConvertBreakthroughFinal = breakthroughFinalRound
-    && liveMatch.playerFrames < liveMatch.opponentFrames
-    && isProfessionalTournament
-    && (
-      (!isWorldMainDrawTournament && professionalTitles === 0 && professionalFinals >= 1 && state.player.age >= 24)
-      || (isWorldMainDrawTournament && professionalFinals >= 1 && state.player.age >= 30 && state.player.age <= 48)
-    )
-
-  if (shouldConvertBreakthroughFinal) {
-    const loserFrames = clamp(liveMatch.framesNeeded - 2, 0, liveMatch.framesNeeded - 1)
-    liveMatch = {
-      ...liveMatch,
-      playerFrames: liveMatch.framesNeeded,
-      opponentFrames: loserFrames,
-      frameHistory: buildCareerFrameOrder(true, liveMatch.framesNeeded, loserFrames).map((playerWonFrame, index) => ({
-        frame: `F${index + 1}`,
-        player: playerWonFrame ? '72' : '34',
-        opponent: playerWonFrame ? '34' : '68',
-        winner: playerWonFrame ? liveMatch.playerName : liveMatch.opponentName,
-      })),
-    }
-  }
-
   const currentRoundIndex = TOURNAMENT_ROUNDS.indexOf(liveMatch.round)
   const roundPlan = getTournamentRoundPlan(tournament, liveMatch.round)
   const won = liveMatch.playerFrames > liveMatch.opponentFrames
@@ -8385,7 +8683,7 @@ function finalizeLiveMatch(state: GameState, liveMatch: LiveMatchState): GameSta
   const opponentRow = rankingRows.find((row) => row.playerName === liveMatch.opponentName)
   const tournamentClass = getTournamentCircuitClass(tournament)
   const latestMatch: Match = {
-    id: `match-${Date.now()}`,
+    id: `match-${Date.now()}-${tournament.id}-${liveMatch.round.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${state.history.matchLog.length + 1}`,
     tournamentId: tournament.id,
     playedOn: state.currentDate,
     round: liveMatch.round,
@@ -8644,17 +8942,20 @@ function recalculateState(state: GameState, lastAction = state.lastAction): Game
     tournaments: state.tournaments,
   }, 'oneYear')
   competitionTables = removeOveragePlayerFromYouthTable(competitionTables, state.player)
+  competitionTables = enforcePlayerWorldRankingCeiling(
+    competitionTables,
+    state.player.fullName,
+    getPlayerWorldRankingCeiling(state),
+  )
   const careerSystems = syncCareerSystems({ competitionTables, player: state.player, careerSystems: state.careerSystems, history: state.history })
   const primaryCompetitionKey = getPrimaryCompetitionKey({ player: state.player, careerSystems })
   const activeRankings = competitionTables[primaryCompetitionKey].map((row) => ({ ...row }))
-  const isCurrentOrUpcomingEvent = (event: Tournament) => (event.endDate ?? event.startDate) >= state.currentDate
-  const relevantTournaments = state.tournaments.filter((event) => getCompetitionKeysForTournament(event).includes(primaryCompetitionKey))
-  const nextEvent = relevantTournaments.find((event) => event.status === 'Entered' && isCurrentOrUpcomingEvent(event))
-    ?? relevantTournaments.find((event) => (event.status === 'Booked' || event.status === 'Available' || event.status === 'High Cost') && isCurrentOrUpcomingEvent(event))
-    ?? state.tournaments.find((event) => event.status === 'Entered' && isCurrentOrUpcomingEvent(event))
-    ?? state.tournaments.find((event) => (event.status === 'Booked' || event.status === 'Available' || event.status === 'High Cost') && isCurrentOrUpcomingEvent(event))
-    ?? relevantTournaments[0]
-    ?? state.tournaments[0]
+  const nextEvent = getNextEligibleTournament({
+    ...state,
+    rankings: activeRankings,
+    competitionTables,
+    careerSystems,
+  })
   const activePlayerRow = activeRankings.find((row) => row.playerName === state.player.fullName)
   const playerWorldRow = competitionTables.world.find((row) => row.playerName === state.player.fullName)
   const playerSeniorRow = competitionTables.senior.find((row) => row.playerName === state.player.fullName)
@@ -8710,6 +9011,7 @@ export function createStarterState(): GameState {
   const careerSystems = syncCareerSystems({ competitionTables, player: starterPlayer, careerSystems: createEmptyCareerSystems() })
 
   const baseState: GameState = {
+    schemaVersion: SAVE_SCHEMA_VERSION,
     worldSeed,
     currentDate: '2026-05-11',
     season: '2026/27',
@@ -8723,6 +9025,8 @@ export function createStarterState(): GameState {
       cash: starterPlayerProfile.cash,
       baseCashFlow: starterPlayerProfile.cashFlow,
       cashFlow: starterPlayerProfile.cashFlow,
+      budgetTargets: {},
+      ledger: [],
     },
     tournaments: buildTournamentScheduleForSeason(2026),
     matches: starterMatches.map((match) => ({ ...match })),
@@ -8746,7 +9050,7 @@ export function createStarterState(): GameState {
 
   baseState.trainingPlan = buildAutoTrainingPlanFromState(baseState)
 
-  return withHistorySnapshot(recalculateState(baseState, baseState.lastAction), 'Starter Save')
+  return withHistorySnapshot(recalculateState(repairGameState(baseState), baseState.lastAction), 'Starter Save')
 }
 
 export function createNewCareerState(config?: NewCareerConfig): GameState {
@@ -8793,9 +9097,15 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
 
     return Math.max(60, weekly)
   })()
-  const startingFunds = selectedStartingLevel.competitionTable === 'qSchool'
+  const baseStartingFunds = selectedStartingLevel.competitionTable === 'qSchool'
     ? Math.max(selectedBackground.funds, 2500)
     : selectedBackground.funds
+  const startingFunds = selectedStartingLevel.id === 'start-bottom-tour'
+    ? Math.max(1500, Math.round(baseStartingFunds * 0.65))
+    : baseStartingFunds
+  const adjustedStartingWeeklyCashFlow = selectedStartingLevel.id === 'start-bottom-tour'
+    ? Math.max(60, startingWeeklyCashFlow - 55)
+    : startingWeeklyCashFlow
 
   const player: Player = {
     ...starterPlayerProfile,
@@ -8816,7 +9126,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
     personalityTraits: effectiveSliders.map((slider) => ({ ...slider })),
     amateurRanking: selectedStartingLevel.competitionTable === 'world' || selectedStartingLevel.competitionTable === 'senior' ? null : selectedStartingLevel.targetRanking,
     cash: startingFunds,
-    cashFlow: startingWeeklyCashFlow,
+    cashFlow: adjustedStartingWeeklyCashFlow,
     confidence: clamp(58 + Math.round((competitiveness - 50) / 3), 45, 82),
     fatigue: 18,
     morale: clamp(62 + Math.round((perseverance - 50) / 4), 48, 86),
@@ -8835,6 +9145,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
   const careerSystems = syncCareerSystems({ competitionTables, player, careerSystems: createCareerSystemsForStartingLevel(selectedStartingLevel) })
 
   const baseState: GameState = {
+    schemaVersion: SAVE_SCHEMA_VERSION,
     worldSeed,
     currentDate: '2026-05-11',
     season: '2026/27',
@@ -8846,8 +9157,10 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
     equipment: buildEmptyEquipmentState(),
     finance: {
       cash: startingFunds,
-      baseCashFlow: startingWeeklyCashFlow,
-      cashFlow: startingWeeklyCashFlow,
+      baseCashFlow: adjustedStartingWeeklyCashFlow,
+      cashFlow: adjustedStartingWeeklyCashFlow,
+      budgetTargets: {},
+      ledger: [],
     },
     tournaments: buildTournamentScheduleForSeason(2026),
     matches: [],
@@ -8862,7 +9175,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
       selectedBackground.name,
       selectedBackground.difficulty,
       selectedStartingLevel.name,
-      startingWeeklyCashFlow,
+      adjustedStartingWeeklyCashFlow,
     ),
     travel: createEmptyTravelState(),
     maintenance: { history: [] },
@@ -8877,7 +9190,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
 
   baseState.trainingPlan = buildAutoTrainingPlanFromState(baseState)
 
-  return withHistorySnapshot(recalculateState(baseState, baseState.lastAction), 'Career Created')
+  return withHistorySnapshot(recalculateState(repairGameState(baseState), baseState.lastAction), 'Career Created')
 }
 
 function loadStoredState(): GameState {
@@ -8916,7 +9229,12 @@ function loadStoredState(): GameState {
           ...(parsed.equipment?.cueStates ?? {}),
         },
       },
-      finance: { ...fallbackState.finance, ...parsed.finance },
+      finance: {
+        ...fallbackState.finance,
+        ...parsed.finance,
+        budgetTargets: parsed.finance?.budgetTargets ?? {},
+        ledger: Array.isArray(parsed.finance?.ledger) ? parsed.finance.ledger : [],
+      },
       tournaments: Array.isArray(parsed.tournaments) ? parsed.tournaments : fallbackState.tournaments,
       matches: Array.isArray(parsed.matches) ? parsed.matches : fallbackState.matches,
       rankings: Array.isArray(parsed.rankings) ? parsed.rankings : fallbackState.rankings,
@@ -8967,7 +9285,8 @@ function loadStoredState(): GameState {
       lastAction: parsed.lastAction ?? 'Loaded saved career.',
     }
 
-    return recalculateState(hydratedState, hydratedState.lastAction)
+    const repairedState = repairGameState(hydratedState)
+    return recalculateState(repairedState, repairedState.lastAction)
   } catch {
     return createStarterState()
   }
@@ -8980,6 +9299,16 @@ function runMatchSimulation(state: GameState, tournament: Tournament, simulation
 
   const resolvedLiveMatch = resolveCareerSimulationLiveMatch(state, tournament)
   return finalizeLiveMatch({ ...state, liveMatch: resolvedLiveMatch }, resolvedLiveMatch)
+}
+
+export function simulateTournamentMatchState(previousState: GameState, tournamentId?: string) {
+  const tournament = previousState.tournaments.find((item) => item.id === tournamentId) ?? previousState.tournaments.find((item) => item.status === 'Entered')
+  if (!tournament) return finalizeState(previousState, 'No entered tournament is ready for simulation.')
+  const playability = getTournamentPlayability(previousState, tournament)
+  if (!playability.canPlay) return finalizeState(previousState, playability.reason ?? `${tournament.name} is not ready to simulate.`)
+  const equipmentMessage = getTournamentEquipmentMessage(previousState.equipment)
+  if (equipmentMessage) return finalizeState(previousState, equipmentMessage)
+  return runMatchSimulation(previousState, tournament)
 }
 
 export function hireCoachState(previousState: GameState, coachId: string, contractLabel?: string) {
@@ -9406,6 +9735,48 @@ export function scheduleTreatmentState(previousState: GameState, optionId?: stri
   )
 }
 
+export function updateBudgetTargetsState(previousState: GameState, targets: Record<string, number>) {
+  const budgetTargets = Object.fromEntries(
+    Object.entries(targets).map(([category, amount]) => [category, Math.max(0, Math.round(Number(amount) || 0))]),
+  )
+  return finalizeState(
+    { ...previousState, finance: { ...previousState.finance, budgetTargets } },
+    'Updated the monthly budget allocation.',
+    'Budget Updated',
+  )
+}
+
+export function recordFinanceExpenseState(previousState: GameState, description: string, category: string, amount: number) {
+  const normalizedAmount = Math.max(0, Math.round(Number(amount) || 0))
+  const normalizedDescription = description.trim()
+  if (!normalizedDescription || normalizedAmount <= 0) return finalizeState(previousState, 'Enter an expense description and positive amount.')
+  if (normalizedAmount > previousState.player.cash) return finalizeState(previousState, 'There is not enough cash to record that expense.')
+
+  const transaction: FinanceTransaction = {
+    id: `finance-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+    date: previousState.currentDate,
+    description: normalizedDescription,
+    category: category.trim() || 'Other',
+    amount: -normalizedAmount,
+    type: 'Expense',
+  }
+  return finalizeState(
+    {
+      ...previousState,
+      player: { ...previousState.player, cash: previousState.player.cash - normalizedAmount },
+      finance: {
+        ...previousState.finance,
+        cash: previousState.player.cash - normalizedAmount,
+        ledger: [transaction, ...previousState.finance.ledger].slice(0, 240),
+      },
+    },
+    `Recorded ${normalizedDescription} for £${normalizedAmount.toLocaleString('en-GB')}.`,
+    'Expense Recorded',
+  )
+}
+
+export type { SaveSlotSummary }
+
 export function useGameState() {
   const [gameState, setGameState] = useState<GameState>(() => loadStoredState())
 
@@ -9416,6 +9787,52 @@ export function useGameState() {
 
   const actions = useMemo(
     () => ({
+      listSaveSlots() {
+        return readSaveSlotIndex()
+      },
+      saveToSlot(name: string) {
+        if (typeof window === 'undefined') return null
+        const normalizedName = name.trim() || `${gameState.player.fullName} · ${gameState.season}`
+        const id = `${Date.now()}-${Math.floor(Math.random() * 10000)}`
+        const summary: SaveSlotSummary = { id, name: normalizedName, playerName: gameState.player.fullName, season: gameState.season, date: gameState.currentDate, updatedAt: new Date().toISOString() }
+        window.localStorage.setItem(`${SAVE_SLOT_PREFIX}${id}`, JSON.stringify({ ...gameState, schemaVersion: SAVE_SCHEMA_VERSION }))
+        writeSaveSlotIndex([summary, ...readSaveSlotIndex()].slice(0, 20))
+        return summary
+      },
+      loadSaveSlot(id: string) {
+        if (typeof window === 'undefined') return false
+        const saved = window.localStorage.getItem(`${SAVE_SLOT_PREFIX}${id}`)
+        if (!saved) return false
+        window.localStorage.setItem(STORAGE_KEY, saved)
+        setGameState(loadStoredState())
+        return true
+      },
+      deleteSaveSlot(id: string) {
+        if (typeof window === 'undefined') return
+        window.localStorage.removeItem(`${SAVE_SLOT_PREFIX}${id}`)
+        writeSaveSlotIndex(readSaveSlotIndex().filter((slot) => slot.id !== id))
+      },
+      exportCareer() {
+        return JSON.stringify({ ...gameState, schemaVersion: SAVE_SCHEMA_VERSION }, null, 2)
+      },
+      importCareer(serializedState: string) {
+        if (typeof window === 'undefined') return false
+        try {
+          const parsed = JSON.parse(serializedState) as Partial<GameState>
+          if (!parsed.player || !Array.isArray(parsed.tournaments) || !parsed.currentDate) return false
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
+          setGameState(loadStoredState())
+          return true
+        } catch {
+          return false
+        }
+      },
+      updateBudgetTargets(targets: Record<string, number>) {
+        setGameState((previousState) => updateBudgetTargetsState(previousState, targets))
+      },
+      recordFinanceExpense(description: string, category: string, amount: number) {
+        setGameState((previousState) => recordFinanceExpenseState(previousState, description, category, amount))
+      },
       resetCareer(config?: NewCareerConfig) {
         setGameState(createNewCareerState(config))
       },
@@ -9665,94 +10082,14 @@ export function useGameState() {
       enterTournament(tournamentId: string) {
         setGameState((previousState) => enterTournamentState(previousState, tournamentId))
       },
+      withdrawTournament(tournamentId: string) {
+        setGameState((previousState) => withdrawTournamentState(previousState, tournamentId))
+      },
       bookTravel(tournamentId?: string, travelOptionId?: string, hotelOptionId?: string) {
-        setGameState((previousState) => {
-          const tournament = previousState.tournaments.find((item) => item.id === tournamentId) ?? previousState.tournaments.find((item) => item.status === 'Entered')
-          if (!tournament) {
-            return finalizeState(previousState, 'Enter a tournament before booking travel.')
-          }
-
-          const travelOption = getTravelOption(travelOptionId)
-          const hotelOption = getHotelOption(hotelOptionId)
-          const totalCost = getTripCost(travelOption, hotelOption)
-          const existingBooking = previousState.travel.bookings[tournament.id]
-          const delta = totalCost - (existingBooking?.totalCost ?? 0)
-
-          if (previousState.player.cash < delta) {
-            return finalizeState(previousState, `Not enough cash to lock the ${travelOption.name} and ${hotelOption.name} package.`)
-          }
-
-          return finalizeState(
-            {
-              ...previousState,
-              player: {
-                ...previousState.player,
-                cash: previousState.player.cash - delta,
-                fatigue: clamp(previousState.player.fatigue - Math.round((100 - travelOption.fatigueValue) / 25), 0, 100),
-                confidence: clamp(previousState.player.confidence + Math.round(hotelOption.preparationValue / 40), 0, 100),
-              },
-              travel: {
-                bookings: {
-                  ...previousState.travel.bookings,
-                  [tournament.id]: {
-                    tournamentId: tournament.id,
-                    travelOptionId: travelOption.id,
-                    hotelOptionId: hotelOption.id,
-                    totalCost,
-                    bookedWeek: previousState.week,
-                    bookedDate: previousState.currentDate,
-                  },
-                },
-              },
-              history: {
-                ...previousState.history,
-                tournamentHistory: upsertTournamentHistoryEntry(
-                  previousState.history.tournamentHistory,
-                  synchronizeTournamentHistoryEntry(
-                    tournament,
-                    {
-                      ...(previousState.history.tournamentHistory.find((entry) => entry.id === getTournamentHistoryId(previousState.season, tournament.id)) ?? createTournamentHistoryEntry(tournament, previousState.season)),
-                      status: 'Entered',
-                      result: 'Travel booked',
-                      bookedTravelCost: totalCost,
-                    },
-                  ),
-                ),
-              },
-              inbox: [
-                createInboxMessage(
-                  {
-                    sender: 'Travel Desk',
-                    subject: `${tournament.name} travel booked`,
-                    preview: `${travelOption.name} and ${hotelOption.name} are now locked in for £${totalCost}. Match-day readiness has improved.`,
-                    priority: 'Medium',
-                    actionLabel: 'Review Travel',
-                    actionRoute: '/travel',
-                  },
-                  'Today',
-                ),
-                ...previousState.inbox,
-              ].slice(0, 18),
-            },
-            `Booked travel for ${tournament.name}.`,
-            'Travel Booking',
-          )
-        })
+        setGameState((previousState) => bookTravelState(previousState, tournamentId, travelOptionId, hotelOptionId))
       },
       simulateMatch(tournamentId?: string) {
-        setGameState((previousState) => {
-          const tournament = previousState.tournaments.find((item) => item.id === tournamentId) ?? previousState.tournaments.find((item) => item.status === 'Entered')
-          if (!tournament) {
-            return finalizeState(previousState, 'No entered tournament is ready for simulation.')
-          }
-
-          const equipmentMessage = getTournamentEquipmentMessage(previousState.equipment)
-          if (equipmentMessage) {
-            return finalizeState(previousState, equipmentMessage)
-          }
-
-          return runMatchSimulation(previousState, tournament)
-        })
+        setGameState((previousState) => simulateTournamentMatchState(previousState, tournamentId))
       },
       startLiveMatch(tournamentId?: string) {
         setGameState((previousState) => {
@@ -9761,13 +10098,18 @@ export function useGameState() {
             return finalizeState(previousState, 'No entered tournament is ready to go live.')
           }
 
+          if (previousState.liveMatch && previousState.liveMatch.tournamentId === tournament.id && previousState.liveMatch.status === 'In Progress') {
+            return finalizeState(previousState, `Resumed the live match against ${previousState.liveMatch.opponentName}.`)
+          }
+
+          const playability = getTournamentPlayability(previousState, tournament)
+          if (!playability.canPlay) {
+            return finalizeState(previousState, playability.reason ?? `${tournament.name} is not ready to go live.`)
+          }
+
           const equipmentMessage = getTournamentEquipmentMessage(previousState.equipment)
           if (equipmentMessage) {
             return finalizeState(previousState, equipmentMessage)
-          }
-
-          if (previousState.liveMatch && previousState.liveMatch.tournamentId === tournament.id && previousState.liveMatch.status === 'In Progress') {
-            return finalizeState(previousState, `Resumed the live match against ${previousState.liveMatch.opponentName}.`)
           }
 
           return finalizeState(
@@ -9837,9 +10179,14 @@ export function useGameState() {
           }
 
           if (!nextState.liveMatch) {
-            const tournament = nextState.tournaments.find((item) => item.status === 'Entered')
+            const tournament = getNextEligibleTournament(nextState)
             if (!tournament) {
               return finalizeState(nextState, 'There is no live match to simulate.')
+            }
+
+            const playability = getTournamentPlayability(nextState, tournament)
+            if (!playability.canPlay) {
+              return finalizeState(nextState, playability.reason ?? `${tournament.name} is not ready to simulate.`)
             }
 
             nextState = {
@@ -10358,7 +10705,7 @@ export function useGameState() {
         })
       },
     }),
-    [],
+    [gameState],
   )
 
   return useMemo(

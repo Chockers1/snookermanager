@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom'
 import { Calendar, MapPin, Play, Search, Trophy, Users } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 import { chalkCatalog, cueCatalog, tipCatalog } from '../data/catalogs'
+import { getNextEligibleTournament, getTournamentPlayability } from '../hooks/useGameState'
 import { buildTournamentHubData } from '../utils/liveRouteData'
 import { formatMoney } from '../utils/formatters'
 
@@ -26,15 +27,16 @@ function isFinalRound(round: string | null) {
 }
 
 export function TournamentHubPage() {
-  const { gameState, simulateMatch, startLiveMatch, enterTournament } = useGame()
+  const { gameState, simulateMatch, startLiveMatch, enterTournament, continueToNextTournament } = useGame()
   const navigate = useNavigate()
   const tournamentData = buildTournamentHubData(gameState)
   const currentCue = cueCatalog.find((cue) => cue.id === gameState.equipment.currentCueId)
   const currentChalk = chalkCatalog.find((chalk) => chalk.id === gameState.equipment.currentChalkId)
   const currentTip = tipCatalog.find((tip) => tip.id === gameState.equipment.currentTipId)
   const equipmentReady = Boolean(currentCue && currentChalk && currentTip)
-  const activeTournament = gameState.tournaments.find((item) => item.status === 'Entered') ?? gameState.tournaments.find((item) => item.status === 'Booked' || item.status === 'Available' || item.status === 'High Cost') ?? gameState.tournaments[0]
+  const activeTournament = getNextEligibleTournament(gameState)
   const tournamentEntered = activeTournament?.status === 'Entered'
+  const playability = activeTournament ? getTournamentPlayability(gameState, activeTournament) : null
   const playerRow = gameState.rankings.find((row) => row.playerName === gameState.player.fullName)
   const nextOpponent = gameState.rankings.find((row) => row.playerName !== gameState.player.fullName && Math.abs(row.ranking - (playerRow?.ranking ?? 1)) <= 3) ?? gameState.rankings.find((row) => row.playerName !== gameState.player.fullName)
   const activeRound = gameState.tournamentProgress.tournamentId === activeTournament?.id ? gameState.tournamentProgress.currentRound : null
@@ -58,8 +60,15 @@ export function TournamentHubPage() {
     { round: 'First Round', prize: activeTournament?.firstRoundPrize ?? 0 },
   ]
   const nextMatchStageLabel = tournamentEntered ? activeRound ?? 'Awaiting Draw' : 'Awaiting Draw'
-  const primaryActionLabel = !equipmentReady ? 'Open Equipment' : tournamentEntered ? 'Play Next Match' : 'Enter Tournament'
-  const sidebarSecondaryActionLabel = equipmentReady ? 'Scout Opponent' : 'Manage Equipment'
+  const primaryActionLabel = !equipmentReady
+    ? 'Open Equipment'
+    : !tournamentEntered
+      ? 'Enter Tournament'
+      : (playability?.daysUntilStart ?? 0) > 7
+        ? 'Continue To Event'
+        : !playability?.travelBooked
+          ? 'Book Travel'
+          : 'Play Next Match'
 
   function handleQuickSim() {
     if (!activeTournament) return
@@ -67,6 +76,8 @@ export function TournamentHubPage() {
       navigate('/equipment/cues')
       return
     }
+
+    if (!playability?.canPlay) return
 
     simulateMatch(activeTournament.id)
     if (isFinalRound(activeRound)) navigate('/rankings?from=final')
@@ -81,6 +92,16 @@ export function TournamentHubPage() {
 
     if (!tournamentEntered) {
       enterTournament(activeTournament.id)
+      return
+    }
+
+    if ((playability?.daysUntilStart ?? 0) > 7) {
+      continueToNextTournament()
+      return
+    }
+
+    if (!playability?.travelBooked) {
+      navigate('/travel')
       return
     }
 
@@ -128,7 +149,7 @@ export function TournamentHubPage() {
           </div>
 
           <div className="card min-h-0 flex h-full flex-col overflow-hidden border-green-600/40 bg-gradient-to-r from-green-600/10 via-surface to-surface">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Next Match - {nextMatchStageLabel}</h3><span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-green-400">{tournamentEntered ? 'Playable' : 'Entry Needed'}</span></div>
+            <div className="card-header"><h3 className="text-sm font-semibold text-white">Next Match - {nextMatchStageLabel}</h3><span className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${playability?.canPlay ? 'text-green-400' : 'text-amber-400'}`}>{playability?.canPlay ? 'Playable' : tournamentEntered ? 'Preparation Needed' : 'Entry Needed'}</span></div>
             <div className="card-body flex h-full min-h-0 flex-col justify-between gap-3 p-3">
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
                 <div className="text-center">
@@ -151,8 +172,9 @@ export function TournamentHubPage() {
               <div className="flex justify-center gap-2">
                 <button type="button" className="btn-primary px-6 py-2 text-xs" onClick={handlePlayLiveMatch}><Play className="h-3.5 w-3.5" /> {primaryActionLabel}</button>
                 <button type="button" className="btn-secondary px-4 py-2 text-xs" onClick={handleScoutPreview}><Search className="h-3.5 w-3.5" /> Scout Preview</button>
-                <button type="button" className="btn-secondary px-4 py-2 text-xs" onClick={handleQuickSim}>Quick Sim</button>
+                <button type="button" className="btn-secondary px-4 py-2 text-xs" disabled={!playability?.canPlay} onClick={handleQuickSim}>Quick Sim</button>
               </div>
+              {tournamentEntered && !playability?.canPlay ? <p className="text-center text-[10px] text-amber-300">{playability?.reason}</p> : null}
             </div>
           </div>
 
@@ -242,11 +264,9 @@ export function TournamentHubPage() {
             </div>
           </div>
 
-          <div className="grid gap-2">
-            <button type="button" className="btn-primary justify-center py-2 text-xs" onClick={handlePlayLiveMatch}><Play className="h-3.5 w-3.5" /> {primaryActionLabel}</button>
-            <button type="button" className="btn-secondary justify-center py-2 text-xs" onClick={() => equipmentReady ? handleScoutPreview() : navigate('/equipment/cues')}><Search className="h-3.5 w-3.5" /> {sidebarSecondaryActionLabel}</button>
+          <div className="grid grid-cols-2 gap-2">
             <button type="button" className="btn-secondary justify-center py-2 text-xs" onClick={() => navigate('/tournaments/draw')}>View Draw</button>
-            <button type="button" className="btn-secondary justify-center py-2 text-xs" onClick={() => navigate('/travel')}><MapPin className="h-3.5 w-3.5" /> Travel Plan</button>
+            <button type="button" className="btn-secondary justify-center py-2 text-xs" onClick={() => navigate('/travel')}><MapPin className="h-3.5 w-3.5" /> Travel</button>
           </div>
         </div>
       </div>

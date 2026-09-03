@@ -1,7 +1,7 @@
 # Tournament Format Audit
 
-Generated: 2026-06-03T23:36:55.083Z
-Scenario: Custom start age 50 (start-masters) (middle coaching/equipment impact)
+Generated: 2026-09-03T09:06:32.484Z
+Scenario: Age 20 Top 32 (middle coaching/equipment impact)
 - Calendar model (expanded-tour): ranking 14-18 | qualifiers 4-8 | Players Series 2-3 | Q Tour 18-21 | Q School 5-5 | Top 16 12-18 | Top 64 8-14 | Bottom/Rookie 6-12
 
 ## 2026/27

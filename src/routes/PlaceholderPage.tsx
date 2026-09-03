@@ -1,37 +1,20 @@
-import { Construction, LayoutTemplate } from 'lucide-react'
-import { PageHeader } from '../components/layout/PageHeader'
-import { ActionButton } from '../components/ui/ActionButton'
-import { SectionCard } from '../components/ui/SectionCard'
+import { ArrowLeft, Home, MapPinOff } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
-type PlaceholderPageProps = {
-  title: string
-  description: string
-  section: string
-}
+export function NotFoundPage() {
+  const navigate = useNavigate()
 
-export function PlaceholderPage({ title, description, section }: PlaceholderPageProps) {
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow={section}
-        title={title}
-        description={description}
-        actions={<ActionButton tone="secondary" icon={<LayoutTemplate className="h-4 w-4" />}>Route Status</ActionButton>}
-      />
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_340px]">
-        <SectionCard title="Planned Screen" subtitle="This route is available in navigation, but its gameplay systems are not wired yet.">
-          <div className="rounded-xl border border-dashed border-scm-borderStrong bg-scm-deep/60 p-10 text-center">
-            <Construction className="mx-auto h-10 w-10 text-scm-gold" />
-            <p className="mt-4 text-lg font-semibold text-scm-text">{title} is not implemented yet</p>
-            <p className="mt-2 text-sm text-scm-textMuted">The route stays visible so navigation and shell structure remain consistent while the underlying systems are still being built.</p>
-          </div>
-        </SectionCard>
-        <SectionCard title="Route Status" subtitle="Current implementation state for this screen.">
-          <div className="mt-4 space-y-3 text-sm text-scm-textSoft">
-            <p>The shared shell, card language, and navigation structure are already in place.</p>
-            <p>Route-specific gameplay data will appear here once the screen is connected to live save systems.</p>
-          </div>
-        </SectionCard>
+    <div className="flex min-h-[65vh] items-center justify-center px-4">
+      <div className="card card-body w-full max-w-xl p-8 text-center sm:p-12">
+        <MapPinOff className="mx-auto h-12 w-12 text-amber-400" />
+        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">404 · Route not found</p>
+        <h1 className="mt-2 text-2xl font-bold text-white">That part of the venue does not exist</h1>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-gray-400">The address may be outdated or mistyped. Your career has not been changed.</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <button type="button" className="btn-secondary text-xs" onClick={() => navigate(-1)}><ArrowLeft className="h-3.5 w-3.5" /> Go Back</button>
+          <button type="button" className="btn-primary text-xs" onClick={() => navigate('/')}><Home className="h-3.5 w-3.5" /> Dashboard</button>
+        </div>
       </div>
     </div>
   )

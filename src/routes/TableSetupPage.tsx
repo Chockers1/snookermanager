@@ -6,7 +6,7 @@ import { ActionButton } from '../components/ui/ActionButton'
 import { AttributeBar } from '../components/ui/AttributeBar'
 import { SectionCard } from '../components/ui/SectionCard'
 import { StatusBadge } from '../components/ui/StatusBadge'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 import { tableSetupCatalog } from '../data/catalogs'
 import { formatMoney } from '../utils/formatters'
 
@@ -69,7 +69,12 @@ export function TableSetupPage() {
                 const tableEquipped = gameState.equipment.currentTableId === tableSetup.id
 
                 return (
-                  <button type="button" key={tableSetup.id} onClick={() => handleSelectTable(tableSetup.id)} className={`rounded-xl border p-4 text-left ${selected ? 'border-scm-green bg-scm-green/10' : 'border-scm-border bg-scm-panelSoft hover:border-scm-green/30'}`}>
+                  <div role="button" tabIndex={0} key={tableSetup.id} onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      handleSelectTable(tableSetup.id)
+                    }
+                  }} onClick={() => handleSelectTable(tableSetup.id)} className={`rounded-xl border p-4 text-left ${selected ? 'border-scm-green bg-scm-green/10' : 'border-scm-border bg-scm-panelSoft hover:border-scm-green/30'}`}>
                     <div className="flex items-start justify-between gap-3"><div><p className="text-xl font-semibold text-scm-text">{tableSetup.name}</p><p className="mt-2 text-2xl font-semibold text-scm-green">{formatMoney(tableSetup.price)}</p></div>{selected ? <StatusBadge tone="green">Selected</StatusBadge> : null}</div>
                     <div className="mt-4 space-y-3">
                       <AttributeBar label="Cloth Speed" value={tableSetup.clothSpeed} />
@@ -85,7 +90,7 @@ export function TableSetupPage() {
                         buyTableSetup(tableSetup.id)
                       }}>{tableEquipped ? 'Active' : tableOwned ? 'Activate Table' : 'Buy Table'}</ActionButton>
                     </div>
-                  </button>
+                  </div>
                 )
               })}
             </div>

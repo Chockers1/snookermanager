@@ -879,18 +879,21 @@ This sequence keeps the architecture coherent and prevents UI-first drift.
 
 ## 26. Save And Persistence Strategy
 
-Persistence is intentionally simple:
+Persistence is local-first and portable:
 
-- save is loaded from `localStorage`
-- state changes rewrite the save
+- the active save is loaded from `localStorage` and upgraded through a versioned repair step
+- state changes rewrite the active save
+- Save Manager supports multiple named browser-local slots
+- careers can be exported to and imported from JSON
 - the save contains both current progress and accumulated history
 
 Implications:
 
 - the app works offline
 - browser storage is the source of truth
-- resetting a career overwrites the local save
-- schema evolution requires fallback handling for older saves
+- resetting a career overwrites the active save but leaves named slots intact
+- schema evolution is handled by the save schema version and hydration repair
+- JSON exports provide a user-controlled backup and a future cloud-storage interchange format
 
 ## 27. Current Constraints And Tradeoffs
 
@@ -899,7 +902,7 @@ The current build is substantial, but still pragmatic rather than fully exhausti
 Known tradeoffs include:
 
 - no backend or cloud sync
-- no automated test suite yet
+- Vitest protects tournament eligibility, date/travel gating, legacy-save repair, withdrawal, finance actions, season rollover, CPU retirement, the complete tournament journey, and smoke-renders every application route in a browser-like DOM
 - some selector code still assumes a primary ranking view for older routes
 - match and AI simulation remain simplified relative to a full sports sim
 - some late-career and tour-rule details are summarized rather than modeled at governing-body granularity
@@ -912,6 +915,7 @@ Install and run locally:
 ```bash
 npm install
 npm run dev
+npm test
 ```
 
 Production build validation:
@@ -920,6 +924,14 @@ Production build validation:
 npm run build
 npm run preview
 ```
+
+Long-horizon simulation is deterministic by default (`20260903`) and accepts an alternate seed. Use the snapshot-skip flag for balance matrices that do not need multi-megabyte per-season player dumps:
+
+```bash
+npm run simulate:seasons -- --seasons=30 --seed=20260904 --skip-player-snapshots
+```
+
+Raw simulation output is written to the ignored `artifacts/simulations/` directory. Only compact, canonical audit summaries are retained in `docs/reports/`.
 
 Python launcher:
 

@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Dice5, ShieldCheck, UserRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 import {
   createPlayerBackgroundCatalog,
   createPlayerIdentitySeed,
@@ -106,10 +106,6 @@ export function NewCareerPage() {
   const startingRating = useMemo(() => calculateOverallRating({ attributes: previewAttributes, personalityTraits: effectiveSliders, playingStyle: form.playingStyle }), [effectiveSliders, form.playingStyle, previewAttributes])
   const startingPotential = useMemo(() => calculatePotentialRating({ attributes: previewAttributes, personalityTraits: effectiveSliders, age: normalizedAge, playingStyle: form.playingStyle, personalityType: derivedPersonality, overallRating: startingRating }), [derivedPersonality, effectiveSliders, form.playingStyle, normalizedAge, previewAttributes, startingRating])
   const canContinueFromIdentity = form.fullName.trim().length > 1 && form.nationality.trim().length > 1
-
-  useEffect(() => {
-    if (form.startingLevelId !== selectedStartingLevel.id) setForm((previous) => ({ ...previous, startingLevelId: selectedStartingLevel.id }))
-  }, [form.startingLevelId, selectedStartingLevel.id])
 
   const updateField = <T extends keyof typeof form,>(field: T, value: (typeof form)[T]) => setForm((previous) => ({ ...previous, [field]: value }))
 

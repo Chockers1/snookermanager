@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SlidersHorizontal } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
@@ -6,7 +6,7 @@ import { ActionButton } from '../components/ui/ActionButton'
 import { AttributeBar } from '../components/ui/AttributeBar'
 import { SectionCard } from '../components/ui/SectionCard'
 import { StatusBadge } from '../components/ui/StatusBadge'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 import { chalkCatalog, cueCatalog, tipCatalog } from '../data/catalogs'
 import { formatMoney } from '../utils/formatters'
 
@@ -36,17 +36,14 @@ export function ChalkTipPage() {
     { label: 'Maintenance', action: () => navigate('/equipment/maintenance'), active: false },
   ]
 
-  const setupBonuses = useMemo(
-    () => [
+  const setupBonuses = [
       { label: 'Grip & Contact', value: Math.round((selectedChalk.grip + selectedChalk.cleanContact) / 20) },
       { label: 'Spin Transfer', value: Math.round((selectedChalk.spinTransfer + selectedTip.spinControl) / 20) },
       { label: 'Consistency', value: Math.round((selectedChalk.consistency + selectedTip.consistency) / 20) },
       { label: 'Miscue Reduction', value: Math.round((selectedChalk.miscueReduction + selectedTip.miscueReduction) / 20) },
       { label: 'Cue Feel', value: Math.round((selectedTip.feel + (currentCue?.touch ?? 48)) / 20) },
       { label: 'Durability', value: Math.round((selectedTip.durability + (currentCue?.durability ?? 52)) / 20) },
-    ],
-    [currentCue?.durability, currentCue?.touch, selectedChalk.cleanContact, selectedChalk.consistency, selectedChalk.grip, selectedChalk.miscueReduction, selectedChalk.spinTransfer, selectedTip.consistency, selectedTip.durability, selectedTip.feel, selectedTip.miscueReduction, selectedTip.spinControl],
-  )
+    ]
 
   function openDetails() {
     detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -81,7 +78,13 @@ export function ChalkTipPage() {
                 const chalkEquipped = gameState.equipment.currentChalkId === chalk.id
 
                 return (
-                  <button type="button" key={chalk.id} onClick={() => {
+                  <div role="button" tabIndex={0} key={chalk.id} onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setSelectedChalkId(chalk.id)
+                      openDetails()
+                    }
+                  }} onClick={() => {
                     setSelectedChalkId(chalk.id)
                     openDetails()
                   }} className={`rounded-xl border p-4 text-left ${selected ? 'border-scm-green bg-scm-green/10' : 'border-scm-border bg-scm-panelSoft hover:border-scm-green/30'}`}>
@@ -100,7 +103,7 @@ export function ChalkTipPage() {
                         buyChalk(chalk.id)
                       }}>{chalkEquipped ? 'Equipped' : chalkOwned ? 'Equip Chalk' : 'Buy Chalk'}</ActionButton>
                     </div>
-                  </button>
+                  </div>
                 )
               })}
             </div>
@@ -114,7 +117,13 @@ export function ChalkTipPage() {
                 const tipEquipped = gameState.equipment.currentTipId === tip.id
 
                 return (
-                  <button type="button" key={tip.id} onClick={() => {
+                  <div role="button" tabIndex={0} key={tip.id} onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setSelectedTipId(tip.id)
+                      openDetails()
+                    }
+                  }} onClick={() => {
                     setSelectedTipId(tip.id)
                     openDetails()
                   }} className={`rounded-xl border p-4 text-left ${selected ? 'border-scm-green bg-scm-green/10' : 'border-scm-border bg-scm-panelSoft hover:border-scm-green/30'}`}>
@@ -137,7 +146,7 @@ export function ChalkTipPage() {
                         buyTip(tip.id)
                       }}>{tipEquipped ? 'Equipped' : tipOwned ? 'Equip Tip' : 'Buy Tip'}</ActionButton>
                     </div>
-                  </button>
+                  </div>
                 )
               })}
             </div>

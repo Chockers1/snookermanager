@@ -25,3 +25,7 @@ dist-ssr
 
 # Local environments
 .venv/
+
+# Generated design and simulation artifacts
+.superdesign/
+artifacts/

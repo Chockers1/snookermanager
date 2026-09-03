@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AlertTriangle, Bell, Check, CheckCircle2, ChevronRight, Mail, Trophy } from 'lucide-react'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
+import { getNextEligibleTournament } from '../hooks/useGameState'
 import { buildInboxData } from '../utils/liveRouteData'
 
 function priorityClass(priority: 'Low' | 'Medium' | 'High') {
@@ -20,15 +21,15 @@ export function InboxPage() {
   const [reviewedIds, setReviewedIds] = useState<string[]>([])
   const [selectedMessageId, setSelectedMessageId] = useState(gameState.inbox[0]?.id ?? '')
 
-  const filteredInbox = useMemo(() => gameState.inbox.filter((item) => {
+  const filteredInbox = gameState.inbox.filter((item) => {
     if (showActionableOnly && !item.actionRoute) return false
     if (categoryFilter === 'High Priority') return item.priority === 'High'
     if (categoryFilter === 'Staff') return /coach|staff|medical/i.test(item.sender)
     if (categoryFilter === 'Events') return /tournament|event|tour/i.test(`${item.subject} ${item.preview}`)
     return true
-  }), [categoryFilter, gameState.inbox, showActionableOnly])
+  })
 
-  const uniqueNewsCards = useMemo(() => {
+  const uniqueNewsCards = (() => {
     const seen = new Set<string>()
     return newsCards.filter((card) => {
       const key = `${card.title}-${card.source}-${card.date}`
@@ -36,23 +37,16 @@ export function InboxPage() {
       seen.add(key)
       return true
     })
-  }, [newsCards])
+  })()
 
   const selectedMessage = filteredInbox.find((item) => item.id === selectedMessageId) ?? filteredInbox[0] ?? null
-  const featuredTournament =
-    gameState.tournaments.find((item) => item.status === 'Booked' || item.status === 'Available' || item.status === 'High Cost') ??
-    gameState.tournaments.find((item) => item.status === 'Entered') ??
-    gameState.tournaments[0]
+  const featuredTournament = getNextEligibleTournament(gameState) ?? gameState.tournaments[0]
   const tabs = [
     { id: 'All', label: 'All', count: gameState.inbox.length },
     { id: 'High Priority', label: 'High Priority', count: gameState.inbox.filter((item) => item.priority === 'High').length },
     { id: 'Staff', label: 'Staff', count: gameState.inbox.filter((item) => /coach|staff|medical/i.test(item.sender)).length },
     { id: 'Events', label: 'Events', count: gameState.inbox.filter((item) => /tournament|event|tour/i.test(`${item.subject} ${item.preview}`)).length },
   ] as const
-
-  useEffect(() => {
-    if (!selectedMessage && filteredInbox[0]) setSelectedMessageId(filteredInbox[0].id)
-  }, [filteredInbox, selectedMessage])
 
   function openMessage(messageId: string) {
     setSelectedMessageId(messageId)

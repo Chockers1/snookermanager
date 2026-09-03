@@ -1,16 +1,16 @@
 # Status Integrity Audit
 
-Generated: 2026-06-03T23:36:55.083Z
-Scenario: Custom start age 50 (start-masters) (middle coaching/equipment impact)
+Generated: 2026-09-03T09:06:32.484Z
+Scenario: Age 20 Top 32 (middle coaching/equipment impact)
 
 ## Status Integrity Audit
 
-- Final status: Retired
-- worldTitles: 0
-- worldChampionshipWins: 0
-- majorTitles: 0
-- rankingTitles: 0
-- bestTournamentResult: Final
-- source of status assignment: retired from competitive events
+- Final status: World Champion
+- worldTitles: 1
+- worldChampionshipWins: 1
+- majorTitles: 1
+- rankingTitles: 4
+- bestTournamentResult: Winner
+- source of status assignment: confirmed World Championship main-draw win
 - valid: yes
 - warning: none

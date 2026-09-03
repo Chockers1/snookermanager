@@ -14,7 +14,8 @@ import {
 } from 'lucide-react'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useNavigate } from 'react-router-dom'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
+import { getNextEligibleTournament, getTournamentPlayability } from '../hooks/useGameState'
 import { buildDashboardData } from '../utils/liveRouteData'
 import { formatMoney } from '../utils/formatters'
 
@@ -74,14 +75,13 @@ export function DashboardPage() {
   const { gameState, continueWeek, continueToNextTournament, enterTournament, startLiveMatch } = useGame()
   const navigate = useNavigate()
   const { currentCue, financeChart, trainingWeek } = buildDashboardData(gameState)
-  const enteredEvent = gameState.tournaments.find((event) => event.status === 'Entered')
-  const nextEvent = enteredEvent
-    ?? gameState.tournaments.find((event) => event.status === 'Booked' || event.status === 'Available' || event.status === 'High Cost')
-    ?? gameState.tournaments[0]
+  const nextEvent = getNextEligibleTournament(gameState)
+  const enteredEvent = nextEvent?.status === 'Entered' ? nextEvent : undefined
   const currentRanking = gameState.rankings.find((row) => row.playerName === gameState.player.fullName)?.ranking
     ?? gameState.player.worldRanking
     ?? gameState.player.amateurRanking
-  const canPlayTournament = !!enteredEvent && gameState.player.daysUntilEvent <= 7
+  const tournamentPlayability = enteredEvent ? getTournamentPlayability(gameState, enteredEvent) : null
+  const canPlayTournament = tournamentPlayability?.canPlay ?? false
   const hasLiveMatchInProgress = gameState.liveMatch?.status === 'In Progress'
   const activeCoach = gameState.coaches.find((coach) => coach.id === gameState.currentCoachId)
   const latestMatches = gameState.matches.slice(0, 5)
@@ -121,7 +121,13 @@ export function DashboardPage() {
   const primaryEventActionLabel = hasLiveMatchInProgress
     ? 'Resume Live Match'
     : enteredEvent
-      ? canPlayTournament ? 'Play Live Match' : 'Continue To Event'
+      ? canPlayTournament
+        ? 'Play Live Match'
+        : (tournamentPlayability?.daysUntilStart ?? 0) > 7
+          ? 'Continue To Event'
+          : !tournamentPlayability?.travelBooked
+            ? 'Book Travel'
+            : 'Prepare Event'
       : 'Save Next Event'
   const currentCueBonus = Object.entries(currentCue?.bonuses ?? {}).sort((left, right) => right[1] - left[1])[0]
   const rankingBest = activeRankingTrend.length > 0 ? Math.min(...activeRankingTrend.map((point) => point.rank)) : currentRanking ?? 0
@@ -137,15 +143,18 @@ export function DashboardPage() {
       return
     }
 
-    if (enteredEvent && canPlayTournament) {
-      startLiveMatch(enteredEvent.id)
-      navigate('/match/live')
-      return
-    }
-
     if (enteredEvent) {
-      continueToNextTournament()
-      navigate('/tournaments/hub')
+      if (canPlayTournament) {
+        startLiveMatch(enteredEvent.id)
+        navigate('/match/live')
+      } else if ((tournamentPlayability?.daysUntilStart ?? 0) > 7) {
+        continueToNextTournament()
+        navigate('/tournaments/hub')
+      } else if (!tournamentPlayability?.travelBooked) {
+        navigate('/travel')
+      } else {
+        navigate('/tournaments/hub')
+      }
       return
     }
 
@@ -419,7 +428,7 @@ export function DashboardPage() {
             </div>
             <div className="card-body flex h-full flex-col">
               <div className="flex-1">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
                   <AreaChart data={activeRankingTrend}>
                     <defs>
                       <linearGradient id="dashboardRankGradient" x1="0" y1="0" x2="0" y2="1">
@@ -475,16 +484,8 @@ export function DashboardPage() {
                 </div>
               </div>
               <div className="rounded-xl border border-border bg-surface-light/40 p-2">
-                <div className="flex items-center justify-between gap-2.5">
-                  <div className="min-w-0">
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">Opponent</p>
-                    <p className="mt-0.5 truncate text-xs font-semibold leading-tight text-white">{opponentName}</p>
-                  </div>
-                  <button type="button" onClick={handlePrimaryEventAction} className="btn-primary shrink-0 px-2 py-0.5 text-[9px]">
-                    Prepare
-                    <ChevronRight className="h-3 w-3" />
-                  </button>
-                </div>
+                <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">Opponent</p>
+                <p className="mt-0.5 truncate text-xs font-semibold leading-tight text-white">{opponentName}</p>
               </div>
             </div>
           </div>
@@ -535,11 +536,7 @@ export function DashboardPage() {
                 <button type="button" onClick={() => navigate('/mental')} className="btn-secondary justify-center text-[10px]">Before Match Routine</button>
                 <button type="button" onClick={() => navigate(latestResult ? '/match/result' : '/calendar')} className="btn-secondary justify-center text-[10px]">Review Last Event</button>
               </div>
-              <button type="button" onClick={handlePrimaryEventAction} className="btn-primary w-full justify-center text-xs">
-                {primaryEventActionLabel}
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-              <button type="button" onClick={continueWeek} className="text-left text-[10px] font-medium text-gray-400 transition hover:text-green-400">Advance One Week</button>
+              <button type="button" onClick={continueWeek} className="btn-secondary w-full justify-center text-[10px]">Advance One Week</button>
             </div>
           </div>
         </div>

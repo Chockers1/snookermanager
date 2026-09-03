@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Filter, Star } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 import { getCoachAvailability, getCoachContractOptions, getCoachSlotLimit } from '../utils/coachMarket'
 import { formatMoney } from '../utils/formatters'
 

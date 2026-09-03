@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Brain, BrainCircuit, Check, ChevronRight, Flame, ShieldAlert, Target } from 'lucide-react'
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 import { buildMentalStateData } from '../utils/liveRouteData'
 
 function toneClass(tone: 'green' | 'amber' | 'red') {
@@ -97,7 +97,7 @@ export function MentalStatePage() {
             <div className="card min-h-0 flex h-full flex-col overflow-hidden">
               <div className="card-header px-3 py-2"><h3 className="text-sm font-semibold text-white">Mental Trend (Last 6 Weeks)</h3></div>
               <div className="card-body h-full min-h-0 px-2 py-2">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
                   <LineChart data={mentalData.trend}>
                     <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} domain={[0, 100]} width={26} />

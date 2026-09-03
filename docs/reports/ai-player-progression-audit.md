@@ -1,67 +1,70 @@
 # AI Player Progression Audit
 
-Generated: 2026-06-03T23:36:55.083Z
-Scenario: Custom start age 50 (start-masters) (middle coaching/equipment impact)
+Generated: 2026-09-03T09:06:32.484Z
+Scenario: Age 20 Top 32 (middle coaching/equipment impact)
 Seasons completed: 30
 
 ## 2026/27
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 6.4 / 0
+- Active AI season match average / zero-match players: 7.0 / 0
 - New AI players / overall movers / potential movers: 8 / 0 / 0
-- Top 16 average age / overall / potential: 30.3 / 93.4 / 93.6
-- Top 64 average age / overall / potential: 29.6 / 89.8 / 90.7
-- Players gaining tour cards: Adrian Verma, Bailey Nakamura, Bailey Tremblay, Bartosz Petrov, Bartosz Rahman, Cedric Rahman, Connor Otero, Connor Urban, Dario Verma, Dylan Sorensen, Emil Mendoza, Fraser Nakamura, Freddie Petrov, Freddie Rahman, Freddie Whitaker, Gareth Otero, Gareth Urban, Gianni Lombardi, Gianni Sorensen, Harris Mendoza, Ilyas Nakamura, Ivan Petrov, Ivan Verma, Ivan Whitaker, Jasper Petrov, Jasper Rahman, Kaito Sorensen, Kieran Petrov, Kieran Urban, Kieran Verma, Lennon Mendoza, Lorenzo Petrov, Lorenzo Whitaker, Malik Rahman, Mateo Nakamura, Nathan Urban, Niall Lombardi, Niall Sorensen, Oskar Petrov, Oskar Verma, Otis Mendoza, Patrick Nakamura, Pavel Petrov, Pavel Whitaker, Quentin Rahman, Rafael Sorensen, Reuben Tremblay, Reuben Urban, Samir Otero, Samir Verma, Sebastian Mendoza, Tariq Nakamura, Tobias Whitaker, Ulrich Urban, Viktor Petrov, Vincent Rahman, Warren Lombardi, Warren Sorensen, Wesley Petrov, Wesley Whitaker, Xander Rahman, Yannick Lombardi, Yannick Sorensen, Yusuf Grimaldi, Yusuf Mendoza, Zac Nakamura, Zac Tremblay, Zane Mendoza
+- AI retirements this season / total retired records: 0 / 0
+- Top 16 average age / overall / potential: 31.5 / 90.3 / 90.5
+- Top 64 average age / overall / potential: 29.4 / 85.2 / 86.3
+- Players gaining tour cards: Adrian Petrov, Bailey Hayashi, Bailey Nakamura, Bartosz Kowalski, Cedric Lombardi, Connor Otero, Dario Iversen, Dylan Fletcher, Emil Gallagher, Euan Iversen, Euan Kowalski, Euan Petrov, Fraser Hayashi, Fraser Nakamura, Freddie Lombardi, Gianni Ashford, Gianni Fletcher, Hamza Iversen, Hamza Otero, Harris Gallagher, Harris Mendoza, Ilyas Hayashi, Ivan Iversen, Ivan Kowalski, Ivan Whitaker, Jasper Lombardi, Joel Iversen, Joel Nakamura, Kaito Fletcher, Kieran Iversen, Kieran Petrov, Lennon Gallagher, Malik El-Sayed, Malik Lombardi, Mateo Hayashi, Mateo Nakamura, Nathan Iversen, Niall Fletcher, Oskar Iversen, Oskar Kowalski, Oskar Petrov, Otis Gallagher, Patrick Hayashi, Patrick Mendoza, Patrick Nakamura, Pavel Kowalski, Quentin Lombardi, Quentin Yates, Rafael Fletcher, Reuben Hayashi, Reuben Iversen, Samir Iversen, Sebastian Gallagher, Sebastian Mendoza, Tariq Hayashi, Tariq Nakamura, Tobias Kowalski, Viktor Iversen, Viktor Petrov, Vincent El-Sayed, Warren Fletcher, Xander El-Sayed, Yannick Fletcher, Yusuf Barker, Yusuf Gallagher, Yusuf Mendoza, Zac Hayashi, Zac Nakamura, Zane Gallagher, Zane Mendoza
 - Players losing tour cards: none
-- Players returning via Q School: Bailey Nakamura, Bailey Tremblay, Connor Urban, Gareth Urban, Ivan Verma, Jasper Petrov, Kieran Urban, Nathan Urban, Oskar Verma, Reuben Tremblay, Samir Otero, Ulrich Urban, Zac Tremblay
-- Players moving to Q Tour: Adrian Whitaker, Connor Verma, Gianni Ashford, Gianni Barker, Ivan Drayton, Jasper Caldwell, Joel Verma, Lennon Grimaldi, Lorenzo Drayton, Malik Sorensen, Nathan Verma, Oskar Whitaker, Reuben Verma, Tobias Ashford, Tobias Drayton, Vincent Sorensen, Wesley Drayton, Xander Sorensen
-- Players moving to senior/legend circuit: Adrian Vos, Bailey Olsen, Cedric Ashford, Cedric Langford, Cedric Yates, Emil Caldwell, Euan Janssen, Fraser Easton, Freddie Sorensen, Gareth Yates, Gianni Forster, Jasper Easton, Kaito Drayton, Mateo Barker, Nathan Caldwell, Nathan Iqbal, Niall Drayton, Otis Urban, Pavel Drayton, Vincent Langford, Warren Ashford, Xander Ashford, Zane Drayton
-- Biggest ranking climbers: Viktor Yilmaz (+5), Yusuf Costa (+4), Reuben Vos (+4), Pavel Costa (+4), Niall Xu (+4)
-- Biggest ranking fallers: Connor Mendoza (-33), Bailey Ashford (-31)
-- Youngest top 16 player: Niall Petrov (26)
-- Oldest top 16 player: Euan Whitaker (34)
-- Top prospects by potential: Bartosz Urban (97), Dylan Forster (96), Tobias Yates (96), Lorenzo Olsen (94), Samir Kovacs (94)
-- High-potential players who failed to progress: Jasper Gallagher: no tour access
+- Players returning via Q School: Bailey Nakamura, Fraser Nakamura, Harris Mendoza, Joel Nakamura, Mateo Nakamura, Patrick Mendoza, Patrick Nakamura, Reuben Hayashi, Tariq Nakamura, Yusuf Mendoza, Zac Nakamura, Zane Mendoza
+- Players moving to Q Tour: Adrian Rahman, Bailey Otero, Bailey Verma, Cedric Mendoza, Dario Grimaldi, Dario Verma, Gareth Petrov, Hamza Verma, Ilyas Otero, Ivan Sorensen, Joel Petrov, Lennon Whitaker, Nathan Petrov, Oskar Verma, Patrick Otero, Pavel Rahman, Reuben Petrov, Reuben Sorensen, Reuben Urban, Ulrich Petrov, Wesley Forster
+- Players moving to senior/legend circuit: Bartosz Easton, Bartosz Sorensen, Emil Otero, Fraser Langford, Fraser Otero, Freddie Sorensen, Gianni Verma, Hamza Kowalski, Ivan Forster, Kaito Mendoza, Lorenzo Langford, Lorenzo Rahman, Niall Mendoza, Oskar Sorensen, Otis Janssen, Pavel Lombardi, Quentin Mendoza, Rafael Verma, Reuben Rahman, Warren Ashford, Warren Tremblay, Wesley Rahman, Yusuf Nakamura, Zac Otero
+- Biggest ranking climbers: Viktor Harrington (+5), Freddie Barker (+5), Yannick Forster (+5), Kieran Iqbal (+5), Yusuf Langford (+5)
+- Biggest ranking fallers: Connor Drayton (-12), Hamza Grimaldi (-12), Bailey Olsen (-6), Patrick Gallagher (-4), Gareth Iversen (-3)
+- Youngest top 16 player: Ulrich Kowalski (26)
+- Oldest top 16 player: Patrick Gallagher (43)
+- Top prospects by potential: Samir Rahman (92), Ilyas Yates (92), Fraser Verma (92), Kieran Iqbal (89), Dylan Tanaka (89)
+- High-potential players who failed to progress: none
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2027/28
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 8.9 / 11
-- New AI players / overall movers / potential movers: 8 / 252 / 320
-- Top 16 average age / overall / potential: 31.3 / 91.4 / 91.5
-- Top 64 average age / overall / potential: 30.2 / 87.3 / 88.0
-- Players gaining tour cards: Oskar Otero
-- Players losing tour cards: Bailey Ashford
-- Players returning via Q School: Connor Urban, Gareth Urban, Ivan Verma, Jasper Petrov, Kieran Urban, Nathan Urban, Oskar Verma, Reuben Tremblay, Samir Otero, Ulrich Urban, Zac Tremblay
-- Players moving to Q Tour: Bartosz Drayton, Emil Urban, Euan Drayton, Quentin Ashford, Reuben Otero, Ulrich Verma, Wesley Yates
+- Active AI season match average / zero-match players: 8.9 / 0
+- New AI players / overall movers / potential movers: 8 / 234 / 301
+- AI retirements this season / total retired records: 0 / 0
+- Top 16 average age / overall / potential: 31.8 / 88.8 / 88.9
+- Top 64 average age / overall / potential: 29.4 / 84.3 / 85.4
+- Players gaining tour cards: Connor Petrov, Freddie Mendoza, Samir Kowalski
+- Players losing tour cards: Hamza Grimaldi, Patrick Gallagher
+- Players returning via Q School: Connor Petrov, Fraser Nakamura, Freddie Mendoza, Harris Mendoza, Joel Nakamura, Mateo Nakamura, Patrick Mendoza, Patrick Nakamura, Reuben Hayashi, Samir Kowalski, Tariq Nakamura, Yusuf Mendoza, Zac Nakamura, Zane Mendoza
+- Players moving to Q Tour: Cedric Verma, Dario Drayton, Dylan Verma, Emil Yates, Euan Forster, Gareth Rahman, Ilyas Rahman, Reuben Otero, Wesley Tremblay
 - Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Yannick Otero (+5), Samir Kovacs (+1), Fraser Olsen (+1), Lennon Kovacs (+1), Ivan Madsen (+1)
-- Biggest ranking fallers: Connor Mendoza (-23), Euan Whitaker (-1), Kieran Sorensen (-1), Sebastian Tremblay (-1), Jasper Barker (-1)
-- Youngest top 16 player: Niall Petrov (27)
-- Oldest top 16 player: Euan Whitaker (35)
-- Top prospects by potential: Mika Keane A (97), Bartosz Urban (94), Kai Pryce (93), Tobias Yates (91), Finn Cross (91)
-- High-potential players who failed to progress: Dylan Lombardi: no tour access, Jasper Gallagher: no tour access
+- Biggest ranking climbers: Xander Hayashi (+6), Joel Tanaka (+5), Jasper Patel (+4), Emil Iqbal (+4), Pavel Langford (+4)
+- Biggest ranking fallers: Connor Drayton (-16), Dylan Lombardi (-1)
+- Youngest top 16 player: Ulrich Kowalski (27)
+- Oldest top 16 player: Bailey Fletcher (36)
+- Top prospects by potential: Ren Vale (91), Samir Rahman (90), Ilyas Yates (90), Dylan Tanaka (89), Kieran Iqbal (88)
+- High-potential players who failed to progress: Euan Kowalski: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2028/29
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.0 / 24
-- New AI players / overall movers / potential movers: 8 / 227 / 324
-- Top 16 average age / overall / potential: 32.3 / 90.0 / 90.0
-- Top 64 average age / overall / potential: 31.1 / 85.5 / 86.0
-- Players gaining tour cards: Connor Mendoza, Adrian Petrov, Bailey Urban, Bartosz Drayton, Cedric Rahman, Cedric Sorensen, Connor Urban, Dario Verma, Dylan Sorensen, Emil Mendoza, Emil Tremblay, Euan Drayton, Euan Petrov, Euan Rahman, Fraser Harrington, Fraser Nakamura, Fraser Urban, Freddie Rahman, Freddie Whitaker, Gareth Iqbal, Gareth Otero, Gareth Urban, Gianni Ashford, Gianni Barker, Gianni Lombardi, Hamza Verma, Harris Mendoza, Harris Tremblay, Ilyas Nakamura, Ivan Petrov, Ivan Rahman, Ivan Whitaker, Jasper Petrov, Jasper Rahman, Jasper Sorensen, Joel Otero, Joel Urban, Kieran Petrov, Kieran Urban, Lennon Tremblay, Lorenzo Petrov, Lorenzo Whitaker, Malik Rahman, Malik Sorensen, Mateo Nakamura, Mateo Urban, Nathan Otero, Noah Bennett, Patrick Tremblay, Patrick Urban, Pavel Rahman, Quentin Ashford, Quentin Sorensen, Reuben Otero, Samir Petrov, Tariq Tremblay, Tariq Urban, Toby Hale, Ulrich Verma, Vincent Sorensen, Xander Sorensen, Yusuf Tremblay, Zac Urban, Zane Tremblay
-- Players losing tour cards: Connor Otero, Freddie Petrov, Gianni Sorensen, Ivan Verma, Kaito Sorensen, Kieran Verma, Lennon Mendoza, Nathan Urban, Niall Lombardi, Niall Sorensen, Oskar Petrov, Oskar Verma, Otis Mendoza, Patrick Nakamura, Pavel Petrov, Pavel Whitaker, Quentin Rahman, Rafael Sorensen, Reuben Tremblay, Reuben Urban, Samir Otero, Samir Verma, Sebastian Mendoza, Tariq Nakamura, Tobias Whitaker, Ulrich Urban, Viktor Petrov, Vincent Rahman, Warren Lombardi, Warren Sorensen, Wesley Petrov, Wesley Whitaker, Xander Rahman, Yannick Lombardi, Yannick Sorensen, Yusuf Grimaldi, Yusuf Mendoza, Zac Nakamura, Zac Tremblay, Zane Mendoza
-- Players returning via Q School: Adrian Petrov, Bailey Urban, Emil Tremblay, Fraser Urban, Harris Tremblay, Ivan Rahman, Patrick Urban, Pavel Rahman, Tariq Tremblay, Tariq Urban, Yusuf Tremblay, Zane Tremblay
-- Players moving to Q Tour: Adrian Ashford, Harris Easton, Ilyas Easton, Quentin Yates, Rafael Drayton, Sebastian Mendoza, Tariq Verma, Tobias Petrov, Viktor Verma, Vincent Ashford, Zane Easton
+- Active AI season match average / zero-match players: 9.1 / 0
+- New AI players / overall movers / potential movers: 8 / 197 / 284
+- AI retirements this season / total retired records: 0 / 0
+- Top 16 average age / overall / potential: 32.8 / 88.3 / 88.3
+- Top 64 average age / overall / potential: 30.2 / 83.3 / 84.0
+- Players gaining tour cards: Bailey Olsen, Adrian Kowalski, Adrian Rahman, Adrian Sorensen, Bailey Rahman, Bailey Verma, Bartosz Lombardi, Bartosz Rahman, Bartosz Tremblay, Bartosz Urban, Cedric Mendoza, Cedric Verma, Dario Drayton, Dario Easton, Dario Grimaldi, Dario Kowalski, Dylan Mendoza, Dylan Verma, Emil Gallagher, Emil Nakamura, Emil Yates, Euan Forster, Euan Iversen, Euan Kowalski, Euan Lombardi, Euan Petrov, Euan Urban, Fraser Hayashi, Fraser Nakamura, Freddie Lombardi, Gareth Otero, Gareth Rahman, Gianni Fletcher, Hamza Iversen, Hamza Otero, Harris Gallagher, Harris Mendoza, Ilyas El-Sayed, Ilyas Nakamura, Ilyas Rahman, Ivan Ainsley, Ivan Iversen, Ivan Kowalski, Ivan Lombardi, Joel Nakamura, Joel Otero, Jonah Jones, Kaito Fletcher, Kian Martin, Kieran Kowalski, Kieran Petrov, Lennon Gallagher, Lennon Nakamura, Lennon Whitaker, Nathan Drayton, Nathan Otero, Nathan Sorensen, Patrick Caldwell, Rafael Ashford, Rafael Drayton, Samir Yilmaz, Viktor Verma
+- Players losing tour cards: Gianni Ashford, Ilyas Hayashi, Ivan Whitaker, Jasper Lombardi, Joel Iversen, Kieran Iversen, Malik El-Sayed, Malik Lombardi, Mateo Hayashi, Mateo Nakamura, Nathan Iversen, Niall Fletcher, Oskar Iversen, Oskar Kowalski, Oskar Petrov, Otis Gallagher, Patrick Hayashi, Patrick Mendoza, Patrick Nakamura, Pavel Kowalski, Quentin Lombardi, Quentin Yates, Rafael Fletcher, Reuben Hayashi, Reuben Iversen, Samir Iversen, Sebastian Gallagher, Sebastian Mendoza, Tariq Hayashi, Tariq Nakamura, Tobias Kowalski, Viktor Iversen, Viktor Petrov, Vincent El-Sayed, Warren Fletcher, Xander El-Sayed, Yannick Fletcher, Yusuf Barker, Yusuf Gallagher, Yusuf Mendoza, Zac Hayashi, Zac Nakamura, Zane Gallagher, Zane Mendoza
+- Players returning via Q School: Adrian Kowalski, Bailey Verma, Bartosz Lombardi, Bartosz Rahman, Cedric Mendoza, Dario Grimaldi, Dario Kowalski, Dylan Mendoza, Emil Nakamura, Euan Lombardi, Freddie Mendoza, Ilyas El-Sayed, Samir Kowalski, Viktor Verma
+- Players moving to Q Tour: Harris Tremblay, Quentin Yates, Sebastian Mendoza, Tobias Sorensen, Viktor Petrov, Yusuf Barker
 - Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Rafael Grimaldi (+1), Bartosz Urban (+1), Lorenzo Olsen (+1), Tariq Patel (+1), Samir Kovacs (+1)
-- Biggest ranking fallers: Kieran Petrov (-14), Kieran Urban (-14), Mateo Nakamura (-14), Oskar Otero (-14), Lorenzo Petrov (-13)
-- Youngest top 16 player: Niall Petrov (28)
-- Oldest top 16 player: Euan Whitaker (36)
-- Top prospects by potential: Mika Keane A (97), Kai Pryce (93), Arlo Dawes B (92), Finn Cross (91), Noah Bennett A (91)
+- Biggest ranking climbers: Ilyas Yates (+1), Tobias Novak (+1)
+- Biggest ranking fallers: Kieran Petrov (-28), Lennon Gallagher (-28), Ivan Iversen (-27), Ivan Kowalski (-27), Kaito Fletcher (-27)
+- Youngest top 16 player: Ulrich Kowalski (28)
+- Oldest top 16 player: Bailey Fletcher (37)
+- Top prospects by potential: Zhen Novak (98), Louis Park (95), Kai Rossi (93), Ren Vale (91), Mateo Tan (89)
 - High-potential players who failed to progress: none
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
@@ -69,20 +72,21 @@ Seasons completed: 30
 
 ## 2029/30
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.3 / 2
-- New AI players / overall movers / potential movers: 8 / 198 / 280
-- Top 16 average age / overall / potential: 33.3 / 89.0 / 89.0
-- Top 64 average age / overall / potential: 31.7 / 84.7 / 85.1
-- Players gaining tour cards: Harris Kovacs, Kai Pryce, Oskar Westbrook, Sebastian Janssen
-- Players losing tour cards: Bartosz Petrov, Bartosz Rahman, Connor Mendoza, Oskar Otero
-- Players returning via Q School: Emil Tremblay, Fraser Urban, Harris Kovacs, Harris Tremblay, Ivan Rahman, Patrick Urban, Pavel Rahman, Sebastian Janssen, Tariq Tremblay, Tariq Urban, Yusuf Tremblay, Zane Tremblay
-- Players moving to Q Tour: Arlo Dawes A, Evan Mori, Jude Sloan, Kai Pryce A, Mateo Harrington, Ulrich Kowalski, Ulrich Otero
+- Active AI season match average / zero-match players: 9.4 / 0
+- New AI players / overall movers / potential movers: 8 / 176 / 261
+- AI retirements this season / total retired records: 0 / 0
+- Top 16 average age / overall / potential: 33.8 / 87.9 / 87.9
+- Top 64 average age / overall / potential: 30.4 / 83.3 / 84.0
+- Players gaining tour cards: Dario Verma, Kaito Tremblay, Lorenzo Kowalski, Ren Vale, Reuben Otero, Samir Petrov, Viktor Tremblay, Will Khan, Yuri Novak, Zane Nakamura
+- Players losing tour cards: Bailey Olsen, Bartosz Kowalski, Cedric Lombardi, Connor Drayton, Connor Otero, Connor Petrov, Dario Iversen, Dylan Fletcher, Freddie Mendoza, Samir Kowalski
+- Players returning via Q School: Bartosz Lombardi, Bartosz Rahman, Cedric Mendoza, Dario Grimaldi, Dario Kowalski, Dario Verma, Dylan Mendoza, Emil Nakamura, Euan Lombardi, Ilyas El-Sayed, Kaito Tremblay, Lorenzo Kowalski, Reuben Otero, Samir Petrov, Viktor Tremblay, Viktor Verma, Zane Nakamura
+- Players moving to Q Tour: Adrian Verma, Ivan Whitaker, Oskar Kowalski, Patrick Petrov, Pavel Mori, Sacha Bauer, Ulrich Otero, Wesley Tremblay, Wesley Whitaker
 - Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Cedric Rahman (+3), Cedric Sorensen (+3), Connor Urban (+3), Dario Verma (+3), Dylan Sorensen (+3)
-- Biggest ranking fallers: Ulrich Easton (-5), Rafael Grimaldi (-2), Otis Madsen (-2), Lennon Kovacs (-2), Zane Langford (-1)
-- Youngest top 16 player: Niall Petrov (29)
-- Oldest top 16 player: Euan Whitaker (37)
-- Top prospects by potential: Mika Keane A (97), Kai Pryce (93), Arlo Dawes B (92), Luca Mercer B (92), Finn Cross (91)
+- Biggest ranking climbers: Rafael Mendoza (+10), Gareth Otero (+8), Gareth Rahman (+8), Gianni Fletcher (+8), Hamza Iversen (+8)
+- Biggest ranking fallers: Sebastian Janssen (-6), Quentin Ashford (-5), Jasper Gallagher (-4), Oskar Otero (-3), Gareth Iversen (-3)
+- Youngest top 16 player: Ulrich Kowalski (29)
+- Oldest top 16 player: Bailey Fletcher (38)
+- Top prospects by potential: Zhen Novak (98), Evan Fischer (96), Louis Park (95), Will Huang (94), Hugo Dubois (93)
 - High-potential players who failed to progress: none
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
@@ -90,20 +94,21 @@ Seasons completed: 30
 
 ## 2030/31
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.6 / 19
-- New AI players / overall movers / potential movers: 8 / 177 / 207
-- Top 16 average age / overall / potential: 34.3 / 88.6 / 88.6
-- Top 64 average age / overall / potential: 32.5 / 83.9 / 84.4
-- Players gaining tour cards: Arlo Dawes, Arlo Dawes A, Bartosz Barker, Cedric Caldwell, Cedric Rahman, Cedric Sorensen, Connor Urban, Connor Yates, Dario Verma, Dylan Sorensen, Emil Tremblay, Euan Petrov, Euan Rahman, Evan Mori, Evan Mori A, Finn Cross, Fraser Forster, Fraser Nakamura, Fraser Urban, Freddie Rahman, Freddie Whitaker, Gianni Drayton, Gianni Lombardi, Hamza Ashford, Hamza Whitaker, Ilyas Easton, Ilyas Nakamura, Ilyas Tremblay, Ivan Drayton, Ivan Petrov, Ivan Whitaker, Kieran Yates, Lorenzo Ashford, Luca Mercer, Malik Caldwell, Mateo Harrington, Mika Keane, Mika Keane A, Nathan Verma, Niall Caldwell, Noah Bennett A, Oskar Ashford, Rafael Ashford, Rafael Drayton, Reuben Verma, Rory Vale, Rory Vale A, Tobias Ashford, Tobias Drayton, Tobias Petrov, Ulrich Kowalski, Ulrich Otero, Viktor Verma, Warren Yates, Wesley Yates, Yannick Caldwell, Yusuf Barker, Zac Forster, Zane Easton, Zane Urban
-- Players losing tour cards: Emil Mendoza, Euan Drayton, Fraser Harrington, Gareth Iqbal, Gareth Otero, Gareth Urban, Gianni Ashford, Gianni Barker, Hamza Verma, Harris Mendoza, Harris Tremblay, Ivan Rahman, Jasper Petrov, Jasper Rahman, Jasper Sorensen, Joel Otero, Joel Urban, Kieran Petrov, Kieran Urban, Lennon Tremblay, Lorenzo Petrov, Lorenzo Whitaker, Malik Rahman, Malik Sorensen, Mateo Nakamura, Mateo Urban, Nathan Otero, Noah Bennett, Patrick Tremblay, Patrick Urban, Pavel Rahman, Quentin Ashford, Quentin Sorensen, Reuben Otero, Samir Petrov, Tariq Tremblay, Tariq Urban, Toby Hale, Ulrich Verma, Vincent Sorensen, Xander Sorensen, Yusuf Tremblay, Zac Urban, Zane Tremblay
-- Players returning via Q School: Connor Yates, Evan Mori A, Gianni Drayton, Hamza Ashford, Harris Kovacs, Ivan Drayton, Oskar Ashford, Sebastian Janssen, Tobias Ashford, Warren Yates, Wesley Yates, Yannick Caldwell, Yusuf Barker, Zac Forster
-- Players moving to Q Tour: Lorenzo Petrov, Oskar Otero, Rafael Mendoza, Yannick Forster, Zac Ashford
+- Active AI season match average / zero-match players: 9.5 / 0
+- New AI players / overall movers / potential movers: 8 / 154 / 187
+- AI retirements this season / total retired records: 1 / 1
+- Top 16 average age / overall / potential: 34.7 / 87.9 / 87.9
+- Top 64 average age / overall / potential: 31.4 / 82.5 / 83.0
+- Players gaining tour cards: Adrian Iversen, Arlo Dawes, Bailey Otero, Bartosz Tremblay, Bartosz Urban, Cedric Mendoza, Cedric Verma, Dario Drayton, Dario Grimaldi, Dario Kowalski, Dylan Mendoza, Dylan Verma, Emil Gallagher, Euan Petrov, Finn Ortega, Fraser Hayashi, Fraser Nakamura, Freddie El-Sayed, Gareth Petrov, Gianni Ashford, Hamza Verma, Harris Whitaker, Ilyas Hayashi, Ivan Ainsley, Ivan Sorensen, Ivan Whitaker, Jasper Mendoza, Joel Petrov, Jude Larsen, Kaito Urban, Kaito Verma, Kieran Rahman, Mateo Tan, Mika Keane, Nathan Petrov, Oskar Kowalski, Oskar Verma, Otis Mendoza, Otis Nakamura, Patrick Petrov, Pavel Mori, Pavel Rahman, Quentin Yates, Reuben Sorensen, Rory Ito, Sacha Bauer, Sebastian Mendoza, Ulrich Otero, Victor Huang, Viktor Petrov, Wesley Kowalski, Yusuf Barker, Zac Caldwell, Zane Iqbal
+- Players losing tour cards: Dario Easton, Emil Nakamura, Emil Yates, Euan Forster, Euan Iversen, Euan Kowalski, Euan Lombardi, Euan Urban, Freddie Lombardi, Gareth Otero, Gareth Rahman, Gianni Fletcher, Hamza Iversen, Hamza Otero, Harris Gallagher, Harris Mendoza, Ilyas El-Sayed, Ilyas Nakamura, Ilyas Rahman, Ivan Iversen, Ivan Kowalski, Ivan Lombardi, Joel Nakamura, Joel Otero, Jonah Jones, Kaito Fletcher, Kian Martin, Kieran Kowalski, Kieran Petrov, Lennon Gallagher, Lennon Nakamura, Lennon Whitaker, Nathan Drayton, Nathan Otero, Nathan Sorensen, Patrick Caldwell, Rafael Ashford, Rafael Drayton, Samir Yilmaz, Viktor Verma
+- Players returning via Q School: Adrian Iversen, Bailey Otero, Dario Verma, Gareth Petrov, Hamza Verma, Ivan Sorensen, Jasper Mendoza, Kaito Tremblay, Kaito Urban, Kaito Verma, Lorenzo Kowalski, Nathan Petrov, Otis Mendoza, Reuben Otero, Samir Petrov, Victor Huang, Viktor Tremblay, Zac Caldwell, Zane Nakamura
+- Players moving to Q Tour: Freddie Mendoza, Jasper Urban, Rafael Ashford, Rafael Drayton, Samir Yilmaz, Tobias Sorensen, Viktor Verma
 - Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Sebastian Janssen (+4), Patrick Barker (+3), Yannick Westbrook (+3), Dylan Forster (+2), Warren Iqbal (+2)
-- Biggest ranking fallers: Fraser Nakamura (-6), Fraser Urban (-6), Freddie Rahman (-6), Freddie Whitaker (-6), Dario Verma (-5)
-- Youngest top 16 player: Niall Petrov (30)
-- Oldest top 16 player: Euan Whitaker (38)
-- Top prospects by potential: Luca Mercer C (98), Mika Keane A (97), Mika Keane C (97), Rory Vale C (97), Kai Pryce (93)
+- Biggest ranking climbers: Lorenzo Kowalski (+14), Kaito Tremblay (+11), Ivan Ainsley (+9), Ren Vale (+9), Reuben Otero (+9)
+- Biggest ranking fallers: Xander Hayashi (-4), Gareth Iversen (-4), Oskar Otero (-3), Bailey Rahman (-3), Bailey Verma (-3)
+- Youngest top 16 player: Ulrich Kowalski (30)
+- Oldest top 16 player: Bailey Fletcher (39)
+- Top prospects by potential: Zhen Novak (98), Evan Fischer (96), Louis Park (95), Will Huang (94), Hugo Dubois (93)
 - High-potential players who failed to progress: none
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
@@ -111,41 +116,43 @@ Seasons completed: 30
 
 ## 2031/32
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.6 / 5
-- New AI players / overall movers / potential movers: 8 / 152 / 169
-- Top 16 average age / overall / potential: 35.3 / 87.8 / 87.8
-- Top 64 average age / overall / potential: 33.5 / 83.6 / 83.9
-- Players gaining tour cards: Bartosz Rahman, Fraser Harrington, Jasper Langford, Kai Pryce, Noah Bennett, Toby Hale
-- Players losing tour cards: Bailey Urban, Bartosz Drayton, Harris Kovacs, Oskar Westbrook, Sebastian Janssen
-- Players returning via Q School: Connor Yates, Evan Mori A, Fraser Harrington, Gianni Drayton, Hamza Ashford, Ivan Drayton, Jasper Langford, Noah Bennett, Oskar Ashford, Tobias Ashford, Toby Hale, Warren Yates, Wesley Yates, Yannick Caldwell, Yusuf Barker, Zac Forster
-- Players moving to Q Tour: Bailey Forster, Emil Urban, Gareth Urban, Joel Urban, Mateo Urban, Oskar Whitaker, Patrick Urban, Quentin Sorensen
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Tobias Yates (+3), Freddie Sinclair (+3), Emil Zimmer (+3), Oskar Iqbal (+2), Gareth Drayton (+2)
-- Biggest ranking fallers: Otis Madsen (-4), Lennon Kovacs (-4), Connor Upton (-4), Kaito Vos (-4), Rafael Grimaldi (-3)
-- Youngest top 16 player: Niall Petrov (31)
-- Oldest top 16 player: Euan Whitaker (39)
-- Top prospects by potential: Luca Mercer C (98), Mika Keane A (97), Mika Keane C (97), Noah Bennett D (97), Rory Vale C (97)
-- High-potential players who failed to progress: none
+- Active AI season match average / zero-match players: 9.6 / 0
+- New AI players / overall movers / potential movers: 8 / 138 / 157
+- AI retirements this season / total retired records: 1 / 2
+- Top 16 average age / overall / potential: 35.8 / 87.4 / 87.4
+- Top 64 average age / overall / potential: 32.4 / 82.7 / 83.1
+- Players gaining tour cards: Connor Petrov, Dario Easton, Dylan Fletcher, Euan Urban, Evan Fischer, Joel Otero, Jonah Jones, Kai Rossi, Nathan Drayton, Nathan Otero, Will Huang, Zhen Novak, Zhen Quinn
+- Players losing tour cards: Bailey Verma, Bartosz Lombardi, Bartosz Rahman, Dario Verma, Kaito Tremblay, Lorenzo Kowalski, Ren Vale, Reuben Otero, Samir Petrov, Viktor Tremblay, Will Khan, Yuri Novak, Zane Nakamura
+- Players returning via Q School: Connor Petrov, Dario Easton, Dylan Fletcher, Euan Urban, Gareth Petrov, Hamza Verma, Ivan Sorensen, Jasper Mendoza, Joel Otero, Jonah Jones, Kaito Urban, Kaito Verma, Nathan Drayton, Nathan Otero, Nathan Petrov, Otis Mendoza, Victor Huang, Zac Caldwell, Zhen Quinn
+- Players moving to Q Tour: Adrian Verma, Caleb Cross, Dev Pryce, Harris Rahman, Ilyas Rahman, Mateo Urban, Oskar Tremblay, Toby Chen, Will Khan, Yuri Novak
+- Players moving to senior/legend circuit: Cedric Yates
+- Biggest ranking climbers: Gianni Nakamura (+7), Xander Hayashi (+7), Gareth Rossi (+6), Fraser Verma (+3), Wesley Urban (+3)
+- Biggest ranking fallers: Quentin Ashford (-5), Patrick Patel (-5), Otis Tremblay (-4), Oskar Westbrook (-4), Nathan Petrov (-4)
+- Youngest top 16 player: Gianni Nakamura (31)
+- Oldest top 16 player: Bailey Fletcher (40)
+- Top prospects by potential: Zhen Novak (98), Evan Fischer (96), Louis Park (95), Will Huang (94), Kai Rossi (93)
+- High-potential players who failed to progress: Dario Grimaldi: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2032/33
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.4 / 4
-- New AI players / overall movers / potential movers: 8 / 134 / 160
-- Top 16 average age / overall / potential: 36.3 / 87.7 / 87.7
-- Top 64 average age / overall / potential: 34.1 / 83.1 / 83.8
-- Players gaining tour cards: Arlo Dawes B, Arlo Dawes C, Arlo Dawes D, Bailey Forster, Cedric Caldwell, Cedric Rahman, Cedric Sorensen, Connor Urban, Connor Yates, Dario Verma, Dylan Sorensen, Emil Tremblay, Euan Drayton, Euan Petrov, Euan Rahman, Evan Mori B, Evan Mori C, Finn Cross A, Fraser Forster, Fraser Nakamura, Fraser Urban, Freddie Rahman, Freddie Whitaker, Gareth Iqbal, Gareth Urban, Gianni Ashford, Gianni Barker, Ilyas Easton, Ivan Petrov, Joel Otero, Jude Sloan, Jude Sloan A, Kai Pryce A, Kai Pryce B, Lorenzo Barker, Lorenzo Drayton, Luca Mercer A, Luca Mercer B, Luca Mercer C, Mika Keane B, Mika Keane C, Nathan Otero, Oskar Otero, Patrick Urban, Pavel Rahman, Quentin Ashford, Quentin Sorensen, Rafael Mendoza, Reuben Otero, Rory Vale B, Samir Petrov, Sebastian Mendoza, Tariq Verma, Toby Hale A, Viktor Petrov, Vincent Ashford, Yusuf Grimaldi, Zac Ashford
-- Players losing tour cards: Bartosz Barker, Evan Mori, Evan Mori A, Finn Cross, Gianni Drayton, Gianni Lombardi, Hamza Ashford, Hamza Whitaker, Ilyas Nakamura, Ilyas Tremblay, Ivan Drayton, Ivan Whitaker, Kieran Yates, Lorenzo Ashford, Luca Mercer, Malik Caldwell, Mateo Harrington, Mika Keane, Mika Keane A, Nathan Verma, Niall Caldwell, Noah Bennett A, Oskar Ashford, Rafael Ashford, Rafael Drayton, Reuben Verma, Rory Vale, Rory Vale A, Tobias Ashford, Tobias Drayton, Tobias Petrov, Ulrich Kowalski, Ulrich Otero, Viktor Verma, Warren Yates, Wesley Yates, Yannick Caldwell, Yusuf Barker, Zac Forster, Zane Easton, Zane Urban
-- Players returning via Q School: Finn Cross A, Fraser Harrington, Jasper Langford, Joel Otero, Jude Sloan, Kai Pryce A, Lorenzo Barker, Lorenzo Drayton, Nathan Otero, Noah Bennett, Rory Vale B, Sebastian Mendoza, Tariq Verma, Toby Hale, Toby Hale A, Vincent Ashford
-- Players moving to Q Tour: Adrian Janssen, Luca Mercer, Mateo Harrington, Mika Keane, Sebastian Easton, Tobias El-Sayed, Warren Westbrook
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Hamza Xu (+4), Reuben Vos (+4), Kieran Zimmer (+4), Vincent Tanaka (+3), Mateo El-Sayed (+3)
-- Biggest ranking fallers: Otis Madsen (-7), Lennon Kovacs (-6), Toby Hale (-5), Quentin Rossi (-4), Bailey Nakamura (-4)
-- Youngest top 16 player: Niall Petrov (32)
-- Oldest top 16 player: Euan Whitaker (40)
-- Top prospects by potential: Luca Mercer C (98), Mika Keane C (97), Mika Keane A (97), Noah Bennett D (97), Rory Vale C (97)
+- Active AI season match average / zero-match players: 9.8 / 0
+- New AI players / overall movers / potential movers: 8 / 140 / 149
+- AI retirements this season / total retired records: 1 / 3
+- Top 16 average age / overall / potential: 36.7 / 87.5 / 87.5
+- Top 64 average age / overall / potential: 33.3 / 82.3 / 82.8
+- Players gaining tour cards: Aiden Usman, Bartosz Tremblay, Bartosz Urban, Ben Sloan, Caleb Cross, Cedric Mendoza, Cedric Verma, Dario Grimaldi, Dev Pryce, Dylan Mendoza, Dylan Verma, Eli Aoki, Emil Gallagher, Euan Petrov, Freddie El-Sayed, Freddie Mendoza, Gianni Ashford, Hugo Dubois, Ilyas El-Sayed, Ilyas Otero, Ilyas Rahman, Ivo Garcia, Kai Ortega, Kian Martin, Lennon Whitaker, Lorenzo Urban, Louis Park, Luca Tan, Milo Singh, Nathan Sorensen, Patrick Caldwell, Patrick Rahman, Quentin Lombardi, Quentin Sorensen, Rafael Ashford, Rafael Drayton, Rafael Tremblay, Ren Vale, Samir Kowalski, Samir Yilmaz, Tariq Davenport, Tariq Rahman, Theo Bauer, Toby Chen, Viktor Verma, Wesley Tremblay, Wesley Whitaker, Will Khan, Xander Yates, Yannick Fletcher, Yuri Novak
+- Players losing tour cards: Dario Drayton, Dario Kowalski, Finn Ortega, Fraser Hayashi, Fraser Nakamura, Gareth Petrov, Hamza Verma, Harris Whitaker, Ilyas Hayashi, Ivan Ainsley, Ivan Sorensen, Ivan Whitaker, Jasper Mendoza, Joel Petrov, Jude Larsen, Kaito Urban, Kaito Verma, Kieran Rahman, Mateo Tan, Mika Keane, Nathan Petrov, Oskar Kowalski, Oskar Verma, Otis Mendoza, Otis Nakamura, Patrick Petrov, Pavel Mori, Pavel Rahman, Quentin Yates, Reuben Sorensen, Rory Ito, Sacha Bauer, Sebastian Mendoza, Ulrich Otero, Victor Huang, Viktor Petrov, Wesley Kowalski, Yusuf Barker, Zac Caldwell, Zane Iqbal
+- Players returning via Q School: Aiden Usman, Connor Petrov, Dario Easton, Dylan Fletcher, Eli Aoki, Euan Urban, Joel Otero, Jonah Jones, Kian Martin, Lorenzo Urban, Nathan Drayton, Nathan Otero, Patrick Rahman, Quentin Lombardi, Quentin Sorensen, Rafael Tremblay, Ren Vale, Tariq Davenport, Theo Bauer, Yannick Fletcher, Zhen Quinn
+- Players moving to Q Tour: Bartosz Rahman, Gianni Fletcher, Lorenzo Kowalski, Malik Ashford, Malik Mendoza, Patrick Petrov, Patrick Whitaker, Ulrich Otero
+- Players moving to senior/legend circuit: Patrick Gallagher
+- Biggest ranking climbers: Gareth Iversen (+8), Dylan Lombardi (+6), Bailey Fletcher (+3), Jonah Jones (+3), Kai Rossi (+3)
+- Biggest ranking fallers: Rafael Mendoza (-7), Xander Hayashi (-5), Gianni Nakamura (-4), Lorenzo Verma (-4), Malik Iversen (-4)
+- Youngest top 16 player: Gianni Nakamura (32)
+- Oldest top 16 player: Bailey Fletcher (41)
+- Top prospects by potential: Zhen Novak (98), Evan Fischer (96), Sacha Vale (96), Louis Park (95), Will Huang (94)
 - High-potential players who failed to progress: none
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
@@ -153,20 +160,21 @@ Seasons completed: 30
 
 ## 2033/34
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.6 / 5
-- New AI players / overall movers / potential movers: 8 / 116 / 107
-- Top 16 average age / overall / potential: 37.3 / 87.4 / 87.4
-- Top 64 average age / overall / potential: 34.5 / 83.1 / 83.6
-- Players gaining tour cards: Bartosz Drayton, Evan Mori, Evan Mori A, Finn Cross, Finn Cross D, Mika Keane A, Noah Bennett A, Noah Bennett D, Rory Vale, Rory Vale A
-- Players losing tour cards: Bailey Nakamura, Bailey Tremblay, Bartosz Rahman, Fraser Harrington, Jasper Langford, Kai Pryce, Lennon Kovacs, Noah Bennett, Otis Madsen, Toby Hale
-- Players returning via Q School: Evan Mori, Evan Mori A, Finn Cross, Finn Cross A, Joel Otero, Jude Sloan, Kai Pryce A, Lorenzo Barker, Lorenzo Drayton, Mika Keane A, Nathan Otero, Noah Bennett A, Rory Vale, Rory Vale A, Rory Vale B, Sebastian Mendoza, Tariq Verma, Toby Hale A, Vincent Ashford
-- Players moving to Q Tour: Finn Cross B, Lennon Barker, Noah Bennett B, Pavel Whitaker, Tobias Drayton, Ulrich Kowalski, Ulrich Otero, Zane Urban
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Cedric Caldwell (+4), Cedric Rahman (+4), Cedric Sorensen (+4), Connor Urban (+4), Connor Yates (+4)
-- Biggest ranking fallers: Jasper Barker (-6), Cedric Quinnell (-6), Quentin Rossi (-4), Tariq Patel (-2), Adrian Harrington (-1)
-- Youngest top 16 player: Niall Petrov (33)
-- Oldest top 16 player: Euan Whitaker (41)
-- Top prospects by potential: Luca Mercer C (98), Mika Keane A (97), Mika Keane C (97), Noah Bennett D (97), Jude Sloan E (97)
+- Active AI season match average / zero-match players: 9.6 / 0
+- New AI players / overall movers / potential movers: 8 / 117 / 105
+- AI retirements this season / total retired records: 4 / 7
+- Top 16 average age / overall / potential: 37.8 / 87.2 / 87.2
+- Top 64 average age / overall / potential: 34.1 / 82.5 / 82.8
+- Players gaining tour cards: Ben Usman, Dev Cross, Finn Ortega, Harris Whitaker, Jude Ito, Jude Larsen, Mateo Tan, Mika Keane, Nico Wilson, Rory Ito, Sacha Bauer, Theo Evans, Victor Huang, Yuri Huang, Zhen Novak
+- Players losing tour cards: Bailey Rahman, Connor Petrov, Dario Easton, Dylan Fletcher, Euan Urban, Evan Fischer, Joel Otero, Jonah Jones, Kai Rossi, Nathan Drayton, Nathan Otero, Sebastian Janssen, Will Huang, Zhen Quinn
+- Players returning via Q School: Eli Aoki, Finn Ortega, Harris Whitaker, Jude Larsen, Kian Martin, Lorenzo Urban, Mateo Tan, Mika Keane, Patrick Rahman, Quentin Lombardi, Quentin Sorensen, Rafael Tremblay, Ren Vale, Rory Ito, Sacha Bauer, Tariq Davenport, Theo Bauer, Victor Huang, Yannick Fletcher
+- Players moving to Q Tour: Owen Hale, Pavel Whitaker, Reuben Otero, Samir Petrov, Zane Nakamura
+- Players moving to senior/legend circuit: Connor Drayton, Hamza Grimaldi, Ivan Tremblay
+- Biggest ranking climbers: Adrian Nakamura (+13), Gareth Rossi (+4), Freddie El-Sayed (+4), Freddie Mendoza (+4), Gianni Ashford (+4)
+- Biggest ranking fallers: Otis Tremblay (-4), Dylan Tanaka (-4), Warren Westbrook (-3), Zane Sorensen (-2), Ilyas Yates (-2)
+- Youngest top 16 player: Gianni Nakamura (33)
+- Oldest top 16 player: Adrian Nakamura (42)
+- Top prospects by potential: Zhen Novak (98), Evan Fischer (96), Sacha Vale (96), Louis Park (95), Ivo Aoki (94)
 - High-potential players who failed to progress: none
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
@@ -174,357 +182,374 @@ Seasons completed: 30
 
 ## 2034/35
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.7 / 3
-- New AI players / overall movers / potential movers: 8 / 126 / 99
-- Top 16 average age / overall / potential: 38.3 / 87.2 / 87.3
-- Top 64 average age / overall / potential: 35.3 / 82.9 / 83.5
-- Players gaining tour cards: Bailey Verma, Bartosz Barker, Cedric Caldwell, Cedric Rahman, Cedric Sorensen, Connor Urban, Connor Yates, Dario Verma, Dylan Barker, Dylan Sorensen, Emil Tremblay, Emil Urban, Euan Drayton, Euan Rahman, Euan Yates, Evan Mori D, Finn Cross B, Finn Cross C, Fraser Nakamura, Fraser Urban, Hamza Whitaker, Ilyas Barker, Ilyas Tremblay, Joel Otero, Joel Urban, Jude Sloan, Jude Sloan B, Jude Sloan D, Kai Pryce, Kai Pryce C, Kai Pryce D, Kai Pryce E, Kieran Iqbal, Kieran Whitaker, Lorenzo Petrov, Luca Mercer, Luca Mercer D, Mateo Harrington, Mika Keane, Noah Bennett B, Noah Bennett C, Rafael Tremblay, Rory Vale C, Rory Vale D, Rory Vale E, Tobias Kovacs, Tobias Novak, Toby Hale B, Toby Hale C, Toby Hale D, Ulrich Kowalski, Ulrich Otero, Warren Westbrook, Yannick Forster, Zane Urban
-- Players losing tour cards: Euan Petrov, Evan Mori B, Evan Mori C, Finn Cross A, Fraser Forster, Freddie Rahman, Freddie Whitaker, Gareth Iqbal, Gareth Urban, Gianni Ashford, Gianni Barker, Ilyas Easton, Ivan Petrov, Jude Sloan A, Kai Pryce A, Kai Pryce B, Lorenzo Barker, Lorenzo Drayton, Luca Mercer A, Luca Mercer B, Luca Mercer C, Mika Keane B, Mika Keane C, Nathan Otero, Oskar Otero, Patrick Urban, Pavel Rahman, Quentin Ashford, Quentin Sorensen, Rafael Mendoza, Reuben Otero, Rory Vale B, Samir Petrov, Sebastian Mendoza, Tariq Verma, Toby Hale A, Viktor Petrov, Viktor Yilmaz, Vincent Ashford, Yusuf Grimaldi, Zac Ashford
-- Players returning via Q School: Bailey Verma, Dylan Barker, Euan Yates, Evan Mori, Evan Mori A, Evan Mori D, Finn Cross, Ilyas Barker, Joel Urban, Jude Sloan B, Kai Pryce C, Kieran Iqbal, Kieran Whitaker, Lorenzo Petrov, Mika Keane A, Noah Bennett A, Noah Bennett C, Rory Vale, Rory Vale A
-- Players moving to Q Tour: Bartosz Rahman, Malik Caldwell, Niall Caldwell, Rafael Drayton, Tobias Petrov, Viktor Verma, Xander Rahman, Zane Easton
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Reuben Vos (+4), Yusuf Costa (+4), Rory Vale (+4), Rory Vale A (+4), Kieran Zimmer (+3)
-- Biggest ranking fallers: Euan Whitaker (-9), Kieran Sorensen (-7), Fraser Olsen (-6), Emil Zimmer (-4), Vincent Tanaka (-3)
-- Youngest top 16 player: Niall Petrov (34)
-- Oldest top 16 player: Euan Whitaker (42)
-- Top prospects by potential: Luca Mercer C (98), Mika Keane A (97), Noah Bennett D (97), Rory Vale C (97), Jude Sloan E (97)
-- High-potential players who failed to progress: Noah Bennett: failed Q School campaigns, Toby Hale: failed Q School campaigns
+- Active AI season match average / zero-match players: 9.7 / 0
+- New AI players / overall movers / potential movers: 8 / 135 / 106
+- AI retirements this season / total retired records: 2 / 9
+- Top 16 average age / overall / potential: 38.7 / 87.4 / 87.6
+- Top 64 average age / overall / potential: 35.3 / 82.3 / 82.7
+- Players gaining tour cards: Adrian Verma, Bailey Verma, Bartosz Kowalski, Bartosz Rahman, Bartosz Urban, Cedric Mendoza, Cedric Verma, Dario Grimaldi, Dario Iversen, Dylan Verma, Eli Pryce, Emil Gallagher, Emil Yates, Euan Forster, Evan Fischer, Finn Larsen, Freddie Mendoza, Gareth Rahman, Harris Rahman, Harris Tremblay, Hugo Aoki, Ivan Lombardi, Jasper Urban, Jonah Garcia, Kai Rossi, Kian Jones, Kieran Petrov, Lorenzo Kowalski, Louis Martin, Louis Park, Luca Mercer, Luca Novak, Malik Mendoza, Mateo Urban, Noah Bennett, Oskar Tremblay, Owen Hale, Patrick Petrov, Pavel Mori, Ren Vale, Reuben Otero, Samir Petrov, Ulrich Otero, Viktor Tremblay, Wesley Kowalski, Will Huang, Will Khan, Zac Caldwell, Zane Nakamura
+- Players losing tour cards: Ben Sloan, Caleb Cross, Dev Pryce, Dylan Mendoza, Eli Aoki, Euan Petrov, Freddie El-Sayed, Gianni Ashford, Hugo Dubois, Ilyas El-Sayed, Ilyas Otero, Ilyas Rahman, Ivo Garcia, Kai Ortega, Kian Martin, Lennon Whitaker, Lorenzo Urban, Luca Tan, Milo Singh, Nathan Sorensen, Patrick Caldwell, Patrick Rahman, Quentin Lombardi, Quentin Sorensen, Rafael Ashford, Rafael Drayton, Rafael Tremblay, Samir Kowalski, Samir Yilmaz, Tariq Davenport, Tariq Rahman, Theo Bauer, Toby Chen, Viktor Verma, Wesley Tremblay, Wesley Whitaker, Xander Yates, Yannick Fletcher, Yuri Novak
+- Players returning via Q School: Adrian Verma, Bartosz Kowalski, Dario Iversen, Emil Yates, Euan Forster, Evan Fischer, Finn Ortega, Harris Tremblay, Harris Whitaker, Hugo Aoki, Jasper Urban, Jude Larsen, Kai Rossi, Mateo Tan, Mika Keane, Oskar Tremblay, Rory Ito, Sacha Bauer, Victor Huang, Will Huang
+- Players moving to Q Tour: Connor Petrov, Ilyas Petrov, Ivan Whitaker, Joel Petrov, Kaito Verma, Malik Lombardi
+- Players moving to senior/legend circuit: Adrian Vos
+- Biggest ranking climbers: Oskar Otero (+10), Emil Iqbal (+4), Jasper Patel (+4), Pavel Langford (+4), Euan Madsen (+4)
+- Biggest ranking fallers: Yusuf Langford (-12), Mika Keane (-8), Tobias Novak (-7), Mateo Tan (-7), Dylan Lombardi (-6)
+- Youngest top 16 player: Ulrich Kowalski (34)
+- Oldest top 16 player: Bailey Fletcher (43)
+- Top prospects by potential: Zhen Novak (98), Evan Fischer (96), Sacha Vale (96), Louis Park (95), Will Huang (94)
+- High-potential players who failed to progress: none
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2035/36
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.7 / 3
-- New AI players / overall movers / potential movers: 8 / 122 / 97
-- Top 16 average age / overall / potential: 39.3 / 87.2 / 87.3
-- Top 64 average age / overall / potential: 35.5 / 83.0 / 83.6
-- Players gaining tour cards: Arlo Dawes E, Evan Mori B, Evan Mori C, Kai Pryce B, Luca Mercer A, Luca Mercer B, Luca Mercer C, Mika Keane B, Mika Keane C, Noah Bennett, Noah Bennett D, Toby Hale, Toby Hale A
-- Players losing tour cards: Bartosz Drayton, Evan Mori, Evan Mori A, Finn Cross, Finn Cross D, Kaito Vos, Mika Keane A, Noah Bennett A, Pavel Costa, Quentin Rossi, Rory Vale, Rory Vale A
-- Players returning via Q School: Arlo Dawes E, Dylan Barker, Euan Yates, Evan Mori C, Evan Mori D, Ilyas Barker, Joel Urban, Jude Sloan B, Kai Pryce B, Kai Pryce C, Kieran Iqbal, Kieran Whitaker, Lorenzo Petrov, Luca Mercer A, Luca Mercer B, Luca Mercer C, Mika Keane B, Mika Keane C, Noah Bennett, Noah Bennett C, Toby Hale, Toby Hale A
-- Players moving to Q Tour: Finn Cross A, Fraser Forster, Hamza Verma, Kai Pryce A, Lorenzo Barker, Rory Vale B, Yusuf Barker
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Fraser Nakamura (+5), Fraser Urban (+5), Hamza Whitaker (+5), Ilyas Barker (+5), Ilyas Tremblay (+5)
-- Biggest ranking fallers: Viktor Rahman (-6), Tariq Patel (-5), Ulrich Easton (-4), Joel Forster (-2), Reuben Vos (-2)
-- Youngest top 16 player: Niall Petrov (35)
-- Oldest top 16 player: Euan Whitaker (43)
-- Top prospects by potential: Luca Mercer C (98), Kai Pryce G (98), Mika Keane C (97), Noah Bennett D (97), Rory Vale C (97)
-- High-potential players who failed to progress: Kai Pryce: random development failure, Noah Bennett: low match volume, Toby Hale: low match volume, Evan Mori A: failed Q School campaigns
+- Active AI season match average / zero-match players: 9.6 / 0
+- New AI players / overall movers / potential movers: 8 / 106 / 80
+- AI retirements this season / total retired records: 1 / 10
+- Top 16 average age / overall / potential: 39.8 / 87.0 / 87.1
+- Top 64 average age / overall / potential: 35.9 / 82.4 / 82.9
+- Players gaining tour cards: Aiden Ortega, Ben Sloan, Eli Aoki, Eli Cross, Hugo Dubois, Ilyas Hayashi, Ivo Aoki, Ivo Garcia, Jonah Jones, Luca Tan, Milo Singh, Nico Singh, Sacha Vale, Theo Bauer, Toby Chen, Yuri Khan, Yuri Novak
+- Players losing tour cards: Bartosz Tremblay, Ben Usman, Dev Cross, Finn Ortega, Harris Whitaker, Jude Ito, Jude Larsen, Mateo Tan, Mika Keane, Nico Wilson, Patrick Patel, Rory Ito, Sacha Bauer, Theo Evans, Victor Huang, Yuri Huang, Zhen Novak
+- Players returning via Q School: Bartosz Kowalski, Ben Sloan, Dario Iversen, Eli Aoki, Emil Yates, Euan Forster, Evan Fischer, Harris Tremblay, Hugo Aoki, Hugo Dubois, Ilyas Hayashi, Ivo Garcia, Jasper Urban, Jonah Jones, Kai Rossi, Luca Tan, Milo Singh, Oskar Tremblay, Theo Bauer, Toby Chen, Will Huang, Yuri Novak
+- Players moving to Q Tour: Dylan Fletcher, Euan Rahman, Freddie El-Sayed, Hamza Verma, Kian Martin, Rafael Urban, Yuri Huang
+- Players moving to senior/legend circuit: Bailey Olsen
+- Biggest ranking climbers: Malik Iversen (+7), Lorenzo Verma (+3), Dylan Lombardi (+3), Warren Westbrook (+3), Adrian Nakamura (+2)
+- Biggest ranking fallers: Zane Sorensen (-4), Pavel Langford (-3), Tobias Novak (-3), Mateo Novak (-3), Reuben Easton (-2)
+- Youngest top 16 player: Ulrich Kowalski (35)
+- Oldest top 16 player: Adrian Nakamura (44)
+- Top prospects by potential: Zhen Novak (98), Mika Bennett (97), Evan Fischer (96), Sacha Vale (96), Caleb Usman (96)
+- High-potential players who failed to progress: Ren Vale: random development failure, Will Khan: random development failure, Yuri Novak: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2036/37
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.5 / 5
-- New AI players / overall movers / potential movers: 8 / 132 / 82
-- Top 16 average age / overall / potential: 40.3 / 86.9 / 87.0
-- Top 64 average age / overall / potential: 36.1 / 82.9 / 83.4
-- Players gaining tour cards: Adrian Janssen, Bartosz Rahman, Cedric Rahman, Cedric Sorensen, Connor Urban, Connor Yates, Dario Verma, Dylan Barker, Dylan Sorensen, Euan Drayton, Euan Yates, Evan Mori E, Finn Cross, Finn Cross A, Finn Cross D, Finn Cross E, Finn Cross F, Fraser Forster, Fraser Nakamura, Gianni Barker, Gianni Drayton, Hamza Whitaker, Ilyas Tremblay, Jasper Langford, Jude Sloan A, Jude Sloan C, Kai Pryce, Kai Pryce A, Kieran Petrov, Kieran Yates, Lennon Barker, Lorenzo Ashford, Lorenzo Barker, Malik Caldwell, Mika Keane A, Mika Keane D, Mika Keane E, Mika Keane F, Nathan Otero, Niall Caldwell, Noah Bennett A, Noah Bennett E, Noah Bennett F, Oskar Ashford, Pavel Whitaker, Rafael Drayton, Rory Vale, Rory Vale B, Rory Vale F, Sebastian Easton, Tobias Drayton, Tobias Petrov, Viktor Verma, Zane Easton
-- Players losing tour cards: Emil Tremblay, Emil Urban, Euan Rahman, Evan Mori D, Finn Cross B, Finn Cross C, Fraser Urban, Ilyas Barker, Joel Otero, Joel Urban, Jude Sloan, Jude Sloan B, Jude Sloan D, Kai Pryce C, Kai Pryce D, Kai Pryce E, Kieran Iqbal, Kieran Whitaker, Lorenzo Petrov, Luca Mercer, Luca Mercer D, Mateo Harrington, Mika Keane, Noah Bennett B, Noah Bennett C, Rafael Tremblay, Rory Vale C, Rory Vale D, Rory Vale E, Tariq Patel, Tobias Kovacs, Tobias Novak, Toby Hale B, Toby Hale C, Toby Hale D, Ulrich Easton, Ulrich Kowalski, Ulrich Otero, Warren Westbrook, Yannick Forster, Zane Urban
-- Players returning via Q School: Adrian Janssen, Evan Mori C, Evan Mori E, Finn Cross D, Gianni Drayton, Jude Sloan A, Jude Sloan C, Kai Pryce B, Kieran Petrov, Kieran Yates, Lorenzo Ashford, Luca Mercer A, Luca Mercer B, Luca Mercer C, Mika Keane B, Mika Keane C, Mika Keane D, Noah Bennett, Oskar Ashford, Sebastian Easton, Toby Hale, Toby Hale A
-- Players moving to Q Tour: Bartosz Drayton, Freddie Caldwell, Noah Bennett B, Patrick Verma, Warren Forster
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Vincent Tanaka (+3), Harris Bouchard (+3), Euan Yates (+3), Evan Mori B (+3), Evan Mori C (+3)
-- Biggest ranking fallers: Toby Hale (-6), Toby Hale A (-6), Zane Langford (-5), Freddie Sinclair (-2), Hamza Whitaker (-2)
-- Youngest top 16 player: Niall Petrov (36)
-- Oldest top 16 player: Euan Whitaker (44)
-- Top prospects by potential: Luca Mercer C (98), Kai Pryce G (98), Mika Keane A (97), Mika Keane C (97), Noah Bennett D (97)
-- High-potential players who failed to progress: Finn Cross: random development failure, Kai Pryce: random development failure, Mika Keane A: random development failure, Noah Bennett: random development failure, Noah Bennett A: random development failure
+- Active AI season match average / zero-match players: 9.6 / 0
+- New AI players / overall movers / potential movers: 8 / 125 / 91
+- AI retirements this season / total retired records: 2 / 12
+- Top 16 average age / overall / potential: 40.8 / 86.8 / 86.9
+- Top 64 average age / overall / potential: 36.0 / 82.5 / 83.0
+- Players gaining tour cards: Joel Lombardi, Arlo Bennett, Bailey Verma, Bartosz Kowalski, Bartosz Urban, Ben Usman, Caleb Cross, Cedric Mendoza, Connor Petrov, Dario Easton, Dario Grimaldi, Dario Iversen, Dev Cross, Dev Pryce, Dylan Fletcher, Dylan Verma, Dylan Whitaker, Emil Gallagher, Evan Fischer, Fraser Nakamura, Freddie El-Sayed, Ivan Ainsley, Ivan Whitaker, Jasper Mendoza, Jude Ito, Kai Ortega, Kai Rossi, Kaito Verma, Kian Garcia, Kian Martin, Louis Park, Malik Ashford, Mateo Quinn, Mateo Tan, Mika Dawes, Milo Martin, Milo Park, Nathan Sorensen, Nico Wilson, Noah Novak, Patrick Whitaker, Pavel Rahman, Pavel Whitaker, Ren Mori, Reuben Sorensen, Sebastian Mendoza, Theo Evans, Toby Keane, Will Huang, Yuri Huang, Yusuf Barker, Zhen Novak, Zhen Quinn
+- Players losing tour cards: Bartosz Rahman, Cedric Verma, Eli Pryce, Emil Yates, Euan Forster, Finn Larsen, Freddie Mendoza, Gareth Rahman, Harris Rahman, Harris Tremblay, Hugo Aoki, Ivan Lombardi, Jasper Urban, Jonah Garcia, Kian Jones, Kieran Petrov, Lorenzo Kowalski, Louis Martin, Luca Mercer, Luca Novak, Malik Mendoza, Mateo Novak, Mateo Urban, Noah Bennett, Oskar Tremblay, Oskar Westbrook, Owen Hale, Patrick Petrov, Pavel Mori, Quentin Ashford, Ren Vale, Reuben Otero, Samir Petrov, Ulrich Otero, Viktor Tremblay, Wesley Kowalski, Will Khan, Yusuf Langford, Zac Caldwell, Zane Nakamura
+- Players returning via Q School: Ben Sloan, Dev Cross, Eli Aoki, Fraser Nakamura, Hugo Dubois, Ilyas Hayashi, Ivo Garcia, Jonah Jones, Jude Ito, Kai Ortega, Luca Tan, Malik Ashford, Milo Singh, Nico Wilson, Pavel Rahman, Reuben Sorensen, Sebastian Mendoza, Theo Bauer, Theo Evans, Toby Chen, Yuri Novak, Yusuf Barker, Zhen Quinn
+- Players moving to Q Tour: Kian Jones, Luca Mercer, Rafael Drayton, Reuben Petrov, Rory Ito, Viktor Verma, Warren Forster
+- Players moving to senior/legend circuit: Sebastian Gallagher, Tariq Hayashi
+- Biggest ranking climbers: Xander Hayashi (+7), Malik Iversen (+6), Dario Xu (+6), Gareth Rossi (+5), Luca Tan (+5)
+- Biggest ranking fallers: Oskar Otero (-4), Adrian Nakamura (-4), Wesley Urban (-4), Gareth Iversen (-3), Bailey Fletcher (-3)
+- Youngest top 16 player: Ulrich Kowalski (36)
+- Oldest top 16 player: Adrian Nakamura (45)
+- Top prospects by potential: Zhen Novak (98), Mika Bennett (97), Evan Fischer (96), Sacha Vale (96), Caleb Usman (96)
+- High-potential players who failed to progress: Mateo Tan: random development failure, Yuri Novak: low match volume, Ren Vale: failed Q School campaigns, Will Khan: failed Q School campaigns
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2037/38
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.3 / 4
-- New AI players / overall movers / potential movers: 8 / 100 / 72
-- Top 16 average age / overall / potential: 40.1 / 86.8 / 86.8
-- Top 64 average age / overall / potential: 36.3 / 82.8 / 83.4
-- Players gaining tour cards: Arlo Dawes G, Evan Mori A, Jude Sloan D, Jude Sloan E, Kai Pryce D, Kai Pryce E, Luca Mercer D, Luca Mercer G, Noah Bennett G, Rory Vale A, Rory Vale C, Rory Vale E, Toby Hale B, Toby Hale C, Toby Hale D, Toby Hale F
-- Players losing tour cards: Evan Mori B, Evan Mori C, Jasper Barker, Kai Pryce B, Kieran Sorensen, Luca Mercer A, Luca Mercer B, Luca Mercer C, Mika Keane B, Mika Keane C, Noah Bennett, Noah Bennett D, Rafael Grimaldi, Toby Hale, Toby Hale A, Zane Langford
-- Players returning via Q School: Evan Mori A, Evan Mori E, Finn Cross D, Gianni Drayton, Jude Sloan A, Jude Sloan C, Jude Sloan D, Kai Pryce D, Kai Pryce E, Kieran Petrov, Kieran Yates, Lorenzo Ashford, Luca Mercer D, Mika Keane D, Noah Bennett G, Oskar Ashford, Rory Vale A, Rory Vale C, Rory Vale E, Sebastian Easton, Toby Hale B, Toby Hale C, Toby Hale D
-- Players moving to Q Tour: Euan Madsen, Kai Pryce C, Kieran Whitaker, Luca Mercer, Malik Barker, Mika Keane, Toby Hale G
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Noah Bennett E (+6), Noah Bennett F (+6), Samir Kovacs (+5), Kieran Zimmer (+5), Niall Xu (+5)
-- Biggest ranking fallers: Sebastian Tremblay (-6), Xander Caldwell (-2)
-- Youngest top 16 player: Bartosz Urban (34)
-- Oldest top 16 player: Euan Whitaker (45)
-- Top prospects by potential: Kai Pryce G (98), Luca Mercer C (98), Jude Sloan E (97), Rory Vale C (97), Mika Keane C (97)
-- High-potential players who failed to progress: Evan Mori A: low match volume, Finn Cross: random development failure, Kai Pryce: random development failure, Mika Keane A: random development failure, Noah Bennett A: random development failure
+- Active AI season match average / zero-match players: 9.5 / 0
+- New AI players / overall movers / potential movers: 8 / 115 / 74
+- AI retirements this season / total retired records: 7 / 19
+- Top 16 average age / overall / potential: 40.0 / 86.5 / 86.6
+- Top 64 average age / overall / potential: 35.6 / 82.4 / 83.1
+- Players gaining tour cards: Aiden Rossi, Eli Pryce, Euan Urban, Evan Chen, Finn Larsen, Hugo Aoki, Jonah Aoki, Jonah Garcia, Jude Larsen, Kian Jones, Louis Martin, Luca Novak, Mika Keane, Noah Bennett, Owen Singh, Rafael Ashford, Ren Vale, Sacha Vale, Victor Bauer, Victor Evans, Will Khan
+- Players losing tour cards: Ben Sloan, Dylan Lombardi, Eli Aoki, Eli Cross, Hugo Dubois, Ilyas Hayashi, Ivo Aoki, Ivo Garcia, Joel Lombardi, Jonah Jones, Lennon Rahman, Luca Tan, Milo Singh, Nico Singh, Otis Tremblay, Theo Bauer, Tobias Novak, Toby Chen, Yuri Khan, Yuri Novak
+- Players returning via Q School: Dev Cross, Eli Pryce, Euan Urban, Finn Larsen, Fraser Nakamura, Hugo Aoki, Jonah Garcia, Jude Ito, Jude Larsen, Kai Ortega, Louis Martin, Luca Novak, Malik Ashford, Mika Keane, Nico Wilson, Noah Bennett, Pavel Rahman, Ren Vale, Reuben Sorensen, Sebastian Mendoza, Theo Evans, Victor Evans, Yusuf Barker, Zhen Quinn
+- Players moving to Q Tour: Finn Ortega, Fraser Costa, Patrick Petrov, Sacha Bauer, Samir Yilmaz, Ulrich Otero, Victor Huang, Vincent Verma
+- Players moving to senior/legend circuit: Connor Otero, Gianni Mendoza, Hamza Mendoza, Mateo Otero, Quentin Ashford, Tariq Nakamura, Tariq Whitaker
+- Biggest ranking climbers: Dylan Tanaka (+13), Bartosz Kovacs (+11), Fraser Verma (+6), Emil Gallagher (+6), Jasper Mendoza (+6)
+- Biggest ranking fallers: Yuri Huang (-2), Lorenzo Verma (-1), Ulrich Kowalski (-1), Gareth Iversen (-1), Reuben Sorensen (-1)
+- Youngest top 16 player: Samir Rahman (33)
+- Oldest top 16 player: Adrian Nakamura (46)
+- Top prospects by potential: Zhen Novak (98), Mika Bennett (97), Evan Fischer (96), Sacha Vale (96), Caleb Usman (96)
+- High-potential players who failed to progress: Evan Fischer: random development failure, Kai Rossi: random development failure, Mateo Tan: random development failure, Ren Vale: low match volume, Will Huang: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2038/39
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.8 / 4
-- New AI players / overall movers / potential movers: 8 / 149 / 86
-- Top 16 average age / overall / potential: 40.0 / 86.9 / 86.9
-- Top 64 average age / overall / potential: 36.1 / 83.0 / 83.6
-- Players gaining tour cards: Kaito Nakamura, Cedric Quinnell, Arlo Dawes F, Bartosz Drayton, Connor Yates, Dario Verma, Dylan Barker, Dylan Sorensen, Euan Drayton, Evan Mori, Evan Mori D, Evan Mori F, Evan Mori G, Finn Cross, Finn Cross A, Finn Cross B, Finn Cross C, Finn Cross D, Finn Cross G, Finn Cross H, Fraser Forster, Fraser Harrington, Gareth Iqbal, Gianni Ashford, Hamza Verma, Jude Sloan, Jude Sloan A, Jude Sloan B, Jude Sloan C, Jude Sloan F, Jude Sloan G, Kai Pryce, Kai Pryce C, Kai Pryce F, Luca Mercer, Luca Mercer B, Luca Mercer C, Luca Mercer E, Luca Mercer F, Mika Keane, Mika Keane A, Mika Keane B, Mika Keane C, Noah Bennett A, Noah Bennett B, Noah Bennett C, Noah Bennett D, Rafael Ashford, Reuben Otero, Rory Vale D, Samir Petrov, Toby Hale E, Toby Hale G, Ulrich Kowalski, Xander Rahman, Yusuf Barker
-- Players losing tour cards: Euan Yates, Evan Mori E, Finn Cross E, Finn Cross F, Fraser Nakamura, Gianni Barker, Gianni Drayton, Hamza Whitaker, Ilyas Tremblay, Jasper Langford, Kai Pryce A, Kieran Petrov, Kieran Yates, Lennon Barker, Lorenzo Ashford, Lorenzo Barker, Malik Caldwell, Mateo El-Sayed, Mika Keane D, Mika Keane E, Mika Keane F, Nathan Otero, Niall Caldwell, Noah Bennett E, Noah Bennett F, Oskar Ashford, Pavel Whitaker, Rafael Drayton, Rory Vale, Rory Vale B, Rory Vale F, Sebastian Easton, Tobias Drayton, Tobias Petrov, Viktor Rahman, Viktor Verma, Vincent Tanaka, Xander Caldwell, Yannick Otero, Zane Easton
-- Players returning via Q School: Arlo Dawes F, Evan Mori, Evan Mori A, Fraser Harrington, Gareth Iqbal, Jude Sloan D, Kai Pryce D, Kai Pryce E, Luca Mercer D, Luca Mercer E, Luca Mercer F, Noah Bennett C, Noah Bennett G, Reuben Otero, Rory Vale A, Rory Vale C, Rory Vale D, Rory Vale E, Toby Hale B, Toby Hale C, Toby Hale D, Toby Hale E, Xander Rahman, Yusuf Barker
-- Players moving to Q Tour: Evan Mori B, Ilyas Easton, Mika Keane D, Noah Bennett, Oskar Westbrook
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Lorenzo Olsen (+5), Zac Rossi (+5), Ilyas Quinnell (+5), Emil Zimmer (+5), Harris Bouchard (+5)
-- Biggest ranking fallers: Luca Mercer G (-4), Mika Keane A (-4), Kai Pryce (-3), Kai Pryce D (-3), Kai Pryce E (-3)
-- Youngest top 16 player: Bartosz Urban (35)
-- Oldest top 16 player: Euan Whitaker (46)
-- Top prospects by potential: Luca Mercer C (98), Kai Pryce G (98), Rory Vale J (98), Jude Sloan E (97), Mika Keane C (97)
-- High-potential players who failed to progress: Evan Mori A: random development failure, Finn Cross: random development failure, Kai Pryce: random development failure, Luca Mercer B: random development failure, Luca Mercer C: random development failure
+- Active AI season match average / zero-match players: 9.7 / 0
+- New AI players / overall movers / potential movers: 8 / 148 / 83
+- AI retirements this season / total retired records: 4 / 23
+- Top 16 average age / overall / potential: 40.4 / 86.4 / 86.5
+- Top 64 average age / overall / potential: 35.9 / 82.7 / 83.4
+- Players gaining tour cards: Caleb Sloan, Dev Cross, Eli Aoki, Eli Cross, Euan Rahman, Evan Fischer, Evan Keane, Finn Ortega, Hamza Verma, Hugo Dubois, Ilyas Petrov, Ivo Aoki, Ivo Dubois, Joel Otero, Joel Petrov, Jude Ito, Kai Rossi, Louis Garcia, Louis Park, Luca Mercer, Luca Tan, Malik Lombardi, Mika Bennett, Nathan Drayton, Nathan Otero, Nico Martin, Nico Singh, Noah Mercer, Noah Tan, Owen Hale, Patrick Caldwell, Patrick Petrov, Pavel Mori, Rafael Drayton, Rafael Urban, Rory Fischer, Rory Ito, Sacha Bauer, Samir Yilmaz, Theo Evans, Ulrich Otero, Victor Huang, Viktor Verma, Wesley Kowalski, Yuri Khan, Zane Nakamura
+- Players losing tour cards: Dario Easton, Dario Grimaldi, Dario Iversen, Dev Pryce, Dylan Fletcher, Dylan Verma, Dylan Whitaker, Emil Gallagher, Fraser Nakamura, Freddie El-Sayed, Ivan Ainsley, Ivan Whitaker, Jasper Gallagher, Jasper Mendoza, Kai Ortega, Kaito Verma, Kian Garcia, Kian Martin, Malik Ashford, Malik Rossi, Mateo Quinn, Mateo Tan, Mika Dawes, Milo Martin, Milo Park, Nathan Sorensen, Nico Wilson, Noah Novak, Patrick Whitaker, Pavel Rahman, Pavel Whitaker, Ren Mori, Reuben Sorensen, Sebastian Mendoza, Toby Keane, Will Huang, Yuri Huang, Yusuf Barker, Zhen Novak, Zhen Quinn
+- Players returning via Q School: Eli Cross, Eli Pryce, Euan Urban, Finn Larsen, Hugo Aoki, Ilyas Petrov, Ivo Aoki, Joel Otero, Jonah Garcia, Jude Larsen, Louis Martin, Luca Mercer, Luca Novak, Malik Lombardi, Mika Keane, Nathan Drayton, Nathan Otero, Nico Singh, Noah Bennett, Patrick Caldwell, Ren Vale, Rory Fischer, Victor Evans, Yuri Khan
+- Players moving to Q Tour: Dario Verma, Jasper Urban, Lorenzo Kowalski, Milo Park, Oskar Iversen, Ren Mori, Toby Chen
+- Players moving to senior/legend circuit: Dylan Lombardi, Joel Lombardi, Lennon Rahman, Otis Tremblay
+- Biggest ranking climbers: Dario Xu (+11), Warren Otero (+7), Eli Pryce (+6), Euan Urban (+6), Evan Chen (+6)
+- Biggest ranking fallers: Vincent Caldwell (-11), Lorenzo Verma (-4), Bailey Fletcher (-2), Gianni Nakamura (-2), Will Khan (-2)
+- Youngest top 16 player: Samir Rahman (34)
+- Oldest top 16 player: Adrian Nakamura (47)
+- Top prospects by potential: Mika Bennett (97), Sacha Vale (96), Caleb Usman (96), Finn Ito (96), Louis Park (95)
+- High-potential players who failed to progress: Eli Aoki: random development failure, Evan Fischer: random development failure, Hugo Dubois: random development failure, Kai Rossi: random development failure, Louis Park: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2039/40
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.5 / 5
-- New AI players / overall movers / potential movers: 8 / 126 / 72
-- Top 16 average age / overall / potential: 40.4 / 86.6 / 86.6
-- Top 64 average age / overall / potential: 34.5 / 83.1 / 84.1
-- Players gaining tour cards: Evan Mori B, Evan Mori C, Evan Mori E, Evan Mori H, Finn Cross E, Finn Cross F, Jude Sloan E, Kai Pryce B, Kai Pryce G, Kai Pryce I, Luca Mercer G, Mika Keane E, Mika Keane F, Mika Keane G, Noah Bennett, Noah Bennett E, Noah Bennett F, Noah Bennett H, Rory Vale, Rory Vale F, Rory Vale G, Rory Vale I, Toby Hale, Toby Hale A
-- Players losing tour cards: Cedric Quinnell, Connor Upton, Dario Janssen, Evan Mori A, Fraser Olsen, Harris Bouchard, Jude Sloan D, Kai Pryce D, Kai Pryce E, Kaito Nakamura, Luca Mercer D, Noah Bennett G, Reuben Nakamura, Rory Vale A, Rory Vale C, Rory Vale E, Toby Hale B, Toby Hale C, Toby Hale D, Toby Hale F, Wesley Novak, Yannick Westbrook
-- Players returning via Q School: Evan Mori, Evan Mori C, Evan Mori E, Evan Mori H, Finn Cross E, Fraser Harrington, Gareth Iqbal, Kai Pryce B, Luca Mercer E, Luca Mercer F, Mika Keane E, Mika Keane F, Noah Bennett C, Noah Bennett E, Noah Bennett F, Reuben Otero, Rory Vale, Rory Vale D, Rory Vale F, Toby Hale A, Toby Hale E, Xander Rahman, Yusuf Barker
-- Players moving to Q Tour: Bartosz Kovacs, Euan Barker, Hamza Whitaker, Ilyas Tremblay, Jasper Langford, Kai Pryce A, Lorenzo Barker, Oskar Otero, Xander Hayashi
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Adrian Janssen (+9), Adrian Petrov (+9), Adrian Verma (+9), Arlo Dawes (+9), Arlo Dawes A (+9)
-- Biggest ranking fallers: Samir Petrov (-2), Adrian Harrington (-1), Rafael Ashford (-1), Reuben Otero (-1), Toby Hale E (-1)
-- Youngest top 16 player: Bartosz Urban (36)
-- Oldest top 16 player: Euan Whitaker (47)
-- Top prospects by potential: Kai Pryce G (98), Rory Vale J (98), Jude Sloan E (97), Noah Bennett D (97), Rory Vale C (97)
-- High-potential players who failed to progress: Evan Mori C: low match volume, Finn Cross: random development failure, Finn Cross D: random development failure, Kai Pryce: random development failure, Kai Pryce B: low match volume
+- Active AI season match average / zero-match players: 9.6 / 0
+- New AI players / overall movers / potential movers: 8 / 148 / 82
+- AI retirements this season / total retired records: 5 / 28
+- Top 16 average age / overall / potential: 40.6 / 86.9 / 86.9
+- Top 64 average age / overall / potential: 34.8 / 82.9 / 84.3
+- Players gaining tour cards: Arlo Tan, Ben Sloan, Caleb Usman, Dev Pryce, Finn Ito, Ivo Garcia, Jude Fischer, Kai Larsen, Kai Ortega, Kian Garcia, Mateo Quinn, Mateo Tan, Mika Dawes, Milo Martin, Milo Park, Milo Singh, Nico Wilson, Noah Novak, Owen Wilson, Theo Bauer, Toby Dawes, Toby Keane, Will Huang, Yuri Huang, Yuri Novak, Zhen Khan, Zhen Novak
+- Players losing tour cards: Eli Pryce, Euan Urban, Evan Chen, Finn Larsen, Hugo Aoki, Joel Tanaka, Jonah Aoki, Jonah Garcia, Jude Larsen, Kian Jones, Louis Martin, Luca Novak, Mika Keane, Noah Bennett, Oskar Otero, Owen Singh, Rafael Ashford, Ren Vale, Sacha Vale, Ulrich Sinclair, Victor Bauer, Victor Evans, Vincent Caldwell, Warren Otero, Will Khan, Xander Hayashi, Zane Zimmer
+- Players returning via Q School: Ben Sloan, Eli Cross, Ilyas Petrov, Ivo Aoki, Joel Otero, Kian Garcia, Luca Mercer, Malik Lombardi, Mateo Quinn, Mika Dawes, Milo Martin, Nathan Drayton, Nathan Otero, Nico Singh, Noah Novak, Patrick Caldwell, Rory Fischer, Theo Bauer, Toby Keane, Will Huang, Yuri Khan, Yuri Novak, Zhen Khan, Zhen Novak
+- Players moving to Q Tour: Dario Easton, Dylan Mendoza, Freddie El-Sayed, Jonah Jones, Kaito Nakamura, Kian Martin, Kieran Tremblay, Nathan Sorensen, Samir Petrov
+- Players moving to senior/legend circuit: Jasper Gallagher, Joel Iversen, Joel Rahman, Tobias Rahman, Xander Quinnell
+- Biggest ranking climbers: Luca Tan (+8), Malik Lombardi (+8), Dario Petrov (+7), Adrian Iversen (+7), Adrian Kowalski (+7)
+- Biggest ranking fallers: Adrian Nakamura (-3)
+- Youngest top 16 player: Samir Rahman (35)
+- Oldest top 16 player: Bailey Fletcher (48)
+- Top prospects by potential: Kian Aoki (98), Mika Bennett (97), Caleb Usman (96), Finn Ito (96), Jonah Dubois (96)
+- High-potential players who failed to progress: Eli Aoki: random development failure, Evan Fischer: random development failure, Hugo Dubois: random development failure, Jude Ito: random development failure, Kai Rossi: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2040/41
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.4 / 2
-- New AI players / overall movers / potential movers: 8 / 162 / 84
-- Top 16 average age / overall / potential: 41.2 / 86.4 / 86.4
-- Top 64 average age / overall / potential: 34.6 / 83.3 / 84.4
-- Players gaining tour cards: Arlo Dawes H, Arlo Dawes I, Euan Madsen, Evan Mori I, Finn Cross, Freddie Caldwell, Gianni Drayton, Hamza Whitaker, Ilyas Tremblay, Jasper Langford, Joel Otero, Jude Sloan D, Jude Sloan H, Jude Sloan I, Kai Pryce A, Kai Pryce D, Kai Pryce H, Kieran Whitaker, Lorenzo Barker, Luca Mercer A, Luca Mercer C, Luca Mercer D, Luca Mercer H, Luca Mercer I, Malik Barker, Malik Caldwell, Mateo Harrington, Mika Keane A, Mika Keane C, Mika Keane D, Mika Keane H, Mika Keane I, Noah Bennett G, Oskar Otero, Patrick Verma, Rory Vale B, Rory Vale C, Rory Vale E, Rory Vale H, Toby Hale C, Toby Hale D, Toby Hale F, Toby Hale H, Ulrich Otero, Warren Forster, Zane Urban
-- Players losing tour cards: Emil Sorensen, Emil Zimmer, Finn Cross A, Finn Cross B, Finn Cross C, Finn Cross D, Finn Cross G, Finn Cross H, Fraser Forster, Fraser Harrington, Gareth Iqbal, Gianni Ashford, Hamza Verma, Jude Sloan, Jude Sloan A, Jude Sloan B, Jude Sloan C, Jude Sloan F, Jude Sloan G, Kai Pryce, Kai Pryce C, Kai Pryce F, Luca Mercer, Luca Mercer B, Luca Mercer E, Luca Mercer F, Mika Keane, Mika Keane B, Noah Bennett A, Noah Bennett B, Noah Bennett C, Noah Bennett D, Rafael Ashford, Reuben Otero, Rory Vale D, Samir Petrov, Sebastian Tremblay, Toby Hale E, Toby Hale G, Ulrich Kowalski, Xander Rahman, Yusuf Barker
-- Players returning via Q School: Evan Mori H, Finn Cross E, Freddie Caldwell, Joel Otero, Kai Pryce B, Kai Pryce H, Luca Mercer A, Malik Barker, Mateo Harrington, Mika Keane E, Mika Keane F, Mika Keane H, Mika Keane I, Noah Bennett E, Noah Bennett F, Rory Vale, Rory Vale F, Toby Hale A, Toby Hale F, Ulrich Otero, Warren Forster, Zane Urban
-- Players moving to Q Tour: Emil Tremblay, Rafael Drayton, Tobias Petrov, Viktor Verma, Wesley Barker
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Kai Pryce G (+8), Jude Sloan E (+7), Kai Pryce B (+7), Kai Pryce I (+7), Luca Mercer G (+7)
-- Biggest ranking fallers: Euan Whitaker (-2), Finn Cross (-1)
-- Youngest top 16 player: Bartosz Urban (37)
-- Oldest top 16 player: Euan Whitaker (48)
-- Top prospects by potential: Kai Pryce G (98), Rory Vale J (98), Jude Sloan E (97), Rory Vale C (97), Arlo Dawes K (97)
-- High-potential players who failed to progress: Finn Cross: random development failure, Jude Sloan D: random development failure, Kai Pryce B: random development failure, Kai Pryce D: random development failure, Luca Mercer C: random development failure
+- Active AI season match average / zero-match players: 9.4 / 0
+- New AI players / overall movers / potential movers: 8 / 163 / 90
+- AI retirements this season / total retired records: 4 / 32
+- Top 16 average age / overall / potential: 40.3 / 86.6 / 86.6
+- Top 64 average age / overall / potential: 34.5 / 83.3 / 84.7
+- Players gaining tour cards: Bailey Fletcher, Ben Rossi, Dario Easton, Dario Verma, Dylan Fletcher, Eli Pryce, Evan Chen, Evan Fischer, Finn Larsen, Fraser Costa, Freddie El-Sayed, Harris Whitaker, Hugo Aoki, Hugo Dubois, Hugo Pryce, Ivo Aoki, Ivo Dubois, Jonah Aoki, Jonah Jones, Jude Ito, Kian Martin, Lorenzo Kowalski, Louis Jones, Louis Martin, Louis Park, Mika Bennett, Nathan Sorensen, Noah Bennett, Owen Martin, Owen Singh, Pavel Hale, Ren Mori, Reuben Otero, Reuben Petrov, Rory Keane, Sacha Vale, Samir Petrov, Toby Bennett, Toby Chen, Victor Bauer, Victor Evans, Viktor Tremblay, Vincent Verma, Warren Forster, Zac Caldwell, Zhen Huang, Zhen Quinn
+- Players losing tour cards: Adrian Nakamura, Evan Keane, Finn Ortega, Hamza Verma, Ilyas Petrov, Joel Otero, Joel Petrov, Kai Rossi, Lorenzo Verma, Louis Garcia, Luca Mercer, Luca Tan, Malik Iversen, Malik Lombardi, Nathan Drayton, Nathan Otero, Nico Martin, Nico Singh, Noah Mercer, Noah Tan, Owen Hale, Patrick Caldwell, Patrick Petrov, Pavel Mori, Rafael Drayton, Rafael Urban, Reuben Easton, Rory Fischer, Rory Ito, Sacha Bauer, Samir Yilmaz, Theo Evans, Ulrich Otero, Victor Huang, Viktor Verma, Wesley Kowalski, Yuri Khan, Zane Nakamura, Zane Sorensen
+- Players returning via Q School: Evan Chen, Harris Whitaker, Jonah Aoki, Kian Garcia, Mateo Quinn, Mika Dawes, Milo Martin, Noah Novak, Owen Singh, Pavel Hale, Ren Mori, Theo Bauer, Toby Keane, Victor Bauer, Viktor Tremblay, Vincent Verma, Warren Forster, Will Huang, Yuri Novak, Zac Caldwell, Zhen Huang, Zhen Khan, Zhen Novak
+- Players moving to Q Tour: Emil Yates, Freddie Mendoza, Kian Jones, Otis Nakamura, Will Khan
+- Players moving to senior/legend circuit: Oskar Otero, Oskar Petrov, Warren Otero, Xander Hayashi
+- Biggest ranking climbers: Bartosz Kovacs (+12), Dario Xu (+12), Dylan Tanaka (+12), Emil Iqbal (+12), Euan Madsen (+12)
+- Biggest ranking fallers: Wesley Urban (-7), Yannick Forster (-7), Zac Ashford (-7), Niall Grimaldi (-6), Viktor Harrington (-6)
+- Youngest top 16 player: Samir Rahman (36)
+- Oldest top 16 player: Bailey Fletcher (49)
+- Top prospects by potential: Kian Aoki (98), Mika Bennett (97), Caleb Usman (96), Finn Ito (96), Sacha Vale (96)
+- High-potential players who failed to progress: Eli Pryce: random development failure, Evan Fischer: random development failure, Hugo Dubois: random development failure, Jude Ito: random development failure, Louis Martin: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2041/42
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.6 / 7
-- New AI players / overall movers / potential movers: 8 / 146 / 77
-- Top 16 average age / overall / potential: 40.1 / 86.0 / 86.0
-- Top 64 average age / overall / potential: 33.4 / 83.4 / 85.0
-- Players gaining tour cards: Evan Mori A, Finn Cross B, Finn Cross D, Finn Cross G, Finn Cross H, Finn Cross I, Jude Sloan C, Jude Sloan E, Jude Sloan F, Jude Sloan G, Kai Pryce, Kai Pryce E, Kai Pryce F, Kai Pryce G, Kai Pryce I, Luca Mercer B, Luca Mercer E, Luca Mercer F, Luca Mercer J, Mika Keane B, Mika Keane G, Noah Bennett A, Noah Bennett D, Noah Bennett H, Oskar Westbrook, Rory Vale A, Toby Hale B, Toby Hale E
-- Players losing tour cards: Euan Whitaker, Evan Mori H, Finn Cross E, Finn Cross F, Hamza Xu, Kai Pryce B, Luca Mercer G, Malik Drayton, Mika Keane E, Mika Keane F, Noah Bennett, Noah Bennett E, Noah Bennett F, Pavel Verma, Rory Vale, Rory Vale F, Rory Vale G, Rory Vale I, Toby Hale, Toby Hale A, Vincent Lombardi, Warren Iqbal, Yusuf Verma
-- Players returning via Q School: Finn Cross G, Finn Cross H, Freddie Caldwell, Joel Otero, Jude Sloan F, Jude Sloan G, Kai Pryce E, Kai Pryce F, Kai Pryce H, Luca Mercer A, Luca Mercer E, Luca Mercer F, Luca Mercer J, Malik Barker, Mateo Harrington, Mika Keane H, Mika Keane I, Noah Bennett D, Oskar Westbrook, Toby Hale E, Toby Hale F, Ulrich Otero, Warren Forster, Zane Urban
-- Players moving to Q Tour: Fraser Nakamura, Jude Sloan A, Jude Sloan B, Kai Pryce C, Lorenzo Drayton
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Ilyas Quinnell (+7), Adrian Harrington (+7), Adrian Janssen (+7), Adrian Petrov (+7), Adrian Verma (+7)
-- Biggest ranking fallers: Mika Keane C (-5), Mika Keane D (-5), Malik Barker (-4), Malik Caldwell (-4), Mateo Harrington (-4)
-- Youngest top 16 player: Zac Rossi (37)
-- Oldest top 16 player: Patrick Barker (43)
-- Top prospects by potential: Kai Pryce G (98), Rory Vale J (98), Jude Sloan E (97), Arlo Dawes K (97), Luca Mercer G (96)
-- High-potential players who failed to progress: Evan Mori A: low match volume, Finn Cross: random development failure, Finn Cross D: random development failure, Jude Sloan D: random development failure, Kai Pryce: low match volume
+- Active AI season match average / zero-match players: 9.1 / 0
+- New AI players / overall movers / potential movers: 8 / 152 / 80
+- AI retirements this season / total retired records: 7 / 39
+- Top 16 average age / overall / potential: 40.3 / 86.9 / 86.9
+- Top 64 average age / overall / potential: 33.6 / 83.8 / 86.0
+- Players gaining tour cards: Ben Ortega, Evan Keane, Finn Ito, Finn Ortega, Hugo Cross, Jonah Dubois, Jonah Garcia, Jude Larsen, Kai Rossi, Kian Jones, Louis Garcia, Luca Mercer, Luca Novak, Luca Tan, Mika Keane, Nico Martin, Nico Park, Nico Singh, Noah Mercer, Noah Tan, Oskar Iversen, Pavel Rahman, Ren Vale, Rory Fischer, Sacha Mori, Theo Evans, Will Khan, Yuri Khan
+- Players losing tour cards: Bailey Fletcher, Bailey Otero, Gareth Iversen, Ivo Garcia, Jude Fischer, Kai Larsen, Kai Ortega, Kian Garcia, Mateo Quinn, Mateo Tan, Mika Dawes, Milo Martin, Milo Park, Milo Singh, Nico Wilson, Noah Novak, Owen Wilson, Theo Bauer, Toby Dawes, Toby Keane, Wesley Urban, Will Huang, Yuri Huang, Yuri Novak, Zac Ashford, Zhen Khan, Zhen Novak
+- Players returning via Q School: Evan Chen, Evan Keane, Harris Whitaker, Jonah Aoki, Jonah Garcia, Jude Larsen, Louis Garcia, Nico Martin, Nico Singh, Noah Mercer, Noah Tan, Oskar Iversen, Owen Singh, Pavel Hale, Ren Mori, Rory Fischer, Theo Evans, Victor Bauer, Viktor Tremblay, Vincent Verma, Warren Forster, Yuri Khan, Zac Caldwell, Zhen Huang
+- Players moving to Q Tour: Fraser Nakamura, Joel Otero, Kaito Urban, Nathan Otero, Pavel Mori, Ulrich Otero, Wesley Kowalski
+- Players moving to senior/legend circuit: Adrian Nakamura, Lorenzo Verma, Malik Iversen, Reuben Easton, Sebastian Janssen, Vincent Caldwell, Zane Sorensen
+- Biggest ranking climbers: Bartosz Kovacs (+9), Dylan Tanaka (+9), Emil Iqbal (+7), Bailey Verma (+5), Bartosz Kowalski (+5)
+- Biggest ranking fallers: Sacha Vale (-5), Samir Petrov (-5), Toby Bennett (-5), Toby Chen (-5), Samir Rahman (-4)
+- Youngest top 16 player: Dylan Tanaka (37)
+- Oldest top 16 player: Tobias El-Sayed (43)
+- Top prospects by potential: Kian Aoki (98), Mika Bennett (97), Kai Fischer (97), Caleb Usman (96), Finn Ito (96)
+- High-potential players who failed to progress: Evan Fischer: random development failure, Hugo Dubois: random development failure, Ivo Aoki: random development failure, Jude Ito: random development failure, Kai Rossi: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2042/43
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.4 / 3
-- New AI players / overall movers / potential movers: 8 / 154 / 73
-- Top 16 average age / overall / potential: 40.8 / 86.4 / 86.4
-- Top 64 average age / overall / potential: 34.5 / 83.9 / 85.2
-- Players gaining tour cards: Bartosz Kovacs, Emil Tremblay, Evan Mori H, Finn Cross C, Finn Cross E, Ilyas Easton, Jude Sloan A, Jude Sloan B, Jude Sloan J, Jude Sloan K, Kai Pryce B, Kai Pryce C, Kai Pryce J, Kai Pryce K, Luca Mercer G, Mika Keane E, Mika Keane F, Mika Keane J, Mika Keane K, Nathan Otero, Niall Caldwell, Noah Bennett B, Noah Bennett C, Noah Bennett E, Noah Bennett F, Noah Bennett I, Oskar Ashford, Rafael Drayton, Rory Vale D, Rory Vale F, Rory Vale G, Rory Vale I, Rory Vale J, Rory Vale L, Tobias Petrov, Toby Hale G, Toby Hale I, Toby Hale J, Toby Hale K, Ulrich Kowalski, Viktor Verma, Xander Hayashi
-- Players losing tour cards: Freddie Caldwell, Gianni Drayton, Hamza Whitaker, Ilyas Tremblay, Jasper Langford, Joel Otero, Jude Sloan D, Jude Sloan H, Jude Sloan I, Kai Pryce A, Kai Pryce D, Kai Pryce H, Kieran Whitaker, Lorenzo Barker, Luca Mercer A, Luca Mercer C, Luca Mercer D, Luca Mercer H, Luca Mercer I, Malik Barker, Malik Caldwell, Mateo Harrington, Mika Keane A, Mika Keane C, Mika Keane D, Mika Keane H, Mika Keane I, Noah Bennett G, Oskar Otero, Patrick Barker, Patrick Verma, Rory Vale B, Rory Vale C, Rory Vale E, Rory Vale H, Toby Hale C, Toby Hale D, Toby Hale F, Toby Hale H, Ulrich Otero, Warren Forster, Zane Urban
-- Players returning via Q School: Finn Cross C, Ilyas Easton, Jude Sloan F, Jude Sloan G, Kai Pryce E, Kai Pryce F, Luca Mercer E, Luca Mercer F, Luca Mercer G, Luca Mercer J, Nathan Otero, Noah Bennett C, Noah Bennett D, Noah Bennett E, Oskar Ashford, Oskar Westbrook, Rory Vale D, Rory Vale G, Rory Vale I, Toby Hale E, Toby Hale G, Xander Hayashi
-- Players moving to Q Tour: Euan Yates, Jude Sloan, Lorenzo Whitaker, Tariq Urban, Toby Hale, Toby Hale A
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Mika Keane B (+9), Mika Keane G (+9), Noah Bennett A (+7), Luca Mercer J (+5), Noah Bennett D (+5)
-- Biggest ranking fallers: Finn Cross G (-4), Finn Cross H (-4), Finn Cross I (-4), Finn Cross D (-3), Evan Mori I (-2)
-- Youngest top 16 player: Zac Rossi (38)
-- Oldest top 16 player: Gareth Drayton (44)
-- Top prospects by potential: Kai Pryce G (98), Rory Vale J (98), Jude Sloan E (97), Arlo Dawes K (97), Luca Mercer G (96)
-- High-potential players who failed to progress: Finn Cross E: random development failure, Kai Pryce: low match volume, Kai Pryce B: random development failure, Luca Mercer B: random development failure, Mika Keane B: random development failure
+- Active AI season match average / zero-match players: 9.6 / 0
+- New AI players / overall movers / potential movers: 8 / 140 / 63
+- AI retirements this season / total retired records: 5 / 44
+- Top 16 average age / overall / potential: 41.1 / 87.1 / 87.1
+- Top 64 average age / overall / potential: 34.1 / 83.7 / 85.7
+- Players gaining tour cards: Aiden Larsen, Arlo Novak, Caleb Rossi, Dev Usman, Dylan Mendoza, Emil Yates, Finn Fischer, Freddie Mendoza, Ilyas Hayashi, Jasper Urban, Joel Otero, Jude Fischer, Jude Keane, Kai Larsen, Kian Garcia, Luca Quinn, Mateo Quinn, Mika Dawes, Mika Tan, Nathan Otero, Nico Wilson, Owen Hale, Owen Wilson, Patrick Petrov, Pavel Mori, Pavel Singh, Pavel Wilson, Ren Hale, Rory Ito, Sacha Bauer, Theo Vale, Toby Dawes, Ulrich Otero, Victor Huang, Viktor Verma, Wesley Kowalski, Yuri Huang, Yusuf Barker, Zhen Khan, Zhen Novak
+- Players losing tour cards: Finn Larsen, Fraser Costa, Freddie El-Sayed, Harris Whitaker, Hugo Aoki, Hugo Dubois, Hugo Pryce, Ivo Aoki, Ivo Dubois, Jonah Aoki, Jonah Jones, Jude Ito, Kian Martin, Lorenzo Kowalski, Louis Jones, Louis Martin, Louis Park, Mika Bennett, Nathan Sorensen, Noah Bennett, Owen Martin, Owen Singh, Pavel Hale, Ren Mori, Reuben Otero, Reuben Petrov, Rory Keane, Sacha Vale, Samir Petrov, Tobias El-Sayed, Toby Bennett, Toby Chen, Victor Bauer, Victor Evans, Viktor Tremblay, Vincent Verma, Warren Forster, Zac Caldwell, Zhen Huang, Zhen Quinn
+- Players returning via Q School: Aiden Larsen, Dylan Mendoza, Finn Fischer, Ilyas Hayashi, Jasper Urban, Jonah Garcia, Jude Fischer, Jude Larsen, Kai Larsen, Louis Garcia, Nico Martin, Nico Singh, Noah Mercer, Noah Tan, Oskar Iversen, Owen Hale, Owen Wilson, Ren Hale, Rory Fischer, Theo Evans, Theo Vale, Yuri Khan, Yusuf Barker
+- Players moving to Q Tour: Lorenzo Whitaker, Milo Singh, Nathan Rahman, Patrick Caldwell, Toby Keane, Warren Nakamura
+- Players moving to senior/legend circuit: Bailey Fletcher, Gareth Iversen, Patrick Patel, Wesley Urban, Zac Ashford
+- Biggest ranking climbers: Gareth Rossi (+14), Ulrich Kowalski (+5), Fraser Verma (+4), Emil Iqbal (+3), Luca Mercer (+3)
+- Biggest ranking fallers: Finn Ito (-6), Euan Rahman (-5), Evan Chen (-5), Evan Fischer (-5), Evan Keane (-5)
+- Youngest top 16 player: Gareth Rossi (38)
+- Oldest top 16 player: Bartosz Kovacs (43)
+- Top prospects by potential: Kian Aoki (98), Ivo Cross (97), Ivo Pryce (97), Kai Fischer (97), Mika Bennett (97)
+- High-potential players who failed to progress: Kai Rossi: random development failure, Kian Garcia: random development failure, Luca Tan: random development failure, Mateo Quinn: random development failure, Mika Dawes: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2043/44
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.5 / 5
-- New AI players / overall movers / potential movers: 8 / 140 / 58
-- Top 16 average age / overall / potential: 40.9 / 86.1 / 86.1
-- Top 64 average age / overall / potential: 33.3 / 83.5 / 85.8
-- Players gaining tour cards: Arlo Dawes J, Arlo Dawes K, Evan Mori J, Evan Mori K, Finn Cross A, Finn Cross F, Jude Sloan, Jude Sloan D, Jude Sloan H, Jude Sloan I, Kai Pryce D, Kai Pryce H, Kai Pryce L, Luca Mercer C, Luca Mercer D, Luca Mercer H, Luca Mercer I, Mika Keane, Mika Keane C, Mika Keane I, Noah Bennett, Noah Bennett J, Rory Vale, Rory Vale C, Rory Vale E, Rory Vale K, Toby Hale, Toby Hale C, Toby Hale D, Toby Hale F, Toby Hale H, Wesley Barker
-- Players losing tour cards: Adrian Harrington, Finn Cross D, Finn Cross G, Finn Cross H, Finn Cross I, Freddie Sinclair, Gareth Drayton, Joel Forster, Jude Sloan C, Jude Sloan E, Jude Sloan F, Jude Sloan G, Kai Pryce, Kai Pryce E, Kai Pryce F, Kai Pryce G, Kai Pryce I, Luca Mercer B, Luca Mercer E, Luca Mercer F, Luca Mercer J, Mika Keane B, Mika Keane G, Noah Bennett A, Noah Bennett D, Noah Bennett H, Oskar Iqbal, Oskar Westbrook, Reuben Vos, Rory Vale A, Toby Hale B, Toby Hale E
-- Players returning via Q School: Finn Cross F, Ilyas Easton, Jude Sloan H, Jude Sloan I, Kai Pryce L, Luca Mercer G, Luca Mercer I, Nathan Otero, Noah Bennett, Noah Bennett C, Noah Bennett E, Noah Bennett J, Oskar Ashford, Rory Vale C, Rory Vale D, Rory Vale E, Rory Vale G, Rory Vale I, Rory Vale K, Toby Hale G, Toby Hale H, Wesley Barker, Xander Hayashi
-- Players moving to Q Tour: Bailey Easton, Fraser Forster, Gareth Iqbal, Quentin Sorensen
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Kai Pryce J (+7), Kai Pryce K (+7), Luca Mercer G (+7), Noah Bennett I (+7), Rafael Drayton (+7)
-- Biggest ranking fallers: none
-- Youngest top 16 player: Zac Rossi (39)
-- Oldest top 16 player: Harris Urban (44)
-- Top prospects by potential: Rory Vale J (98), Kai Pryce G (98), Arlo Dawes K (97), Finn Cross M (97), Jude Sloan E (97)
-- High-potential players who failed to progress: Finn Cross E: random development failure, Jude Sloan D: random development failure, Kai Pryce B: low match volume, Kai Pryce D: random development failure, Luca Mercer C: random development failure
+- Active AI season match average / zero-match players: 9.6 / 0
+- New AI players / overall movers / potential movers: 8 / 124 / 50
+- AI retirements this season / total retired records: 3 / 47
+- Top 16 average age / overall / potential: 41.7 / 87.2 / 87.2
+- Top 64 average age / overall / potential: 34.3 / 84.1 / 86.3
+- Players gaining tour cards: Arlo Mercer, Ben Larsen, Hugo Pryce, Ivo Aoki, Ivo Dubois, Ivo Garcia, Jonah Aoki, Jude Ito, Kai Fischer, Kian Aoki, Louis Jones, Louis Martin, Louis Park, Mika Bennett, Milo Jones, Milo Martin, Milo Singh, Nathan Drayton, Noah Bennett, Noah Novak, Otis Nakamura, Owen Martin, Owen Singh, Rory Chen, Rory Keane, Sacha Vale, Toby Bennett, Victor Bauer, Victor Vale, Will Evans, Will Huang, Zhen Huang
+- Players losing tour cards: Euan Rahman, Evan Chen, Evan Fischer, Evan Keane, Finn Ito, Finn Ortega, Freddie Barker, Hugo Cross, Jonah Dubois, Jonah Garcia, Jude Larsen, Kai Rossi, Kian Jones, Louis Garcia, Luca Mercer, Luca Novak, Luca Tan, Mika Keane, Nico Martin, Nico Park, Nico Singh, Noah Mercer, Noah Tan, Oskar Iversen, Pavel Rahman, Rafael Mendoza, Ren Vale, Rory Fischer, Sacha Mori, Theo Evans, Will Khan, Yuri Khan
+- Players returning via Q School: Finn Fischer, Hugo Pryce, Ilyas Hayashi, Ivo Dubois, Jasper Urban, Jude Fischer, Kai Larsen, Louis Jones, Mika Bennett, Milo Martin, Otis Nakamura, Owen Hale, Owen Martin, Owen Wilson, Ren Hale, Rory Keane, Sacha Vale, Theo Vale, Toby Bennett, Will Evans, Yusuf Barker, Zhen Huang
+- Players moving to Q Tour: Quentin Sorensen, Ren Mori, Theo Bauer, Yuri Novak, Zane Whitaker
+- Players moving to senior/legend circuit: Bailey Otero, Tobias El-Sayed, Vincent El-Sayed
+- Biggest ranking climbers: Harris Kovacs (+13), Euan Madsen (+6), Freddie Mendoza (+6), Ilyas Hayashi (+6), Dylan Tanaka (+5)
+- Biggest ranking fallers: Bartosz Kovacs (-5), Gareth Rossi (-4), Fraser Verma (-4), Ulrich Kowalski (-3), Gianni Nakamura (-3)
+- Youngest top 16 player: Dylan Tanaka (39)
+- Oldest top 16 player: Bartosz Kovacs (44)
+- Top prospects by potential: Kian Aoki (98), Kai Fischer (97), Mika Bennett (97), Ivo Cross (97), Ivo Pryce (97)
+- High-potential players who failed to progress: Ivo Aoki: random development failure, Jonah Aoki: random development failure, Jude Ito: low match volume, Kian Garcia: random development failure, Louis Martin: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2044/45
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.4 / 1
-- New AI players / overall movers / potential movers: 8 / 155 / 58
-- Top 16 average age / overall / potential: 41.3 / 86.6 / 86.6
-- Top 64 average age / overall / potential: 32.4 / 84.0 / 86.0
-- Players gaining tour cards: Arlo Dawes L, Evan Mori L, Finn Cross H, Finn Cross I, Finn Cross J, Finn Cross K, Finn Cross L, Fraser Forster, Fraser Harrington, Fraser Nakamura, Gareth Iqbal, Jude Sloan E, Jude Sloan G, Kai Pryce E, Kai Pryce G, Kai Pryce I, Kai Pryce K, Luca Mercer, Luca Mercer A, Luca Mercer E, Luca Mercer F, Luca Mercer J, Luca Mercer L, Luca Mercer M, Mika Keane A, Mika Keane D, Mika Keane G, Mika Keane H, Mika Keane L, Mika Keane M, Noah Bennett D, Noah Bennett G, Noah Bennett H, Noah Bennett L, Reuben Otero, Rory Vale B, Rory Vale H, Rory Vale J, Rory Vale M, Tariq Urban, Toby Hale A, Toby Hale E
-- Players losing tour cards: Adrian Verma, Cedric Sorensen, Euan Madsen, Hamza Petrov, Ilyas Easton, Jude Sloan A, Jude Sloan B, Jude Sloan J, Jude Sloan K, Kai Pryce B, Kai Pryce C, Kai Pryce J, Luca Mercer G, Mika Keane E, Mika Keane F, Mika Keane J, Mika Keane K, Nathan Otero, Niall Caldwell, Niall Petrov, Noah Bennett B, Noah Bennett C, Noah Bennett E, Noah Bennett F, Noah Bennett I, Oskar Ashford, Rafael Drayton, Rory Vale D, Rory Vale F, Rory Vale G, Rory Vale I, Rory Vale L, Tobias Petrov, Toby Hale G, Toby Hale I, Toby Hale J, Toby Hale K, Ulrich Kowalski, Viktor Verma, Xander Hayashi
-- Players returning via Q School: Arlo Dawes L, Evan Mori L, Finn Cross F, Finn Cross I, Fraser Nakamura, Jude Sloan E, Jude Sloan H, Jude Sloan I, Kai Pryce G, Kai Pryce I, Kai Pryce L, Luca Mercer, Luca Mercer I, Mika Keane A, Mika Keane G, Noah Bennett, Noah Bennett H, Noah Bennett J, Rory Vale C, Rory Vale E, Rory Vale K, Toby Hale A, Toby Hale H, Wesley Barker
-- Players moving to Q Tour: Bailey Nakamura, Finn Cross D, Jude Sloan F, Kai Pryce F, Rafael Ashford, Samir Petrov, Warren Yates
+- Active AI season match average / zero-match players: 9.5 / 0
+- New AI players / overall movers / potential movers: 8 / 140 / 54
+- AI retirements this season / total retired records: 0 / 47
+- Top 16 average age / overall / potential: 41.5 / 86.5 / 86.5
+- Top 64 average age / overall / potential: 33.2 / 84.2 / 86.9
+- Players gaining tour cards: Dev Sloan, Euan Urban, Evan Chen, Evan Fischer, Evan Keane, Finn Ito, Finn Larsen, Fraser Nakamura, Hugo Aoki, Hugo Cross, Hugo Dubois, Ivo Cross, Jonah Dubois, Kai Ortega, Kaito Urban, Louis Garcia, Mateo Khan, Mateo Tan, Milo Garcia, Milo Park, Nico Park, Nico Singh, Patrick Caldwell, Pavel Hale, Ren Mori, Ren Singh, Rory Fischer, Sacha Hale, Sacha Mori, Theo Bauer, Theo Evans, Theo Mori, Toby Chen, Toby Keane, Victor Evans, Warren Nakamura, Will Bauer, Yuri Evans, Yuri Khan, Yuri Novak, Zane Nakamura
+- Players losing tour cards: Adrian Verma, Dario Petrov, Dario Xu, Euan Madsen, Finn Fischer, Freddie Mendoza, Ilyas Hayashi, Jasper Urban, Joel Otero, Jude Fischer, Jude Keane, Kai Larsen, Kian Garcia, Luca Quinn, Mateo Quinn, Mika Dawes, Mika Tan, Nathan Otero, Niall Grimaldi, Nico Wilson, Owen Hale, Owen Wilson, Patrick Petrov, Pavel Mori, Pavel Singh, Pavel Wilson, Ren Hale, Rory Ito, Sacha Bauer, Theo Vale, Toby Dawes, Ulrich Kowalski, Ulrich Otero, Victor Huang, Viktor Harrington, Viktor Verma, Wesley Kowalski, Yuri Huang, Yusuf Barker, Zhen Khan, Zhen Novak
+- Players returning via Q School: Euan Urban, Evan Chen, Finn Ito, Fraser Nakamura, Hugo Cross, Hugo Dubois, Hugo Pryce, Ivo Dubois, Jonah Dubois, Louis Jones, Mika Bennett, Milo Martin, Nico Park, Otis Nakamura, Owen Martin, Pavel Hale, Rory Keane, Sacha Hale, Sacha Mori, Sacha Vale, Toby Bennett, Will Bauer, Will Evans, Zhen Huang
+- Players moving to Q Tour: Dario Grimaldi, Jonah Jones, Luca Mercer, Luca Novak, Samir Petrov, Zhen Quinn
 - Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Evan Mori (+4), Evan Mori A (+4), Evan Mori B (+4), Evan Mori C (+4), Evan Mori D (+4)
-- Biggest ranking fallers: Mika Keane I (-11), Mika Keane C (-10), Mika Keane (-9), Noah Bennett (-9), Rory Vale C (-8)
-- Youngest top 16 player: Arlo Dawes (33)
-- Oldest top 16 player: Adrian Petrov (46)
-- Top prospects by potential: Kai Pryce G (98), Rory Vale J (98), Arlo Dawes K (97), Finn Cross M (97), Kai Pryce I (95)
-- High-potential players who failed to progress: Jude Sloan D: random development failure, Jude Sloan E: random development failure, Kai Pryce D: random development failure, Luca Mercer C: random development failure, Luca Mercer D: random development failure
+- Biggest ranking climbers: Ilyas Yates (+9), Warren Westbrook (+7), Yannick Forster (+7), Adrian Iversen (+7), Aiden Larsen (+7)
+- Biggest ranking fallers: Harris Kovacs (-3), Hugo Pryce (-2), Ivo Dubois (-2), Ivo Garcia (-2), Zhen Huang (-2)
+- Youngest top 16 player: Adrian Iversen (34)
+- Oldest top 16 player: Bartosz Kovacs (45)
+- Top prospects by potential: Kian Aoki (98), Ivo Cross (97), Kai Fischer (97), Mika Bennett (97), Ivo Pryce (97)
+- High-potential players who failed to progress: Hugo Dubois: low match volume, Ivo Aoki: random development failure, Ivo Dubois: random development failure, Jonah Aoki: random development failure, Jude Ito: low match volume
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2045/46
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.9 / 3
-- New AI players / overall movers / potential movers: 8 / 126 / 52
-- Top 16 average age / overall / potential: 40.7 / 87.4 / 87.4
-- Top 64 average age / overall / potential: 33.2 / 84.4 / 86.4
-- Players gaining tour cards: Euan Yates, Finn Cross D, Finn Cross G, Jude Sloan I, Jude Sloan J, Jude Sloan K, Kai Pryce, Kai Pryce B, Kai Pryce M, Luca Mercer B, Luca Mercer G, Luca Mercer K, Mika Keane B, Mika Keane F, Mika Keane J, Mika Keane K, Noah Bennett E, Noah Bennett F, Noah Bennett I, Noah Bennett K, Rory Vale F, Rory Vale G, Rory Vale I, Rory Vale L, Toby Hale I, Toby Hale J, Toby Hale K, Toby Hale L
-- Players losing tour cards: Harris Urban, Jude Sloan, Jude Sloan D, Jude Sloan H, Kai Pryce D, Kai Pryce H, Kai Pryce L, Luca Mercer C, Luca Mercer D, Luca Mercer H, Luca Mercer I, Mateo Yates, Mika Keane, Mika Keane C, Mika Keane I, Noah Bennett, Noah Bennett J, Rory Vale, Rory Vale C, Rory Vale E, Rory Vale K, Toby Hale, Toby Hale C, Toby Hale D, Toby Hale F, Toby Hale H, Wesley Barker
-- Players returning via Q School: Euan Yates, Fraser Nakamura, Jude Sloan E, Jude Sloan J, Jude Sloan K, Kai Pryce G, Kai Pryce I, Luca Mercer, Luca Mercer K, Mika Keane A, Mika Keane G, Mika Keane J, Mika Keane K, Noah Bennett H, Noah Bennett I, Noah Bennett K, Rory Vale L, Toby Hale A, Toby Hale J, Toby Hale K, Toby Hale L
-- Players moving to Q Tour: Luca Mercer D, Noah Bennett B, Tobias Petrov, Yusuf Grimaldi
+- Active AI season match average / zero-match players: 9.8 / 0
+- New AI players / overall movers / potential movers: 8 / 147 / 55
+- AI retirements this season / total retired records: 0 / 47
+- Top 16 average age / overall / potential: 42.3 / 87.3 / 87.3
+- Top 64 average age / overall / potential: 32.8 / 84.3 / 87.3
+- Players gaining tour cards: Evan Dawes, Finn Fischer, Jonah Garcia, Jude Fischer, Jude Keane, Kai Fischer, Kai Ito, Kai Larsen, Kai Rossi, Kian Aoki, Kian Garcia, Luca Novak, Luca Quinn, Luca Tan, Mateo Huang, Mateo Quinn, Mika Dawes, Mika Novak, Mika Tan, Nico Martin, Nico Wilson, Noah Mercer, Noah Quinn, Noah Tan, Owen Wilson, Pavel Singh, Pavel Wilson, Ren Hale, Ren Vale, Theo Hale, Theo Vale, Toby Dawes, Will Vale, Yuri Huang, Zhen Novak
+- Players losing tour cards: Cedric Mendoza, Gianni Nakamura, Harris Kovacs, Hugo Pryce, Ivo Aoki, Ivo Dubois, Ivo Garcia, Jasper Patel, Jonah Aoki, Jude Ito, Kaito Easton, Louis Jones, Louis Martin, Louis Park, Mika Bennett, Milo Jones, Milo Martin, Milo Singh, Nathan Drayton, Noah Bennett, Noah Novak, Otis Nakamura, Owen Martin, Owen Singh, Rory Chen, Rory Keane, Sacha Vale, Toby Bennett, Victor Bauer, Victor Vale, Will Evans, Will Huang, Zhen Huang
+- Players returning via Q School: Finn Fischer, Fraser Nakamura, Hugo Cross, Hugo Dubois, Jonah Dubois, Jude Fischer, Jude Keane, Kian Garcia, Luca Quinn, Mateo Quinn, Mika Tan, Nico Martin, Nico Park, Pavel Hale, Pavel Singh, Pavel Wilson, Ren Vale, Sacha Hale, Sacha Mori, Theo Vale, Will Bauer
+- Players moving to Q Tour: Cedric Verma, Finn Ortega, Freddie El-Sayed, Reuben Otero, Rory Ito, Sacha Bauer
 - Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Dylan Forster (+2), Samir Kovacs (+2), Zac Rossi (+2), Lorenzo Olsen (+2), Ilyas Quinnell (+2)
-- Biggest ranking fallers: Noah Bennett L (-2), Reuben Otero (-2), Rory Vale J (-2), Rory Vale M (-2), Tariq Urban (-2)
-- Youngest top 16 player: Arlo Dawes B (31)
-- Oldest top 16 player: Adrian Petrov (47)
-- Top prospects by potential: Arlo Dawes K (98), Kai Pryce G (98), Rory Vale J (98), Noah Bennett O (98), Finn Cross M (97)
-- High-potential players who failed to progress: Jude Sloan E: random development failure, Kai Pryce: low match volume, Kai Pryce B: random development failure, Kai Pryce G: random development failure, Kai Pryce I: random development failure
+- Biggest ranking climbers: Jonah Dubois (+8), Kai Fischer (+6), Gareth Rossi (+5), Adrian Kowalski (+5), Adrian Petrov (+5)
+- Biggest ranking fallers: Fraser Verma (-3), Ilyas Yates (-2), Milo Garcia (-2), Ren Mori (-2), Ren Singh (-2)
+- Youngest top 16 player: Adrian Iversen (35)
+- Oldest top 16 player: Adrian Kowalski (48)
+- Top prospects by potential: Kian Aoki (98), Ivo Cross (97), Kai Fischer (97), Ivo Pryce (97), Caleb Usman (96)
+- High-potential players who failed to progress: Hugo Dubois: random development failure, Jude Fischer: random development failure, Kai Rossi: low match volume, Kian Garcia: random development failure, Luca Tan: low match volume
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2046/47
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.7 / 2
-- New AI players / overall movers / potential movers: 8 / 128 / 46
-- Top 16 average age / overall / potential: 38.3 / 88.2 / 88.4
-- Top 64 average age / overall / potential: 32.4 / 83.8 / 86.3
-- Players gaining tour cards: Arlo Dawes M, Arlo Dawes N, Evan Mori M, Evan Mori N, Evan Mori O, Jude Sloan A, Jude Sloan C, Jude Sloan F, Jude Sloan H, Jude Sloan L, Jude Sloan M, Jude Sloan N, Kai Pryce F, Kai Pryce H, Kai Pryce J, Kai Pryce K, Kai Pryce L, Luca Mercer C, Luca Mercer D, Luca Mercer H, Luca Mercer I, Luca Mercer N, Mika Keane C, Mika Keane E, Mika Keane I, Noah Bennett A, Noah Bennett B, Noah Bennett C, Noah Bennett J, Quentin Sorensen, Rafael Ashford, Rory Vale A, Rory Vale C, Rory Vale D, Rory Vale E, Rory Vale J, Rory Vale K, Samir Petrov, Toby Hale B, Toby Hale F, Toby Hale G, Toby Hale H, Warren Yates
-- Players losing tour cards: Finn Cross I, Finn Cross J, Finn Cross K, Finn Cross L, Fraser Forster, Fraser Harrington, Fraser Nakamura, Gareth Iqbal, Ilyas Quinnell, Ivan Madsen, Jude Sloan E, Jude Sloan G, Kai Pryce E, Kai Pryce G, Kai Pryce I, Kieran Zimmer, Lorenzo Olsen, Luca Mercer, Luca Mercer A, Luca Mercer E, Luca Mercer F, Luca Mercer J, Luca Mercer L, Luca Mercer M, Mika Keane A, Mika Keane D, Mika Keane G, Mika Keane H, Mika Keane L, Mika Keane M, Noah Bennett D, Noah Bennett G, Noah Bennett H, Noah Bennett L, Reuben Otero, Rory Vale B, Rory Vale H, Rory Vale M, Tariq Urban, Toby Hale A, Toby Hale E
-- Players returning via Q School: Jude Sloan F, Jude Sloan J, Jude Sloan K, Jude Sloan L, Kai Pryce F, Kai Pryce J, Kai Pryce L, Luca Mercer I, Luca Mercer K, Mika Keane E, Mika Keane J, Mika Keane K, Noah Bennett A, Noah Bennett I, Noah Bennett J, Noah Bennett K, Rafael Ashford, Rory Vale K, Rory Vale L, Toby Hale B, Toby Hale J, Toby Hale K, Toby Hale L
-- Players moving to Q Tour: Kai Pryce C, Toby Hale, Vincent Ashford, Wesley Yates
+- Active AI season match average / zero-match players: 9.7 / 0
+- New AI players / overall movers / potential movers: 8 / 129 / 43
+- AI retirements this season / total retired records: 0 / 47
+- Top 16 average age / overall / potential: 41.9 / 87.8 / 88.1
+- Top 64 average age / overall / potential: 33.3 / 84.6 / 87.4
+- Players gaining tour cards: Caleb Larsen, Evan Bennett, Finn Ortega, Hugo Pryce, Ivo Cross, Ivo Dubois, Ivo Pryce, Jonah Aoki, Jude Chen, Jude Larsen, Kian Jones, Louis Aoki, Louis Jones, Luca Khan, Luca Mercer, Mika Bennett, Milo Jones, Owen Hale, Owen Singh, Quentin Sorensen, Rory Chen, Rory Keane, Sacha Vale, Toby Bennett, Victor Bauer, Victor Vale, Will Evans, Will Khan, Yuri Bauer, Zhen Evans, Zhen Khan, Zhen Quinn
+- Players losing tour cards: Hugo Dubois, Jonah Dubois, Kai Ortega, Kaito Urban, Louis Garcia, Mateo Khan, Mateo Tan, Milo Garcia, Milo Park, Nico Park, Nico Singh, Patrick Caldwell, Pavel Hale, Pavel Langford, Ren Mori, Ren Singh, Rory Fischer, Sacha Hale, Sacha Mori, Theo Bauer, Theo Evans, Theo Mori, Toby Chen, Toby Keane, Victor Evans, Warren Nakamura, Will Bauer, Yuri Evans, Yuri Khan, Yuri Novak, Zane Nakamura
+- Players returning via Q School: Caleb Larsen, Ivo Dubois, Jonah Aoki, Jude Fischer, Jude Keane, Kian Garcia, Luca Mercer, Luca Quinn, Mateo Quinn, Mika Bennett, Mika Tan, Milo Jones, Nico Martin, Owen Hale, Pavel Singh, Pavel Wilson, Ren Vale, Rory Chen, Theo Vale, Victor Vale, Will Evans, Zhen Khan, Zhen Quinn
+- Players moving to Q Tour: Ilyas El-Sayed, Jude Ito, Louis Martin, Louis Park, Pavel Mori, Will Huang
 - Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Noah Bennett I (+6), Jude Sloan I (+5), Jude Sloan J (+5), Jude Sloan K (+5), Noah Bennett K (+5)
-- Biggest ranking fallers: Finn Cross (-1), Finn Cross A (-1), Finn Cross B (-1), Finn Cross C (-1), Finn Cross D (-1)
-- Youngest top 16 player: Arlo Dawes F (27)
-- Oldest top 16 player: Adrian Petrov (48)
-- Top prospects by potential: Arlo Dawes K (98), Rory Vale J (98), Jude Sloan P (98), Noah Bennett O (98), Arlo Dawes P (97)
-- High-potential players who failed to progress: Jude Sloan H: random development failure, Jude Sloan I: random development failure, Kai Pryce B: random development failure, Luca Mercer B: low match volume, Luca Mercer C: random development failure
+- Biggest ranking climbers: Bartosz Kovacs (+3), Dylan Tanaka (+2), Aiden Larsen (+2), Warren Westbrook (+1), Yannick Forster (+1)
+- Biggest ranking fallers: Luca Novak (-8), Luca Quinn (-8), Luca Tan (-8), Mateo Huang (-8), Mateo Quinn (-7)
+- Youngest top 16 player: Aiden Larsen (23)
+- Oldest top 16 player: Adrian Kowalski (49)
+- Top prospects by potential: Kian Aoki (98), Ivo Cross (97), Ivo Pryce (97), Kai Fischer (97), Louis Aoki (96)
+- High-potential players who failed to progress: Hugo Pryce: random development failure, Ivo Dubois: random development failure, Jonah Aoki: low match volume, Jude Fischer: random development failure, Kai Rossi: age decline
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2047/48
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.7 / 2
-- New AI players / overall movers / potential movers: 8 / 130 / 44
-- Top 16 average age / overall / potential: 37.1 / 89.3 / 89.4
-- Top 64 average age / overall / potential: 32.0 / 84.6 / 87.0
-- Players gaining tour cards: Finn Cross I, Finn Cross J, Finn Cross K, Finn Cross L, Finn Cross M, Jude Sloan B, Jude Sloan D, Jude Sloan E, Jude Sloan G, Kai Pryce D, Kai Pryce G, Kai Pryce I, Luca Mercer L, Luca Mercer M, Mika Keane G, Mika Keane L, Mika Keane M, Noah Bennett D, Noah Bennett H, Noah Bennett L, Noah Bennett M, Noah Bennett N, Noah Bennett O, Rory Vale, Rory Vale M, Rory Vale O, Toby Hale C, Toby Hale D, Toby Hale E, Toby Hale N
-- Players losing tour cards: Bartosz Kovacs, Dario Verma, Finn Cross H, Jude Sloan I, Jude Sloan J, Jude Sloan K, Kai Pryce, Kai Pryce B, Kai Pryce M, Luca Mercer B, Luca Mercer G, Luca Mercer K, Mika Keane B, Mika Keane F, Mika Keane J, Mika Keane K, Noah Bennett E, Noah Bennett F, Noah Bennett I, Noah Bennett K, Rory Vale F, Rory Vale G, Rory Vale I, Rory Vale L, Samir Kovacs, Tobias Yates, Toby Hale I, Toby Hale J, Toby Hale K, Toby Hale L
-- Players returning via Q School: Finn Cross L, Jude Sloan E, Jude Sloan F, Jude Sloan L, Kai Pryce F, Kai Pryce G, Kai Pryce I, Kai Pryce J, Kai Pryce L, Luca Mercer I, Luca Mercer L, Luca Mercer M, Mika Keane E, Mika Keane G, Mika Keane L, Mika Keane M, Noah Bennett A, Noah Bennett H, Noah Bennett J, Noah Bennett L, Rafael Ashford, Rory Vale K, Rory Vale M, Toby Hale B
-- Players moving to Q Tour: Kai Pryce A, Kieran Yates, Mika Keane A, Mika Keane H, Noah Bennett G, Rory Vale B, Tobias Ashford
+- Active AI season match average / zero-match players: 9.8 / 0
+- New AI players / overall movers / potential movers: 8 / 145 / 48
+- AI retirements this season / total retired records: 0 / 47
+- Top 16 average age / overall / potential: 36.2 / 89.4 / 89.9
+- Top 64 average age / overall / potential: 30.9 / 84.0 / 88.0
+- Players gaining tour cards: Arlo Quinn, Caleb Ortega, Dario Grimaldi, Dev Rossi, Eli Sloan, Hugo Cross, Ivo Aoki, Jonah Dubois, Jonah Jones, Jude Ito, Kai Fischer, Kian Aoki, Kian Dubois, Louis Garcia, Louis Martin, Louis Park, Luca Quinn, Mateo Khan, Mika Keane, Milo Garcia, Nico Park, Noah Bennett, Noah Quinn, Owen Martin, Owen Park, Patrick Petrov, Pavel Martin, Pavel Mori, Ren Singh, Reuben Otero, Rory Ito, Sacha Bauer, Sacha Hale, Sacha Mori, Sacha Singh, Samir Petrov, Theo Hale, Theo Mori, Victor Huang, Wesley Kowalski, Will Bauer, Will Huang, Yuri Evans, Yuri Vale, Zhen Huang
+- Players losing tour cards: Adrian Kowalski, Bartosz Kovacs, Bartosz Kowalski, Dario Verma, Dylan Mendoza, Emil Iqbal, Fraser Verma, Hugo Aoki, Jonah Garcia, Jude Fischer, Jude Keane, Kai Ito, Kai Larsen, Kai Rossi, Kian Garcia, Kieran Iqbal, Luca Novak, Luca Tan, Mateo Huang, Mateo Quinn, Mika Dawes, Mika Novak, Mika Tan, Nico Martin, Nico Wilson, Noah Mercer, Noah Tan, Owen Wilson, Pavel Singh, Pavel Wilson, Ren Hale, Ren Vale, Theo Vale, Toby Dawes, Warren Westbrook, Will Vale, Yannick Forster, Yuri Huang, Zhen Novak
+- Players returning via Q School: Eli Sloan, Ivo Dubois, Jonah Aoki, Jonah Dubois, Luca Mercer, Mateo Khan, Mika Bennett, Mika Keane, Milo Jones, Owen Hale, Owen Martin, Pavel Martin, Ren Singh, Rory Chen, Rory Ito, Samir Petrov, Theo Mori, Victor Vale, Will Evans, Yuri Evans, Zhen Huang, Zhen Khan, Zhen Quinn
+- Players moving to Q Tour: Ren Vale, Toby Keane
 - Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Dylan Barker (+4), Dylan Sorensen (+4), Emil Tremblay (+4), Euan Drayton (+4), Euan Yates (+4)
-- Biggest ranking fallers: Jude Sloan H (-4), Jude Sloan F (-3), Toby Hale F (-3), Toby Hale G (-3), Toby Hale H (-3)
-- Youngest top 16 player: Arlo Dawes H (25)
+- Biggest ranking climbers: Owen Hale (+11), Adrian Sorensen (+10), Noah Quinn (+10), Milo Jones (+9), Owen Singh (+9)
+- Biggest ranking fallers: Gareth Rossi (-1), Zhen Khan (-1)
+- Youngest top 16 player: Arlo Mercer (22)
 - Oldest top 16 player: Adrian Petrov (49)
-- Top prospects by potential: Noah Bennett O (98), Rory Vale J (98), Jude Sloan P (98), Arlo Dawes K (97), Finn Cross M (97)
-- High-potential players who failed to progress: Jude Sloan D: low match volume, Jude Sloan E: random development failure, Jude Sloan H: random development failure, Kai Pryce D: low match volume, Kai Pryce G: random development failure
+- Top prospects by potential: Kian Aoki (98), Ivo Cross (97), Ivo Pryce (97), Kai Fischer (97), Ivo Sloan (97)
+- High-potential players who failed to progress: Hugo Pryce: random development failure, Ivo Aoki: low match volume, Ivo Dubois: random development failure, Jonah Aoki: random development failure, Jonah Dubois: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2048/49
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.4 / 8
-- New AI players / overall movers / potential movers: 8 / 147 / 48
-- Top 16 average age / overall / potential: 34.3 / 90.9 / 91.6
-- Top 64 average age / overall / potential: 31.0 / 84.4 / 87.6
-- Players gaining tour cards: Arlo Dawes O, Arlo Dawes P, Finn Cross N, Finn Cross O, Jasper Langford, Jude Sloan H, Jude Sloan I, Jude Sloan J, Jude Sloan K, Kai Pryce C, Kai Pryce E, Kai Pryce K, Kai Pryce M, Kai Pryce N, Kai Pryce O, Kai Pryce P, Luca Mercer E, Luca Mercer F, Luca Mercer J, Luca Mercer K, Mika Keane A, Mika Keane D, Mika Keane H, Mika Keane J, Mika Keane K, Mika Keane N, Noah Bennett, Noah Bennett G, Noah Bennett I, Noah Bennett K, Rory Vale G, Rory Vale H, Rory Vale I, Rory Vale J, Rory Vale L, Rory Vale N, Tobias Petrov, Toby Hale, Toby Hale J, Toby Hale K, Toby Hale L, Toby Hale M, Toby Hale O
-- Players losing tour cards: Cedric Rahman, Dylan Sorensen, Jude Sloan A, Jude Sloan C, Jude Sloan F, Jude Sloan L, Jude Sloan M, Jude Sloan N, Kai Pryce F, Kai Pryce H, Kai Pryce J, Kai Pryce L, Luca Mercer C, Luca Mercer D, Luca Mercer H, Luca Mercer I, Luca Mercer N, Mika Keane C, Mika Keane E, Mika Keane I, Niall Xu, Noah Bennett A, Noah Bennett B, Noah Bennett C, Noah Bennett J, Quentin Sorensen, Rafael Ashford, Rory Vale A, Rory Vale C, Rory Vale D, Rory Vale E, Rory Vale K, Samir Petrov, Toby Hale B, Toby Hale F, Toby Hale G, Toby Hale H, Warren Yates, Yusuf Costa, Zac Rossi
-- Players returning via Q School: Finn Cross N, Finn Cross O, Jasper Langford, Jude Sloan E, Kai Pryce C, Kai Pryce G, Kai Pryce I, Kai Pryce M, Luca Mercer L, Luca Mercer M, Mika Keane G, Mika Keane L, Mika Keane M, Mika Keane N, Noah Bennett, Noah Bennett H, Noah Bennett L, Rory Vale M, Rory Vale N, Tobias Petrov, Toby Hale, Toby Hale M, Toby Hale O
-- Players moving to Q Tour: Joel Otero, Mika Keane F
+- Active AI season match average / zero-match players: 9.7 / 0
+- New AI players / overall movers / potential movers: 8 / 136 / 44
+- AI retirements this season / total retired records: 0 / 47
+- Top 16 average age / overall / potential: 33.1 / 90.1 / 91.8
+- Top 64 average age / overall / potential: 31.2 / 85.0 / 88.9
+- Players gaining tour cards: Aiden Ito, Finn Keane, Freddie El-Sayed, Hugo Dubois, Hugo Sloan, Ivo Pryce, Jonah Pryce, Jude Fischer, Jude Keane, Kai Ito, Kai Larsen, Kian Garcia, Mateo Huang, Mateo Quinn, Mika Novak, Mika Tan, Milo Martin, Nico Singh, Noah Novak, Owen Wilson, Pavel Hale, Pavel Singh, Pavel Wilson, Theo Evans, Toby Dawes, Victor Evans, Will Vale, Yuri Khan
+- Players losing tour cards: Ilyas Yates, Jonah Aoki, Jude Chen, Jude Larsen, Kian Jones, Louis Aoki, Louis Jones, Luca Khan, Luca Mercer, Mika Bennett, Milo Jones, Owen Hale, Owen Singh, Quentin Sorensen, Rory Chen, Rory Keane, Sacha Vale, Samir Rahman, Toby Bennett, Victor Bauer, Victor Vale, Will Evans, Will Khan, Yuri Bauer, Zhen Evans, Zhen Khan, Zhen Quinn
+- Players returning via Q School: Freddie El-Sayed, Jonah Dubois, Jude Fischer, Kai Ito, Mateo Huang, Mateo Khan, Mika Keane, Mika Novak, Milo Martin, Nico Singh, Owen Martin, Owen Wilson, Pavel Martin, Pavel Singh, Ren Singh, Rory Ito, Samir Petrov, Theo Mori, Victor Evans, Will Vale, Yuri Evans, Yuri Khan, Zhen Huang
+- Players moving to Q Tour: Joel Otero, Kai Rossi, Nathan Drayton, Nico Martin, Yuri Huang
 - Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Kai Pryce K (+4), Adrian Janssen (+3), Adrian Petrov (+3), Arlo Dawes (+3), Arlo Dawes A (+3)
-- Biggest ranking fallers: Noah Bennett L (-1), Noah Bennett M (-1), Noah Bennett N (-1), Noah Bennett O (-1)
-- Youngest top 16 player: Arlo Dawes J (23)
+- Biggest ranking climbers: Arlo Dawes (+13), Aiden Usman (+9), Aiden Larsen (+7), Adrian Petrov (+2), Arlo Mercer (+2)
+- Biggest ranking fallers: Ren Singh (-7), Reuben Otero (-7), Noah Quinn (-6), Pavel Martin (-6), Pavel Mori (-6)
+- Youngest top 16 player: Aiden Ito (18)
 - Oldest top 16 player: Adrian Petrov (50)
-- Top prospects by potential: Arlo Dawes K (98), Noah Bennett O (98), Rory Vale J (98), Jude Sloan P (98), Arlo Dawes P (97)
-- High-potential players who failed to progress: Jude Sloan D: random development failure, Jude Sloan E: random development failure, Jude Sloan H: random development failure, Jude Sloan I: random development failure, Jude Sloan J: random development failure
+- Top prospects by potential: Kian Aoki (98), Arlo Mercer (97), Ben Larsen (97), Ivo Cross (97), Ivo Pryce (97)
+- High-potential players who failed to progress: Hugo Dubois: low match volume, Jonah Dubois: random development failure, Jude Fischer: random development failure, Jude Ito: age decline, Kian Garcia: low match volume
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2049/50
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.3 / 0
-- New AI players / overall movers / potential movers: 8 / 125 / 40
-- Top 16 average age / overall / potential: 33.9 / 91.4 / 92.1
-- Top 64 average age / overall / potential: 31.3 / 85.0 / 87.9
-- Players gaining tour cards: Evan Mori P, Finn Cross H, Hamza Whitaker, Jude Sloan L, Jude Sloan M, Jude Sloan N, Jude Sloan O, Jude Sloan P, Kai Pryce J, Kai Pryce L, Luca Mercer C, Luca Mercer D, Luca Mercer G, Luca Mercer I, Luca Mercer N, Luca Mercer Q, Mika Keane F, Mika Keane O, Noah Bennett E, Noah Bennett F, Noah Bennett O, Rory Vale B, Rory Vale C, Rory Vale E, Toby Hale F, Toby Hale H, Toby Hale I
-- Players losing tour cards: Bartosz Urban, Connor Urban, Jude Sloan B, Jude Sloan D, Jude Sloan E, Jude Sloan G, Kai Pryce D, Kai Pryce G, Kai Pryce I, Luca Mercer L, Luca Mercer M, Mika Keane G, Mika Keane L, Mika Keane M, Noah Bennett D, Noah Bennett H, Noah Bennett L, Noah Bennett M, Noah Bennett N, Rory Vale, Rory Vale M, Rory Vale O, Toby Hale C, Toby Hale D, Toby Hale E, Toby Hale N
-- Players returning via Q School: Finn Cross H, Hamza Whitaker, Jasper Langford, Jude Sloan L, Jude Sloan M, Jude Sloan N, Kai Pryce C, Kai Pryce M, Luca Mercer G, Luca Mercer I, Luca Mercer N, Mika Keane N, Noah Bennett, Noah Bennett E, Rory Vale B, Rory Vale N, Tobias Petrov, Toby Hale, Toby Hale H, Toby Hale I, Toby Hale M, Toby Hale O
-- Players moving to Q Tour: Kai Pryce, Luca Mercer B, Mika Keane E, Rory Vale F
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Jude Sloan H (+3), Jude Sloan I (+3), Jude Sloan J (+3), Jude Sloan K (+3), Connor Yates (+2)
-- Biggest ranking fallers: Luca Mercer J (-5), Luca Mercer K (-5), Mika Keane A (-5), Mika Keane D (-5), Mika Keane H (-5)
-- Youngest top 16 player: Arlo Dawes J (24)
+- Active AI season match average / zero-match players: 9.9 / 0
+- New AI players / overall movers / potential movers: 8 / 122 / 31
+- AI retirements this season / total retired records: 1 / 48
+- Top 16 average age / overall / potential: 32.4 / 90.3 / 92.0
+- Top 64 average age / overall / potential: 31.4 / 84.9 / 88.7
+- Players gaining tour cards: Aiden Fischer, Eli Rossi, Eli Usman, Ivo Cross, Jude Chen, Kai Rossi, Kian Aoki, Louis Aoki, Louis Dubois, Louis Jones, Luca Huang, Luca Khan, Mateo Evans, Mika Dawes, Mika Mercer, Milo Jones, Milo Park, Nico Jones, Nico Martin, Nico Wilson, Noah Khan, Noah Mercer, Noah Tan, Owen Park, Ren Hale, Ren Mori, Ren Vale, Ren Wilson, Rory Bennett, Rory Chen, Rory Fischer, Rory Keane, Theo Vale, Toby Bennett, Toby Keane, Toby Tan, Ulrich Otero, Victor Vale, Yuri Bauer, Yuri Huang, Zane Nakamura, Zhen Evans, Zhen Novak
+- Players losing tour cards: Bailey Nakamura, Gareth Rossi, Ivo Aoki, Ivo Dubois, Jonah Dubois, Jonah Jones, Jude Ito, Kai Fischer, Kian Dubois, Louis Garcia, Louis Martin, Louis Park, Luca Quinn, Mateo Khan, Mika Keane, Milo Garcia, Nico Park, Noah Bennett, Noah Quinn, Owen Martin, Patrick Petrov, Pavel Martin, Pavel Mori, Ren Singh, Reuben Otero, Rory Ito, Sacha Bauer, Sacha Hale, Sacha Mori, Sacha Singh, Samir Petrov, Theo Hale, Theo Mori, Victor Huang, Wesley Kowalski, Will Bauer, Will Huang, Yuri Evans, Yuri Vale, Zhen Huang
+- Players returning via Q School: Jude Chen, Jude Fischer, Kai Ito, Louis Aoki, Luca Khan, Mateo Evans, Mateo Huang, Mika Novak, Milo Martin, Nico Singh, Noah Khan, Owen Wilson, Pavel Singh, Ren Wilson, Rory Fischer, Theo Vale, Toby Tan, Ulrich Otero, Victor Evans, Will Vale, Yuri Bauer, Yuri Khan, Zhen Evans
+- Players moving to Q Tour: Owen Singh, Victor Bauer
+- Players moving to senior/legend circuit: Adrian Kowalski
+- Biggest ranking climbers: Adrian Iversen (+7), Adrian Rahman (+4), Kai Ito (+4), Kai Larsen (+4), Kian Garcia (+4)
+- Biggest ranking fallers: Arlo Dawes (-3), Aiden Larsen (-3), Aiden Usman (-3), Noah Novak (-2), Adrian Sorensen (-1)
+- Youngest top 16 player: Aiden Fischer (18)
 - Oldest top 16 player: Adrian Petrov (51)
-- Top prospects by potential: Arlo Dawes P (98), Jude Sloan P (98), Noah Bennett O (98), Arlo Dawes K (97), Finn Cross M (97)
-- High-potential players who failed to progress: Jude Sloan H: random development failure, Jude Sloan I: low match volume, Jude Sloan J: random development failure, Jude Sloan K: random development failure, Kai Pryce K: random development failure
+- Top prospects by potential: Aiden Ito (98), Kian Aoki (98), Ivo Cross (97), Ivo Pryce (97), Finn Chen (97)
+- High-potential players who failed to progress: Jude Fischer: low match volume, Kian Aoki: random development failure, Kian Garcia: random development failure, Louis Jones: random development failure, Mateo Quinn: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2050/51
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 10.0 / 0
-- New AI players / overall movers / potential movers: 8 / 131 / 38
-- Top 16 average age / overall / potential: 34.9 / 91.4 / 91.8
-- Top 64 average age / overall / potential: 31.5 / 84.8 / 87.5
-- Players gaining tour cards: Finn Cross P, Joel Otero, Jude Sloan Q, Kai Pryce, Kai Pryce A, Kai Pryce H, Kai Pryce K, Kai Pryce M, Kai Pryce Q, Luca Mercer A, Luca Mercer B, Luca Mercer H, Luca Mercer L, Luca Mercer M, Luca Mercer O, Luca Mercer P, Mika Keane, Mika Keane B, Mika Keane C, Mika Keane E, Mika Keane I, Mika Keane L, Mika Keane M, Mika Keane P, Mika Keane Q, Noah Bennett A, Noah Bennett J, Noah Bennett L, Noah Bennett M, Noah Bennett N, Noah Bennett P, Noah Bennett Q, Rory Vale F, Rory Vale K, Rory Vale M, Rory Vale O, Rory Vale P, Rory Vale Q, Toby Hale A, Toby Hale N, Toby Hale P, Toby Hale Q, Toby Hale R
-- Players losing tour cards: Bailey Forster, Bailey Verma, Dylan Barker, Euan Yates, Jasper Langford, Jude Sloan H, Jude Sloan I, Jude Sloan J, Jude Sloan K, Kai Pryce C, Kai Pryce E, Kai Pryce N, Kai Pryce O, Kai Pryce P, Luca Mercer E, Luca Mercer F, Luca Mercer J, Luca Mercer K, Mika Keane A, Mika Keane D, Mika Keane H, Mika Keane J, Mika Keane K, Mika Keane N, Noah Bennett, Noah Bennett G, Noah Bennett I, Noah Bennett K, Rory Vale G, Rory Vale H, Rory Vale I, Rory Vale J, Rory Vale L, Rory Vale N, Tobias Petrov, Toby Hale, Toby Hale J, Toby Hale K, Toby Hale L, Toby Hale M, Toby Hale O
-- Players returning via Q School: Hamza Whitaker, Jude Sloan L, Jude Sloan M, Jude Sloan N, Jude Sloan Q, Kai Pryce A, Luca Mercer A, Luca Mercer G, Luca Mercer I, Luca Mercer N, Luca Mercer O, Luca Mercer P, Mika Keane, Mika Keane P, Noah Bennett E, Noah Bennett J, Noah Bennett N, Rory Vale B, Rory Vale K, Rory Vale O, Toby Hale H, Toby Hale I, Toby Hale N
-- Players moving to Q Tour: Luca Mercer, Noah Bennett D, Noah Bennett H, Toby Hale B
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Jude Sloan L (+7), Jude Sloan M (+7), Jude Sloan N (+7), Jude Sloan O (+7), Jude Sloan P (+7)
-- Biggest ranking fallers: Rory Vale B (-2), Rory Vale C (-2), Rory Vale E (-2), Toby Hale F (-1), Toby Hale H (-1)
-- Youngest top 16 player: Arlo Dawes J (25)
+- Active AI season match average / zero-match players: 9.6 / 0
+- New AI players / overall movers / potential movers: 8 / 115 / 32
+- AI retirements this season / total retired records: 5 / 53
+- Top 16 average age / overall / potential: 32.4 / 91.4 / 92.6
+- Top 64 average age / overall / potential: 30.6 / 85.1 / 89.9
+- Players gaining tour cards: Hugo Sloan, Ivo Aoki, Ivo Dubois, Ivo Sloan, Jonah Aoki, Jonah Cross, Jonah Dubois, Jonah Garcia, Kai Fischer, Kian Dubois, Kian Pryce, Luca Novak, Luca Quinn, Luca Tan, Mateo Khan, Mateo Tan, Mika Bennett, Nico Park, Noah Quinn, Owen Singh, Pavel Martin, Ren Singh, Sacha Hale, Sacha Mori, Sacha Singh, Sacha Vale, Theo Hale, Theo Mori, Yuri Evans, Yuri Vale
+- Players losing tour cards: Bailey Hayashi, Bailey Verma, Bartosz Urban, Dylan Tanaka, Emil Yates, Fraser Nakamura, Ivo Pryce, Jonah Pryce, Jude Fischer, Jude Keane, Kai Ito, Kai Larsen, Kian Garcia, Mateo Huang, Mateo Quinn, Mika Novak, Mika Tan, Milo Martin, Nico Singh, Noah Novak, Owen Wilson, Pavel Hale, Pavel Singh, Pavel Wilson, Theo Evans, Toby Dawes, Victor Evans, Will Vale, Yuri Khan
+- Players returning via Q School: Jonah Dubois, Jude Chen, Kai Fischer, Kian Dubois, Louis Aoki, Luca Khan, Luca Quinn, Mateo Evans, Mika Bennett, Noah Khan, Noah Quinn, Pavel Martin, Ren Singh, Ren Wilson, Rory Fischer, Sacha Singh, Theo Hale, Theo Vale, Toby Tan, Ulrich Otero, Yuri Bauer, Yuri Evans, Yuri Vale, Zhen Evans
+- Players moving to Q Tour: Jude Ito, Luca Mercer, Milo Singh, Patrick Petrov
+- Players moving to senior/legend circuit: Bartosz Kovacs, Emil Iqbal, Gianni Nakamura, Rafael Mendoza, Ulrich Kowalski
+- Biggest ranking climbers: Arlo Bennett (+11), Freddie El-Sayed (+6), Hugo Cross (+6), Hugo Dubois (+6), Hugo Pryce (+6)
+- Biggest ranking fallers: Adrian Petrov (-6), Adrian Iversen (-4), Aiden Larsen (-2), Theo Vale (-2), Toby Bennett (-2)
+- Youngest top 16 player: Aiden Fischer (19)
 - Oldest top 16 player: Adrian Petrov (52)
-- Top prospects by potential: Arlo Dawes P (98), Jude Sloan P (98), Noah Bennett O (98), Arlo Dawes O (97), Finn Cross M (97)
-- High-potential players who failed to progress: Kai Pryce K: random development failure, Luca Mercer D: age decline, Luca Mercer G: random development failure, Luca Mercer I: random development failure, Luca Mercer L: random development failure
+- Top prospects by potential: Aiden Fischer (98), Aiden Ito (98), Ivo Cross (97), Ivo Sloan (97), Finn Chen (97)
+- High-potential players who failed to progress: Jonah Aoki: low match volume, Jonah Dubois: random development failure, Kai Fischer: random development failure, Kian Aoki: random development failure, Louis Jones: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
@@ -532,104 +557,109 @@ Seasons completed: 30
 ## 2051/52
 - Total active main-tour players: 128
 - Active AI season match average / zero-match players: 9.8 / 0
-- New AI players / overall movers / potential movers: 8 / 128 / 45
-- Top 16 average age / overall / potential: 32.4 / 91.3 / 92.1
-- Top 64 average age / overall / potential: 31.6 / 84.8 / 88.0
-- Players gaining tour cards: Jude Sloan E, Jude Sloan I, Jude Sloan J, Jude Sloan K, Jude Sloan O, Jude Sloan P, Kai Pryce G, Kai Pryce I, Kai Pryce N, Kai Pryce O, Kai Pryce P, Luca Mercer Q, Mika Keane G, Mika Keane J, Mika Keane N, Mika Keane O, Noah Bennett D, Noah Bennett H, Noah Bennett I, Rory Vale J, Rory Vale L, Rory Vale N, Toby Hale C, Toby Hale J, Toby Hale M, Toby Hale O
-- Players losing tour cards: Adrian Petrov, Bartosz Rahman, Dylan Forster, Jude Sloan M, Jude Sloan N, Kai Pryce J, Kai Pryce L, Luca Mercer C, Luca Mercer D, Luca Mercer G, Luca Mercer I, Luca Mercer N, Mika Keane F, Noah Bennett E, Noah Bennett F, Noah Bennett O, Rory Vale B, Rory Vale C, Rory Vale E, Toby Hale F, Toby Hale H, Toby Hale I
-- Players returning via Q School: Jude Sloan K, Jude Sloan Q, Kai Pryce A, Kai Pryce G, Kai Pryce N, Kai Pryce O, Kai Pryce P, Luca Mercer A, Luca Mercer O, Luca Mercer P, Mika Keane, Mika Keane N, Mika Keane P, Noah Bennett J, Noah Bennett N, Rory Vale J, Rory Vale K, Rory Vale L, Rory Vale N, Rory Vale O, Toby Hale C, Toby Hale M, Toby Hale N, Toby Hale O
-- Players moving to Q Tour: Jude Sloan D, Kai Pryce E, Mika Keane H, Rory Vale A
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Rory Vale F (+4), Cedric Caldwell (+3), Connor Yates (+3), Emil Tremblay (+3), Euan Drayton (+3)
-- Biggest ranking fallers: Kai Pryce Q (-2), Luca Mercer A (-2), Luca Mercer B (-2), Jude Sloan L (-1)
-- Youngest top 16 player: Arlo Dawes M (23)
-- Oldest top 16 player: Adrian Janssen (47)
-- Top prospects by potential: Arlo Dawes P (98), Jude Sloan P (98), Noah Bennett O (98), Finn Cross M (97), Mika Keane O (97)
-- High-potential players who failed to progress: Jude Sloan E: low match volume, Jude Sloan I: low match volume, Jude Sloan J: low match volume, Jude Sloan K: low match volume, Kai Pryce G: low match volume
+- New AI players / overall movers / potential movers: 8 / 139 / 33
+- AI retirements this season / total retired records: 2 / 55
+- Top 16 average age / overall / potential: 31.3 / 90.5 / 91.9
+- Top 64 average age / overall / potential: 30.5 / 84.9 / 89.5
+- Players gaining tour cards: Arlo Khan, Dev Larsen, Dev Ortega, Ivo Pryce, Jonah Pryce, Jude Fischer, Jude Ito, Jude Keane, Kai Ito, Kai Keane, Louis Garcia, Louis Martin, Louis Park, Mateo Huang, Mika Mercer, Mika Novak, Mika Tan, Milo Dubois, Milo Garcia, Nico Garcia, Noah Bennett, Owen Jones, Owen Martin, Pavel Park, Pavel Singh, Pavel Wilson, Rory Dawes, Rory Ito, Theo Bauer, Toby Novak, Victor Bauer, Victor Hale, Victor Mori, Will Bauer, Will Evans, Will Huang, Will Khan, Will Vale, Yuri Novak, Zhen Huang, Zhen Khan
+- Players losing tour cards: Adrian Petrov, Dario Grimaldi, Jude Chen, Kai Rossi, Kian Aoki, Louis Aoki, Louis Dubois, Louis Jones, Luca Huang, Luca Khan, Mateo Evans, Mika Dawes, Milo Jones, Milo Park, Nico Jones, Nico Martin, Nico Wilson, Noah Khan, Noah Mercer, Noah Tan, Owen Park, Ren Hale, Ren Mori, Ren Vale, Ren Wilson, Rory Bennett, Rory Chen, Rory Fischer, Rory Keane, Theo Vale, Toby Bennett, Toby Keane, Toby Tan, Ulrich Otero, Victor Vale, Yuri Bauer, Yuri Huang, Zane Nakamura, Zhen Evans, Zhen Novak
+- Players returning via Q School: Arlo Khan, Dev Ortega, Ivo Pryce, Jonah Dubois, Jonah Pryce, Kai Fischer, Kian Dubois, Luca Quinn, Mika Bennett, Mika Novak, Milo Garcia, Nico Garcia, Noah Quinn, Pavel Martin, Pavel Park, Ren Singh, Sacha Singh, Theo Hale, Victor Bauer, Victor Mori, Will Bauer, Will Evans, Yuri Evans, Yuri Vale
+- Players moving to Q Tour: Mika Keane, Milo Martin, Nico Singh, Theo Evans, Yuri Khan
+- Players moving to senior/legend circuit: Euan Madsen, Harris Kovacs
+- Biggest ranking climbers: Arlo Mercer (+11), Aiden Usman (+3), Aiden Fischer (+2), Aiden Larsen (+2), Sacha Hale (+2)
+- Biggest ranking fallers: Arlo Dawes (-5), Kai Fischer (-5), Kian Dubois (-5), Kian Pryce (-5), Adrian Sorensen (-4)
+- Youngest top 16 player: Arlo Khan (19)
+- Oldest top 16 player: Adrian Rahman (48)
+- Top prospects by potential: Aiden Fischer (98), Aiden Ito (98), Ivo Pryce (97), Ivo Sloan (97), Finn Chen (97)
+- High-potential players who failed to progress: Jonah Dubois: low match volume, Jude Fischer: low match volume, Kai Fischer: random development failure, Kai Ito: random development failure, Luca Quinn: low match volume
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2052/53
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.6 / 0
-- New AI players / overall movers / potential movers: 8 / 130 / 31
-- Top 16 average age / overall / potential: 33.4 / 91.5 / 92.2
-- Top 64 average age / overall / potential: 31.2 / 84.6 / 87.9
-- Players gaining tour cards: Arlo Dawes Q, Evan Mori Q, Evan Mori R, Finn Cross Q, Finn Cross R, Finn Cross S, Jude Sloan D, Jude Sloan F, Jude Sloan H, Jude Sloan M, Jude Sloan N, Jude Sloan S, Kai Pryce B, Kai Pryce F, Kai Pryce L, Luca Mercer, Luca Mercer G, Luca Mercer J, Luca Mercer K, Luca Mercer N, Luca Mercer S, Mika Keane A, Mika Keane H, Mika Keane K, Mika Keane R, Mika Keane S, Mika Keane T, Noah Bennett F, Noah Bennett K, Noah Bennett O, Noah Bennett S, Rory Vale A, Rory Vale D, Rory Vale G, Rory Vale I, Toby Hale B, Toby Hale D, Toby Hale E, Toby Hale G, Toby Hale I, Toby Hale K, Toby Hale L
-- Players losing tour cards: Jude Sloan L, Jude Sloan Q, Kai Pryce, Kai Pryce A, Kai Pryce H, Kai Pryce K, Kai Pryce M, Kai Pryce Q, Luca Mercer A, Luca Mercer B, Luca Mercer H, Luca Mercer L, Luca Mercer M, Luca Mercer O, Luca Mercer P, Mika Keane, Mika Keane B, Mika Keane C, Mika Keane E, Mika Keane I, Mika Keane L, Mika Keane M, Mika Keane P, Mika Keane Q, Noah Bennett A, Noah Bennett J, Noah Bennett L, Noah Bennett M, Noah Bennett N, Noah Bennett P, Noah Bennett Q, Rory Vale F, Rory Vale K, Rory Vale M, Rory Vale O, Rory Vale P, Rory Vale Q, Toby Hale A, Toby Hale N, Toby Hale P, Toby Hale Q, Toby Hale R
-- Players returning via Q School: Arlo Dawes Q, Jude Sloan F, Kai Pryce B, Kai Pryce F, Kai Pryce G, Kai Pryce N, Kai Pryce O, Kai Pryce P, Luca Mercer N, Mika Keane K, Mika Keane N, Noah Bennett O, Rory Vale J, Rory Vale L, Rory Vale N, Toby Hale B, Toby Hale C, Toby Hale D, Toby Hale E, Toby Hale G, Toby Hale K, Toby Hale M, Toby Hale O
-- Players moving to Q Tour: Kai Pryce H, Noah Bennett E, Rory Vale E
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Toby Hale C (+2)
-- Biggest ranking fallers: Jude Sloan O (-10), Jude Sloan P (-10), Kai Pryce G (-10), Jude Sloan I (-9), Jude Sloan J (-9)
-- Youngest top 16 player: Arlo Dawes M (24)
-- Oldest top 16 player: Adrian Janssen (48)
-- Top prospects by potential: Jude Sloan P (98), Noah Bennett O (98), Arlo Dawes P (97), Finn Cross M (97), Mika Keane O (97)
-- High-potential players who failed to progress: Jude Sloan H: low match volume, Kai Pryce G: random development failure, Kai Pryce I: random development failure, Luca Mercer G: low match volume, Luca Mercer N: low match volume
+- Active AI season match average / zero-match players: 9.7 / 0
+- New AI players / overall movers / potential movers: 8 / 109 / 26
+- AI retirements this season / total retired records: 24 / 79
+- Top 16 average age / overall / potential: 30.9 / 91.7 / 93.0
+- Top 64 average age / overall / potential: 30.2 / 85.1 / 90.3
+- Players gaining tour cards: Finn Chen, Hugo Rossi, Ivo Sloan, Jude Chen, Kai Larsen, Kian Aoki, Kian Garcia, Louis Aoki, Louis Dubois, Luca Huang, Luca Khan, Mateo Evans, Mateo Quinn, Milo Aoki, Milo Jones, Nico Jones, Nico Singh, Noah Khan, Owen Park, Owen Wilson, Ren Wilson, Rory Bennett, Rory Chen, Theo Evans, Toby Mercer, Toby Tan, Victor Vale, Yuri Bauer, Yuri Khan, Zhen Evans
+- Players losing tour cards: Adrian Rahman, Connor Petrov, Dylan Fletcher, Jonah Aoki, Jonah Cross, Jonah Dubois, Jonah Garcia, Kai Fischer, Kian Dubois, Kian Pryce, Luca Novak, Luca Quinn, Luca Tan, Mateo Khan, Mateo Tan, Mika Bennett, Nico Park, Noah Quinn, Owen Singh, Pavel Martin, Ren Singh, Sacha Hale, Sacha Mori, Sacha Singh, Sacha Vale, Theo Hale, Theo Mori, Yuri Evans, Yuri Vale
+- Players returning via Q School: Jonah Pryce, Kian Aoki, Louis Aoki, Louis Dubois, Mateo Evans, Mika Novak, Milo Garcia, Nico Garcia, Nico Jones, Noah Khan, Owen Park, Pavel Park, Ren Wilson, Rory Bennett, Toby Mercer, Toby Tan, Victor Bauer, Victor Mori, Will Bauer, Will Evans, Zhen Evans
+- Players moving to Q Tour: Ivo Garcia, Kai Rossi, Mika Dawes, Nico Martin, Ren Hale, Theo Vale
+- Players moving to senior/legend circuit: Adrian Petrov, Dario Petrov, Fraser Verma, Jasper Patel
+- Biggest ranking climbers: Aiden Ito (+9), Arlo Khan (+9), Adrian Sorensen (+5), Jonah Pryce (+5), Kai Ito (+5)
+- Biggest ranking fallers: Aiden Usman (-5), Aiden Fischer (-4), Arlo Mercer (-3), Arlo Bennett (-3), Arlo Dawes (-1)
+- Youngest top 16 player: Arlo Khan (20)
+- Oldest top 16 player: Adrian Sorensen (43)
+- Top prospects by potential: Aiden Ito (98), Aiden Fischer (98), Arlo Khan (97), Finn Chen (97), Ivo Pryce (97)
+- High-potential players who failed to progress: Jude Chen: random development failure, Jude Fischer: low match volume, Kai Ito: random development failure, Kian Aoki: random development failure, Kian Garcia: low match volume
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2053/54
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.8 / 2
-- New AI players / overall movers / potential movers: 8 / 132 / 37
-- Top 16 average age / overall / potential: 34.4 / 91.4 / 91.9
-- Top 64 average age / overall / potential: 31.4 / 84.9 / 88.0
-- Players gaining tour cards: Jude Sloan Q, Jude Sloan R, Kai Pryce D, Kai Pryce J, Kai Pryce M, Kai Pryce R, Kai Pryce T, Luca Mercer C, Luca Mercer I, Luca Mercer L, Luca Mercer M, Luca Mercer P, Luca Mercer R, Luca Mercer T, Mika Keane L, Mika Keane M, Noah Bennett L, Noah Bennett M, Noah Bennett N, Noah Bennett P, Noah Bennett Q, Noah Bennett R, Rory Vale C, Rory Vale E, Rory Vale M, Rory Vale O, Rory Vale P, Rory Vale Q, Rory Vale S, Toby Hale N, Toby Hale P, Toby Hale R
-- Players losing tour cards: Bartosz Drayton, Cedric Caldwell, Emil Tremblay, Euan Drayton, Hamza Whitaker, Joel Otero, Jude Sloan E, Jude Sloan I, Jude Sloan J, Jude Sloan K, Jude Sloan O, Jude Sloan P, Kai Pryce G, Kai Pryce I, Kai Pryce N, Kai Pryce O, Kai Pryce P, Luca Mercer Q, Mika Keane G, Mika Keane J, Mika Keane N, Mika Keane O, Noah Bennett D, Noah Bennett H, Noah Bennett I, Rory Vale J, Rory Vale L, Rory Vale N, Toby Hale C, Toby Hale J, Toby Hale M, Toby Hale O
-- Players returning via Q School: Jude Sloan F, Jude Sloan R, Kai Pryce B, Kai Pryce F, Kai Pryce J, Luca Mercer I, Luca Mercer N, Luca Mercer R, Luca Mercer T, Mika Keane K, Noah Bennett O, Noah Bennett P, Noah Bennett Q, Noah Bennett R, Rory Vale P, Rory Vale Q, Toby Hale B, Toby Hale D, Toby Hale E, Toby Hale G, Toby Hale K, Toby Hale P, Toby Hale R
-- Players moving to Q Tour: Luca Mercer D, Mika Keane C, Rory Vale K
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Jude Sloan M (+10), Jude Sloan N (+10), Jude Sloan S (+10), Kai Pryce B (+10), Kai Pryce L (+10)
-- Biggest ranking fallers: Toby Hale B (-1)
-- Youngest top 16 player: Arlo Dawes M (25)
-- Oldest top 16 player: Adrian Janssen (49)
-- Top prospects by potential: Arlo Dawes P (98), Noah Bennett O (98), Jude Sloan P (98), Finn Cross M (97), Mika Keane T (97)
-- High-potential players who failed to progress: Jude Sloan H: random development failure, Kai Pryce M: random development failure, Luca Mercer G: low match volume, Luca Mercer I: low match volume, Luca Mercer L: low match volume
+- Active AI season match average / zero-match players: 9.9 / 0
+- New AI players / overall movers / potential movers: 8 / 111 / 19
+- AI retirements this season / total retired records: 38 / 117
+- Top 16 average age / overall / potential: 32.1 / 91.7 / 92.7
+- Top 64 average age / overall / potential: 31.4 / 85.1 / 89.7
+- Players gaining tour cards: Evan Mercer, Hugo Aoki, Jonah Cross, Jonah Dubois, Jude Dawes, Kai Fischer, Kai Rossi, Kian Pryce, Louis Jones, Louis Pryce, Luca Mercer, Luca Quinn, Mika Dawes, Mika Quinn, Milo Singh, Nico Dubois, Nico Wilson, Noah Novak, Noah Quinn, Pavel Hale, Pavel Jones, Ren Hale, Ren Martin, Ren Park, Ren Singh, Rory Keane, Theo Hale, Theo Mori, Theo Singh, Toby Bennett, Toby Dawes, Toby Novak, Yuri Evans, Yuri Huang, Yuri Vale, Zhen Bauer, Zhen Novak
+- Players losing tour cards: Jonah Pryce, Jude Fischer, Jude Ito, Jude Keane, Kai Ito, Kai Keane, Louis Garcia, Louis Martin, Louis Park, Mateo Huang, Mika Mercer, Mika Novak, Mika Tan, Milo Dubois, Milo Garcia, Nico Garcia, Noah Bennett, Owen Jones, Owen Martin, Pavel Park, Pavel Singh, Pavel Wilson, Rory Dawes, Rory Ito, Theo Bauer, Victor Bauer, Victor Hale, Victor Mori, Will Bauer, Will Evans, Will Huang, Will Khan, Will Vale, Yuri Novak, Zhen Huang, Zhen Khan
+- Players returning via Q School: Jonah Cross, Kian Aoki, Kian Pryce, Louis Aoki, Louis Dubois, Louis Pryce, Luca Mercer, Mateo Evans, Mika Quinn, Milo Singh, Nico Jones, Noah Khan, Noah Quinn, Owen Park, Ren Martin, Ren Park, Ren Wilson, Rory Bennett, Rory Keane, Toby Dawes, Toby Mercer, Toby Tan, Zhen Bauer, Zhen Evans
+- Players moving to Q Tour: Mika Bennett, Pavel Park
+- Players moving to senior/legend circuit: Adrian Rahman, Dario Xu, Pavel Langford
+- Biggest ranking climbers: Arlo Bennett (+7), Arlo Quinn (+3), Yuri Bauer (+2), Adrian Iversen (+1), Aiden Fischer (+1)
+- Biggest ranking fallers: Aiden Larsen (-6), Toby Mercer (-6), Toby Novak (-6), Toby Tan (-6), Arlo Khan (-4)
+- Youngest top 16 player: Arlo Khan (21)
+- Oldest top 16 player: Adrian Sorensen (44)
+- Top prospects by potential: Aiden Ito (98), Aiden Fischer (98), Finn Chen (97), Ivo Sloan (97), Arlo Khan (96)
+- High-potential players who failed to progress: Jonah Dubois: random development failure, Jude Chen: random development failure, Kai Fischer: random development failure, Kian Aoki: random development failure, Louis Aoki: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2054/55
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.8 / 0
-- New AI players / overall movers / potential movers: 8 / 115 / 25
-- Top 16 average age / overall / potential: 33.8 / 91.4 / 92.0
-- Top 64 average age / overall / potential: 31.3 / 84.7 / 88.6
-- Players gaining tour cards: Arlo Dawes R, Evan Mori S, Evan Mori T, Finn Cross T, Jude Sloan K, Jude Sloan L, Jude Sloan O, Jude Sloan P, Jude Sloan U, Kai Pryce E, Kai Pryce K, Kai Pryce N, Kai Pryce O, Kai Pryce P, Kai Pryce Q, Kai Pryce S, Luca Mercer Q, Luca Mercer U, Mika Keane C, Mika Keane F, Mika Keane O, Mika Keane P, Mika Keane T, Noah Bennett E, Noah Bennett S, Rory Vale H, Rory Vale J, Rory Vale L, Rory Vale R, Rory Vale T, Toby Hale H, Toby Hale T, Toby Hale U
-- Players losing tour cards: Adrian Janssen, Jude Sloan N, Jude Sloan S, Kai Pryce B, Kai Pryce F, Kai Pryce L, Luca Mercer, Luca Mercer G, Luca Mercer J, Luca Mercer K, Luca Mercer N, Luca Mercer S, Mika Keane A, Mika Keane H, Mika Keane K, Mika Keane R, Mika Keane S, Noah Bennett F, Noah Bennett K, Noah Bennett O, Rory Vale A, Rory Vale D, Rory Vale G, Rory Vale I, Toby Hale B, Toby Hale D, Toby Hale E, Toby Hale G, Toby Hale I, Toby Hale K, Toby Hale L
-- Players returning via Q School: Jude Sloan P, Jude Sloan R, Kai Pryce E, Kai Pryce J, Kai Pryce K, Kai Pryce Q, Kai Pryce S, Luca Mercer I, Luca Mercer Q, Luca Mercer R, Luca Mercer T, Mika Keane O, Noah Bennett E, Noah Bennett P, Noah Bennett Q, Noah Bennett R, Rory Vale H, Rory Vale P, Rory Vale Q, Rory Vale R, Rory Vale T, Toby Hale H, Toby Hale P, Toby Hale R
-- Players moving to Q Tour: Jude Sloan I, Kai Pryce I, Mika Keane G, Mika Keane I, Noah Bennett I
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Toby Hale N (+2), Toby Hale P (+2), Toby Hale R (+2), Arlo Dawes (+1), Arlo Dawes A (+1)
-- Biggest ranking fallers: Kai Pryce T (-10), Kai Pryce R (-9), Luca Mercer C (-9), Luca Mercer I (-8), Jude Sloan Q (-6)
-- Youngest top 16 player: Arlo Dawes O (24)
-- Oldest top 16 player: Arlo Dawes (43)
-- Top prospects by potential: Jude Sloan P (98), Arlo Dawes P (97), Finn Cross T (97), Mika Keane O (97), Mika Keane T (97)
-- High-potential players who failed to progress: Kai Pryce K: low match volume, Kai Pryce M: random development failure, Kai Pryce O: random development failure, Luca Mercer I: random development failure, Luca Mercer L: random development failure
+- Active AI season match average / zero-match players: 9.6 / 0
+- New AI players / overall movers / potential movers: 8 / 115 / 24
+- AI retirements this season / total retired records: 6 / 123
+- Top 16 average age / overall / potential: 32.2 / 90.9 / 92.6
+- Top 64 average age / overall / potential: 31.6 / 85.0 / 90.0
+- Players gaining tour cards: Ben Ito, Evan Tan, Ivo Garcia, Jonah Pryce, Jude Fischer, Kai Chen, Kai Ito, Kai Keane, Kian Dubois, Louis Park, Mateo Huang, Mateo Khan, Mika Bennett, Mika Mercer, Mika Novak, Milo Martin, Nico Park, Owen Garcia, Owen Jones, Pavel Singh, Rory Dawes, Sacha Hale, Sacha Mori, Sacha Vale, Sacha Wilson, Theo Vale, Toby Keane, Victor Hale, Victor Mori, Will Vale, Zhen Vale
+- Players losing tour cards: Dario Easton, Freddie El-Sayed, Ivo Pryce, Ivo Sloan, Jude Chen, Kai Larsen, Kian Aoki, Kian Garcia, Louis Aoki, Louis Dubois, Luca Huang, Luca Khan, Mateo Evans, Mateo Quinn, Milo Aoki, Milo Jones, Nico Jones, Nico Singh, Noah Khan, Owen Park, Owen Wilson, Ren Wilson, Rory Bennett, Rory Chen, Theo Evans, Toby Mercer, Toby Tan, Victor Vale, Yuri Bauer, Yuri Khan, Zhen Evans
+- Players returning via Q School: Jonah Cross, Kai Keane, Kian Pryce, Louis Pryce, Luca Mercer, Mateo Khan, Mika Mercer, Mika Novak, Mika Quinn, Milo Martin, Milo Singh, Noah Quinn, Owen Garcia, Owen Jones, Ren Martin, Ren Park, Rory Dawes, Rory Keane, Theo Vale, Toby Dawes, Toby Keane, Victor Hale, Zhen Bauer, Zhen Vale
+- Players moving to Q Tour: Jude Keane, Louis Martin, Mika Tan
+- Players moving to senior/legend circuit: Dylan Tanaka, Freddie Barker, Gareth Rossi, Ilyas Yates, Kaito Easton
+- Biggest ranking climbers: Arlo Novak (+12), Arlo Khan (+6), Rory Keane (+3), Luca Mercer (+2), Luca Quinn (+2)
+- Biggest ranking fallers: Adrian Iversen (-2), Arlo Mercer (-2), Kai Rossi (-2), Adrian Sorensen (-1), Aiden Ito (-1)
+- Youngest top 16 player: Ben Ito (18)
+- Oldest top 16 player: Adrian Sorensen (45)
+- Top prospects by potential: Aiden Fischer (98), Aiden Ito (97), Finn Chen (97), Ivo Sloan (97), Kai Chen (96)
+- High-potential players who failed to progress: Jonah Dubois: low match volume, Jude Fischer: age decline, Kai Fischer: random development failure, Kai Ito: random development failure, Louis Jones: low match volume
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none
 
 ## 2055/56
 - Total active main-tour players: 128
-- Active AI season match average / zero-match players: 9.7 / 1
-- New AI players / overall movers / potential movers: 8 / 120 / 25
-- Top 16 average age / overall / potential: 34.8 / 91.4 / 92.0
-- Top 64 average age / overall / potential: 31.2 / 84.7 / 88.7
-- Players gaining tour cards: Arlo Dawes S, Arlo Dawes T, Jude Sloan E, Jude Sloan I, Jude Sloan J, Jude Sloan N, Jude Sloan S, Jude Sloan T, Kai Pryce G, Kai Pryce H, Kai Pryce I, Kai Pryce R, Kai Pryce T, Luca Mercer D, Luca Mercer G, Luca Mercer N, Luca Mercer O, Luca Mercer S, Mika Keane G, Mika Keane J, Mika Keane K, Mika Keane N, Mika Keane Q, Mika Keane R, Mika Keane S, Noah Bennett D, Noah Bennett H, Noah Bennett I, Noah Bennett O, Noah Bennett Q, Noah Bennett T, Rory Vale K, Rory Vale N, Rory Vale S, Toby Hale F, Toby Hale J, Toby Hale M, Toby Hale Q, Toby Hale S
-- Players losing tour cards: Bartosz Barker, Connor Yates, Evan Mori, Evan Mori A, Jude Sloan F, Jude Sloan H, Jude Sloan M, Jude Sloan Q, Jude Sloan R, Kai Pryce D, Kai Pryce J, Kai Pryce M, Luca Mercer C, Luca Mercer I, Luca Mercer L, Luca Mercer M, Luca Mercer P, Luca Mercer R, Luca Mercer T, Mika Keane L, Mika Keane M, Noah Bennett L, Noah Bennett M, Noah Bennett N, Noah Bennett P, Noah Bennett R, Rory Vale C, Rory Vale E, Rory Vale M, Rory Vale O, Rory Vale P, Rory Vale Q, Toby Hale N, Toby Hale P, Toby Hale R
-- Players returning via Q School: Arlo Dawes S, Arlo Dawes T, Jude Sloan P, Jude Sloan S, Jude Sloan T, Kai Pryce E, Kai Pryce H, Kai Pryce K, Kai Pryce Q, Kai Pryce S, Luca Mercer O, Luca Mercer Q, Mika Keane O, Mika Keane Q, Mika Keane R, Mika Keane S, Noah Bennett E, Rory Vale H, Rory Vale R, Rory Vale T, Toby Hale F, Toby Hale H, Toby Hale Q, Toby Hale S
-- Players moving to Q Tour: Jude Sloan G, Noah Bennett F, Noah Bennett G, Noah Bennett J, Rory Vale G
-- Players moving to senior/legend circuit: none
-- Biggest ranking climbers: Luca Mercer U (+3), Mika Keane C (+3), Mika Keane F (+3), Evan Mori B (+2), Evan Mori C (+2)
-- Biggest ranking fallers: Noah Bennett E (-3), Mika Keane T (-2), Noah Bennett Q (-2), Noah Bennett S (-1), Rory Vale L (-1)
-- Youngest top 16 player: Arlo Dawes O (25)
-- Oldest top 16 player: Arlo Dawes (44)
-- Top prospects by potential: Arlo Dawes R (98), Jude Sloan P (98), Finn Cross T (97), Mika Keane O (97), Mika Keane T (97)
-- High-potential players who failed to progress: Jude Sloan O: random development failure, Jude Sloan P: random development failure, Kai Pryce G: low match volume, Kai Pryce I: low match volume, Kai Pryce K: random development failure
+- Active AI season match average / zero-match players: 9.8 / 0
+- New AI players / overall movers / potential movers: 8 / 124 / 32
+- AI retirements this season / total retired records: 25 / 148
+- Top 16 average age / overall / potential: 34.1 / 91.7 / 92.5
+- Top 64 average age / overall / potential: 31.9 / 85.2 / 90.0
+- Players gaining tour cards: Ben Fischer, Hugo Usman, Ivo Pryce, Ivo Sloan, Jonah Aoki, Jude Bennett, Jude Chen, Jude Ito, Jude Keane, Kian Aoki, Louis Aoki, Louis Dubois, Louis Martin, Luca Evans, Luca Khan, Mateo Evans, Milo Aoki, Milo Dubois, Milo Garcia, Nico Garcia, Nico Jones, Nico Martin, Noah Huang, Noah Khan, Owen Park, Owen Singh, Pavel Martin, Pavel Wilson, Ren Jones, Ren Wilson, Rory Mercer, Sacha Singh, Toby Quinn, Will Hale, Yuri Bauer, Zhen Evans
+- Players losing tour cards: Euan Urban, Jonah Cross, Jonah Dubois, Jude Dawes, Kai Fischer, Kai Rossi, Kian Pryce, Louis Jones, Louis Pryce, Luca Mercer, Luca Quinn, Mika Dawes, Mika Quinn, Milo Singh, Nico Dubois, Nico Wilson, Noah Novak, Noah Quinn, Pavel Hale, Pavel Jones, Ren Hale, Ren Martin, Ren Park, Ren Singh, Rory Keane, Theo Hale, Theo Mori, Theo Singh, Toby Bennett, Toby Dawes, Toby Novak, Yuri Evans, Yuri Huang, Yuri Vale, Zhen Bauer, Zhen Novak
+- Players returning via Q School: Hugo Usman, Ivo Sloan, Kai Keane, Luca Evans, Mateo Khan, Mika Mercer, Mika Novak, Milo Aoki, Milo Dubois, Milo Martin, Nico Garcia, Nico Martin, Noah Huang, Owen Garcia, Owen Jones, Pavel Martin, Rory Dawes, Sacha Singh, Theo Vale, Toby Keane, Toby Quinn, Victor Hale, Will Hale, Zhen Vale
+- Players moving to Q Tour: Luca Novak, Ren Martin, Ren Park, Rory Fischer, Victor Vale, Zhen Bauer
+- Players moving to senior/legend circuit: Kieran Iqbal, Niall Grimaldi, Samir Rahman, Warren Westbrook
+- Biggest ranking climbers: Aiden Rossi (+9), Arlo Mercer (+4), Arlo Dawes (+4), Aiden Ito (+2), Aiden Larsen (+2)
+- Biggest ranking fallers: Adrian Sorensen (-8), Aiden Fischer (-7), Nico Park (-7), Pavel Singh (-7), Sacha Vale (-7)
+- Youngest top 16 player: Arlo Khan (23)
+- Oldest top 16 player: Adrian Sorensen (46)
+- Top prospects by potential: Aiden Fischer (97), Ben Ito (97), Finn Chen (97), Ivo Sloan (97), Arlo Khan (96)
+- High-potential players who failed to progress: Jude Chen: random development failure, Jude Fischer: low match volume, Kai Ito: random development failure, Kian Aoki: low match volume, Louis Aoki: random development failure
 - Low-potential players overperforming: none
 - AI players with invalid career state: none
 - Warnings: none

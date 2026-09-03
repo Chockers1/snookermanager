@@ -1,8 +1,8 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Activity, Calendar, Copy, RotateCcw, Save, Zap } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/GameStateContext'
+import { useGame } from '../context/useGame'
 import { buildTrainingPlannerData } from '../utils/liveRouteData'
 import {
   buildAutoTrainingPlan,
@@ -63,6 +63,12 @@ function getRiskToneClass(value: number) {
 }
 
 export function TrainingPlannerPage() {
+  const { gameState } = useGame()
+  const plannerKey = `${gameState.currentDate}-${gameState.week}-${JSON.stringify(gameState.trainingPlan)}`
+  return <TrainingPlannerContent key={plannerKey} />
+}
+
+function TrainingPlannerContent() {
   const { gameState, applyTrainingPlan } = useGame()
   const navigate = useNavigate()
   const plannerData = buildTrainingPlannerData(gameState)
@@ -91,10 +97,6 @@ export function TrainingPlannerPage() {
     { label: 'Confidence', value: `+${summary.confidenceProjection}%`, sub: summary.confidenceLabel, tone: 'text-green-400' },
     { label: 'Coach Bonus', value: `+${summary.coachImpact}%`, sub: currentCoach?.name ?? 'No active coach', tone: 'text-green-400' },
   ]
-
-  useEffect(() => {
-    setPlannerWeek(cloneTrainingPlan(plannerData.week))
-  }, [gameState.currentDate, gameState.week, gameState.trainingPlan])
 
   function handleSessionChange(dayIndex: number, sessionKey: TrainingSessionKey, optionId: string) {
     setPlannerWeek((currentWeek) => {
