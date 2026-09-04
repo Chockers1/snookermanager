@@ -891,7 +891,7 @@ export type GameState = {
   lastAction: string;
 };
 
-export const SAVE_SCHEMA_VERSION = 6;
+export const SAVE_SCHEMA_VERSION = 7;
 const STORAGE_KEY = ACTIVE_SAVE_KEY;
 const TOURNAMENT_ROUNDS: TournamentRound[] = [
   "Last 16",
@@ -4359,6 +4359,36 @@ function getCompetitionKeysForTournament(
         return ["world", "oneYear"];
       return [];
   }
+}
+
+function tournamentAwardsCareerTitle(
+  tournament: Pick<Tournament, "name" | "format" | "type">,
+) {
+  const eventDescription = `${tournament.name} ${tournament.format}`;
+  return (
+    tournament.type !== "Q School" &&
+    tournament.type !== "Exhibition" &&
+    !/qualif(?:ier|ication|ying)/i.test(eventDescription) &&
+    !/play[ -]?off/i.test(eventDescription)
+  );
+}
+
+function historyEntryAwardsCareerTitle(
+  entry: TournamentHistoryEntry,
+  tournaments: Tournament[],
+) {
+  if (entry.result !== "Winner") return false;
+  const tournament = tournaments.find(
+    (event) =>
+      event.id === entry.tournamentId || event.name === entry.tournamentName,
+  );
+  if (tournament) return tournamentAwardsCareerTitle(tournament);
+
+  return (
+    entry.eventType !== "Q School" &&
+    entry.eventType !== "Exhibition" &&
+    !/qualif(?:ier|ication|ying)|play[ -]?off/i.test(entry.tournamentName)
+  );
 }
 
 function formatSeasonLabel(startYear: number) {
@@ -8887,14 +8917,41 @@ export function repairGameState(state: GameState): GameState {
       keepProgress &&
       state.liveMatch.tournamentId === activeProgressTournament?.id,
     );
+  const migrateHumanTitles = state.schemaVersion < 7;
+  const archivedCareerTitles = state.history.seasonRecords.reduce(
+    (total, season) => total + season.titles,
+    0,
+  );
+  const currentTitleEntries = state.history.tournamentHistory.filter((entry) =>
+    historyEntryAwardsCareerTitle(entry, repairedTournaments),
+  );
   const repairedCompetitionTables = COMPETITION_TABLE_KEYS.reduce<CompetitionTablesState>(
-    (tables, key) => ({
-      ...tables,
-      [key]: rerankCompetitionRows(
-        state.competitionTables[key] ?? [],
-        state.player.fullName,
-      ),
-    }),
+    (tables, key) => {
+      const currentTableTitles = currentTitleEntries.filter((entry) => {
+        const tournament = repairedTournaments.find(
+          (event) =>
+            event.id === entry.tournamentId ||
+            event.name === entry.tournamentName,
+        );
+        return tournament
+          ? getCompetitionKeysForTournament(tournament).includes(key)
+          : key === "world" || key === "oneYear";
+      }).length;
+      const canonicalHumanTitles =
+        (key === "world" ? archivedCareerTitles : 0) + currentTableTitles;
+
+      return {
+        ...tables,
+        [key]: rerankCompetitionRows(
+          (state.competitionTables[key] ?? []).map((row) =>
+            migrateHumanTitles && row.playerName === state.player.fullName
+              ? { ...row, titles: canonicalHumanTitles }
+              : row,
+          ),
+          state.player.fullName,
+        ),
+      };
+    },
     state.competitionTables,
   );
   const repairedRankingOrder = COMPETITION_TABLE_KEYS.some((key) =>
@@ -8955,12 +9012,13 @@ export function repairGameState(state: GameState): GameState {
     },
     lastAction:
       invalidMatchIds.size > 0 ||
+      migrateHumanTitles ||
       repairedRankingOrder ||
       repairedTournaments.some(
         (tournament, index) =>
           tournament.status !== state.tournaments[index]?.status,
       )
-        ? "Save upgraded: repaired tournament records and rebuilt every ranking table strictly by points."
+        ? "Save upgraded: repaired tournament records and title totals, then rebuilt every ranking table strictly by points."
         : state.lastAction,
   };
 }
@@ -9272,7 +9330,9 @@ function updateCompetitionTablesFromCpuDraw(
       loserChange.losses += 1;
       placements.set(loser, { round: round.label, champion: false });
       if (/^final$/i.test(round.label)) {
-        winnerChange.titles += 1;
+        if (tournamentAwardsCareerTitle(tournament)) {
+          winnerChange.titles += 1;
+        }
         placements.set(winner, { round: round.label, champion: true });
       }
     });
@@ -9440,28 +9500,17 @@ function seedCompetitionTableForStartingLevel(
       : higherPoints > lowerPoints
         ? Math.floor((higherPoints + lowerPoints) / 2)
         : lowerPoints;
-  const seededEvents = Math.max(3, 15 - level.targetRanking);
-  const seededWins = Math.max(
-    1,
-    seededEvents - Math.max(2, Math.floor(level.targetRanking / 2)),
-  );
-
   return rerankCompetitionRows(
     rows.map((row) =>
       row.playerName === playerName
         ? {
             ...row,
             points: seededPoints,
-            prizeMoney: Math.max(
-              row.prizeMoney,
-              Math.round(
-                seededPoints * (level.competitionTable === "qTour" ? 0.4 : 0.2),
-              ),
-            ),
-            eventsPlayed: seededEvents,
-            wins: seededWins,
-            losses: Math.max(0, seededEvents - seededWins),
-            titles: level.targetRanking <= 6 ? 1 : 0,
+            prizeMoney: 0,
+            eventsPlayed: 0,
+            wins: 0,
+            losses: 0,
+            titles: 0,
             statusNote: `Starting at ${level.name}`,
           }
         : row,
@@ -9486,7 +9535,23 @@ function applyStartingLevelToCompetitionTables(
       : removePlayerFromTable(tables.world);
   const oneYearRows =
     level.competitionTable === "world"
-      ? seedCompetitionTableForStartingLevel(tables.oneYear, playerName, level)
+      ? rerankCompetitionRows(
+          tables.oneYear.map((row) =>
+            row.playerName === playerName
+              ? {
+                  ...row,
+                  points: 0,
+                  prizeMoney: 0,
+                  eventsPlayed: 0,
+                  wins: 0,
+                  losses: 0,
+                  titles: 0,
+                  statusNote: "New season",
+                }
+              : row,
+          ),
+          playerName,
+        )
       : removePlayerFromTable(tables.oneYear);
 
   return {
@@ -15282,8 +15347,11 @@ function finalizeLiveMatch(
     4,
     16,
   );
-  const playerWonTitle = won && isFinalRound;
-  const opponentWonTitle = !won && isFinalRound;
+  const playerWonTournament = won && isFinalRound;
+  const opponentWonTournament = !won && isFinalRound;
+  const awardsCareerTitle = tournamentAwardsCareerTitle(tournament);
+  const playerWonTitle = playerWonTournament && awardsCareerTitle;
+  const opponentWonTitle = opponentWonTournament && awardsCareerTitle;
   const rankingRows = getCompetitionRowsForTournament(state, tournament);
   const opponentRow = rankingRows.find(
     (row) => row.playerName === liveMatch.opponentName,
@@ -15538,9 +15606,9 @@ function finalizeLiveMatch(
     won &&
     liveMatch.round === getQSchoolCardWinningRound(tournament);
   const playoffCardClinched =
-    playerWonTitle && tournament.name.toLowerCase().includes("play-off");
+    playerWonTournament && tournament.name.toLowerCase().includes("play-off");
   const directAmateurCardClinched =
-    playerWonTitle && isDirectAmateurTourCardRoute(tournament);
+    playerWonTournament && isDirectAmateurTourCardRoute(tournament);
   const directTourCardSource: Exclude<TourCardSource, null> | null =
     qSchoolCardClinched
       ? "Q School"
@@ -15565,8 +15633,10 @@ function finalizeLiveMatch(
     opponentWonTitle,
     playerEventComplete,
     opponentEventComplete,
-    playerWonTitle
-      ? "Champion"
+    playerWonTournament
+      ? awardsCareerTitle
+        ? "Champion"
+        : "Qualified"
       : won && nextRound
         ? `Advanced to ${nextRound}`
         : `Lost in ${liveMatch.round}`,
@@ -15587,11 +15657,11 @@ function finalizeLiveMatch(
     qTour: {
       ...state.careerSystems.qTour,
       playOffWinner:
-        playerWonTitle && tournament.name.toLowerCase().includes("play-off")
+        playerWonTournament && tournament.name.toLowerCase().includes("play-off")
           ? state.player.fullName
           : state.careerSystems.qTour.playOffWinner,
       directCardAwarded:
-        playerWonTitle && tournament.name.toLowerCase().includes("play-off")
+        playerWonTournament && tournament.name.toLowerCase().includes("play-off")
           ? true
           : state.careerSystems.qTour.directCardAwarded,
     },
@@ -15609,12 +15679,12 @@ function finalizeLiveMatch(
           : 0),
       eventWins:
         state.careerSystems.qSchool.eventWins +
-        (tournament.type === "Q School" && playerWonTitle ? 1 : 0),
+        (tournament.type === "Q School" && playerWonTournament ? 1 : 0),
       repeatedFailures:
         tournament.type === "Q School" && !won && nextRound == null
           ? state.careerSystems.qSchool.repeatedFailures + 1
           : tournament.type === "Q School" &&
-              (playerWonTitle || qSchoolCardClinched)
+              (playerWonTournament || qSchoolCardClinched)
             ? 0
             : state.careerSystems.qSchool.repeatedFailures,
     },

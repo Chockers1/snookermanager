@@ -124,6 +124,96 @@ function createProfessionalStart(
   });
 }
 
+describe("new career records", () => {
+  it("starts every professional route without invented results, money, or titles", () => {
+    const career = createProfessionalStart("start-top-16");
+    const worldRow = career.competitionTables.world.find(
+      (row) => row.playerName === career.player.fullName,
+    );
+    const oneYearRow = career.competitionTables.oneYear.find(
+      (row) => row.playerName === career.player.fullName,
+    );
+
+    expect(worldRow?.points).toBeGreaterThan(0);
+    expect(worldRow).toMatchObject({
+      prizeMoney: 0,
+      eventsPlayed: 0,
+      wins: 0,
+      losses: 0,
+      titles: 0,
+    });
+    expect(oneYearRow).toMatchObject({
+      points: 0,
+      prizeMoney: 0,
+      eventsPlayed: 0,
+      wins: 0,
+      losses: 0,
+      titles: 0,
+    });
+    expect(career.matches).toHaveLength(0);
+    expect(career.history.matchLog).toHaveLength(0);
+    expect(career.history.tournamentHistory).toHaveLength(0);
+  });
+
+  it("removes seeded and qualifying titles when upgrading an existing save", () => {
+    const career = createProfessionalStart("start-top-16");
+    const qualifier = career.tournaments.find((event) =>
+      /qualifying/i.test(event.name),
+    );
+    expect(qualifier).toBeDefined();
+    if (!qualifier) return;
+
+    career.schemaVersion = 6;
+    career.competitionTables.world = career.competitionTables.world.map((row) =>
+      row.playerName === career.player.fullName ? { ...row, titles: 2 } : row,
+    );
+    career.competitionTables.oneYear = career.competitionTables.oneYear.map(
+      (row) =>
+        row.playerName === career.player.fullName ? { ...row, titles: 2 } : row,
+    );
+    career.history.tournamentHistory = [
+      {
+        id: `${career.season}-${qualifier.id}`,
+        season: career.season,
+        tournamentId: qualifier.id,
+        formatId: qualifier.formatId,
+        tournamentName: qualifier.name,
+        eventType: qualifier.eventClass ?? qualifier.type,
+        stageId: qualifier.stageId ?? null,
+        tourCircuit: qualifier.tourCircuit ?? "World Snooker Tour",
+        location: qualifier.location,
+        startDate: qualifier.startDate,
+        endDate: qualifier.endDate,
+        status: "Completed",
+        result: "Winner",
+        rounds: [],
+        matchesPlayed: 1,
+        wins: 1,
+        losses: 0,
+        prizeMoney: 0,
+        rankingPoints: 0,
+        highestBreak: 50,
+        centuries: 0,
+        fatigueChange: 5,
+        entryFee: qualifier.entryFee,
+        bookedTravelCost: 0,
+      },
+    ];
+
+    const repaired = repairGameState(career);
+    expect(
+      repaired.competitionTables.world.find(
+        (row) => row.playerName === career.player.fullName,
+      )?.titles,
+    ).toBe(0);
+    expect(
+      repaired.competitionTables.oneYear.find(
+        (row) => row.playerName === career.player.fullName,
+      )?.titles,
+    ).toBe(0);
+  });
+});
+
 describe("tournament entry and match-start rules", () => {
   it("builds configured real-world fields and seeded entry rounds", () => {
     const state = createStarterState();
