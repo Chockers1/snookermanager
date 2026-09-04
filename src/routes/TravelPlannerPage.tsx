@@ -189,7 +189,7 @@ function TravelPlannerContent() {
   function confirmTravel() {
     if (activeEvent && canConfirm) {
       bookTravel(activeEvent.id, selectedTravel.id, selectedHotel.id);
-      navigate("/tournaments/hub");
+      navigate("/tournament/preparation");
     }
   }
 
@@ -286,10 +286,20 @@ function TravelPlannerContent() {
             type="button"
             aria-label="Match Preview"
             className="btn-secondary min-h-10 justify-center px-2 text-[10px] sm:text-xs"
-            onClick={() => navigate("/match/preview")}
+            onClick={() =>
+              navigate(
+                existingBooking?.preparation
+                  ? "/match/preview"
+                  : "/tournament/preparation",
+              )
+            }
           >
-            <span className="sm:hidden">Preview</span>
-            <span className="hidden sm:inline">Match Preview</span>
+            <span className="sm:hidden">
+              {existingBooking?.preparation ? "Preview" : "Prepare"}
+            </span>
+            <span className="hidden sm:inline">
+              {existingBooking?.preparation ? "Match Preview" : "Preparation"}
+            </span>
           </button>
           <button
             type="button"

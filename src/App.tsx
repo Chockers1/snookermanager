@@ -76,6 +76,11 @@ const TravelPlannerPage = lazy(() =>
     default: module.TravelPlannerPage,
   })),
 );
+const TournamentPreparationPage = lazy(() =>
+  import("./routes/TournamentPreparationPage").then((module) => ({
+    default: module.TournamentPreparationPage,
+  })),
+);
 const TournamentHubPage = lazy(() =>
   import("./routes/TournamentHubPage").then((module) => ({
     default: module.TournamentHubPage,
@@ -223,6 +228,10 @@ export function AppRoutes() {
           <Route path="/equipment/table-setup" element={<CueShopPage />} />
           <Route path="/calendar" element={<TournamentCalendarPage />} />
           <Route path="/travel" element={<TravelPlannerPage />} />
+          <Route
+            path="/tournament/preparation"
+            element={<TournamentPreparationPage />}
+          />
           <Route path="/tournaments/hub" element={<TournamentHubPage />} />
           <Route path="/tournaments/draw" element={<TournamentDrawPage />} />
           <Route path="/match/preview" element={<MatchPreviewPage />} />

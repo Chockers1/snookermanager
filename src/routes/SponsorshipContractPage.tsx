@@ -29,6 +29,7 @@ export function SponsorshipContractPage() {
   const { gameState, acceptSponsor, rejectSponsor, negotiateSponsor } =
     useGame();
   const selectedOfferId = searchParams.get("offer");
+  const selectedSponsorSlot = searchParams.get("slot") ?? undefined;
   const selectedOffer = useMemo(
     () =>
       gameState.sponsorOffers.find((offer) => offer.id === selectedOfferId) ??
@@ -100,7 +101,7 @@ export function SponsorshipContractPage() {
         </h1>
         <p className="mt-1 text-sm text-gray-400">
           Sponsor: {selectedOffer.name}. Review package, negotiation levers, and
-          brand impact.
+          brand impact{selectedSponsorSlot ? ` for the ${selectedSponsorSlot} slot` : ""}.
         </p>
       </div>
       <div className="grid gap-4 xl:grid-cols-12">
@@ -368,7 +369,7 @@ export function SponsorshipContractPage() {
             <button
               type="button"
               className="btn-primary justify-center text-xs"
-              onClick={() => acceptSponsor(selectedOffer.id)}
+              onClick={() => acceptSponsor(selectedOffer.id, selectedSponsorSlot)}
             >
               <Star className="h-3.5 w-3.5" /> Accept Contract
             </button>

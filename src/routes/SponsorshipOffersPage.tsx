@@ -26,6 +26,10 @@ export function SponsorshipOffersPage() {
   const [filter, setFilter] = useState<'All' | 'Ready' | 'Low Risk'>('All')
   const [compareOffers, setCompareOffers] = useState(false)
   const [selectedOfferId, setSelectedOfferId] = useState(availableOffers[0]?.id ?? '')
+  const [selectedSlot, setSelectedSlot] = useState(() => currentSlots.find((slot) => slot.status === 'Vacant')?.slot ?? '')
+  const activeSelectedSlot = currentSlots.some((slot) => slot.slot === selectedSlot && slot.status === 'Vacant')
+    ? selectedSlot
+    : currentSlots.find((slot) => slot.status === 'Vacant')?.slot ?? ''
   const sponsorSlotsFull = gameState.sponsors.length >= sponsorCapacity
   const filteredOffers = availableOffers.filter((offer) => {
     if (filter === 'Ready') return getOfferStatus(offer, gameState.player.reputation, sponsorSlotsFull).canAccept
@@ -97,14 +101,21 @@ export function SponsorshipOffersPage() {
           <div className="card-header px-3 py-2"><h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Handshake className="h-4 w-4 text-green-400" /> Active Sponsors</h3></div>
           <div className="card-body flex h-full min-h-0 flex-col gap-2 overflow-auto px-3 py-3 scrollbar-thin">
             {currentSlots.map((slot) => (
-              <div key={slot.slot} className="rounded-lg bg-surface-light/50 px-3 py-2.5">
+              <button
+                key={slot.slot}
+                type="button"
+                disabled={slot.status !== 'Vacant'}
+                onClick={() => setSelectedSlot(slot.slot)}
+                className={`w-full rounded-lg px-3 py-2.5 text-left transition-colors ${activeSelectedSlot === slot.slot ? 'bg-green-600/10 ring-1 ring-green-500' : 'bg-surface-light/50'} ${slot.status === 'Vacant' ? 'cursor-pointer hover:bg-surface-light' : 'cursor-default disabled:opacity-100'}`}
+              >
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <span className="truncate text-sm font-medium text-white">{slot.sponsor}</span>
                   {slot.status === 'Active' ? <Check className="h-3 w-3 shrink-0 text-green-400" /> : null}
+                  {activeSelectedSlot === slot.slot ? <span className="rounded bg-green-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-green-400">Selected</span> : null}
                 </div>
                 <div className="flex justify-between text-xs text-gray-400"><span>{slot.slot}</span><span className="text-green-400">{slot.monthlyIncome ?? '--'}</span></div>
-                <p className="mt-1 text-[10px] text-gray-500">{slot.status}{slot.timeLeft ? ` - ${slot.timeLeft}` : ''}</p>
-              </div>
+                <p className="mt-1 text-[10px] text-gray-500">{slot.status}{slot.timeLeft ? ` - ${slot.timeLeft}` : ''}{slot.status === 'Vacant' && activeSelectedSlot !== slot.slot ? ' · Click to fill' : ''}</p>
+              </button>
             ))}
             <div className="mt-auto border-t border-border pt-2.5">
               <div className="flex justify-between text-xs"><span className="text-gray-400">Total Sponsored Income</span><span className="font-bold text-green-400">{formatMoney(activeRevenue)}/mo</span></div>
@@ -188,10 +199,10 @@ export function SponsorshipOffersPage() {
                   <div><span className="text-gray-500">Min Rep</span><p className="text-white">{selectedOffer.minimumReputation}</p></div>
                   <div><span className="text-gray-500">Brand Fit</span><p className="text-white">{selectedOffer.brandFit}%</p></div>
                 </div>
-                <p className="text-[11px] text-gray-400">{selectedOfferStatus?.detail}</p>
+                <p className="text-[11px] text-gray-400">{activeSelectedSlot ? `Signing into ${activeSelectedSlot}. ` : ''}{selectedOfferStatus?.detail}</p>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" className="btn-primary px-3 py-2 text-xs" disabled={!selectedOfferStatus?.canAccept} onClick={() => acceptSponsor(selectedOffer.id)}><Handshake className="h-3.5 w-3.5" /> Accept Deal</button>
-                  <Link to={`/sponsorship/contract?offer=${selectedOffer.id}`} className="btn-secondary px-3 py-2 text-xs">View Details</Link>
+                  <button type="button" className="btn-primary px-3 py-2 text-xs" disabled={!selectedOfferStatus?.canAccept || !activeSelectedSlot} onClick={() => acceptSponsor(selectedOffer.id, activeSelectedSlot)}><Handshake className="h-3.5 w-3.5" /> Fill {activeSelectedSlot || 'Sponsor Slot'}</button>
+                  <Link to={`/sponsorship/contract?offer=${selectedOffer.id}${activeSelectedSlot ? `&slot=${encodeURIComponent(activeSelectedSlot)}` : ''}`} className="btn-secondary px-3 py-2 text-xs">View Details</Link>
                   <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => rejectSponsor(selectedOffer.id)}>Decline</button>
                 </div>
               </div>

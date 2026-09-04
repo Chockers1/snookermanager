@@ -150,6 +150,8 @@ export function TournamentHubPage() {
       ? "Enter Tournament"
       : !playability?.travelBooked
         ? "Book Travel"
+        : !playability?.preparationConfirmed
+          ? "Prepare Tournament"
         : (playability?.daysUntilStart ?? 0) > 0
           ? "Advance to Tournament"
           : "Play Next Match";
@@ -187,6 +189,10 @@ export function TournamentHubPage() {
     }
     if (!playability?.travelBooked) {
       navigate("/travel");
+      return;
+    }
+    if (!playability?.preparationConfirmed) {
+      navigate("/tournament/preparation");
       return;
     }
     if ((playability?.daysUntilStart ?? 0) > 0) {
@@ -360,7 +366,13 @@ export function TournamentHubPage() {
                   <button
                     type="button"
                     className="btn-secondary min-h-10 justify-center px-3 text-xs"
-                    onClick={() => navigate("/match/preview")}
+                    onClick={() =>
+                      navigate(
+                        playability?.preparationConfirmed
+                          ? "/match/preview"
+                          : "/tournament/preparation",
+                      )
+                    }
                   >
                     <Search className="h-3.5 w-3.5" /> Scout
                   </button>

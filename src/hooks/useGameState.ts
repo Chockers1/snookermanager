@@ -132,6 +132,13 @@ import {
   getSponsorObligationProfile,
 } from "../game/sponsorshipSystem";
 import { getTreatmentEffect } from "../game/healthSystem";
+import {
+  calculatePreparationEffects,
+  type PreparationAllocations,
+  type PreparationFocusId,
+  type PreparationSupportId,
+  type TournamentPreparationPlan,
+} from "../game/tournamentPreparation";
 
 export {
   getFacilityTrainingMultiplier,
@@ -163,13 +170,14 @@ export type FinanceTransaction = {
   type: "Income" | "Expense";
 };
 
-type TravelBookingState = {
+export type TravelBookingState = {
   tournamentId: string;
   travelOptionId: string;
   hotelOptionId: string;
   totalCost: number;
   bookedWeek: number;
   bookedDate: string;
+  preparation?: TournamentPreparationPlan;
 };
 
 type TravelState = {
@@ -7599,6 +7607,7 @@ export function bookTravelState(
             totalCost,
             bookedWeek: previousState.week,
             bookedDate: previousState.currentDate,
+            preparation: existingBooking?.preparation,
           },
         },
       },
@@ -7636,6 +7645,138 @@ export function bookTravelState(
     },
     `Booked travel for ${tournament.name}.`,
     "Travel Booking",
+  );
+}
+
+export function confirmTournamentPreparationState(
+  previousState: GameState,
+  tournamentId: string,
+  focusId: PreparationFocusId,
+  allocations: PreparationAllocations,
+  supportIds: PreparationSupportId[],
+) {
+  const tournament = previousState.tournaments.find(
+    (item) => item.id === tournamentId,
+  );
+  const booking = previousState.travel.bookings[tournamentId];
+  if (!tournament || tournament.status !== "Entered") {
+    return finalizeState(
+      previousState,
+      "Enter a tournament before confirming preparation.",
+    );
+  }
+  if (!booking) {
+    return finalizeState(
+      previousState,
+      `Book travel for ${tournament.name} before confirming preparation.`,
+    );
+  }
+
+  const allocationTotal = Object.values(allocations).reduce(
+    (total, value) => total + value,
+    0,
+  );
+  const allocationsValid = Object.values(allocations).every(
+    (value) => Number.isFinite(value) && value >= 0 && value <= 100,
+  );
+  if (!allocationsValid || allocationTotal !== 100) {
+    return finalizeState(
+      previousState,
+      "Preparation time must add up to exactly 100%.",
+    );
+  }
+
+  const uniqueSupportIds = [...new Set(supportIds)];
+  const effects = calculatePreparationEffects(allocations, uniqueSupportIds);
+  const previousEffects = booking.preparation?.effects;
+  const costDelta = effects.cost - (previousEffects?.cost ?? 0);
+  if (costDelta > previousState.player.cash) {
+    return finalizeState(
+      previousState,
+      `Not enough cash to add the selected preparation support for ${tournament.name}.`,
+    );
+  }
+
+  const confidenceDelta =
+    effects.confidenceDelta - (previousEffects?.confidenceDelta ?? 0);
+  const fatigueDelta =
+    effects.fatigueDelta - (previousEffects?.fatigueDelta ?? 0);
+  const strainDelta = effects.strainDelta - (previousEffects?.strainDelta ?? 0);
+  const plan: TournamentPreparationPlan = {
+    focusId,
+    allocations: { ...allocations },
+    supportIds: uniqueSupportIds,
+    effects,
+    confirmedWeek: previousState.week,
+    confirmedDate: previousState.currentDate,
+  };
+  const ledgerId = `preparation-${tournament.id}-${previousState.season}`;
+  const ledger = previousState.finance.ledger.filter(
+    (entry) => entry.id !== ledgerId,
+  );
+  if (effects.cost > 0) {
+    ledger.unshift({
+      id: ledgerId,
+      date: previousState.currentDate,
+      description: `${tournament.name} preparation support`,
+      category: "Preparation",
+      amount: effects.cost,
+      type: "Expense",
+    });
+  }
+
+  return finalizeState(
+    {
+      ...previousState,
+      player: {
+        ...previousState.player,
+        cash: previousState.player.cash - costDelta,
+        confidence: clamp(
+          previousState.player.confidence + confidenceDelta,
+          0,
+          100,
+        ),
+        fatigue: clamp(previousState.player.fatigue + fatigueDelta, 0, 100),
+      },
+      trainingCondition: {
+        ...previousState.trainingCondition,
+        strain: clamp(
+          previousState.trainingCondition.strain + strainDelta,
+          0,
+          100,
+        ),
+      },
+      finance: {
+        ...previousState.finance,
+        ledger,
+      },
+      travel: {
+        ...previousState.travel,
+        bookings: {
+          ...previousState.travel.bookings,
+          [tournamentId]: {
+            ...booking,
+            preparation: plan,
+          },
+        },
+      },
+      inbox: [
+        createInboxMessage(
+          {
+            sender: "Performance Team",
+            subject: `${tournament.name} preparation confirmed`,
+            preview: `${effects.sharpnessDelta >= 0 ? "+" : ""}${effects.sharpnessDelta} sharpness, ${effects.confidenceDelta >= 0 ? "+" : ""}${effects.confidenceDelta} confidence, ${effects.fatigueDelta} fatigue and ${effects.strainDelta} strain. Temporary form will peak in the opening round.`,
+            priority: "Medium",
+            actionLabel: "Match Preview",
+            actionRoute: "/match/preview",
+          },
+          "Today",
+        ),
+        ...previousState.inbox,
+      ].slice(0, 18),
+    },
+    `Confirmed ${tournament.name} preparation. Temporary match form is ready.`,
+    "Tournament Preparation",
   );
 }
 
@@ -13420,12 +13561,47 @@ function createMatchSetup(state: GameState, tournament: Tournament) {
   const currentRoundIndex =
     getTournamentRounds(tournament).indexOf(currentRound);
   const roundPlan = getTournamentRoundPlan(tournament, currentRound);
-  const technical = calculateTechnicalAverage(state.attributes.technical);
-  const mental = calculateAverage(Object.values(state.attributes.mental));
-  const physical = calculateAverage(Object.values(state.attributes.physical));
+  const preparationEffects = getTravelBooking(
+    state,
+    tournament.id,
+  )?.preparation?.effects;
+  const preparationRoundsPlayed =
+    state.tournamentProgress.tournamentId === tournament.id
+      ? state.tournamentProgress.completedRounds.length
+      : 0;
+  const preparationDecay = Math.max(
+    0.35,
+    1 - preparationRoundsPlayed * 0.18,
+  );
+  const preparationBonus = (label: string) =>
+    (preparationEffects?.attributeBonuses[label] ?? 0) * preparationDecay;
+  const technical =
+    calculateTechnicalAverage(state.attributes.technical) +
+    calculateAverage([
+      preparationBonus("Long Potting"),
+      preparationBonus("Break Building"),
+      preparationBonus("Cue Ball Control"),
+      preparationBonus("Safety Play"),
+      preparationBonus("Consistency"),
+    ]);
+  const mental =
+    calculateAverage(Object.values(state.attributes.mental)) +
+    calculateAverage([
+      preparationBonus("Composure"),
+      preparationBonus("Focus"),
+      preparationBonus("Big Match Nerve"),
+    ]);
+  const physical =
+    calculateAverage(Object.values(state.attributes.physical)) +
+    calculateAverage([
+      preparationBonus("Stamina"),
+      preparationBonus("Balance"),
+    ]);
   const bigMatchNerve = state.attributes.mental["Big Match Nerve"] ?? mental;
   const composure = state.attributes.mental.Composure ?? mental;
-  const equipmentBonus = getCurrentCueBonus(state.equipment);
+  const equipmentBonus =
+    getCurrentCueBonus(state.equipment) +
+    (preparationEffects?.familiarityBonus ?? 0) * preparationDecay;
   const activeCoach = state.coaches.find(
     (coach) => coach.id === state.currentCoachId,
   );
@@ -13465,6 +13641,7 @@ function createMatchSetup(state: GameState, tournament: Tournament) {
       equipmentBonus,
     }) +
     coachMatchBonus +
+    (preparationEffects?.sharpnessDelta ?? 0) * preparationDecay +
     travelModifier -
     (state.trainingCondition.injuryWeeks > 0 ? 6 : 0) -
     state.trainingCondition.strain / 25 -
@@ -16086,9 +16263,11 @@ function finalizeLiveMatch(
   const rankingMovement =
     previousRank && currentRank ? previousRank - currentRank : 0;
   const travelCost = state.travel.bookings[tournament.id]?.totalCost ?? 0;
+  const preparationCost =
+    state.travel.bookings[tournament.id]?.preparation?.effects.cost ?? 0;
   const entryCost = getTournamentEntryCashRequirement(state, tournament);
   const eventIncome = prizeMoneyEarned + sponsorBonusTotal;
-  const eventCosts = entryCost + travelCost;
+  const eventCosts = entryCost + travelCost + preparationCost;
   const eventNet = eventIncome - eventCosts;
   const nextTournament = getNextEligibleTournament(completedMatchState);
   const finish = won ? "Winner" : `Lost in ${liveMatch.round}`;
@@ -16166,7 +16345,7 @@ function finalizeLiveMatch(
               {
                 label: "Event costs",
                 value: `-£${eventCosts.toLocaleString("en-GB")}`,
-                detail: `Entry £${entryCost.toLocaleString("en-GB")} · travel £${travelCost.toLocaleString("en-GB")}`,
+                detail: `Entry £${entryCost.toLocaleString("en-GB")} · travel £${travelCost.toLocaleString("en-GB")} · preparation £${preparationCost.toLocaleString("en-GB")}`,
                 tone: eventCosts > 0 ? "negative" : "neutral",
               },
               {
@@ -17621,6 +17800,7 @@ export function applyTrainingPlanState(
 export function acceptSponsorState(
   previousState: GameState,
   sponsorId: string,
+  requestedSlot?: string,
 ) {
   const offer = findSponsorOfferFromState(previousState, sponsorId);
   if (!offer) return previousState;
@@ -17645,7 +17825,28 @@ export function acceptSponsorState(
       "All currently unlocked sponsor slots are already occupied.",
     );
   }
-  const sponsorSlot = getNextSponsorSlot(previousState);
+  const unlockedSponsorSlots = SPONSOR_SLOT_NAMES.slice(
+    0,
+    getSponsorSlotLimit(previousState),
+  );
+  if (
+    requestedSlot &&
+    !unlockedSponsorSlots.some((slot) => slot === requestedSlot)
+  ) {
+    return finalizeState(
+      previousState,
+      `${requestedSlot} is not currently unlocked.`,
+    );
+  }
+  if (
+    requestedSlot &&
+    previousState.sponsors.some((sponsor) => sponsor.slot === requestedSlot)
+  ) {
+    return finalizeState(previousState, `${requestedSlot} is already occupied.`);
+  }
+  const sponsorSlot = requestedSlot
+    ? unlockedSponsorSlots.find((slot) => slot === requestedSlot) ?? null
+    : getNextSponsorSlot(previousState);
   if (!sponsorSlot) {
     return finalizeState(
       previousState,
@@ -18647,6 +18848,22 @@ export function useGameState() {
           ),
         );
       },
+      confirmTournamentPreparation(
+        tournamentId: string,
+        focusId: PreparationFocusId,
+        allocations: PreparationAllocations,
+        supportIds: PreparationSupportId[],
+      ) {
+        setGameState((previousState) =>
+          confirmTournamentPreparationState(
+            previousState,
+            tournamentId,
+            focusId,
+            allocations,
+            supportIds,
+          ),
+        );
+      },
       simulateMatch(tournamentId?: string) {
         setGameState((previousState) =>
           simulateTournamentMatchState(previousState, tournamentId),
@@ -19112,9 +19329,9 @@ export function useGameState() {
               );
         });
       },
-      acceptSponsor(sponsorId: string) {
+      acceptSponsor(sponsorId: string, requestedSlot?: string) {
         setGameState((previousState) =>
-          acceptSponsorState(previousState, sponsorId),
+          acceptSponsorState(previousState, sponsorId, requestedSlot),
         );
       },
       renewSponsor(sponsorId: string) {

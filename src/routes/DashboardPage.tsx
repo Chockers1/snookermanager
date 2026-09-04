@@ -136,6 +136,8 @@ export function DashboardPage() {
         ? "Play Next Match"
         : !tournamentPlayability?.travelBooked
           ? "Book Travel"
+          : !tournamentPlayability?.preparationConfirmed
+            ? "Prepare Tournament"
           : (tournamentPlayability?.daysUntilStart ?? 0) > 0
             ? "Advance to Tournament"
             : "Open Tournament Hub"
@@ -178,6 +180,8 @@ export function DashboardPage() {
         navigate("/match/preview");
       } else if (!tournamentPlayability?.travelBooked) {
         navigate("/travel");
+      } else if (!tournamentPlayability?.preparationConfirmed) {
+        navigate("/tournament/preparation");
       } else if ((tournamentPlayability?.daysUntilStart ?? 0) > 0) {
         continueToNextTournament();
         navigate("/tournaments/hub");

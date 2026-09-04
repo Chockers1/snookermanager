@@ -139,7 +139,7 @@ export function MatchPreviewPage() {
     }
     if (!activeTournament?.id) return
     if (!playability?.canPlay) {
-      navigate(playability?.travelBooked === false && (playability.daysUntilStart ?? 0) <= 7 ? '/travel' : '/tournaments/hub')
+      navigate(!playability?.travelBooked ? '/travel' : !playability?.preparationConfirmed ? '/tournament/preparation' : '/tournaments/hub')
       return
     }
     startLiveMatch(activeTournament.id)
@@ -180,7 +180,7 @@ export function MatchPreviewPage() {
             <button type="button" onClick={() => navigate('/training')} className="btn-secondary h-10 whitespace-nowrap px-3 text-xs">Adjust Training</button>
             <button type="button" onClick={() => navigate('/equipment/chalk-tips')} className="btn-secondary h-10 whitespace-nowrap px-3 text-xs">Change Equipment</button>
             <button type="button" onClick={handleStartMatch} className="btn-primary h-10 whitespace-nowrap px-4 text-xs">
-              {activeLiveMatch ? 'Resume Match' : playability?.canPlay ? 'Start Match' : !playability?.travelBooked && (playability?.daysUntilStart ?? 0) <= 7 ? 'Book Travel' : 'Tournament Hub'} <ChevronRight className="h-3.5 w-3.5" />
+              {activeLiveMatch ? 'Resume Match' : playability?.canPlay ? 'Start Match' : !playability?.travelBooked ? 'Book Travel' : !playability?.preparationConfirmed ? 'Prepare' : 'Tournament Hub'} <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>

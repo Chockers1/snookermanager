@@ -22,6 +22,7 @@ import {
   buyTipState,
   calculateSponsorMatchBonus,
   continueToNextTournamentState,
+  confirmTournamentPreparationState,
   enterTournamentState,
   getNextEligibleTournament,
   getEquipmentPerformanceProfile,
@@ -46,6 +47,7 @@ import {
   updateBudgetTargetsState,
   withdrawTournamentState,
 } from "./useGameState";
+import { getDefaultPreparationAllocations } from "../game/tournamentPreparation";
 import {
   buildTrainingCell,
   calculateTrainingEffects,
@@ -60,6 +62,19 @@ import {
 afterEach(() => {
   vi.restoreAllMocks();
 });
+
+function bookAndPrepareTournament(
+  state: ReturnType<typeof createStarterState>,
+  tournamentId: string,
+) {
+  return confirmTournamentPreparationState(
+    bookTravelState(state, tournamentId),
+    tournamentId,
+    "balanced",
+    getDefaultPreparationAllocations(),
+    [],
+  );
+}
 
 describe("mental and health support data", () => {
   it("uses the stored burnout state instead of treating confidence as burnout", () => {
@@ -368,11 +383,68 @@ describe("tournament entry and match-start rules", () => {
       bookedWeek: state.week,
       bookedDate: state.currentDate,
     };
-    expect(getTournamentPlayability(state, tournament)).toMatchObject({
+    expect(getTournamentPlayability(state, tournament).reason).toMatch(
+      /preparation/i,
+    );
+    const prepared = confirmTournamentPreparationState(
+      state,
+      tournament.id,
+      "balanced",
+      getDefaultPreparationAllocations(),
+      [],
+    );
+    expect(getTournamentPlayability(prepared, tournament)).toMatchObject({
       canPlay: true,
       reason: null,
       travelBooked: true,
     });
+  });
+
+  it("applies tournament preparation once and stores temporary match bonuses", () => {
+    const state = createStarterState();
+    const tournament = getNextEligibleTournament(state);
+    expect(tournament).toBeDefined();
+    if (!tournament) return;
+
+    const entered = enterTournamentState(state, tournament.id);
+    const atEvent = continueToNextTournamentState(entered);
+    const travelled = bookTravelState(atEvent, tournament.id);
+    const cashBefore = travelled.player.cash;
+    const confidenceBefore = travelled.player.confidence;
+    const prepared = confirmTournamentPreparationState(
+      travelled,
+      tournament.id,
+      "balanced",
+      getDefaultPreparationAllocations(),
+      ["physio", "psychologist"],
+    );
+    const plan = prepared.travel.bookings[tournament.id]?.preparation;
+
+    expect(plan?.effects.cost).toBe(160);
+    expect(plan?.effects.attributeBonuses["Break Building"]).toBeGreaterThan(0);
+    expect(prepared.player.cash).toBe(cashBefore - 160);
+    expect(plan?.effects.confidenceDelta).toBeGreaterThan(0);
+    expect(prepared.player.confidence).toBeGreaterThanOrEqual(confidenceBefore);
+    expect(
+      getTournamentPlayability(
+        prepared,
+        prepared.tournaments.find((item) => item.id === tournament.id)!,
+      ).canPlay,
+    ).toBe(true);
+
+    const reconfirmed = confirmTournamentPreparationState(
+      prepared,
+      tournament.id,
+      "balanced",
+      getDefaultPreparationAllocations(),
+      ["physio", "psychologist"],
+    );
+    expect(reconfirmed.player.cash).toBe(prepared.player.cash);
+    expect(reconfirmed.player.confidence).toBe(prepared.player.confidence);
+    expect(reconfirmed.player.fatigue).toBe(prepared.player.fatigue);
+    expect(reconfirmed.trainingCondition.strain).toBe(
+      prepared.trainingCondition.strain,
+    );
   });
 
   it("repairs legacy impossible entries and match records when a save is loaded", () => {
@@ -732,7 +804,7 @@ describe("career lifecycle presets", () => {
 
     const entered = enterTournamentState(equipped, tournament.id);
     const atEvent = continueToNextTournamentState(entered);
-    const travelled = bookTravelState(atEvent, tournament.id);
+    const travelled = bookAndPrepareTournament(atEvent, tournament.id);
     const afterMatch = simulateTournamentMatchState(travelled, tournament.id);
     const baseLog = afterMatch.history.matchLog[0];
     expect(baseLog).toBeDefined();
@@ -844,7 +916,7 @@ describe("complete tournament journey", () => {
 
     const entered = enterTournamentState(equipped, tournament.id);
     const atEvent = continueToNextTournamentState(entered);
-    const travelled = bookTravelState(atEvent, tournament.id);
+    const travelled = bookAndPrepareTournament(atEvent, tournament.id);
     const started = startLiveMatchState(travelled, tournament.id);
     expect(started.liveMatch).not.toBeNull();
     if (!started.liveMatch) return;
@@ -883,7 +955,7 @@ describe("complete tournament journey", () => {
 
     const entered = enterTournamentState(equipped, tournament.id);
     const atEvent = continueToNextTournamentState(entered);
-    const travelled = bookTravelState(atEvent, tournament.id);
+    const travelled = bookAndPrepareTournament(atEvent, tournament.id);
     const started = startLiveMatchState(travelled, tournament.id);
     expect(started.liveMatch).not.toBeNull();
     if (!started.liveMatch) return;
@@ -935,7 +1007,7 @@ describe("complete tournament journey", () => {
 
     const entered = enterTournamentState(equipped, tournament.id);
     const atEvent = continueToNextTournamentState(entered);
-    const travelled = bookTravelState(atEvent, tournament.id);
+    const travelled = bookAndPrepareTournament(atEvent, tournament.id);
     expect(
       getTournamentPlayability(
         travelled,
@@ -986,7 +1058,7 @@ describe("complete tournament journey", () => {
 
     const entered = enterTournamentState(equipped, tournament.id);
     const atEvent = continueToNextTournamentState(entered);
-    const travelled = bookTravelState(atEvent, tournament.id);
+    const travelled = bookAndPrepareTournament(atEvent, tournament.id);
     const cpuFormBefore = new Map(
       travelled.worldPlayers.map((record) => [
         record.playerName,
@@ -1481,6 +1553,30 @@ describe("connected career systems", () => {
     const advanced = advanceWeekState(accepted);
     expect(advanced.player.fatigue).toBeGreaterThanOrEqual(
       withoutSponsor.player.fatigue + 2,
+    );
+  });
+
+  it("fills the vacant sponsor slot selected by the player", () => {
+    const state = createStarterState();
+    state.sponsors = [];
+    state.player.reputation = 100;
+    state.player.worldRanking = 8;
+    const offers = state.sponsorOffers.filter(
+      (item) => item.status === "Available",
+    );
+
+    const cueCaseDeal = acceptSponsorState(state, offers[0].id, "Cue Case");
+    const socialDeal = acceptSponsorState(
+      cueCaseDeal,
+      offers[1].id,
+      "Social Media Partner",
+    );
+
+    expect(cueCaseDeal.sponsors.find((item) => item.id === offers[0].id)?.slot).toBe(
+      "Cue Case",
+    );
+    expect(socialDeal.sponsors.find((item) => item.id === offers[1].id)?.slot).toBe(
+      "Social Media Partner",
     );
   });
 

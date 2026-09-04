@@ -34,6 +34,11 @@ export const appRoutes: AppRoute[] = [
   },
   { path: "/calendar", label: "Calendar", section: "Events" },
   { path: "/travel", label: "Travel Planner", section: "Events" },
+  {
+    path: "/tournament/preparation",
+    label: "Tournament Preparation",
+    section: "Events",
+  },
   { path: "/tournaments/hub", label: "Tournament Hub", section: "Events" },
   { path: "/tournaments/draw", label: "Tournament Draw", section: "Events" },
   { path: "/match/preview", label: "Match Preview", section: "Match Centre" },
