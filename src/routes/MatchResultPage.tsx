@@ -1,37 +1,42 @@
-import { useNavigate } from 'react-router-dom'
-import { Award, ChevronRight, ShieldCheck, SignalHigh, TrendingUp, Trophy, Zap } from 'lucide-react'
-import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/useGame'
-import { buildMatchResultData } from '../utils/liveRouteData'
-import { formatMoney } from '../utils/formatters'
+import { useNavigate } from "react-router-dom";
+import {
+  Award,
+  ChevronRight,
+  ShieldCheck,
+  SignalHigh,
+  TrendingUp,
+  Trophy,
+  Zap,
+} from "lucide-react";
+import { ProgressBar } from "../components/ui/ProgressBar";
+import { useGame } from "../context/useGame";
+import { buildMatchResultData } from "../utils/liveRouteData";
+import { formatMoney } from "../utils/formatters";
 
 function getInitials(name: string) {
-  return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }
 
-function getShortName(name: string) {
-  return name.split(' ').at(-1) ?? name
+function feedbackTone(tone: "green" | "amber" | "blue") {
+  if (tone === "green") return "text-green-400";
+  if (tone === "amber") return "text-amber-400";
+  return "text-sky-400";
 }
 
-function feedbackTone(tone: 'green' | 'amber' | 'blue') {
-  if (tone === 'green') return 'text-green-400'
-  if (tone === 'amber') return 'text-amber-400'
-  return 'text-sky-400'
-}
-
-function signedValue(value: number | undefined, suffix = '') {
-  const amount = value ?? 0
-  return `${amount > 0 ? '+' : ''}${amount}${suffix}`
-}
-
-function getPostMatchRoute(round: string | undefined) {
-  return round?.trim().toLowerCase() === 'final' ? '/rankings?from=final' : '/tournaments/hub'
+function signedValue(value: number | undefined, suffix = "") {
+  const amount = value ?? 0;
+  return `${amount > 0 ? "+" : ""}${amount}${suffix}`;
 }
 
 export function MatchResultPage() {
-  const { gameState } = useGame()
-  const navigate = useNavigate()
-  const latestMatch = gameState.matches[0]
+  const { gameState } = useGame();
+  const navigate = useNavigate();
+  const latestMatch = gameState.matches[0];
   const {
     equipmentImpact,
     coachFeedback,
@@ -41,248 +46,573 @@ export function MatchResultPage() {
     resultExplanation,
     improvementAdvice,
     pressureDiagnosis,
-  } = buildMatchResultData(gameState)
-  const latestTournament = gameState.tournaments.find((item) => item.id === latestMatch?.tournamentId)
-  const playerName = latestMatch?.playerName ?? gameState.player.fullName
-  const opponentName = latestMatch?.opponentName ?? 'Opponent TBD'
-  const playerFrames = latestMatch?.playerFrames ?? 0
-  const opponentFrames = latestMatch?.opponentFrames ?? 0
-  const playerWon = latestMatch?.result === 'Won'
-  const frameRows = latestMatch?.frameHistory?.length ? latestMatch.frameHistory : []
+  } = buildMatchResultData(gameState);
+  const latestTournament = gameState.tournaments.find(
+    (item) => item.id === latestMatch?.tournamentId,
+  );
+  const playerName = latestMatch?.playerName ?? gameState.player.fullName;
+  const opponentName = latestMatch?.opponentName ?? "Opponent TBD";
+  const playerFrames = latestMatch?.playerFrames ?? 0;
+  const opponentFrames = latestMatch?.opponentFrames ?? 0;
+  const playerWon = latestMatch?.result === "Won";
+  const tournamentContinues = Boolean(
+    playerWon &&
+    latestMatch &&
+    gameState.tournamentProgress.tournamentId === latestMatch.tournamentId &&
+    gameState.tournamentProgress.currentRound,
+  );
+  const frameRows = latestMatch?.frameHistory?.length
+    ? latestMatch.frameHistory
+    : [];
   const statRows = latestMatch
     ? [
-        { label: 'Pot Success', player: `${latestMatch.potSuccess}%`, opponent: `${Math.max(48, latestMatch.potSuccess - 6)}%` },
-        { label: 'Long Pot', player: `${latestMatch.longPotSuccess}%`, opponent: `${Math.max(42, latestMatch.longPotSuccess - 5)}%` },
-        { label: 'Safety', player: `${latestMatch.safetySuccess}%`, opponent: `${Math.max(45, latestMatch.safetySuccess - 4)}%` },
-        { label: 'Highest Break', player: latestMatch.highestBreak, opponent: latestMatch.opponentHighestBreak },
-        { label: 'Centuries', player: latestMatch.centuries, opponent: Math.max(0, latestMatch.centuries - 1) },
-        { label: '50+ Breaks', player: latestMatch.fifties, opponent: Math.max(0, latestMatch.fifties - 1) },
-        { label: 'Fouls', player: latestMatch.fouls, opponent: Math.max(0, latestMatch.fouls - 1) },
+        {
+          label: "Pot Success",
+          player: `${latestMatch.potSuccess}%`,
+          opponent: null,
+        },
+        {
+          label: "Long Pot",
+          player: `${latestMatch.longPotSuccess}%`,
+          opponent: null,
+        },
+        {
+          label: "Safety",
+          player: `${latestMatch.safetySuccess}%`,
+          opponent: null,
+        },
+        {
+          label: "Highest Break",
+          player: latestMatch.highestBreak,
+          opponent: latestMatch.opponentHighestBreak,
+        },
+        { label: "Centuries", player: latestMatch.centuries, opponent: null },
+        { label: "50+ Breaks", player: latestMatch.fifties, opponent: null },
+        { label: "Fouls", player: latestMatch.fouls, opponent: null },
       ]
-    : []
-  const impactMetrics = [
-    { label: 'Prize Money', value: formatMoney(latestMatch?.prizeMoneyEarned ?? 0), color: 'text-green-400', icon: Award },
-    { label: 'Ranking Points', value: signedValue(latestMatch?.rankingPointsGained), color: 'text-white', icon: TrendingUp },
-    { label: 'Confidence', value: signedValue(latestMatch?.confidenceChange, '%'), sub: `Now ${gameState.player.confidence}%`, color: (latestMatch?.confidenceChange ?? 0) >= 0 ? 'text-green-400' : 'text-red-400', icon: Zap },
-    { label: 'Fatigue', value: signedValue(latestMatch?.fatigueChange, '%'), sub: `Now ${gameState.player.fatigue}%`, color: 'text-amber-400', icon: TrendingUp },
-    { label: 'Highest Break', value: String(latestMatch?.highestBreak ?? 0), color: 'text-white', icon: Trophy },
-    { label: 'Expected Chance', value: `${matchSummary?.expectedWinChance ?? 50}%`, color: 'text-green-400', icon: SignalHigh },
-  ]
+    : [];
+  const careerImpact = [
+    {
+      label: "Prize Money",
+      value: formatMoney(latestMatch?.prizeMoneyEarned ?? 0),
+      color: "text-green-400",
+      icon: Award,
+    },
+    {
+      label: "Ranking Points",
+      value: signedValue(latestMatch?.rankingPointsGained),
+      color: "text-white",
+      icon: TrendingUp,
+    },
+    {
+      label: "Confidence",
+      value: signedValue(latestMatch?.confidenceChange, "%"),
+      sub: `Now ${gameState.player.confidence}%`,
+      color:
+        (latestMatch?.confidenceChange ?? 0) >= 0
+          ? "text-green-400"
+          : "text-red-400",
+      icon: Zap,
+    },
+    {
+      label: "Fatigue",
+      value: signedValue(latestMatch?.fatigueChange, "%"),
+      sub: `Now ${gameState.player.fatigue}%`,
+      color: "text-amber-400",
+      icon: TrendingUp,
+    },
+    {
+      label: "Sponsor Bonus",
+      value: formatMoney(latestMatch?.sponsorBonusEarned ?? 0),
+      color: "text-green-400",
+      icon: Award,
+    },
+    {
+      label: "Cue Familiarity",
+      value: signedValue(latestMatch?.familiarityGained, "%"),
+      color: "text-sky-400",
+      icon: SignalHigh,
+    },
+  ];
+  const systemChanges = [
+    {
+      label: "Sponsor Bonus",
+      value: formatMoney(latestMatch?.sponsorBonusEarned ?? 0),
+      detail:
+        (latestMatch?.sponsorBonusEarned ?? 0) > 0
+          ? "Paid to finance ledger"
+          : "No clause triggered",
+      tone: "text-green-400",
+    },
+    {
+      label: "Equipment Wear",
+      value: `-${latestMatch?.equipmentWear ?? 0}%`,
+      detail: "Active cue condition",
+      tone: "text-amber-400",
+    },
+    {
+      label: "Cue Familiarity",
+      value: `+${latestMatch?.familiarityGained ?? 0}%`,
+      detail: "Gained from match use",
+      tone: "text-sky-400",
+    },
+    {
+      label: "Strain Penalty",
+      value: `-${latestMatch?.strainImpact ?? 0}`,
+      detail: `Current strain ${gameState.trainingCondition.strain}%`,
+      tone:
+        (latestMatch?.strainImpact ?? 0) > 0
+          ? "text-red-400"
+          : "text-green-400",
+    },
+  ];
 
   if (!latestMatch) {
     return (
       <div className="space-y-5">
         <div>
-          <p className="text-[10px] font-semibold uppercase text-gray-500">Match Centre</p>
+          <p className="text-[10px] font-semibold uppercase text-gray-500">
+            Match Centre
+          </p>
           <h1 className="mt-1 text-2xl font-bold text-white">Match Result</h1>
         </div>
         <div className="card card-body p-8 text-center">
           <Trophy className="mx-auto h-14 w-14 text-gray-500" />
-          <p className="mt-4 text-xl font-semibold text-white">No completed match yet</p>
-          <p className="mt-2 text-sm text-gray-400">Play or simulate a match before opening the result breakdown.</p>
-          <button type="button" onClick={() => navigate('/tournaments/hub')} className="btn-primary mx-auto mt-6 text-xs">Go To Tournament Hub</button>
+          <p className="mt-4 text-xl font-semibold text-white">
+            No completed match yet
+          </p>
+          <p className="mt-2 text-sm text-gray-400">
+            Play or simulate a match before opening the result breakdown.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate("/tournaments/hub")}
+            className="btn-primary mx-auto mt-6 text-xs"
+          >
+            Go To Tournament Hub
+          </button>
         </div>
       </div>
-    )
+    );
   }
 
+  const primaryRoute = tournamentContinues
+    ? "/tournaments/hub"
+    : `/tournaments/draw?tournament=${encodeURIComponent(latestMatch.tournamentId)}`;
+  const primaryLabel = tournamentContinues
+    ? "Continue Tournament"
+    : "View Completed Bracket";
+
   return (
-    <div className="space-y-5 pb-10">
-      <div className="flex items-center gap-2 text-xs text-gray-400">
-        <span>{latestTournament?.name ?? 'Completed match'}</span>
-        <span>/</span>
-        <span>{latestMatch.round}</span>
-        <span>/</span>
-        <span>Best of {latestMatch.bestOf}</span>
-        <span>/</span>
-        <span className="font-medium text-white">Result</span>
+    <div className="space-y-3 pb-8">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-green-400">
+            {latestTournament?.name ?? "Completed match"} · {latestMatch.round}{" "}
+            · Best of {latestMatch.bestOf}
+          </p>
+          <h1 className="mt-1 text-2xl font-bold text-white">Match Review</h1>
+          <p className="mt-1 text-xs text-gray-400">
+            {tournamentContinues
+              ? "Round complete · your tournament continues"
+              : `Event complete · ${playerWon ? "tournament won" : `eliminated in the ${latestMatch.round}`}`}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate(primaryRoute)}
+          className="btn-primary shrink-0 text-xs"
+        >
+          {primaryLabel} <ChevronRight className="h-3.5 w-3.5" />
+        </button>
       </div>
 
-      <div className={`card overflow-hidden border ${playerWon ? 'border-green-600/30' : 'border-red-600/30'}`}>
-        <div className={`p-6 ${playerWon ? 'bg-gradient-to-r from-green-600/10 via-transparent to-transparent' : 'bg-gradient-to-r from-red-600/10 via-transparent to-transparent'}`}>
-          <div className="flex flex-col items-center justify-between gap-5 lg:flex-row">
-            <div className="flex min-w-0 items-center gap-3 sm:gap-5">
-              <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 ${playerWon ? 'border-green-500 bg-green-600/20 text-green-400' : 'border-border bg-surface-light text-white'} text-xl font-bold`}>{getInitials(playerName)}</div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">{playerWon ? <Trophy className="h-4 w-4 text-amber-400" /> : null}<p className="truncate text-lg font-bold text-white">{playerName}</p></div>
-                <p className="text-xs text-gray-400">{gameState.player.rankingLabel} #{gameState.player.amateurRanking ?? gameState.player.worldRanking ?? '-'}</p>
-                <p className={`mt-0.5 text-xs ${playerWon ? 'text-green-400' : 'text-red-400'}`}>{playerWon ? 'MATCH WON' : 'MATCH LOST'}</p>
-              </div>
+      <section
+        className={`grid overflow-hidden rounded-xl border bg-surface md:grid-cols-[1fr_190px_1fr] ${playerWon ? "border-green-600/30" : "border-red-600/30"}`}
+      >
+        <div className="flex items-center gap-3 px-4 py-4 sm:px-6">
+          <div
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border font-bold ${playerWon ? "border-green-500 bg-green-600/15 text-green-400" : "border-border bg-surface-light text-white"}`}
+          >
+            {getInitials(playerName)}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-base font-bold text-white">
+              {playerName}
+            </p>
+            <p className="text-xs text-gray-400">
+              {gameState.player.rankingLabel} #
+              {gameState.player.amateurRanking ??
+                gameState.player.worldRanking ??
+                "-"}
+            </p>
+            <p
+              className={`mt-1 text-[10px] font-semibold uppercase ${playerWon ? "text-green-400" : "text-red-400"}`}
+            >
+              {playerWon ? "Match won" : "Match lost"}
+            </p>
+          </div>
+        </div>
+        <div className="order-first grid place-items-center border-b border-border/70 bg-black/15 py-4 text-center md:order-none md:border-x md:border-y-0">
+          <div>
+            <div className="flex items-center gap-4">
+              <span
+                className={`text-4xl font-bold ${playerWon ? "text-green-400" : "text-white"}`}
+              >
+                {playerFrames}
+              </span>
+              <span className="text-gray-600">—</span>
+              <span
+                className={`text-4xl font-bold ${playerWon ? "text-white" : "text-red-400"}`}
+              >
+                {opponentFrames}
+              </span>
             </div>
-            <div className="flex shrink-0 items-center gap-5 text-center">
-              <p className={`text-5xl font-bold ${playerWon ? 'text-green-400' : 'text-white'}`}>{playerFrames}</p>
-              <div><p className="text-2xl font-bold text-gray-500">-</p><p className="mt-1 text-[10px] text-gray-500">{matchSummary?.actualResult ?? latestMatch.result}</p></div>
-              <p className={`text-5xl font-bold ${!playerWon ? 'text-red-400' : 'text-white'}`}>{opponentFrames}</p>
+            <p className="mt-1 text-[10px] text-gray-400">
+              {matchSummary?.actualResult ?? latestMatch.result}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-3 px-4 py-4 text-right sm:px-6">
+          <div className="min-w-0">
+            <p className="truncate text-base font-bold text-white">
+              {opponentName}
+            </p>
+            <p className="text-xs text-gray-400">
+              Opponent ranking #{latestMatch.opponentRanking}
+            </p>
+            <p className="text-[10px] text-gray-500">
+              {latestMatch.opponentRankBand ?? "Ranking band"}
+            </p>
+          </div>
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-red-500/40 bg-red-500/10 font-bold text-red-200">
+            {getInitials(opponentName)}
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(330px,.9fr)]">
+        <section className="card overflow-hidden">
+          <div className="card-header">
+            <div>
+              <h2 className="text-sm font-semibold text-white">
+                Match Statistics
+              </h2>
+              <p className="text-[10px] text-gray-500">
+                What happened on the table
+              </p>
             </div>
-            <div className="flex min-w-0 items-center gap-3 sm:gap-5">
-              <div className="min-w-0 text-right">
-                <p className="truncate text-lg font-bold text-white">{opponentName}</p>
-                <p className="text-xs text-gray-400">Opponent ranking #{latestMatch.opponentRanking}</p>
-                <p className="text-xs text-gray-400">{latestMatch.opponentRankBand ?? 'Ranking band'}</p>
+            <span
+              className={`rounded-full px-2.5 py-1 text-[10px] ${playerWon ? "bg-green-500/10 text-green-300" : "bg-red-500/10 text-red-300"}`}
+            >
+              {playerWon ? "Winning performance" : "Defeat reviewed"}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4 xl:grid-cols-7">
+            {statRows.map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-lg bg-surface-light/45 px-2 py-2 text-center"
+              >
+                <p className="text-base font-bold text-white">{stat.player}</p>
+                <p className="text-[9px] text-gray-500">{stat.label}</p>
+                {stat.opponent !== null ? (
+                  <p className="mt-0.5 text-[9px] text-gray-400">
+                    Opponent {stat.opponent}
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-[9px] text-gray-600">
+                    Your match stat
+                  </p>
+                )}
               </div>
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-border/50 bg-surface-light text-xl font-bold text-gray-400">{getInitials(opponentName)}</div>
+            ))}
+          </div>
+          <div className="border-t border-border px-3 py-3">
+            <div className="mb-2 flex justify-between text-[10px]">
+              <span className="font-semibold text-white">Frame by frame</span>
+              <span className="text-gray-500">
+                {playerName} {playerFrames} · {opponentName} {opponentFrames}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">
+              {frameRows.length > 0 ? (
+                frameRows.map((frame) => {
+                  const wonFrame =
+                    frame.winner === "Player" || frame.winner === playerName;
+                  return (
+                    <div
+                      key={frame.frame}
+                      className={`rounded-md border p-2 text-center text-[10px] ${wonFrame ? "border-green-500/20 bg-green-500/10" : "border-red-500/20 bg-red-500/10"}`}
+                    >
+                      <span className="text-gray-500">F{frame.frame}</span>
+                      <strong className="block text-white">
+                        {frame.player}–{frame.opponent}
+                      </strong>
+                      <span
+                        className={wonFrame ? "text-green-400" : "text-red-400"}
+                      >
+                        {wonFrame ? "W" : "L"}
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="col-span-full py-3 text-center text-xs text-gray-400">
+                  No frame history recorded.
+                </p>
+              )}
             </div>
           </div>
+        </section>
+
+        <section className="card overflow-hidden">
+          <div className="card-header">
+            <div>
+              <h2 className="text-sm font-semibold text-white">
+                Career Impact
+              </h2>
+              <p className="text-[10px] text-gray-500">
+                Changes applied to the live save
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">
+            {careerImpact.map((metric) => (
+              <div
+                key={metric.label}
+                className="rounded-lg bg-surface-light/50 p-2 text-center"
+              >
+                <metric.icon className="mx-auto mb-1 h-3.5 w-3.5 text-gray-500" />
+                <p className={`text-sm font-bold ${metric.color}`}>
+                  {metric.value}
+                </p>
+                <p className="text-[9px] text-gray-500">{metric.label}</p>
+                {"sub" in metric && metric.sub ? (
+                  <p className="text-[9px] text-gray-400">{metric.sub}</p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <div className="mx-3 grid grid-cols-2 gap-2 border-t border-border py-3">
+            {systemChanges
+              .filter(
+                (change) =>
+                  change.label === "Equipment Wear" ||
+                  change.label === "Strain Penalty",
+              )
+              .map((change) => (
+                <div key={change.label}>
+                  <p className="text-[9px] uppercase text-gray-500">
+                    {change.label}
+                  </p>
+                  <p className={`text-xs font-semibold ${change.tone}`}>
+                    {change.value}{" "}
+                    <span className="font-normal text-gray-400">
+                      · {change.detail}
+                    </span>
+                  </p>
+                </div>
+              ))}
+          </div>
+          <div className="mx-3 mb-3 rounded-lg border border-sky-500/25 bg-sky-500/5 p-3">
+            <div className="flex justify-between gap-2">
+              <p className="text-xs font-semibold text-white">
+                Attribute development
+              </p>
+              <span className="text-[10px] text-sky-300">No direct change</span>
+            </div>
+            <p className="mt-1 text-[10px] leading-relaxed text-gray-400">
+              Match performance changes form, confidence and fatigue. Permanent
+              technical, mental and physical improvement remains training-led;
+              ageing and health can cause decline.
+            </p>
+          </div>
+        </section>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-3">
+        <section className="card card-body">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+            Why the result happened
+          </p>
+          <h3 className="mt-2 text-sm font-semibold text-white">
+            {resultExplanation?.title ??
+              matchSummary?.actualResult ??
+              latestMatch.result}
+          </h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-gray-400">
+            {resultExplanation?.summary ??
+              `You entered with a ${matchSummary?.expectedWinChance ?? 50}% expected chance.`}
+          </p>
+        </section>
+        <section className="card card-body">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+            Performance diagnosis
+          </p>
+          <div className="mt-2 space-y-1.5">
+            {strengthBreakdown.slice(0, 3).map((row) => (
+              <div key={row.label} className="flex justify-between text-xs">
+                <span className="text-gray-300">{row.label}</span>
+                <strong
+                  className={row.edge >= 0 ? "text-green-400" : "text-red-400"}
+                >
+                  {row.edge > 0 ? "+" : ""}
+                  {row.edge}
+                </strong>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="card card-body">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+            Coach’s next step
+          </p>
+          <h3 className="mt-2 text-sm font-semibold text-white">
+            {gameState.player.fatigue >= 65
+              ? "Recover, then rebuild"
+              : "Build on the evidence"}
+          </h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-gray-400">
+            {improvementAdvice[0] ??
+              coachFeedback[0]?.items[0] ??
+              "Keep the next training block balanced and protect match readiness."}
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate("/training/report")}
+            className="btn-secondary mt-3 text-[10px]"
+          >
+            Review Training
+          </button>
+        </section>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-green-400">
+            Next step
+          </p>
+          <p className="mt-1 text-xs text-gray-300">
+            {tournamentContinues
+              ? "Return to the Tournament Hub for the next round."
+              : "Review the completed bracket and tournament winner, then return to the Dashboard."}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => navigate("/rankings")}
+            className="btn-secondary text-[10px]"
+          >
+            Season Rankings
+          </button>
+          <a href="#full-analysis" className="btn-secondary text-[10px]">
+            Full Analysis
+          </a>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        {impactMetrics.map((metric) => (
-          <div key={metric.label} className="card card-body text-center">
-            <metric.icon className="mx-auto mb-1 h-3.5 w-3.5 text-gray-500" />
-            <p className="metric-label">{metric.label}</p>
-            <p className={`mt-0.5 text-lg font-bold ${metric.color}`}>{metric.value}</p>
-            {'sub' in metric && metric.sub ? <p className="text-[10px] text-gray-400">{metric.sub}</p> : null}
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap justify-center gap-3 rounded-xl border border-border/70 bg-surface/70 p-4">
-        <button type="button" onClick={() => navigate(getPostMatchRoute(latestMatch.round))} className="btn-primary text-xs"><Trophy className="h-3.5 w-3.5" /> Continue Tournament <ChevronRight className="h-3.5 w-3.5" /></button>
-        <button type="button" onClick={() => navigate('/training/report')} className="btn-secondary text-xs">Review Training</button>
-        <button type="button" onClick={() => navigate('/tournaments/draw')} className="btn-secondary text-xs">View Draw</button>
-      </div>
-
-      <details className="group card overflow-hidden">
+      <details id="full-analysis" className="group card overflow-hidden">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-white hover:bg-surface-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500">
-          <span><span className="text-green-400">More analysis</span><span className="ml-2 text-xs font-normal text-gray-400">Stats, frames, equipment and coaching detail</span></span>
+          <span>
+            <span className="text-green-400">Full analysis</span>
+            <span className="ml-2 text-xs font-normal text-gray-400">
+              Equipment, modifiers, pressure and coaching detail
+            </span>
+          </span>
           <ChevronRight className="h-4 w-4 text-gray-400 transition-transform group-open:rotate-90" />
         </summary>
-        <div className="grid grid-cols-12 gap-4 border-t border-border p-4">
-        <div className="col-span-12 space-y-4 lg:col-span-4">
-          <div className="card">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Match Stats</h3></div>
-            <div className="card-body">
-              <table className="w-full text-xs">
-                <thead><tr className="border-b border-border text-gray-500"><th className="py-1.5 text-left">{getShortName(playerName)}</th><th className="py-1.5 text-center">Stat</th><th className="py-1.5 text-right">{getShortName(opponentName)}</th></tr></thead>
-                <tbody>
-                  {statRows.map((row) => (
-                    <tr key={row.label} className="border-b border-border/30"><td className="py-1.5 font-medium text-green-400">{row.player}</td><td className="py-1.5 text-center text-gray-400">{row.label}</td><td className="py-1.5 text-right text-white">{row.opponent}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Strength Breakdown</h3></div>
-            <div className="card-body space-y-2">
-              {strengthBreakdown.map((row) => (
-                <div key={row.label} className="rounded-lg bg-surface-light/50 p-2.5">
-                  <div className="mb-1 flex items-center justify-between text-[10px]"><span className="text-white">{row.label}</span><span className={row.edge >= 0 ? 'font-medium text-green-400' : 'font-medium text-red-400'}>{row.edge > 0 ? '+' : ''}{row.edge}</span></div>
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-[10px]"><ProgressBar value={Number(row.player)} compact /><span className="text-gray-500">vs</span><ProgressBar value={Number(row.opponent)} tone="amber" compact /></div>
+        <div className="grid gap-4 border-t border-border p-4 lg:grid-cols-3">
+          <div className="space-y-3">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
+              <ShieldCheck className="h-4 w-4 text-green-400" /> Equipment
+              Impact
+            </h3>
+            {equipmentImpact.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-lg bg-surface-light/50 p-3"
+              >
+                <div className="mb-1 flex justify-between text-xs">
+                  <span className="font-medium text-white">{item.label}</span>
+                  <span className="text-green-400">
+                    {Math.round(item.condition)}%
+                  </span>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Equipment Impact</h3><ShieldCheck className="h-3.5 w-3.5 text-green-400" /></div>
-            <div className="card-body space-y-2">
-              {equipmentImpact.map((item) => (
-                <div key={item.label} className="rounded-lg bg-surface-light/50 p-3 text-xs">
-                  <div className="mb-1 flex justify-between"><span className="font-medium text-white">{item.label}</span><span className="text-green-400">{Math.round(item.condition)}%</span></div>
-                  <p className="text-[10px] text-gray-400">{item.highlight}</p>
-                  <p className="mt-1 text-[10px] leading-relaxed text-gray-400">{item.detail}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="col-span-12 space-y-4 lg:col-span-4">
-          <div className="card">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Frame by Frame</h3></div>
-            <div className="card-body space-y-1">
-              {frameRows.length > 0 ? frameRows.map((frame) => {
-                const total = Number(frame.player) + Number(frame.opponent)
-                const playerShare = total > 0 ? (Number(frame.player) / total) * 100 : 50
-                const wonFrame = frame.winner === 'Player' || frame.winner === playerName
-                return (
-                  <div key={frame.frame} className="flex items-center gap-2 border-b border-border/30 py-1.5 text-xs">
-                    <span className="w-7 text-gray-500">F{frame.frame}</span>
-                    <span className={`w-8 font-medium ${wonFrame ? 'text-green-400' : 'text-white'}`}>{frame.player}</span>
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-700/50"><div className={wonFrame ? 'h-full rounded-full bg-green-500' : 'h-full rounded-full bg-red-500'} style={{ width: `${playerShare}%` }} /></div>
-                    <span className={`w-8 text-right font-medium ${!wonFrame ? 'text-red-400' : 'text-white'}`}>{frame.opponent}</span>
-                    <span className={`w-5 text-right font-bold ${wonFrame ? 'text-green-400' : 'text-red-400'}`}>{wonFrame ? 'W' : 'L'}</span>
-                  </div>
-                )
-              }) : <p className="text-xs text-gray-400">No frame history recorded for this match.</p>}
-            </div>
-          </div>
-
-          {resultExplanation ? (
-            <div className="card">
-              <div className="card-header"><h3 className="text-sm font-semibold text-white">{resultExplanation.title}</h3></div>
-              <div className="card-body space-y-3">
-                <p className="text-xs leading-relaxed text-gray-300">{resultExplanation.summary}</p>
-                <p className="rounded-lg bg-surface-light/50 p-3 text-[11px] leading-relaxed text-gray-400">{resultExplanation.detail}</p>
+                <ProgressBar value={item.condition} compact />
+                <p className="mt-2 text-[10px] leading-relaxed text-gray-400">
+                  {item.highlight} {item.detail}
+                </p>
               </div>
-            </div>
-          ) : null}
-
-          <div className="card">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Match Modifiers</h3></div>
-            <div className="card-body space-y-2">
-              {matchModifiers.map((modifier) => (
-                <div key={modifier.label} className="flex items-start gap-2 rounded-lg bg-surface-light/50 p-2.5 text-xs">
-                  <span className={modifier.impact.startsWith('-') ? 'mt-0.5 shrink-0 text-red-400' : 'mt-0.5 shrink-0 text-green-400'}>{modifier.impact.startsWith('-') ? '-' : '+'}</span>
-                  <div className="min-w-0"><div className="flex gap-2"><p className="font-medium text-white">{modifier.label}</p><span className="text-amber-400">{modifier.impact}</span></div><p className="mt-0.5 text-[10px] leading-relaxed text-gray-400">{modifier.detail}</p></div>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
-        </div>
-
-        <div className="col-span-12 space-y-4 lg:col-span-4">
-          {matchSummary ? (
-            <div className="card card-body">
-              <h3 className="mb-2 text-xs font-semibold text-white">Match Summary</h3>
-              <div className="grid grid-cols-2 gap-2 text-[10px]">
-                <div><p className="text-gray-500">Tournament</p><p className="truncate text-white">{matchSummary.tournament}</p></div>
-                <div><p className="text-gray-500">Round</p><p className="text-white">{matchSummary.round}</p></div>
-                <div><p className="text-gray-500">Format</p><p className="text-white">{matchSummary.format}</p></div>
-                <div><p className="text-gray-500">Expectation</p><p className="text-green-400">{matchSummary.expectedWinChance}%</p></div>
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-white">
+              Match Modifiers
+            </h3>
+            {matchModifiers.map((modifier) => (
+              <div
+                key={modifier.label}
+                className="rounded-lg bg-surface-light/50 p-3"
+              >
+                <div className="flex justify-between text-xs">
+                  <span className="font-medium text-white">
+                    {modifier.label}
+                  </span>
+                  <span
+                    className={
+                      modifier.impact.startsWith("-")
+                        ? "text-red-400"
+                        : "text-green-400"
+                    }
+                  >
+                    {modifier.impact}
+                  </span>
+                </div>
+                <p className="mt-1 text-[10px] leading-relaxed text-gray-400">
+                  {modifier.detail}
+                </p>
               </div>
-            </div>
-          ) : null}
-
-          <div className="card card-body">
-            <h3 className="mb-2 text-xs font-semibold text-white">Pressure Diagnosis</h3>
+            ))}
+          </div>
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-white">
+              Pressure & Coaching
+            </h3>
             <div className="grid grid-cols-2 gap-2 text-[10px]">
-              <div className="rounded bg-surface-light/50 p-2"><p className="text-gray-500">QF+ Record</p><p className="text-white">{pressureDiagnosis.qfPlusRecord}</p></div>
-              <div className="rounded bg-surface-light/50 p-2"><p className="text-gray-500">Semi Finals</p><p className="text-white">{pressureDiagnosis.semiFinalConversion}</p></div>
-              <div className="rounded bg-surface-light/50 p-2"><p className="text-gray-500">Finals</p><p className="text-white">{pressureDiagnosis.finalConversion}</p></div>
-              <div className="rounded bg-surface-light/50 p-2"><p className="text-gray-500">Deciders</p><p className="text-white">{pressureDiagnosis.deciderRecord}</p></div>
+              <div className="rounded bg-surface-light/50 p-2">
+                <p className="text-gray-500">QF+ Record</p>
+                <p className="text-white">{pressureDiagnosis.qfPlusRecord}</p>
+              </div>
+              <div className="rounded bg-surface-light/50 p-2">
+                <p className="text-gray-500">Deciders</p>
+                <p className="text-white">{pressureDiagnosis.deciderRecord}</p>
+              </div>
             </div>
-            <div className="mt-3 rounded border border-border bg-surface-light/50 p-3"><p className="text-[10px] uppercase text-gray-500">Pressure Trait</p><p className="mt-1 text-xs font-medium text-white">{pressureDiagnosis.pressureTrait}</p><p className="mt-1 text-[10px] leading-relaxed text-gray-400">{pressureDiagnosis.diagnosis}</p></div>
+            <p className="rounded-lg bg-surface-light/50 p-3 text-[10px] leading-relaxed text-gray-400">
+              {pressureDiagnosis.diagnosis}
+            </p>
+            {coachFeedback.map((group) => (
+              <div key={group.title}>
+                <p
+                  className={`text-[11px] font-semibold ${feedbackTone(group.tone)}`}
+                >
+                  {group.title}
+                </p>
+                {group.items.map((item) => (
+                  <p
+                    key={item}
+                    className="mt-1 text-[10px] leading-relaxed text-gray-400"
+                  >
+                    {item}
+                  </p>
+                ))}
+              </div>
+            ))}
           </div>
-
-          <div className="card card-body">
-            <h3 className="mb-2 text-xs font-semibold text-white">Improvement Areas</h3>
-            <div className="space-y-1.5">
-              {improvementAdvice.length > 0 ? improvementAdvice.map((area) => (
-                <div key={area} className="flex items-start gap-2 text-[10px]"><span className="mt-0.5 shrink-0 text-amber-400">!</span><span className="text-gray-300">{area}</span></div>
-              )) : <p className="text-[10px] text-gray-400">No urgent correction stands out from this result.</p>}
-            </div>
-          </div>
-
-          <div className="card card-body">
-            <h3 className="mb-2 text-xs font-semibold text-white">Coach Feedback</h3>
-            <div className="space-y-3">
-              {coachFeedback.map((group) => (
-                <div key={group.title}>
-                  <p className={`text-[11px] font-semibold ${feedbackTone(group.tone)}`}>{group.title}</p>
-                  <div className="mt-1 space-y-1.5">
-                    {group.items.map((item) => <p key={item} className="text-[10px] leading-relaxed text-gray-400">{item}</p>)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
         </div>
       </details>
     </div>
-  )
+  );
 }

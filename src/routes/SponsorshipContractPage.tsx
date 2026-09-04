@@ -1,47 +1,406 @@
-import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { Info, Scale, Star } from 'lucide-react'
-import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/useGame'
-import { buildSponsorshipContractData } from '../utils/liveRouteData'
-import { formatMoney } from '../utils/formatters'
+import { useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Info, Scale, Star } from "lucide-react";
+import { ProgressBar } from "../components/ui/ProgressBar";
+import { useGame } from "../context/useGame";
+import { buildSponsorshipContractData } from "../utils/liveRouteData";
+import { formatMoney } from "../utils/formatters";
+import { getSponsorObligationProfile } from "../hooks/useGameState";
 
 function probabilityClass(value: number) {
-  if (value >= 65) return 'bg-green-600/20 text-green-400'
-  if (value >= 45) return 'bg-amber-600/20 text-amber-400'
-  return 'bg-red-600/20 text-red-400'
+  if (value >= 65) return "bg-green-600/20 text-green-400";
+  if (value >= 45) return "bg-amber-600/20 text-amber-400";
+  return "bg-red-600/20 text-red-400";
 }
 
 function stars(value: number) {
-  return Array.from({ length: 5 }, (_, index) => <span key={index} className={index < value ? 'text-amber-400' : 'text-gray-700'}>★</span>)
+  return Array.from({ length: 5 }, (_, index) => (
+    <span
+      key={index}
+      className={index < value ? "text-amber-400" : "text-gray-700"}
+    >
+      ★
+    </span>
+  ));
 }
 
 export function SponsorshipContractPage() {
-  const [searchParams] = useSearchParams()
-  const { gameState, acceptSponsor, rejectSponsor, negotiateSponsor } = useGame()
-  const selectedOfferId = searchParams.get('offer')
-  const selectedOffer = useMemo(() => gameState.sponsorOffers.find((offer) => offer.id === selectedOfferId) ?? gameState.sponsorOffers.find((offer) => offer.status === 'Available') ?? gameState.sponsorOffers[0], [gameState.sponsorOffers, selectedOfferId])
-  const contractData = selectedOffer ? buildSponsorshipContractData(gameState, selectedOffer) : null
-  const [selectedNegotiationLabel, setSelectedNegotiationLabel] = useState(contractData?.negotiationOptions[0]?.label ?? '')
-  const [negotiationTone, setNegotiationTone] = useState<'Conservative' | 'Balanced' | 'Ambitious'>('Balanced')
+  const [searchParams] = useSearchParams();
+  const { gameState, acceptSponsor, rejectSponsor, negotiateSponsor } =
+    useGame();
+  const selectedOfferId = searchParams.get("offer");
+  const selectedOffer = useMemo(
+    () =>
+      gameState.sponsorOffers.find((offer) => offer.id === selectedOfferId) ??
+      gameState.sponsorOffers.find((offer) => offer.status === "Available") ??
+      gameState.sponsorOffers[0],
+    [gameState.sponsorOffers, selectedOfferId],
+  );
+  const contractData = selectedOffer
+    ? buildSponsorshipContractData(gameState, selectedOffer)
+    : null;
+  const [selectedNegotiationLabel, setSelectedNegotiationLabel] = useState(
+    contractData?.negotiationOptions[0]?.label ?? "",
+  );
+  const [negotiationTone, setNegotiationTone] = useState<
+    "Conservative" | "Balanced" | "Ambitious"
+  >("Balanced");
 
-  if (!selectedOffer || selectedOffer.status !== 'Available' || !contractData) {
-    return <div className="space-y-6 pb-10"><div><p className="text-[10px] font-semibold uppercase text-gray-500">Support</p><h1 className="mt-1 text-2xl font-bold text-white">Sponsorship Contract Detail</h1><p className="mt-1 text-sm text-gray-400">That offer is no longer available.</p></div><div className="card card-body p-8 text-center"><p className="text-2xl font-semibold text-white">Offer unavailable</p><p className="mt-3 text-sm text-gray-400">The selected sponsor offer has already been accepted or rejected.</p><Link to="/sponsorship" className="btn-primary mt-6 inline-flex">Back To Offers</Link></div></div>
+  if (!selectedOffer || selectedOffer.status !== "Available" || !contractData) {
+    return (
+      <div className="space-y-6 pb-10">
+        <div>
+          <p className="text-[10px] font-semibold uppercase text-gray-500">
+            Support
+          </p>
+          <h1 className="mt-1 text-2xl font-bold text-white">
+            Sponsorship Contract Detail
+          </h1>
+          <p className="mt-1 text-sm text-gray-400">
+            That offer is no longer available.
+          </p>
+        </div>
+        <div className="card card-body p-8 text-center">
+          <p className="text-2xl font-semibold text-white">Offer unavailable</p>
+          <p className="mt-3 text-sm text-gray-400">
+            The selected sponsor offer has already been accepted or rejected.
+          </p>
+          <Link to="/sponsorship" className="btn-primary mt-6 inline-flex">
+            Back To Offers
+          </Link>
+        </div>
+      </div>
+    );
   }
+
+  const obligationProfile = getSponsorObligationProfile({
+    category: selectedOffer.category,
+    brandFit: selectedOffer.brandFit,
+    risk:
+      selectedOffer.risk === "Risky Terms"
+        ? "High"
+        : selectedOffer.risk === "Medium Risk"
+          ? "Medium"
+          : "Low",
+    behaviour: selectedOffer.behaviour,
+  });
+  const reputationImpact = Math.max(
+    1,
+    Math.round((selectedOffer.brandFit - 45) / 8),
+  );
 
   return (
     <div className="space-y-6 pb-10">
-      <div><p className="text-[10px] font-semibold uppercase text-gray-500">Support</p><h1 className="mt-1 text-2xl font-bold text-white">Sponsorship Contract Detail</h1><p className="mt-1 text-sm text-gray-400">Sponsor: {selectedOffer.name}. Review package, negotiation levers, and brand impact.</p></div>
-      <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-8 space-y-4">
-          <div className="card card-body"><div className="grid grid-cols-[140px_1fr] gap-4"><div className="flex items-center justify-center rounded-xl border border-border bg-surface-light p-6 text-center text-4xl font-semibold text-green-400">A</div><div><div className="flex items-center gap-3"><h2 className="text-3xl font-semibold text-white">{selectedOffer.name}</h2><span className="rounded bg-green-600/20 px-2 py-1 text-[10px] text-green-400">Exclusive</span></div><p className="mt-2 text-gray-400">{selectedOffer.category}</p><div className="mt-5 grid grid-cols-4 gap-3 text-xs"><div className="rounded bg-surface-light/50 p-3"><span className="text-gray-500">Brand Fit</span><p className="mt-1 text-lg font-bold text-green-400">{selectedOffer.brandFit}%</p></div><div className="rounded bg-surface-light/50 p-3"><span className="text-gray-500">Required Rep</span><p className="mt-1 text-lg font-bold text-amber-400">{selectedOffer.minimumReputation}+</p></div><div className="rounded bg-surface-light/50 p-3"><span className="text-gray-500">Status</span><p className="mt-1 text-lg font-bold text-white">Review</p></div><div className="rounded bg-surface-light/50 p-3"><span className="text-gray-500">Deal Rating</span><p className="mt-1 text-lg font-bold text-green-400">{Math.round((selectedOffer.brandFit + Math.min(100, selectedOffer.monthlyValue / 25)) / 2)}/100</p></div></div></div></div></div>
-          <div className="grid grid-cols-4 gap-3">{[['Monthly Payment', formatMoney(selectedOffer.monthlyValue)], ['Win Bonuses', selectedOffer.bonusClause], ['Length', selectedOffer.contractLength], ['Behaviour', selectedOffer.behaviour]].map(([label, value]) => <div key={label} className="card card-body"><p className="metric-label">{label}</p><p className="mt-2 text-sm font-semibold text-white">{value}</p></div>)}</div>
-          <div className="card overflow-hidden"><div className="card-header"><h3 className="text-sm font-semibold text-white">Sponsor Slots Included</h3></div><table className="w-full text-xs"><thead><tr className="border-b border-border text-gray-500"><th className="px-3 py-2 text-left">Slot</th><th className="px-3 py-2 text-left">Annual Value</th><th className="px-3 py-2 text-left">Visibility</th><th className="px-3 py-2 text-left">Fit</th></tr></thead><tbody>{contractData.includedSlots.map((slot) => <tr key={slot.slot} className="border-b border-border/50"><td className="px-3 py-2 text-white">{slot.slot}</td><td className="px-3 py-2 text-white">{formatMoney(slot.annualValue)}</td><td className="px-3 py-2 text-gray-400">{slot.visibility}</td><td className="px-3 py-2">{stars(Math.max(1, Math.round(slot.fit / 20)))}</td></tr>)}</tbody></table></div>
-          <div className="grid grid-cols-2 gap-4"><div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Advisor Notes</h3><p className="text-sm text-gray-400">{contractData.advisor.note}</p><p className="mt-3 text-green-400">Recommendation: {contractData.advisor.recommendation}</p></div><div className="card overflow-hidden"><div className="card-header"><h3 className="text-sm font-semibold text-white">Deal Comparison</h3></div><table className="w-full text-xs"><tbody>{contractData.comparisonRows.map((row) => <tr key={row.metric} className="border-b border-border/50"><td className="px-3 py-2 text-white">{row.metric}</td><td className="px-3 py-2 text-gray-400">{row.current}</td><td className="px-3 py-2 text-green-400">{row.proposed}</td></tr>)}</tbody></table></div></div>
-          <div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Obligations & Brand Impact</h3><div className="grid grid-cols-3 gap-4"><div><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">Reputation Impact</span><span className="text-green-400">+8</span></div><ProgressBar value={80} compact /></div><div><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">Fan Reaction</span><span className="text-green-400">{selectedOffer.brandFit}%</span></div><ProgressBar value={selectedOffer.brandFit} compact /></div><div><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">Obligation Load</span><span className="text-amber-400">3/5</span></div><ProgressBar value={60} tone="amber" compact /></div></div><p className="mt-4 flex items-center gap-2 rounded border border-amber-600/30 bg-amber-600/10 p-3 text-xs text-amber-100"><Info className="h-4 w-4" /> This deal is strong commercially, but it leaves less room for low-effort additions later.</p></div>
+      <div>
+        <p className="text-[10px] font-semibold uppercase text-gray-500">
+          Support
+        </p>
+        <h1 className="mt-1 text-2xl font-bold text-white">
+          Sponsorship Contract Detail
+        </h1>
+        <p className="mt-1 text-sm text-gray-400">
+          Sponsor: {selectedOffer.name}. Review package, negotiation levers, and
+          brand impact.
+        </p>
+      </div>
+      <div className="grid gap-4 xl:grid-cols-12">
+        <div className="space-y-4 xl:col-span-8">
+          <div className="card card-body">
+            <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
+              <div className="flex items-center justify-center rounded-xl border border-border bg-surface-light p-6 text-center text-4xl font-semibold text-green-400">
+                A
+              </div>
+              <div>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-3xl font-semibold text-white">
+                    {selectedOffer.name}
+                  </h2>
+                  <span className="rounded bg-green-600/20 px-2 py-1 text-[10px] text-green-400">
+                    Exclusive
+                  </span>
+                </div>
+                <p className="mt-2 text-gray-400">{selectedOffer.category}</p>
+                <div className="mt-5 grid grid-cols-2 gap-3 text-xs lg:grid-cols-4">
+                  <div className="rounded bg-surface-light/50 p-3">
+                    <span className="text-gray-500">Brand Fit</span>
+                    <p className="mt-1 text-lg font-bold text-green-400">
+                      {selectedOffer.brandFit}%
+                    </p>
+                  </div>
+                  <div className="rounded bg-surface-light/50 p-3">
+                    <span className="text-gray-500">Required Rep</span>
+                    <p className="mt-1 text-lg font-bold text-amber-400">
+                      {selectedOffer.minimumReputation}+
+                    </p>
+                  </div>
+                  <div className="rounded bg-surface-light/50 p-3">
+                    <span className="text-gray-500">Status</span>
+                    <p className="mt-1 text-lg font-bold text-white">Review</p>
+                  </div>
+                  <div className="rounded bg-surface-light/50 p-3">
+                    <span className="text-gray-500">Deal Rating</span>
+                    <p className="mt-1 text-lg font-bold text-green-400">
+                      {Math.round(
+                        (selectedOffer.brandFit +
+                          Math.min(100, selectedOffer.monthlyValue / 25)) /
+                          2,
+                      )}
+                      /100
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              ["Monthly Payment", formatMoney(selectedOffer.monthlyValue)],
+              ["Win Bonuses", selectedOffer.bonusClause],
+              ["Length", selectedOffer.contractLength],
+              ["Behaviour", selectedOffer.behaviour],
+            ].map(([label, value]) => (
+              <div key={label} className="card card-body">
+                <p className="metric-label">{label}</p>
+                <p className="mt-2 text-sm font-semibold text-white">{value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="card overflow-hidden">
+            <div className="card-header">
+              <h3 className="text-sm font-semibold text-white">
+                Sponsor Slots Included
+              </h3>
+            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-gray-500">
+                  <th className="px-3 py-2 text-left">Slot</th>
+                  <th className="px-3 py-2 text-left">Annual Value</th>
+                  <th className="px-3 py-2 text-left">Visibility</th>
+                  <th className="px-3 py-2 text-left">Fit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contractData.includedSlots.map((slot) => (
+                  <tr key={slot.slot} className="border-b border-border/50">
+                    <td className="px-3 py-2 text-white">{slot.slot}</td>
+                    <td className="px-3 py-2 text-white">
+                      {formatMoney(slot.annualValue)}
+                    </td>
+                    <td className="px-3 py-2 text-gray-400">
+                      {slot.visibility}
+                    </td>
+                    <td className="px-3 py-2">
+                      {stars(Math.max(1, Math.round(slot.fit / 20)))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="card card-body">
+              <h3 className="mb-3 text-xs font-semibold text-white">
+                Advisor Notes
+              </h3>
+              <p className="text-sm text-gray-400">
+                {contractData.advisor.note}
+              </p>
+              <p className="mt-3 text-green-400">
+                Recommendation: {contractData.advisor.recommendation}
+              </p>
+            </div>
+            <div className="card overflow-hidden">
+              <div className="card-header">
+                <h3 className="text-sm font-semibold text-white">
+                  Deal Comparison
+                </h3>
+              </div>
+              <table className="w-full text-xs">
+                <tbody>
+                  {contractData.comparisonRows.map((row) => (
+                    <tr key={row.metric} className="border-b border-border/50">
+                      <td className="px-3 py-2 text-white">{row.metric}</td>
+                      <td className="px-3 py-2 text-gray-400">{row.current}</td>
+                      <td className="px-3 py-2 text-green-400">
+                        {row.proposed}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="card card-body">
+            <h3 className="mb-3 text-xs font-semibold text-white">
+              Obligations & Brand Impact
+            </h3>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <div className="mb-1 flex justify-between text-xs">
+                  <span className="text-gray-400">Reputation Potential</span>
+                  <span className="text-green-400">+{reputationImpact}</span>
+                </div>
+                <ProgressBar
+                  value={Math.min(100, reputationImpact * 12)}
+                  compact
+                />
+              </div>
+              <div>
+                <div className="mb-1 flex justify-between text-xs">
+                  <span className="text-gray-400">Fan Reaction</span>
+                  <span className="text-green-400">
+                    {selectedOffer.brandFit}%
+                  </span>
+                </div>
+                <ProgressBar value={selectedOffer.brandFit} compact />
+              </div>
+              <div>
+                <div className="mb-1 flex justify-between text-xs">
+                  <span className="text-gray-400">Obligation Load</span>
+                  <span className="text-amber-400">
+                    {obligationProfile.obligationLoad}/5
+                  </span>
+                </div>
+                <ProgressBar
+                  value={obligationProfile.obligationLoad * 20}
+                  tone="amber"
+                  compact
+                />
+              </div>
+            </div>
+            <p className="mt-4 flex items-center gap-2 rounded border border-amber-600/30 bg-amber-600/10 p-3 text-xs text-amber-100">
+              <Info className="h-4 w-4" /> Weekly cost:{" "}
+              {obligationProfile.weeklyFatigueCost} fatigue. Category perk:{" "}
+              {obligationProfile.perk}. Performance bonuses are paid
+              automatically when earned.
+            </p>
+          </div>
         </div>
-        <div className="col-span-4 space-y-4"><div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Negotiation Options</h3><div className="space-y-3">{contractData.negotiationOptions.map((item) => <button key={item.label} type="button" onClick={() => setSelectedNegotiationLabel(item.label)} className={`w-full rounded border p-3 text-left text-xs ${selectedNegotiationLabel === item.label ? 'border-green-600/30 bg-green-600/10' : 'border-border bg-surface-light/50'}`}><div className="flex items-start justify-between"><div><p className="font-semibold text-white">{item.label}</p><p className="mt-1 text-gray-400">{item.adjustment}</p></div><span className={`rounded px-1.5 py-0.5 text-[10px] ${probabilityClass(item.probability)}`}>{item.sponsorResponse}</span></div><div className="mt-2"><ProgressBar value={item.probability} tone={item.probability >= 65 ? 'green' : item.probability >= 45 ? 'amber' : 'red'} compact /></div><p className="mt-2 text-green-400">{item.impact}</p></button>)}</div></div><div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Negotiation Tone</h3><div className="grid gap-2">{(['Conservative', 'Balanced', 'Ambitious'] as const).map((tone) => <button key={tone} type="button" onClick={() => setNegotiationTone(tone)} className={negotiationTone === tone ? 'tab-active text-xs' : 'tab-inactive text-xs'}>{tone}</button>)}</div></div><div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Strengths</h3><ul className="space-y-2 text-xs text-gray-400">{contractData.advisor.strengths.map((item) => <li key={item} className="flex gap-2"><span className="text-green-400">+</span>{item}</li>)}</ul></div><div className="card card-body"><h3 className="mb-3 text-xs font-semibold text-white">Risks</h3><ul className="space-y-2 text-xs text-gray-400">{contractData.advisor.risks.map((item) => <li key={item} className="flex gap-2"><span className="text-red-400">-</span>{item}</li>)}</ul></div><div className="grid gap-2"><button type="button" className="btn-primary justify-center text-xs" onClick={() => acceptSponsor(selectedOffer.id)}><Star className="h-3.5 w-3.5" /> Accept Contract</button><button type="button" className="btn-secondary justify-center text-xs" onClick={() => negotiateSponsor(selectedOffer.id, selectedNegotiationLabel, negotiationTone)}><Scale className="h-3.5 w-3.5" /> Negotiate Terms</button><button type="button" className="btn-secondary justify-center text-xs" onClick={() => rejectSponsor(selectedOffer.id)}>Reject Deal</button><Link to="/sponsorship" className="btn-secondary justify-center text-xs">Compare Offers</Link></div></div>
+        <div className="space-y-4 xl:col-span-4">
+          <div className="card card-body">
+            <h3 className="mb-3 text-xs font-semibold text-white">
+              Negotiation Options
+            </h3>
+            <div className="space-y-3">
+              {contractData.negotiationOptions.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => setSelectedNegotiationLabel(item.label)}
+                  className={`w-full rounded border p-3 text-left text-xs ${selectedNegotiationLabel === item.label ? "border-green-600/30 bg-green-600/10" : "border-border bg-surface-light/50"}`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-white">{item.label}</p>
+                      <p className="mt-1 text-gray-400">{item.adjustment}</p>
+                    </div>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] ${probabilityClass(item.probability)}`}
+                    >
+                      {item.sponsorResponse}
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <ProgressBar
+                      value={item.probability}
+                      tone={
+                        item.probability >= 65
+                          ? "green"
+                          : item.probability >= 45
+                            ? "amber"
+                            : "red"
+                      }
+                      compact
+                    />
+                  </div>
+                  <p className="mt-2 text-green-400">{item.impact}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="card card-body">
+            <h3 className="mb-3 text-xs font-semibold text-white">
+              Negotiation Tone
+            </h3>
+            <div className="grid gap-2">
+              {(["Conservative", "Balanced", "Ambitious"] as const).map(
+                (tone) => (
+                  <button
+                    key={tone}
+                    type="button"
+                    onClick={() => setNegotiationTone(tone)}
+                    className={
+                      negotiationTone === tone
+                        ? "tab-active text-xs"
+                        : "tab-inactive text-xs"
+                    }
+                  >
+                    {tone}
+                  </button>
+                ),
+              )}
+            </div>
+          </div>
+          <div className="card card-body">
+            <h3 className="mb-3 text-xs font-semibold text-white">Strengths</h3>
+            <ul className="space-y-2 text-xs text-gray-400">
+              {contractData.advisor.strengths.map((item) => (
+                <li key={item} className="flex gap-2">
+                  <span className="text-green-400">+</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="card card-body">
+            <h3 className="mb-3 text-xs font-semibold text-white">Risks</h3>
+            <ul className="space-y-2 text-xs text-gray-400">
+              {contractData.advisor.risks.map((item) => (
+                <li key={item} className="flex gap-2">
+                  <span className="text-red-400">-</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="grid gap-2">
+            <button
+              type="button"
+              className="btn-primary justify-center text-xs"
+              onClick={() => acceptSponsor(selectedOffer.id)}
+            >
+              <Star className="h-3.5 w-3.5" /> Accept Contract
+            </button>
+            <button
+              type="button"
+              className="btn-secondary justify-center text-xs"
+              onClick={() =>
+                negotiateSponsor(
+                  selectedOffer.id,
+                  selectedNegotiationLabel,
+                  negotiationTone,
+                )
+              }
+            >
+              <Scale className="h-3.5 w-3.5" /> Negotiate Terms
+            </button>
+            <button
+              type="button"
+              className="btn-secondary justify-center text-xs"
+              onClick={() => rejectSponsor(selectedOffer.id)}
+            >
+              Reject Deal
+            </button>
+            <Link
+              to="/sponsorship"
+              className="btn-secondary justify-center text-xs"
+            >
+              Compare Offers
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
-  )
+  );
 }

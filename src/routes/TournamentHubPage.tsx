@@ -1,275 +1,488 @@
-import { useNavigate } from 'react-router-dom'
-import { Calendar, MapPin, Play, Search, Trophy, Users } from 'lucide-react'
-import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/useGame'
-import { chalkCatalog, cueCatalog, tipCatalog } from '../data/catalogs'
-import { getNextEligibleTournament, getTournamentPlayability } from '../hooks/useGameState'
-import { buildTournamentHubData } from '../utils/liveRouteData'
-import { formatMoney } from '../utils/formatters'
+import { useNavigate } from "react-router-dom";
+import {
+  MapPin,
+  Maximize2,
+  Play,
+  Search,
+  SkipForward,
+  Trophy,
+} from "lucide-react";
+import { TournamentBracket } from "../components/tournaments/TournamentBracket";
+import { ProgressBar } from "../components/ui/ProgressBar";
+import { useGame } from "../context/useGame";
+import { chalkCatalog, cueCatalog, tipCatalog } from "../data/catalogs";
+import {
+  getNextEligibleTournament,
+  getTournamentPlayability,
+} from "../hooks/useGameState";
+import {
+  buildTournamentDrawData,
+  buildTournamentHubData,
+} from "../utils/liveRouteData";
+import { formatMoney } from "../utils/formatters";
 
 function average(values: number[]) {
-  if (values.length === 0) return 0
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+  if (values.length === 0) return 0;
+  return Math.round(
+    values.reduce((sum, value) => sum + value, 0) / values.length,
+  );
 }
 
 function initials(name: string) {
-  return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
-}
-
-function progressClass(status: 'completed' | 'current' | 'upcoming') {
-  if (status === 'completed') return 'border-green-600/30 bg-green-600/10 text-green-400'
-  if (status === 'current') return 'border-amber-600/30 bg-amber-600/10 text-amber-400'
-  return 'border-border bg-surface-light text-gray-500'
-}
-
-function isFinalRound(round: string | null) {
-  return round?.trim().toLowerCase() === 'final'
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 export function TournamentHubPage() {
-  const { gameState, simulateMatch, startLiveMatch, enterTournament, continueToNextTournament } = useGame()
-  const navigate = useNavigate()
-  const tournamentData = buildTournamentHubData(gameState)
-  const currentCue = cueCatalog.find((cue) => cue.id === gameState.equipment.currentCueId)
-  const currentChalk = chalkCatalog.find((chalk) => chalk.id === gameState.equipment.currentChalkId)
-  const currentTip = tipCatalog.find((tip) => tip.id === gameState.equipment.currentTipId)
-  const equipmentReady = Boolean(currentCue && currentChalk && currentTip)
-  const activeTournament = getNextEligibleTournament(gameState)
-  const tournamentEntered = activeTournament?.status === 'Entered'
-  const playability = activeTournament ? getTournamentPlayability(gameState, activeTournament) : null
-  const playerRow = gameState.rankings.find((row) => row.playerName === gameState.player.fullName)
-  const nextOpponent = gameState.rankings.find((row) => row.playerName !== gameState.player.fullName && Math.abs(row.ranking - (playerRow?.ranking ?? 1)) <= 3) ?? gameState.rankings.find((row) => row.playerName !== gameState.player.fullName)
-  const activeRound = gameState.tournamentProgress.tournamentId === activeTournament?.id ? gameState.tournamentProgress.currentRound : null
-  const completedRounds = gameState.tournamentProgress.tournamentId === activeTournament?.id ? gameState.tournamentProgress.completedRounds : []
-  const technicalAverage = average(Object.values(gameState.attributes.technical))
-  const recentResults = tournamentData.recentResults.slice(0, 3)
-  const topPerformers = tournamentData.topPerformers.slice(0, 3)
-  const notes = tournamentData.notes.slice(0, 4)
-  const tournamentCondition = [
-    { label: 'Confidence', detail: `${gameState.player.confidence}%`, value: gameState.player.confidence, tone: 'green' as const },
-    { label: 'Freshness', detail: `${Math.max(0, 100 - gameState.player.fatigue)}%`, value: Math.max(0, 100 - gameState.player.fatigue), tone: 'amber' as const },
-    { label: 'Morale', detail: `${gameState.player.morale}%`, value: gameState.player.morale, tone: 'green' as const },
-    { label: 'Technical Form', detail: `${technicalAverage}%`, value: technicalAverage, tone: 'green' as const },
-  ]
-  const pathRounds = ['Last 16', 'Quarter Final', 'Semi Final', 'Final'] as const
-  const prizeRows = [
-    { round: 'Winner', prize: activeTournament?.winnerPrize ?? activeTournament?.prizeMoney ?? 0 },
-    { round: 'Runner-Up', prize: activeTournament?.runnerUpPrize ?? Math.round((activeTournament?.prizeMoney ?? 0) * 0.5) },
-    { round: 'Semi Final', prize: activeTournament?.semiFinalPrize ?? Math.round((activeTournament?.prizeMoney ?? 0) * 0.25) },
-    { round: 'Quarter Final', prize: activeTournament?.quarterFinalPrize ?? Math.round((activeTournament?.prizeMoney ?? 0) * 0.15) },
-    { round: 'First Round', prize: activeTournament?.firstRoundPrize ?? 0 },
-  ]
-  const nextMatchStageLabel = tournamentEntered ? activeRound ?? 'Awaiting Draw' : 'Awaiting Draw'
+  const {
+    gameState,
+    simulateMatch,
+    enterTournament,
+    skipTournament,
+    continueToNextTournament,
+  } = useGame();
+  const navigate = useNavigate();
+  const hubData = buildTournamentHubData(gameState);
+  const drawData = buildTournamentDrawData(gameState);
+  const currentCue = cueCatalog.find(
+    (cue) => cue.id === gameState.equipment.currentCueId,
+  );
+  const currentChalk = chalkCatalog.find(
+    (chalk) => chalk.id === gameState.equipment.currentChalkId,
+  );
+  const currentTip = tipCatalog.find(
+    (tip) => tip.id === gameState.equipment.currentTipId,
+  );
+  const equipmentReady = Boolean(currentCue && currentChalk && currentTip);
+  const activeTournament = getNextEligibleTournament(gameState);
+  const tournamentEntered = activeTournament?.status === "Entered";
+  const playability = activeTournament
+    ? getTournamentPlayability(gameState, activeTournament)
+    : null;
+  const playerRow = gameState.rankings.find(
+    (row) => row.playerName === gameState.player.fullName,
+  );
+  const activeRound =
+    gameState.tournamentProgress.tournamentId === activeTournament?.id
+      ? gameState.tournamentProgress.currentRound
+      : null;
+  const completedRounds =
+    gameState.tournamentProgress.tournamentId === activeTournament?.id
+      ? gameState.tournamentProgress.completedRounds
+      : [];
+  const activeBracketMatch = drawData.bracket
+    .find((round) => round.label === activeRound)
+    ?.matches.find(
+      (match) =>
+        match.top.name === gameState.player.fullName ||
+        match.bottom.name === gameState.player.fullName,
+    );
+  const bracketOpponent = activeBracketMatch
+    ? activeBracketMatch.top.name === gameState.player.fullName
+      ? activeBracketMatch.bottom
+      : activeBracketMatch.top
+    : null;
+  const nextOpponent =
+    bracketOpponent && bracketOpponent.name !== "TBD"
+      ? (gameState.rankings.find(
+          (row) => row.playerName === bracketOpponent.name,
+        ) ?? {
+          playerName: bracketOpponent.name,
+          ranking: bracketOpponent.rank,
+          nation: bracketOpponent.nation,
+        })
+      : (gameState.rankings.find(
+          (row) =>
+            row.playerName !== gameState.player.fullName &&
+            Math.abs(row.ranking - (playerRow?.ranking ?? 1)) <= 3,
+        ) ??
+        gameState.rankings.find(
+          (row) => row.playerName !== gameState.player.fullName,
+        ));
+  const technicalAverage = average(
+    Object.values(gameState.attributes.technical),
+  );
+  const freshness = Math.max(0, 100 - gameState.player.fatigue);
+  const readiness = Math.round(
+    (gameState.player.confidence +
+      freshness +
+      gameState.player.morale +
+      technicalAverage) /
+      4,
+  );
+  const nextMatchStageLabel = tournamentEntered
+    ? (activeRound ?? "Awaiting Draw")
+    : "Awaiting Draw";
   const primaryActionLabel = !equipmentReady
-    ? 'Open Equipment'
+    ? "Open Equipment"
     : !tournamentEntered
-      ? 'Enter Tournament'
-      : (playability?.daysUntilStart ?? 0) > 7
-        ? 'Continue To Event'
-        : !playability?.travelBooked
-          ? 'Book Travel'
-          : 'Play Next Match'
+      ? "Enter Tournament"
+      : !playability?.travelBooked
+        ? "Book Travel"
+        : (playability?.daysUntilStart ?? 0) > 0
+          ? "Advance to Tournament"
+          : "Play Next Match";
+  const stageLabels =
+    drawData.progress.length > 0
+      ? drawData.progress
+      : [
+          { label: "Last 16", status: "current" as const },
+          { label: "Quarter Final", status: "upcoming" as const },
+          { label: "Semi Final", status: "upcoming" as const },
+          { label: "Final", status: "upcoming" as const },
+        ];
+  const lastResult = hubData.recentResults.at(-1);
 
   function handleQuickSim() {
-    if (!activeTournament) return
+    if (!activeTournament) return;
     if (!equipmentReady) {
-      navigate('/equipment/cues')
-      return
+      navigate("/equipment/cues");
+      return;
     }
-
-    if (!playability?.canPlay) return
-
-    simulateMatch(activeTournament.id)
-    if (isFinalRound(activeRound)) navigate('/rankings?from=final')
+    if (!playability?.canPlay) return;
+    simulateMatch(activeTournament.id);
+    navigate("/match/result");
   }
 
   function handlePlayLiveMatch() {
-    if (!activeTournament) return
+    if (!activeTournament) return;
     if (!equipmentReady) {
-      navigate('/equipment/cues')
-      return
+      navigate("/equipment/cues");
+      return;
     }
-
     if (!tournamentEntered) {
-      enterTournament(activeTournament.id)
-      return
+      enterTournament(activeTournament.id);
+      return;
     }
-
-    if ((playability?.daysUntilStart ?? 0) > 7) {
-      continueToNextTournament()
-      return
-    }
-
     if (!playability?.travelBooked) {
-      navigate('/travel')
-      return
+      navigate("/travel");
+      return;
     }
-
-    startLiveMatch(activeTournament.id)
-    navigate('/match/live')
-  }
-
-  function handleScoutPreview() {
-    navigate('/match/preview')
+    if ((playability?.daysUntilStart ?? 0) > 0) {
+      continueToNextTournament();
+      return;
+    }
+    navigate("/match/preview");
   }
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
-      <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface/85 px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">Tournament Hub</p>
-          <h1 className="mt-1 truncate text-2xl font-bold leading-tight text-white">{activeTournament?.name ?? 'No Active Tournament'}</h1>
-          <p className="mt-1 truncate text-xs text-gray-400">{activeTournament?.location ?? 'Location TBD'} · {activeTournament?.format ?? 'Format pending'} · {activeRound ?? 'Awaiting entry'}</p>
+    <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+      <header className="flex shrink-0 flex-col gap-3 rounded-xl border border-border bg-surface/85 px-3 py-3 sm:flex-row sm:items-center sm:px-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">
+            Tournament Hub
+          </p>
+          <div className="mt-1 flex min-w-0 flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-3">
+            <h1 className="truncate text-xl font-bold leading-tight text-white sm:text-2xl">
+              {activeTournament?.name ?? "No Active Tournament"}
+            </h1>
+            <p className="truncate text-xs text-gray-400">
+              {activeTournament?.location ?? "Location TBD"} ·{" "}
+              {activeTournament?.format ?? "Format pending"}
+            </p>
+          </div>
         </div>
-        <div className="rounded-xl border border-border bg-surface-light/60 px-5 py-3 text-center">
-          <p className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Current Round</p>
-          <p className="mt-1 text-2xl font-bold text-green-400">{activeRound ?? 'Entry'}</p>
+        <div className="flex shrink-0 items-center justify-between rounded-lg border border-border bg-surface-light/60 px-4 py-2 sm:block sm:text-center">
+          <p className="text-[9px] uppercase tracking-[0.16em] text-gray-500">
+            Current Round
+          </p>
+          <p className="text-lg font-bold text-green-400">
+            {activeRound ?? "Entry"}
+          </p>
         </div>
-      </div>
+        <button
+          type="button"
+          className="btn-secondary min-h-11 shrink-0 justify-center px-4 text-xs"
+          onClick={() => navigate("/travel")}
+        >
+          <MapPin className="h-3.5 w-3.5" /> Travel
+        </button>
+      </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-12 gap-2">
-        <div className="col-span-8 grid min-h-0 grid-rows-[0.64fr_1.04fr_0.78fr_0.48fr] gap-2">
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Trophy className="h-3.5 w-3.5 text-green-400" /> Your Tournament Path</h3></div>
-            <div className="card-body grid h-full min-h-0 grid-cols-4 gap-2 p-3">
-              {pathRounds.map((round) => {
-                const completed = completedRounds.find((item) => item.round === round)
-                const isCurrent = activeRound === round
-                const status = completed ? 'completed' : isCurrent ? 'current' : 'upcoming'
-
-                return (
-                  <div key={round} className={`flex min-h-0 flex-col items-center justify-center rounded-xl border p-2 text-center ${progressClass(status)}`}>
-                    <p className="text-[10px] text-gray-400">{round}</p>
-                    <p className="mt-2 text-lg font-semibold text-white">{completed ? `${completed.playerFrames}-${completed.opponentFrames}` : '–'}</p>
-                    <p className="mt-1 truncate text-xs text-gray-300">{completed ? completed.opponentName : 'TBD'}</p>
+      <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-2">
+        <div className="grid min-h-0 gap-3 xl:grid-rows-[12.25rem_minmax(0,1fr)] xl:gap-2">
+          <section className="card flex min-h-0 flex-col overflow-hidden border-green-600/40 bg-gradient-to-r from-green-600/10 via-surface to-surface">
+            <div className="card-header shrink-0">
+              <h2 className="text-sm font-semibold text-white">
+                Next Match{" "}
+                <span className="font-normal text-gray-400">
+                  · {nextMatchStageLabel}
+                </span>
+              </h2>
+              <span
+                className={`text-[9px] font-semibold uppercase tracking-[0.16em] ${playability?.canPlay ? "text-green-400" : "text-amber-400"}`}
+              >
+                {playability?.canPlay
+                  ? "Playable"
+                  : tournamentEntered
+                    ? "Preparation Needed"
+                    : "Entry Needed"}
+              </span>
+            </div>
+            <div className="grid min-h-0 flex-1 gap-3 p-3 md:grid-cols-[minmax(0,1fr)_15rem] md:items-center">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-4">
+                <div className="flex min-w-0 flex-col items-center gap-2 text-center sm:flex-row sm:text-left">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-green-500 bg-green-600/20 font-bold text-white">
+                    {initials(gameState.player.fullName)}
                   </div>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden border-green-600/40 bg-gradient-to-r from-green-600/10 via-surface to-surface">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Next Match - {nextMatchStageLabel}</h3><span className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${playability?.canPlay ? 'text-green-400' : 'text-amber-400'}`}>{playability?.canPlay ? 'Playable' : tournamentEntered ? 'Preparation Needed' : 'Entry Needed'}</span></div>
-            <div className="card-body flex h-full min-h-0 flex-col justify-between gap-3 p-3">
-              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-                <div className="text-center">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border-2 border-green-500 bg-green-600/20 text-xl font-bold text-white">{initials(gameState.player.fullName)}</div>
-                  <p className="mt-2 truncate text-xl font-semibold text-white">{gameState.player.fullName}</p>
-                  <p className="mt-1 text-sm text-gray-400">Rank {playerRow?.ranking ?? gameState.player.amateurRanking ?? gameState.player.worldRanking ?? '-'}</p>
-                  <p className="mt-1 text-sm text-green-400">Confidence {gameState.player.confidence}%</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-4xl font-bold text-gray-400">VS</p>
-                  <p className="mt-2 text-xs text-gray-400">{activeTournament?.format ?? 'Match format'}</p>
-                </div>
-                <div className="text-center">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border-2 border-red-500/60 bg-red-600/20 text-xl font-bold text-white">{initials(nextOpponent?.playerName ?? 'Opponent')}</div>
-                  <p className="mt-2 truncate text-xl font-semibold text-white">{nextOpponent?.playerName ?? 'Opponent TBD'}</p>
-                  <p className="mt-1 text-sm text-gray-400">Rank {nextOpponent?.ranking ?? '-'}</p>
-                  <p className="mt-1 text-sm text-gray-400">{nextOpponent?.nation ?? 'Nation TBD'}</p>
-                </div>
-              </div>
-              <div className="flex justify-center gap-2">
-                <button type="button" className="btn-primary px-6 py-2 text-xs" onClick={handlePlayLiveMatch}><Play className="h-3.5 w-3.5" /> {primaryActionLabel}</button>
-                <button type="button" className="btn-secondary px-4 py-2 text-xs" onClick={handleScoutPreview}><Search className="h-3.5 w-3.5" /> Scout Preview</button>
-                <button type="button" className="btn-secondary px-4 py-2 text-xs" disabled={!playability?.canPlay} onClick={handleQuickSim}>Quick Sim</button>
-              </div>
-              {tournamentEntered && !playability?.canPlay ? <p className="text-center text-[10px] text-amber-300">{playability?.reason}</p> : null}
-            </div>
-          </div>
-
-          <div className="grid min-h-0 grid-cols-3 gap-2">
-            <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-              <div className="card-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Calendar className="h-3.5 w-3.5 text-green-400" /> Event Schedule</h3></div>
-              <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3 text-xs">
-                {pathRounds.map((round) => {
-                  const completed = completedRounds.some((item) => item.round === round)
-                  const current = activeRound === round
-                  return <div key={round} className={`flex items-center gap-2 rounded-lg px-2 py-2 ${current ? 'bg-green-600/10' : 'bg-surface-light/45'}`}><span className={`h-2 w-2 rounded-full ${completed ? 'bg-green-500' : current ? 'bg-amber-500' : 'bg-gray-600'}`} /><span className="w-24 text-white">{round}</span><span className={completed ? 'text-green-400' : current ? 'text-amber-400' : 'text-gray-500'}>{completed ? 'Completed' : current ? 'In Progress' : 'Upcoming'}</span></div>
-                })}
-              </div>
-            </div>
-
-            <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-              <div className="card-header"><h3 className="text-sm font-semibold text-white">Objectives</h3></div>
-              <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
-                {tournamentData.objectives.map((objective) => (
-                  <div key={objective.label}>
-                    <div className="mb-1 flex justify-between text-xs"><span className="truncate text-gray-400">{objective.label}</span><span className="text-white">{objective.current}/{objective.target}</span></div>
-                    <ProgressBar value={(objective.current / objective.target) * 100} tone={objective.current >= objective.target ? 'green' : 'amber'} compact />
-                    <p className="mt-1 truncate text-[10px] text-gray-500">{objective.status} · {objective.reward} pts</p>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white sm:text-base">
+                      {gameState.player.fullName}
+                    </p>
+                    <p className="text-[11px] text-green-400">
+                      Rank{" "}
+                      {playerRow?.ranking ??
+                        gameState.player.amateurRanking ??
+                        gameState.player.worldRanking ??
+                        "-"}{" "}
+                      · {gameState.player.confidence}% confidence
+                    </p>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-              <div className="card-header"><h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Users className="h-3.5 w-3.5 text-green-400" /> Top Performers</h3></div>
-              <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
-                {topPerformers.length > 0 ? topPerformers.map((player, index) => <div key={player.id} className="flex justify-between rounded-lg bg-surface-light/50 px-3 py-2 text-xs"><span className="truncate text-white">{index + 1}. {player.name}</span><span className="shrink-0 text-green-400">{player.score}</span></div>) : <div className="flex h-full items-center justify-center text-sm text-gray-500">-</div>}
-              </div>
-            </div>
-          </div>
-
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Recent Results</h3></div>
-            <div className="card-body grid h-full min-h-0 grid-cols-3 gap-2 p-3">
-              {recentResults.length > 0 ? recentResults.map((result) => (
-                <div key={result.id} className="rounded-lg bg-surface-light/50 p-3 text-xs">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-gray-500">{result.round}</p>
-                  <p className="mt-1 truncate text-white">{result.winner} def. {result.loser}</p>
-                  <p className="mt-1 text-green-400">{result.score}</p>
                 </div>
-              )) : <div className="col-span-3 flex items-center justify-center text-2xl text-gray-500">–</div>}
+                <p className="text-xl font-bold text-gray-500">VS</p>
+                <div className="flex min-w-0 flex-col-reverse items-center gap-2 text-center sm:flex-row sm:text-left">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white sm:text-base">
+                      {nextOpponent?.playerName ?? "Opponent TBD"}
+                    </p>
+                    <p className="text-[11px] text-gray-400">
+                      Rank {nextOpponent?.ranking ?? "-"} ·{" "}
+                      {nextOpponent?.nation ?? "Nation TBD"}
+                    </p>
+                  </div>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-red-500/60 bg-red-600/20 font-bold text-white">
+                    {initials(nextOpponent?.playerName ?? "Opponent")}
+                  </div>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <button
+                  type="button"
+                  className="btn-primary min-h-11 w-full justify-center px-5 text-sm"
+                  onClick={handlePlayLiveMatch}
+                >
+                  <Play className="h-4 w-4" /> {primaryActionLabel}
+                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary min-h-10 justify-center px-3 text-xs"
+                    onClick={() => navigate("/match/preview")}
+                  >
+                    <Search className="h-3.5 w-3.5" /> Scout
+                  </button>
+                  {tournamentEntered ? (
+                    <button
+                      type="button"
+                      className="btn-secondary min-h-10 justify-center px-3 text-xs"
+                      disabled={!playability?.canPlay}
+                      onClick={handleQuickSim}
+                    >
+                      Quick Sim
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn-secondary min-h-10 justify-center px-3 text-xs"
+                      onClick={() =>
+                        activeTournament && skipTournament(activeTournament.id)
+                      }
+                    >
+                      <SkipForward className="h-3.5 w-3.5" /> Skip Event
+                    </button>
+                  )}
+                </div>
+                {tournamentEntered && !playability?.canPlay ? (
+                  <p className="line-clamp-2 text-center text-[9px] leading-tight text-amber-300">
+                    {playability?.reason}
+                  </p>
+                ) : null}
+              </div>
             </div>
-          </div>
+          </section>
+
+          <section className="card flex min-h-[22rem] flex-col overflow-hidden xl:min-h-0">
+            <div className="card-header shrink-0">
+              <div>
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <Trophy className="h-3.5 w-3.5 text-green-400" /> Tournament
+                  Bracket
+                </h2>
+                <p className="mt-0.5 text-[10px] text-gray-500">
+                  Live draw · your route is highlighted
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary min-h-10 justify-center px-3 text-xs"
+                onClick={() => navigate("/tournaments/draw")}
+              >
+                <Maximize2 className="h-3.5 w-3.5" /> Open Full Draw
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 p-2.5">
+              <TournamentBracket
+                rounds={drawData.bracket}
+                playerName={gameState.player.fullName}
+                currentRound={activeRound}
+                dense
+              />
+            </div>
+          </section>
         </div>
 
-        <div className="col-span-4 grid min-h-0 grid-rows-[0.88fr_0.64fr_0.66fr_0.66fr_auto] gap-2">
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Player Condition</h3></div>
-            <div className="card-body grid h-full min-h-0 grid-rows-4 gap-1.5 p-2.5">
-              {tournamentCondition.map((item) => (
-                <div key={item.label}>
-                  <div className="mb-0.5 flex justify-between text-[11px]"><span className="text-gray-400">{item.label}</span><span className="text-white">{item.detail}</span></div>
-                  <ProgressBar value={item.value} tone={item.tone} compact />
-                </div>
+        <aside className="grid min-h-0 gap-3 md:grid-cols-3 xl:grid-cols-1 xl:grid-rows-[auto_auto_minmax(0,1fr)] xl:gap-2">
+          <section className="card card-body">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-white">
+                Match Readiness
+              </h2>
+              <span
+                className={`text-xs font-semibold ${readiness >= 65 && equipmentReady ? "text-green-400" : "text-amber-400"}`}
+              >
+                {readiness >= 65 && equipmentReady
+                  ? "Ready"
+                  : "Needs attention"}
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg bg-surface-light/50 p-2">
+                <span className="block text-[9px] uppercase text-gray-500">
+                  Confidence
+                </span>
+                <b className="text-sm text-white">
+                  {gameState.player.confidence}%
+                </b>
+              </div>
+              <div className="rounded-lg bg-surface-light/50 p-2">
+                <span className="block text-[9px] uppercase text-gray-500">
+                  Freshness
+                </span>
+                <b className="text-sm text-white">{freshness}%</b>
+              </div>
+              <div className="rounded-lg bg-surface-light/50 p-2">
+                <span className="block text-[9px] uppercase text-gray-500">
+                  Equipment
+                </span>
+                <b
+                  className={`text-sm ${equipmentReady ? "text-green-400" : "text-red-400"}`}
+                >
+                  {equipmentReady ? "Ready" : "Check"}
+                </b>
+              </div>
+            </div>
+          </section>
+
+          <section className="card card-body">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-white">
+                Tournament Progress
+              </h2>
+              <span className="text-[11px] text-amber-400">
+                {completedRounds.length} / {stageLabels.length} rounds
+              </span>
+            </div>
+            <div
+              className="mt-3 grid gap-1"
+              style={{
+                gridTemplateColumns: `repeat(${stageLabels.length}, minmax(0, 1fr))`,
+              }}
+            >
+              {stageLabels.map((stage) => (
+                <ProgressBar
+                  key={stage.label}
+                  value={
+                    stage.status === "completed"
+                      ? 100
+                      : stage.status === "current"
+                        ? 32
+                        : 0
+                  }
+                  tone={stage.status === "completed" ? "green" : "amber"}
+                  compact
+                />
               ))}
             </div>
-          </div>
-
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Equipment Readiness</h3></div>
-            <div className="card-body grid h-full min-h-0 grid-cols-[1fr_auto] gap-y-1.5 p-2.5 text-[11px]">
-              <span className="text-gray-400">Cue</span><span className="truncate text-right text-white">{currentCue?.name ?? 'Empty Slot'}</span>
-              <span className="text-gray-400">Tip</span><span className="truncate text-right text-white">{currentTip?.name ?? 'Empty Slot'}</span>
-              <span className="text-gray-400">Chalk</span><span className="truncate text-right text-white">{currentChalk?.name ?? 'Empty Slot'}</span>
-              <span className="text-gray-400">Status</span><span className={`truncate text-right ${equipmentReady ? 'text-green-400' : 'text-red-400'}`}>{equipmentReady ? 'Ready' : 'Incomplete'}</span>
+            <div className="mt-2 flex justify-between gap-1 text-[9px] text-gray-500">
+              {stageLabels.map((stage) => (
+                <span
+                  key={stage.label}
+                  className={
+                    stage.status === "current"
+                      ? "text-amber-400"
+                      : stage.status === "completed"
+                        ? "text-green-400"
+                        : ""
+                  }
+                >
+                  {stage.label
+                    .replace("Quarter Final", "QF")
+                    .replace("Semi Final", "SF")
+                    .replace("Last 16", "L16")}
+                </span>
+              ))}
             </div>
-          </div>
+          </section>
 
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Prize Structure</h3></div>
-            <div className="card-body grid h-full min-h-0 content-start gap-y-1.5 p-2.5 text-[11px]">
-              {prizeRows.map((row) => <div key={row.round} className="flex justify-between gap-3"><span className="text-gray-400">{row.round}</span><span className="shrink-0 text-right font-medium text-green-400">{formatMoney(row.prize)}</span></div>)}
+          <section className="card flex min-h-0 flex-col overflow-hidden">
+            <div className="card-header shrink-0">
+              <h2 className="text-sm font-semibold text-white">
+                Event Details
+              </h2>
             </div>
-          </div>
-
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Event Notes</h3></div>
-            <div className="card-body min-h-0 overflow-auto p-3 scrollbar-thin">
-              <ul className="space-y-2 text-xs text-gray-400">
-                {notes.map((note) => <li key={note} className="leading-relaxed">{note}</li>)}
-              </ul>
+            <div className="scrollbar-thin min-h-0 flex-1 space-y-3 overflow-auto p-3 text-xs">
+              <div className="flex justify-between gap-3">
+                <span className="text-gray-400">Winner prize</span>
+                <b className="text-green-400">
+                  {formatMoney(
+                    activeTournament?.winnerPrize ??
+                      activeTournament?.prizeMoney ??
+                      0,
+                  )}
+                </b>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-gray-400">Ranking value</span>
+                <b className="text-white">
+                  {activeTournament?.rankingValue ?? 0} pts
+                </b>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-gray-400">Entry</span>
+                <b
+                  className={
+                    tournamentEntered ? "text-green-400" : "text-amber-400"
+                  }
+                >
+                  {tournamentEntered ? "Confirmed" : "Required"}
+                </b>
+              </div>
+              <div className="border-t border-border pt-3">
+                <p className="text-[9px] uppercase tracking-[0.16em] text-gray-500">
+                  Objective
+                </p>
+                <p className="mt-1 text-white">
+                  {hubData.objectives[0]?.label ?? "Advance through the draw"}
+                </p>
+              </div>
+              <div className="border-t border-border pt-3">
+                <p className="text-[9px] uppercase tracking-[0.16em] text-gray-500">
+                  Last Result
+                </p>
+                <p className="mt-1 text-gray-400">
+                  {lastResult
+                    ? `${lastResult.winner} def. ${lastResult.loser} ${lastResult.score}`
+                    : "No completed matches yet"}
+                </p>
+              </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" className="btn-secondary justify-center py-2 text-xs" onClick={() => navigate('/tournaments/draw')}>View Draw</button>
-            <button type="button" className="btn-secondary justify-center py-2 text-xs" onClick={() => navigate('/travel')}><MapPin className="h-3.5 w-3.5" /> Travel</button>
-          </div>
-        </div>
+          </section>
+        </aside>
       </div>
     </div>
-  )
+  );
 }

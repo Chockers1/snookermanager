@@ -5,5 +5,5 @@ type RightContextPanelProps = {
 }
 
 export function RightContextPanel({ children }: RightContextPanelProps) {
-  return <aside className="w-[320px] shrink-0 space-y-4">{children}</aside>
+  return <aside className="w-full shrink-0 space-y-4 xl:w-[320px]">{children}</aside>
 }

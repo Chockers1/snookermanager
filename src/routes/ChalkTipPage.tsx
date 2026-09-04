@@ -76,6 +76,7 @@ export function ChalkTipPage() {
                 const selected = chalk.id === selectedChalk.id
                 const chalkOwned = gameState.equipment.chalkOwned.includes(chalk.id)
                 const chalkEquipped = gameState.equipment.currentChalkId === chalk.id
+                const chalkStock = gameState.equipment.chalkStock[chalk.id] ?? 0
 
                 return (
                   <div role="button" tabIndex={0} key={chalk.id} onKeyDown={(event) => {
@@ -101,7 +102,7 @@ export function ChalkTipPage() {
                         event.stopPropagation()
                         setSelectedChalkId(chalk.id)
                         buyChalk(chalk.id)
-                      }}>{chalkEquipped ? 'Equipped' : chalkOwned ? 'Equip Chalk' : 'Buy Chalk'}</ActionButton>
+                      }}>{chalkEquipped && chalkStock > 0 ? `${chalkStock} units left` : chalkOwned && chalkStock > 0 ? 'Open Stocked Unit' : 'Buy 5-Pack'}</ActionButton>
                     </div>
                   </div>
                 )
@@ -144,7 +145,7 @@ export function ChalkTipPage() {
                         event.stopPropagation()
                         setSelectedTipId(tip.id)
                         buyTip(tip.id)
-                      }}>{tipEquipped ? 'Equipped' : tipOwned ? 'Equip Tip' : 'Buy Tip'}</ActionButton>
+                      }}>{tipEquipped && (currentCueState?.tipCondition ?? 100) >= 90 ? 'Freshly Fitted' : tipOwned ? `Fit New Tip · ${formatMoney(tip.cost)}` : `Buy & Fit · ${formatMoney(tip.cost)}`}</ActionButton>
                     </div>
                   </div>
                 )
@@ -157,7 +158,7 @@ export function ChalkTipPage() {
           <SectionCard title="Current Setup">
             <div className="space-y-4">
               {[
-                ['Chalk', currentChalk?.name ?? 'Empty Slot', currentChalk ? (gameState.equipment.chalkOwned.includes(currentChalk.id) ? 'Owned' : 'Trial') : 'Not equipped'],
+                ['Chalk', currentChalk?.name ?? 'Empty Slot', currentChalk ? `${gameState.equipment.chalkCondition}% · ${gameState.equipment.chalkStock[currentChalk.id] ?? 0} units` : 'Not equipped'],
                 ['Cue Tip', currentTip?.name ?? 'Empty Slot', currentTip ? `${currentCueState?.tipCondition ?? 82}%` : 'Not equipped'],
                 ['Cue', currentCue?.name ?? 'Empty Slot', currentCue ? `${currentCueState?.condition ?? currentCue.condition}%` : 'Buy a cue first'],
               ].map(([label, name, condition]) => (

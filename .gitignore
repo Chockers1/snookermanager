@@ -8,6 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.superdesign/tmp/
 dist
 dist-ssr
 *.local
@@ -29,3 +30,5 @@ dist-ssr
 # Generated design and simulation artifacts
 .superdesign/
 artifacts/
+playwright-report/
+test-results/

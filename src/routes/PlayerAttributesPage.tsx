@@ -113,7 +113,7 @@ export function PlayerAttributesPage() {
       </div>
 
       {view === 'grouped' ? (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
           {attributeGroups.map(([group, attributes]) => (
             <div key={group} className="card">
               <div className="card-header"><h3 className="text-sm font-semibold text-white">{groupLabels[group]}</h3></div>
@@ -126,26 +126,26 @@ export function PlayerAttributesPage() {
       ) : (
         <div className="card">
           <div className="card-header"><h3 className="text-sm font-semibold text-white">All Attributes</h3><span className="text-[10px] text-gray-400">Strongest to weakest</span></div>
-          <div className="card-body grid grid-cols-3 gap-x-6 gap-y-2.5">
+          <div className="card-body grid gap-y-2.5 sm:grid-cols-3 sm:gap-x-6">
             {allAttributes.slice().sort((left, right) => right[1] - left[1]).map(([label, value]) => renderAttributeRow(label, value))}
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-4 card card-body">
+      <div className="grid gap-4 lg:grid-cols-12">
+        <div className="card card-body lg:col-span-4">
           <h3 className="mb-3 text-xs font-semibold text-white">Strengths</h3>
           <div className="space-y-2">
             {topStrengths.map(([label, value]) => <div key={label} className="flex items-center justify-between rounded bg-surface-light/50 px-3 py-2 text-xs"><span className="text-gray-300">{label}</span><span className="font-semibold text-green-400">{value}</span></div>)}
           </div>
         </div>
-        <div className="col-span-4 card card-body">
+        <div className="card card-body lg:col-span-4">
           <h3 className="mb-3 text-xs font-semibold text-white">Development Gaps</h3>
           <div className="space-y-2">
             {topWeaknesses.map(([label, value]) => <div key={label} className="flex items-center justify-between rounded bg-surface-light/50 px-3 py-2 text-xs"><span className="text-gray-300">{label}</span><span className="font-semibold text-amber-400">{value}</span></div>)}
           </div>
         </div>
-        <div className="col-span-4 card card-body">
+        <div className="card card-body lg:col-span-4">
           <h3 className="mb-2 text-xs font-semibold text-white">Coach Notes</h3>
           <p className="text-xs leading-relaxed text-gray-400">
             {currentCoach

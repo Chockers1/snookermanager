@@ -90,6 +90,9 @@ export function MatchPreviewPage() {
     playerPotential,
     opponentOverall,
     opponentPotential,
+    opponentConfidence,
+    opponentFatigue,
+    opponentPressure,
     currentCue,
     currentCueState,
     currentChalk,
@@ -98,7 +101,6 @@ export function MatchPreviewPage() {
     totalMeetings,
     wins,
     losses,
-    eventMatchesPlayed,
     eventWins,
     eventLosses,
     eventFrameDifferential,
@@ -145,8 +147,8 @@ export function MatchPreviewPage() {
   }
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
-      <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-surface/85 px-4 py-3">
+    <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+      <div className="flex shrink-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface/85 px-3 py-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-[11px] font-medium text-gray-500">
             <span className="truncate">{activeTournament?.name ?? 'Match Centre'}</span>
@@ -155,15 +157,17 @@ export function MatchPreviewPage() {
             <ChevronRight className="h-3 w-3" />
             <span>{bestOf}</span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold leading-tight text-white">Match Preview</h1>
-          <p className="mt-1 truncate text-xs text-gray-400">Pre-match briefing for {gameState.player.fullName} against {opponentName}.</p>
+          <div className="mt-0.5 flex min-w-0 items-baseline gap-3">
+            <h1 className="shrink-0 text-xl font-bold leading-tight text-white">Match Preview</h1>
+            <p className="hidden min-w-0 truncate text-xs text-gray-400 sm:block">{gameState.player.fullName} against {opponentName}</p>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <div className="card flex h-[52px] w-[110px] flex-col items-center justify-center text-center">
+          <div className="card flex h-11 w-[104px] flex-col items-center justify-center text-center">
             <p className="text-[9px] font-semibold uppercase text-gray-500">Difficulty</p>
             <p className="text-[13px] font-bold text-green-400">{difficultyLabel}</p>
           </div>
-          <div className="card flex h-[52px] w-[98px] flex-col items-center justify-center text-center">
+          <div className="card flex h-11 w-[92px] flex-col items-center justify-center text-center">
             <p className="text-[9px] font-semibold uppercase text-gray-500">Readiness</p>
             <p className="text-[13px] font-bold text-white">{readinessScore}%</p>
           </div>
@@ -190,16 +194,16 @@ export function MatchPreviewPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <div className="card min-h-0 border-green-600/70 bg-gradient-to-r from-green-600/15 via-green-600/5 to-surface p-3.5">
-          <div className="mb-2.5 flex items-center gap-2 text-[10px] font-semibold uppercase text-green-400">
+        <div aria-label="Player profile" className="card min-h-0 border-green-600/70 bg-gradient-to-r from-green-600/15 via-green-600/5 to-surface p-3">
+          <div className="mb-1.5 flex items-center gap-2 text-[10px] font-semibold uppercase text-green-400">
             <span className="h-1.5 w-1.5 rounded-full bg-green-500" /> You
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-green-500 bg-green-600/10 text-2xl font-bold text-green-400">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-green-500 bg-green-600/10 text-xl font-bold text-green-400">
               {getInitials(gameState.player.fullName)}
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-xl font-bold text-white">{gameState.player.fullName}</h2>
+              <h2 className="truncate text-lg font-bold text-white">{gameState.player.fullName}</h2>
               <p className="truncate text-[11px] text-gray-400">{gameState.player.careerStage} - {gameState.player.playingStyle}</p>
               <p className="mt-1.5 text-[11px] text-gray-400">
                 {gameState.player.rankingLabel} <span className="font-bold text-white">#{getRankValue(playerRank)}</span>
@@ -213,23 +217,23 @@ export function MatchPreviewPage() {
               </p>
             </div>
           </div>
-          <div className="mt-2.5 grid grid-cols-3 border-t border-border/60 pt-2 text-center">
+          <div className="mt-2 grid grid-cols-3 border-t border-border/60 pt-1.5 text-center">
             <div><p className="text-[10px] text-gray-400">Confidence</p><p className={`text-[15px] font-bold ${metricTone(gameState.player.confidence)}`}>{gameState.player.confidence}%</p></div>
             <div className="border-x border-border"><p className="text-[10px] text-gray-400">Fatigue</p><p className={`text-[15px] font-bold ${metricTone(gameState.player.fatigue, true)}`}>{gameState.player.fatigue}%</p></div>
             <div><p className="text-[10px] text-gray-400">Pressure</p><p className={`text-[15px] font-bold ${metricTone(pressureLevel, true)}`}>{pressureLevel}%</p></div>
           </div>
         </div>
 
-        <div className="card min-h-0 border-red-600/70 bg-gradient-to-l from-red-600/15 via-red-600/5 to-surface p-3.5">
-          <div className="mb-2.5 flex items-center gap-2 text-[10px] font-semibold uppercase text-red-400">
+        <div aria-label="Opponent profile" className="card min-h-0 border-red-600/70 bg-gradient-to-l from-red-600/15 via-red-600/5 to-surface p-3">
+          <div className="mb-1.5 flex items-center gap-2 text-[10px] font-semibold uppercase text-red-400">
             <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> Opponent
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-red-500 bg-red-600/10 text-2xl font-bold text-red-400">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-red-500 bg-red-600/10 text-xl font-bold text-red-400">
               {getInitials(opponentName)}
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-xl font-bold text-white">{opponentName}</h2>
+              <h2 className="truncate text-lg font-bold text-white">{opponentName}</h2>
               <p className="truncate text-[11px] text-gray-400">Ranking band scout - {difficultyLabel}</p>
               <p className="mt-1.5 text-[11px] text-gray-400">
                 Rank <span className="font-bold text-white">#{getRankValue(opponentRank)}</span>
@@ -243,16 +247,16 @@ export function MatchPreviewPage() {
               </p>
             </div>
           </div>
-          <div className="mt-2.5 grid grid-cols-3 border-t border-border/60 pt-2 text-center">
-            <div><p className="text-[10px] text-gray-400">Event</p><p className="text-[15px] font-bold text-white">{eventMatchesPlayed}</p></div>
-            <div className="border-x border-border"><p className="text-[10px] text-gray-400">Record</p><p className="text-[15px] font-bold text-white">{eventWins}-{eventLosses}</p></div>
-            <div><p className="text-[10px] text-gray-400">Frames</p><p className={`text-[15px] font-bold ${eventFrameDifferential >= 0 ? 'text-green-400' : 'text-red-400'}`}>{eventFrameDifferential > 0 ? '+' : ''}{eventFrameDifferential}</p></div>
+          <div className="mt-2 grid grid-cols-3 border-t border-border/60 pt-1.5 text-center">
+            <div><p className="text-[10px] text-gray-400">Confidence</p><p className={`text-[15px] font-bold ${metricTone(opponentConfidence)}`}>{opponentConfidence}%</p></div>
+            <div className="border-x border-border"><p className="text-[10px] text-gray-400">Fatigue</p><p className={`text-[15px] font-bold ${metricTone(opponentFatigue, true)}`}>{opponentFatigue}%</p></div>
+            <div><p className="text-[10px] text-gray-400">Pressure</p><p className={`text-[15px] font-bold ${metricTone(opponentPressure, true)}`}>{opponentPressure}%</p></div>
           </div>
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-12 gap-2">
-        <div className="col-span-4 grid min-h-0 grid-rows-[0.26fr_0.74fr] gap-2">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
+        <div className="grid min-h-0 gap-3 xl:col-span-4 xl:grid-rows-[0.26fr_0.74fr] xl:gap-2">
           <div className="card min-h-0 flex h-full flex-col overflow-hidden">
             <div className="card-header px-3 py-2">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Users className="h-4 w-4 text-gray-400" />Head-to-Head</h3>
@@ -303,40 +307,45 @@ export function MatchPreviewPage() {
           </div>
         </div>
 
-        <div className="col-span-4 grid min-h-0 grid-rows-[0.46fr_0.54fr] gap-2">
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header px-3 py-2">
+        <div className="grid min-h-0 gap-3 xl:col-span-4 xl:grid-rows-[0.52fr_0.48fr] xl:gap-2">
+          <div data-testid="tactical-plan" className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card-header px-3 py-1.5">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Target className="h-4 w-4 text-gray-400" />Tactical Plan</h3>
               <span className="rounded bg-green-600/20 px-2 py-0.5 text-[9px] font-semibold uppercase text-green-400">Pre-match</span>
             </div>
-            <div className="card-body flex h-full min-h-0 flex-col gap-2.5 px-3 py-3">
-              <div className="flex items-center border-b border-border pb-1.5">
-                <p className="w-24 shrink-0 text-[9px] font-semibold uppercase text-gray-500">Frame Plan</p>
-                <div className="grid min-w-0 flex-1 grid-cols-3">
+            <div className="card-body flex h-full min-h-0 flex-col gap-1.5 px-2.5 py-1.5">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="min-w-0">
+                  <p className="mb-1 text-[9px] font-semibold uppercase text-gray-500">Frame Plan</p>
+                  <div className="grid min-w-0 grid-cols-3">
                   {FRAME_PLANS.map((option) => (
                     <button key={option} type="button" onClick={() => setPlan(option)} className={plan === option ? 'tab-active px-2 py-0.5 text-[10px]' : 'tab-inactive px-2 py-0.5 text-[10px]'}>{option}</button>
                   ))}
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center border-b border-border pb-1.5">
-                <p className="w-24 shrink-0 text-[9px] font-semibold uppercase text-gray-500">Mental Focus</p>
-                <div className="grid min-w-0 flex-1 grid-cols-3">
+                <div className="min-w-0">
+                  <p className="mb-1 text-[9px] font-semibold uppercase text-gray-500">Mental Focus</p>
+                  <div className="grid min-w-0 grid-cols-3">
                   {MENTAL_FOCUS_OPTIONS.map((option) => (
                     <button key={option} type="button" onClick={() => setFocus(option)} className={focus === option ? 'tab-active px-2 py-0.5 text-[10px]' : 'tab-inactive px-2 py-0.5 text-[10px]'}>{option}</button>
                   ))}
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center">
-                <p className="w-24 shrink-0 text-[9px] font-semibold uppercase text-gray-500">Tempo</p>
-                <div className="grid min-w-0 flex-1 grid-cols-2">
+                <div className="min-w-0">
+                  <p className="mb-1 text-[9px] font-semibold uppercase text-gray-500">Tempo</p>
+                  <div className="grid min-w-0 grid-cols-2">
                   {TEMPO_OPTIONS.map((option) => (
                     <button key={option} type="button" onClick={() => setTempo(option)} className={tempo === option ? 'tab-active px-2 py-0.5 text-[10px]' : 'tab-inactive px-2 py-0.5 text-[10px]'}>{option}</button>
                   ))}
+                  </div>
                 </div>
               </div>
-              <div className="rounded-lg border border-green-600/40 bg-green-600/10 p-2.5">
-                <p className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase text-green-400"><Info className="h-3.5 w-3.5" />Coach briefing</p>
-                <p className="text-[11px] leading-relaxed text-gray-300">{tacticalPlan[0]?.description} {tacticalPlan[0]?.impact}</p>
+              <div className="min-h-0 rounded-lg border border-green-600/40 bg-green-600/10 px-2.5 py-1.5">
+                <p className="flex min-w-0 items-center gap-1.5 text-[10px] text-gray-300" title={`${tacticalPlan[0]?.description} ${tacticalPlan[0]?.impact}`}>
+                  <Info className="h-3.5 w-3.5 shrink-0 text-green-400" />
+                  <span className="shrink-0 font-semibold uppercase text-green-400">Coach:</span>
+                  <span className="truncate">{tacticalPlan[0]?.description} {tacticalPlan[0]?.impact}</span>
+                </p>
               </div>
             </div>
           </div>
@@ -362,7 +371,7 @@ export function MatchPreviewPage() {
           </div>
         </div>
 
-        <div className="col-span-4 grid min-h-0 grid-rows-[0.74fr_0.26fr] gap-2">
+        <div className="grid min-h-0 gap-3 xl:col-span-4 xl:grid-rows-[0.74fr_0.26fr] xl:gap-2">
           <div className="card min-h-0 flex h-full flex-col overflow-hidden">
             <div className="card-header px-3 py-2">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Gauge className="h-4 w-4 text-gray-400" />Match Profile Comparison</h3>
@@ -427,7 +436,7 @@ export function MatchPreviewPage() {
       <div className="card card-body flex items-center justify-between gap-4 px-3 py-2.5">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase text-gray-500">Recent opponent pattern</p>
-          <p className="truncate text-xs text-gray-300">{opponentPatternText}</p>
+          <p className="truncate text-xs text-gray-300">Event {eventWins}-{eventLosses} · Frames {eventFrameDifferential > 0 ? '+' : ''}{eventFrameDifferential} · {opponentPatternText}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button type="button" onClick={() => navigate('/training')} className="btn-secondary px-3 py-2 text-xs">Adjust Training</button>

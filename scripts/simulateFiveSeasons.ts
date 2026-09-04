@@ -28,6 +28,7 @@ import {
   createStarterState,
   enterTournamentState,
   fireCoachState,
+  getEquipmentPerformanceProfile,
   getTournamentEntryAccess,
   getTournamentEntryCashRequirement,
   getTournamentEntryRound,
@@ -45,6 +46,7 @@ import {
   createPlayerIdentitySeed,
   createPlayerSliderCatalog,
   createPlayerStartingLevelCatalog,
+  cueCatalog,
   cueMarketplaceCatalog,
   tableSetupCatalog,
   tipCatalog,
@@ -1361,20 +1363,7 @@ function countOpponentRankBands(matches: TournamentMatchMetrics[]) {
 }
 
 function getCurrentCueBonus(state: GameState) {
-  if (!state.equipment.currentCueId) return 0
-
-  const cue = cueMarketplaceCatalog.find((item) => item.id === state.equipment.currentCueId)
-  if (!cue) return 0
-
-  const cueState = state.equipment.cueStates[cue.id]
-  const intrinsicBonus = Object.values(cue.bonuses).reduce((sum, value) => sum + Number(value || 0), 0)
-  const condition = typeof cueState?.condition === 'number'
-    ? cueState.condition
-    : typeof cue.condition === 'number'
-      ? cue.condition
-      : 75
-  const conditionModifier = Math.round((condition - 75) / 5)
-  return Math.round(intrinsicBonus) + conditionModifier
+  return getEquipmentPerformanceProfile(state.equipment).totalBonus
 }
 
 function getEquipmentPreparationBonus(state: GameState) {
@@ -4044,7 +4033,7 @@ function snapshotSupportSetup(state: GameState): SupportSetupSnapshot {
   const coachNames = state.coachContracts
     .map((contract) => state.coaches.find((coach) => coach.id === contract.coachId)?.name ?? coachCatalog.find((coach) => coach.id === contract.coachId)?.name ?? contract.coachId)
   const cueName = state.equipment.currentCueId
-    ? cueMarketplaceCatalog.find((cue) => cue.id === state.equipment.currentCueId)?.name ?? state.equipment.currentCueId
+    ? cueCatalog.find((cue) => cue.id === state.equipment.currentCueId)?.name ?? state.equipment.currentCueId
     : null
   const chalkName = state.equipment.currentChalkId
     ? chalkCatalog.find((chalk) => chalk.id === state.equipment.currentChalkId)?.name ?? state.equipment.currentChalkId
@@ -7223,8 +7212,18 @@ function buyManagedEquipment(state: GameState, profile: ManagedSupportProfile) {
   let nextState = state
 
   const affordableCues = cueMarketplaceCatalog.filter((cue) => cue.price <= nextState.player.cash || nextState.equipment.cuesOwned.includes(cue.id))
-  const affordableChalk = chalkCatalog.filter((chalk) => chalk.cost <= nextState.player.cash || nextState.equipment.chalkOwned.includes(chalk.id))
-  const affordableTips = tipCatalog.filter((tip) => tip.cost <= nextState.player.cash || nextState.equipment.tipsOwned.includes(tip.id))
+  const affordableChalk = chalkCatalog.filter((chalk) => (
+    chalk.cost <= nextState.player.cash
+    || (nextState.equipment.chalkStock[chalk.id] ?? 0) > 0
+    || (nextState.equipment.currentChalkId === chalk.id && nextState.equipment.chalkCondition > 0)
+  ))
+  const fittedTipCondition = nextState.equipment.currentCueId
+    ? nextState.equipment.cueStates[nextState.equipment.currentCueId]?.tipCondition ?? 0
+    : 0
+  const affordableTips = tipCatalog.filter((tip) => (
+    tip.cost <= nextState.player.cash
+    || (nextState.equipment.currentTipId === tip.id && fittedTipCondition >= 35)
+  ))
 
   const targetCue = chooseProfileItem(affordableCues, profile, getCueScore)
   const targetChalk = chooseProfileItem(affordableChalk, profile, getChalkScore)
@@ -7233,10 +7232,20 @@ function buyManagedEquipment(state: GameState, profile: ManagedSupportProfile) {
   if (targetCue && nextState.equipment.currentCueId !== targetCue.id) {
     nextState = buyCueState(nextState, targetCue.id)
   }
-  if (targetChalk && nextState.equipment.currentChalkId !== targetChalk.id) {
+  if (
+    targetChalk
+    && (
+      nextState.equipment.currentChalkId !== targetChalk.id
+      || nextState.equipment.chalkCondition <= 0
+      || (nextState.equipment.chalkStock[targetChalk.id] ?? 0) <= 0
+    )
+  ) {
     nextState = buyChalkState(nextState, targetChalk.id)
   }
-  if (targetTip && nextState.equipment.currentTipId !== targetTip.id) {
+  const currentTipCondition = nextState.equipment.currentCueId
+    ? nextState.equipment.cueStates[nextState.equipment.currentCueId]?.tipCondition ?? 0
+    : 0
+  if (targetTip && (nextState.equipment.currentTipId !== targetTip.id || currentTipCondition < 35)) {
     nextState = buyTipState(nextState, targetTip.id)
   }
 
@@ -8017,6 +8026,12 @@ function main() {
         const bookedState = bookTravelState(eventResolvedState, activeEnteredTournament.id)
         recordCashDelta(currentSeasonFinance, 'travelHotelCosts', eventResolvedState, bookedState)
         eventResolvedState = bookedState
+      }
+
+      if (managedScenario) {
+        const servicedState = buyManagedEquipment(eventResolvedState, managedSupportProfile)
+        recordCashDelta(currentSeasonFinance, 'equipmentMaintenance', eventResolvedState, servicedState)
+        eventResolvedState = servicedState
       }
 
       const preMatchState = eventResolvedState

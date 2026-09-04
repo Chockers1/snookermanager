@@ -180,7 +180,7 @@ export function NewCareerPage() {
   }
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
+    <div className="flex min-h-screen min-w-0 flex-col gap-3 bg-background p-3 sm:p-4 xl:h-screen xl:gap-2 xl:overflow-hidden xl:p-1.5">
       <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -206,8 +206,8 @@ export function NewCareerPage() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-12 gap-2">
-        <div className="col-span-5 min-h-0">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
+        <div className="min-h-0 xl:col-span-5">
           {currentStep === 0 ? (
             <div className="card min-h-0 flex h-full flex-col overflow-hidden">
               <div className="card-header px-3 py-2"><h2 className="text-sm font-semibold uppercase tracking-wider text-white">1. Identity</h2><span className="text-[10px] text-gray-500">Starting setup</span></div>
@@ -275,17 +275,17 @@ export function NewCareerPage() {
           ) : null}
         </div>
 
-        <div className="col-span-7 min-h-0">
+        <div className="min-h-0 xl:col-span-7">
           <div className="card min-h-0 flex h-full flex-col overflow-hidden">
             <div className="card-header px-3 py-2"><h3 className="text-sm font-semibold uppercase text-gray-500">Player Preview</h3><span className="text-[10px] text-gray-500">Live projection</span></div>
             <div className="card-body flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-3 py-3">
               <div className="rounded-xl border border-border bg-surface-light/35 px-4 py-3">
-                <div className="grid grid-cols-[112px_1fr_auto] gap-4">
+                <div className="grid gap-3 sm:grid-cols-[112px_1fr_auto] sm:gap-4">
                   <div className="flex h-28 w-24 items-center justify-center rounded-xl bg-surface-light"><UserRound className="h-10 w-10 text-gray-600" /></div>
                   <div className="min-w-0">
                     <h2 className="truncate text-xl font-bold text-white">{form.fullName}</h2>
                     <p className="mt-0.5 text-sm text-gray-400">{form.nationality}</p>
-                    <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
+                    <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3 sm:gap-3">
                       <div><span className="text-gray-500">Age</span><p className="text-white">{normalizedAge}</p></div>
                       <div><span className="text-gray-500">Handedness</span><p className="text-white">{form.handedness}</p></div>
                       <div><span className="text-gray-500">Cue Style</span><p className="text-white">{form.cueStyle}</p></div>
@@ -301,11 +301,11 @@ export function NewCareerPage() {
                 </div>
               </div>
 
-              <div className="grid min-h-0 flex-1 grid-cols-[0.95fr_1.05fr] gap-3 overflow-hidden">
+              <div className="grid min-h-0 flex-1 gap-3 sm:grid-cols-[0.95fr_1.05fr] sm:overflow-hidden">
                 <div className="grid min-h-0 grid-rows-[0.56fr_0.44fr] gap-3">
                   <div className="rounded-xl border border-border bg-surface-light/35 px-3 py-3">
                     <h4 className="mb-2 text-xs font-semibold uppercase text-gray-500">Background Summary - {activeBackground.name}</h4>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
                       <div>
                         <p className="mb-1 text-[10px] text-gray-500">Starting Bonuses</p>
                         <div className="space-y-1">{activeBackground.bonuses.map((bonus) => <p key={bonus.label} className="text-xs text-green-400">+{bonus.label} {bonus.value}</p>)}</div>

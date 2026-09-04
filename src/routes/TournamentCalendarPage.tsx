@@ -45,6 +45,7 @@ function eventOverlapsMonth(event: { startMonth: number; startYear: number; endM
 
 function statusClass(status: string) {
   if (status === 'Entered') return 'bg-green-600/20 text-green-400 border-green-600/30'
+  if (status === 'Completed') return 'bg-sky-600/20 text-sky-300 border-sky-600/30'
   if (status === 'High Cost') return 'bg-amber-600/20 text-amber-400 border-amber-600/30'
   if (status === 'Skipped') return 'bg-red-600/20 text-red-400 border-red-600/30'
   return 'bg-surface-light text-gray-400 border-border'
@@ -117,7 +118,7 @@ export function TournamentCalendarPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="col-span-12 space-y-4 xl:col-span-7">
           <div className="card">
             <div className="card-header">
@@ -202,7 +203,7 @@ export function TournamentCalendarPage() {
                     <p className="flex items-center gap-2"><span className={selectedAccess?.allowed ? 'h-2 w-2 rounded-full bg-green-500' : 'h-2 w-2 rounded-full bg-red-500'} /> {selectedAccess?.reason ?? selectedTournament.unlockRequirement ?? selectedCalendarEvent.unlockRequirement}</p>
                     <p className="flex items-center gap-2"><span className={equipmentReady ? 'h-2 w-2 rounded-full bg-green-500' : 'h-2 w-2 rounded-full bg-red-500'} /> Equipment slots ready</p>
                     <p className="flex items-center gap-2"><span className={gameState.player.cash >= selectedCashRequirement ? 'h-2 w-2 rounded-full bg-green-500' : 'h-2 w-2 rounded-full bg-red-500'} /> Entry cash available ({formatMoney(selectedCashRequirement)})</p>
-                    {entryBlocker && selectedStatus !== 'Entered' ? <p className="text-red-400" role="alert">{entryBlocker}</p> : null}
+                    {entryBlocker && selectedStatus !== 'Entered' && selectedStatus !== 'Completed' ? <p className="text-red-400" role="alert">{entryBlocker}</p> : null}
                   </div>
                 </div>
               </div>
@@ -220,10 +221,12 @@ export function TournamentCalendarPage() {
               <div className="grid grid-cols-2 gap-2">
                 {selectedStatus === 'Entered' ? (
                   <button type="button" className="btn-secondary justify-center text-xs text-red-300" onClick={() => withdrawTournament(selectedTournament.id)}>Withdraw</button>
+                ) : selectedStatus === 'Completed' ? (
+                  <button type="button" className="btn-primary justify-center text-xs" onClick={() => navigate(`/tournaments/draw?tournament=${encodeURIComponent(selectedTournament.id)}`)}>View Completed Draw <ChevronRight className="h-3 w-3" /></button>
                 ) : (
                   <button type="button" disabled={Boolean(entryBlocker)} className="btn-primary justify-center text-xs disabled:cursor-not-allowed disabled:opacity-50" onClick={() => equipmentReady ? enterTournament(selectedTournament.id) : navigate('/equipment/cues')}>{equipmentReady ? 'Enter Tournament' : 'Open Equipment'} <ChevronRight className="h-3 w-3" /></button>
                 )}
-                <button type="button" className="btn-secondary justify-center text-xs" onClick={() => navigate('/travel')}>Travel Plan</button>
+                <button type="button" disabled={selectedStatus === 'Completed'} className="btn-secondary justify-center text-xs disabled:cursor-not-allowed disabled:opacity-40" onClick={() => navigate('/travel')}>Travel Plan</button>
                 <button type="button" className="btn-secondary justify-center text-xs" onClick={() => navigate('/finance')}>View Budget</button>
                 <button type="button" className="btn-secondary justify-center text-xs" onClick={() => navigate('/tournaments/hub')}>Tournament Hub</button>
               </div>

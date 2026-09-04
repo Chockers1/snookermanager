@@ -12,7 +12,7 @@ export function PageHeader({ eyebrow, title, description, actions }: PageHeaderP
     <header className="flex flex-col gap-4 border-b border-scm-border pb-5 xl:flex-row xl:items-end xl:justify-between">
       <div>
         {eyebrow && <p className="text-xs uppercase tracking-[0.26em] text-scm-gold">{eyebrow}</p>}
-        <h1 className="mt-2 text-3xl font-semibold text-scm-text">{title}</h1>
+        <h1 className="mt-2 text-2xl font-semibold text-scm-text sm:text-3xl">{title}</h1>
         <p className="mt-2 max-w-3xl text-sm text-scm-textMuted">{description}</p>
       </div>
       {actions}

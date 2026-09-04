@@ -29,11 +29,12 @@ const iconMap: Record<string, typeof LayoutDashboard> = {
 
 export function Sidebar() {
   const { gameState } = useGame()
+  const unreadInboxCount = gameState.inbox.filter((message) => !message.read).length
   const nextEvent = getNextEligibleTournament(gameState)
     ?? gameState.tournaments[0]
 
   return (
-    <aside className="scrollbar-thin flex h-full w-52 shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar">
+    <aside className="scrollbar-thin flex h-full w-[min(18rem,88vw)] shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar xl:w-52">
       <div className="border-b border-border p-4">
         <h1 className="text-lg font-bold leading-tight tracking-tight text-white">SNOOKER</h1>
         <p className="text-[10px] font-semibold uppercase tracking-widest text-green-400">Career Manager</p>
@@ -45,7 +46,7 @@ export function Sidebar() {
             <ul className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = iconMap[item.label] ?? LayoutDashboard
-                const badge = item.path === '/inbox' ? gameState.inbox.length : null
+                const badge = item.path === '/inbox' ? unreadInboxCount : null
                 return (
                   <li key={item.path}>
                     <NavLink
@@ -53,7 +54,7 @@ export function Sidebar() {
                       end={item.path === '/'}
                       className={({ isActive }) =>
                         clsx(
-                          'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                          'flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors xl:min-h-0',
                           isActive
                             ? 'bg-green-600/20 font-medium text-green-400'
                             : 'text-gray-400 hover:bg-white/5 hover:text-white',

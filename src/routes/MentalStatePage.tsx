@@ -1,165 +1,374 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Brain, BrainCircuit, Check, ChevronRight, Flame, ShieldAlert, Target } from 'lucide-react'
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/useGame'
-import { buildMentalStateData } from '../utils/liveRouteData'
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  AlertTriangle,
+  Brain,
+  Check,
+  ChevronRight,
+  Flame,
+  Target,
+} from "lucide-react";
+import {
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { ProgressBar } from "../components/ui/ProgressBar";
+import { useGame } from "../context/useGame";
+import { buildMentalStateData } from "../utils/liveRouteData";
 
-function toneClass(tone: 'green' | 'amber' | 'red') {
-  if (tone === 'red') return 'text-red-400'
-  if (tone === 'amber') return 'text-amber-400'
-  return 'text-green-400'
+function toneClass(tone: "green" | "amber" | "red") {
+  if (tone === "red") return "text-red-400";
+  if (tone === "amber") return "text-amber-400";
+  return "text-green-400";
 }
 
-function progressTone(value: number): 'green' | 'amber' | 'red' {
-  if (value >= 70) return 'green'
-  if (value >= 50) return 'amber'
-  return 'red'
+function progressTone(value: number): "green" | "amber" | "red" {
+  if (value >= 70) return "green";
+  if (value >= 45) return "amber";
+  return "red";
 }
 
 export function MentalStatePage() {
-  const { gameState, applyRecoveryPlan, continueWeek } = useGame()
-  const navigate = useNavigate()
-  const mentalData = buildMentalStateData(gameState)
-  const [selectedPlanTitle, setSelectedPlanTitle] = useState(mentalData.actionPlan[0]?.title ?? '')
+  const { gameState, applyRecoveryPlan, continueWeek } = useGame();
+  const navigate = useNavigate();
+  const mentalData = buildMentalStateData(gameState);
+  const [selectedPlanTitle, setSelectedPlanTitle] = useState(
+    mentalData.actionPlan[0]?.title ?? "",
+  );
+  const selectedPlan =
+    mentalData.actionPlan.find((item) => item.title === selectedPlanTitle) ??
+    mentalData.actionPlan[0];
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
-      <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Support</p>
-            <h1 className="mt-1 text-2xl font-bold leading-tight text-white">Mental State & Slump Recovery</h1>
-            <p className="mt-1 truncate text-xs text-gray-400">Monitor psychological condition, diagnose blockers, and apply recovery strategies.</p>
-          </div>
-          <button type="button" className="btn-primary shrink-0 px-3 py-2 text-xs" onClick={() => applyRecoveryPlan(selectedPlanTitle)}>Apply Recovery Plan <ChevronRight className="h-3 w-3" /></button>
+    <div
+      className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 pb-4 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:max-w-none xl:gap-2 xl:overflow-hidden xl:p-1.5 xl:pb-1.5"
+      data-testid="mental-viewport"
+    >
+      <header className="card flex shrink-0 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between xl:py-2">
+        <div className="min-w-0">
+          <p className="metric-label text-green-400">Mental performance</p>
+          <h1 className="mt-1 text-xl font-bold text-white sm:text-2xl">
+            Mental State
+          </h1>
+          <p className="mt-1 text-xs text-gray-400 xl:hidden">
+            See what is affecting performance and choose one clear recovery
+            plan.
+          </p>
         </div>
-      </div>
+        <button
+          type="button"
+          className="btn-primary min-h-10 shrink-0 justify-center text-xs"
+          onClick={() => applyRecoveryPlan(selectedPlanTitle)}
+        >
+          Apply selected plan <ChevronRight className="h-4 w-4" />
+        </button>
+      </header>
 
-      <div className="grid grid-cols-6 gap-2">
+      <section
+        aria-label="Mental state summary"
+        className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6"
+      >
         {mentalData.metrics.slice(0, 6).map((metric) => (
-          <div key={metric.label} className="card min-h-0 px-3 py-2.5 text-center">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{metric.label}</p>
-            <p className="mt-1 text-2xl font-bold text-white">{metric.value}%</p>
-            <p className={`text-[10px] font-medium ${toneClass(metric.tone)}`}>{metric.detail}</p>
-            <div className="mt-2"><ProgressBar value={metric.value} tone={metric.tone} compact /></div>
-          </div>
+          <article
+            key={metric.label}
+            className="card min-w-0 px-3 py-3 xl:py-2"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="metric-label truncate">{metric.label}</p>
+              <span
+                className={`text-[10px] font-medium ${toneClass(metric.tone)}`}
+              >
+                {metric.detail}
+              </span>
+            </div>
+            <p className="my-2 text-2xl font-bold leading-none text-white xl:my-1 xl:text-xl">
+              {metric.value}%
+            </p>
+            <ProgressBar value={metric.value} tone={metric.tone} compact />
+          </article>
         ))}
-      </div>
+      </section>
 
-      <div className="grid min-h-0 flex-1 grid-cols-12 gap-2">
-        <div className="col-span-8 grid min-h-0 grid-rows-[0.38fr_0.3fr_0.32fr] gap-2">
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header px-3 py-2"><h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Brain className="h-4 w-4 text-amber-400" /> Diagnosis</h3><span className="text-[10px] text-red-400">Severity {mentalData.diagnosis.severity}%</span></div>
-            <div className="card-body flex h-full min-h-0 flex-col gap-2 px-3 py-3">
-              <h2 className="text-xl font-bold text-white">{mentalData.diagnosis.title}</h2>
-              <p className="text-[11px] leading-relaxed text-gray-400">{mentalData.diagnosis.description}</p>
-              <div className="grid min-h-0 flex-1 grid-cols-3 gap-3">
-                <div className="min-h-0 overflow-auto scrollbar-thin">
-                  <p className="mb-1 text-[10px] font-semibold uppercase text-red-400">Contributing Factors</p>
-                  <ul className="space-y-1 text-xs text-gray-400">{mentalData.diagnosis.factors.map((factor) => <li key={factor}>{factor}</li>)}</ul>
+      <div className="grid min-h-0 min-w-0 gap-3 xl:flex-1 xl:grid-cols-12 xl:gap-2">
+        <div className="min-h-0 min-w-0 space-y-3 xl:col-span-8 xl:grid xl:grid-rows-[auto_auto_minmax(0,1fr)] xl:gap-2 xl:space-y-0">
+          <section className="card overflow-hidden">
+            <div className="card-header py-2.5">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Brain className="h-4 w-4 text-amber-400" /> Current diagnosis
+              </h2>
+              <span className="text-xs text-amber-400">
+                Severity {mentalData.diagnosis.severity}%
+              </span>
+            </div>
+            <div className="grid gap-3 p-3 lg:grid-cols-[1.35fr_0.65fr]">
+              <div className="min-w-0">
+                <h3 className="text-lg font-bold text-white">
+                  {mentalData.diagnosis.title}
+                </h3>
+                <p className="mt-1 text-xs leading-4 text-gray-400">
+                  {mentalData.diagnosis.description}
+                </p>
+                <ul className="mt-2 grid gap-1 text-[11px] text-gray-300 sm:grid-cols-2">
+                  {mentalData.diagnosis.factors.map((factor) => (
+                    <li key={factor} className="flex items-start gap-2">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                      {factor}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
+                <div className="rounded-lg border border-border bg-surface-light/40 p-3">
+                  <p className="metric-label">Recovery outlook</p>
+                  <p className="mt-2 text-lg font-bold text-white">
+                    {mentalData.diagnosis.recoveryOutlook}
+                  </p>
                 </div>
-                <div className="rounded-lg border border-border bg-surface-light/40 px-3 py-3 text-center">
-                  <p className="mb-1 text-[10px] font-semibold uppercase text-gray-500">Severity</p>
-                  <p className="text-2xl font-bold text-amber-400">{mentalData.diagnosis.severity}%</p>
-                  <p className="text-xs text-amber-400">Significant impact on performance</p>
-                </div>
-                <div>
-                  <p className="mb-1 text-[10px] font-semibold uppercase text-green-400">Recovery Outlook</p>
-                  <p className="text-lg font-bold text-white">{mentalData.diagnosis.recoveryOutlook}</p>
-                  <p className="text-xs text-gray-400">{mentalData.diagnosis.recoveryChance}% chance with plan adherence.</p>
+                <div className="rounded-lg border border-border bg-surface-light/40 p-3">
+                  <p className="metric-label">Recovery chance</p>
+                  <p className="mt-2 text-lg font-bold text-green-400">
+                    {mentalData.diagnosis.recoveryChance}%
+                  </p>
                 </div>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header px-3 py-2"><h3 className="text-sm font-semibold text-white">Recommended Action Plan</h3></div>
-            <div className="card-body grid h-full min-h-0 grid-cols-3 gap-2 overflow-hidden px-3 py-3">
-              {mentalData.actionPlan.map((item) => (
-                <button
-                  key={item.title}
-                  type="button"
-                  onClick={() => setSelectedPlanTitle(item.title)}
-                  className={`min-h-0 rounded-lg border px-3 py-2.5 text-left transition-colors ${selectedPlanTitle === item.title ? 'border-green-600/30 bg-green-600/10' : 'border-transparent bg-surface-light/50 hover:border-border-light'}`}
-                >
-                  <p className="text-xs font-medium text-white">{item.title}</p>
-                  <p className={item.effectTone === 'red' ? 'mt-1 text-[10px] text-red-400' : 'mt-1 text-[10px] text-green-400'}>{item.effect}</p>
-                  <div className="mt-1.5 flex gap-2 text-[10px] text-gray-500"><span>Cost: {item.cost}</span><span>Time: {item.time}</span></div>
-                  <p className="mt-1.5 line-clamp-3 text-[10px] text-gray-400">{item.description}</p>
-                </button>
+          <section className="card overflow-hidden">
+            <div className="card-header py-2.5">
+              <div>
+                <h2 className="text-sm font-semibold text-white">
+                  Recovery plans
+                </h2>
+                <p className="mt-0.5 text-[10px] text-gray-500">
+                  Select a plan to preview its time and effect.
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-2 p-3 sm:grid-cols-2">
+              {mentalData.actionPlan.map((item) => {
+                const selected = selectedPlanTitle === item.title;
+                return (
+                  <button
+                    key={item.title}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setSelectedPlanTitle(item.title)}
+                    className={`min-h-28 rounded-lg border p-3 text-left transition xl:min-h-0 xl:p-2 ${selected ? "border-green-500/50 bg-green-600/10" : "border-border bg-surface-light/35 hover:border-border-light"}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-semibold text-white">
+                        {item.title}
+                      </p>
+                      {selected ? (
+                        <Check className="h-4 w-4 shrink-0 text-green-400" />
+                      ) : null}
+                    </div>
+                    <p
+                      className={`mt-1 text-xs font-medium ${item.effectTone === "red" ? "text-red-400" : "text-green-400"}`}
+                    >
+                      {item.effect}
+                    </p>
+                    <p className="mt-2 text-xs leading-4 text-gray-400 xl:line-clamp-1 xl:mt-1">
+                      {item.description}
+                    </p>
+                    <p className="mt-2 text-[10px] text-gray-500 xl:mt-1">
+                      {item.time} · Cost {item.cost}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="card flex min-h-0 flex-col overflow-hidden">
+            <div className="card-header py-2.5">
+              <h2 className="text-sm font-semibold text-white">
+                Six-week mental trend
+              </h2>
+              <div className="hidden gap-3 text-[10px] text-gray-400 sm:flex">
+                <span className="text-green-400">Confidence</span>
+                <span className="text-red-400">Stress</span>
+                <span className="text-blue-400">Focus</span>
+              </div>
+            </div>
+            <div className="h-56 min-h-0 min-w-0 p-3 sm:h-64 xl:h-auto xl:flex-1">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                minWidth={0}
+                minHeight={0}
+                initialDimension={{ width: 600, height: 240 }}
+              >
+                <LineChart data={mentalData.trend}>
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 10, fill: "#6b7280" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: "#6b7280" }}
+                    axisLine={false}
+                    tickLine={false}
+                    domain={[0, 100]}
+                    width={28}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#141e2a",
+                      border: "1px solid #1e2d3d",
+                      borderRadius: 8,
+                      fontSize: 11,
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="confidence"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="stress"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="focus"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+        </div>
+
+        <aside className="min-h-0 min-w-0 space-y-3 xl:col-span-4 xl:grid xl:grid-cols-2 xl:grid-rows-[auto_auto_auto] xl:gap-2 xl:space-y-0">
+          <section className="card border-green-600/30 bg-green-600/5 p-4 xl:p-3">
+            <p className="metric-label text-green-400">Selected plan</p>
+            <h2 className="mt-2 text-lg font-bold text-white">
+              {selectedPlan?.title}
+            </h2>
+            <p className="mt-2 text-xs leading-5 text-gray-400 xl:line-clamp-2 xl:leading-4">
+              {selectedPlan?.description}
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="rounded bg-surface/70 p-2.5">
+                <p className="metric-label">Expected effect</p>
+                <p className="mt-1 text-xs font-semibold text-green-400">
+                  {selectedPlan?.effect}
+                </p>
+              </div>
+              <div className="rounded bg-surface/70 p-2.5">
+                <p className="metric-label">Time</p>
+                <p className="mt-1 text-xs font-semibold text-white">
+                  {selectedPlan?.time}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="card p-4 xl:p-3">
+            <p className="metric-label">Recommended next focus</p>
+            <h2 className="mt-2 text-lg font-bold text-green-400">
+              {mentalData.nextFocus.title}
+            </h2>
+            <ul className="mt-3 space-y-2 text-xs text-gray-300 xl:mt-2 xl:space-y-1">
+              {mentalData.nextFocus.bullets.map((item) => (
+                <li key={item} className="flex items-start gap-2">
+                  <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-400" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="card p-4 xl:p-3">
+            <p className="metric-label">Recovery progress</p>
+            <div className="mt-3 space-y-3 xl:mt-2 xl:space-y-2">
+              {mentalData.recoveryProgress.map((item) => (
+                <div key={item.label}>
+                  <div className="mb-1 flex justify-between gap-3 text-xs">
+                    <span className="truncate text-gray-400">{item.label}</span>
+                    <span className="text-white">{item.value}%</span>
+                  </div>
+                  <ProgressBar
+                    value={item.value}
+                    tone={progressTone(item.value)}
+                    compact
+                  />
+                </div>
               ))}
             </div>
-          </div>
+          </section>
 
-          <div className="grid min-h-0 grid-cols-[1.2fr_0.8fr] gap-2">
-            <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-              <div className="card-header px-3 py-2"><h3 className="text-sm font-semibold text-white">Mental Trend (Last 6 Weeks)</h3></div>
-              <div className="card-body h-full min-h-0 px-2 py-2">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
-                  <LineChart data={mentalData.trend}>
-                    <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} domain={[0, 100]} width={26} />
-                    <Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 11 }} />
-                    <Line type="monotone" dataKey="confidence" stroke="#22c55e" strokeWidth={1.5} dot={false} />
-                    <Line type="monotone" dataKey="stress" stroke="#ef4444" strokeWidth={1.5} dot={false} />
-                    <Line type="monotone" dataKey="focus" stroke="#3b82f6" strokeWidth={1.5} dot={false} />
-                    <Line type="monotone" dataKey="motivation" stroke="#f59e0b" strokeWidth={1.5} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+          <section className="card p-4 xl:p-3">
+            <p className="metric-label">Recent triggers</p>
+            <div className="mt-3 space-y-2 xl:mt-2 xl:space-y-1">
+              {mentalData.triggers.map((trigger) => (
+                <div
+                  key={trigger.label}
+                  className="flex items-start justify-between gap-3 rounded bg-surface-light/40 p-2.5 text-xs xl:p-1.5 xl:text-[10px]"
+                >
+                  <span className="text-gray-300">{trigger.label}</span>
+                  <span className="shrink-0 text-gray-500">
+                    {trigger.timing}
+                  </span>
+                </div>
+              ))}
             </div>
-            <div className="card min-h-0 flex h-full flex-col overflow-hidden px-3 py-3">
-              <h3 className="mb-2 text-xs font-semibold text-white">Recovery Plan Progress</h3>
-              <div className="min-h-0 flex-1 space-y-2 overflow-auto scrollbar-thin">
-                {mentalData.recoveryProgress.map((item) => (
-                  <div key={item.label}>
-                    <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{item.label}</span><span className="text-white">{item.value}%</span></div>
-                    <ProgressBar value={item.value} tone={progressTone(item.value)} compact />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+          </section>
 
-        <div className="col-span-4 grid min-h-0 grid-rows-[0.3fr_0.32fr_0.38fr] gap-2">
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden px-3 py-3">
-            <h3 className="mb-2 text-xs font-semibold text-white">Recent Triggers</h3>
-            <div className="min-h-0 flex-1 space-y-1.5 overflow-auto scrollbar-thin">
-              {mentalData.triggers.map((trigger) => <div key={trigger.label} className="flex items-center justify-between rounded bg-surface-light/50 px-2.5 py-2 text-xs"><span className="truncate text-gray-300">{trigger.label}</span><span className="shrink-0 text-gray-500">{trigger.timing}</span></div>)}
-            </div>
-          </div>
-
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden px-3 py-3">
-            <h3 className="mb-2 text-xs font-semibold text-white">Coach / Psychologist Notes</h3>
-            <p className="min-h-0 flex-1 overflow-auto text-xs italic leading-relaxed text-gray-400 scrollbar-thin">{mentalData.nextFocus.psychologistNote}</p>
-            <div className="mt-3 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-light text-xs font-bold text-green-400">JH</div>
-              <div><p className="text-xs text-white">Dr. James Holloway</p><p className="text-[10px] text-gray-400">Sports Psychologist</p></div>
-            </div>
-          </div>
-
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden px-3 py-3">
-            <h3 className="mb-2 text-xs font-semibold text-white">Recommended Next Focus</h3>
-            <p className="text-lg font-bold text-green-400">{mentalData.nextFocus.title}</p>
-            <ul className="mt-2 min-h-0 flex-1 space-y-1 overflow-auto text-xs text-gray-400 scrollbar-thin">
-              {mentalData.nextFocus.bullets.map((item) => <li key={item} className="flex items-start gap-1"><Check className="mt-0.5 h-3 w-3 shrink-0 text-green-400" /> <span>{item}</span></li>)}
-            </ul>
-          </div>
-        </div>
+          <section className="card p-4 xl:col-span-2 xl:p-3">
+            <p className="metric-label">Coach note</p>
+            <p className="mt-2 text-xs italic leading-5 text-gray-400 xl:line-clamp-2 xl:mt-1 xl:leading-4">
+              {mentalData.nextFocus.psychologistNote}
+            </p>
+          </section>
+        </aside>
       </div>
 
-      <div className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg border border-amber-600/30 bg-amber-600/10 px-3 py-2.5">
-        <div className="flex min-w-0 items-center gap-3"><AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" /><p className="truncate text-xs text-gray-300">Mental fatigue and overthinking are affecting performance. Confidence {gameState.player.confidence}%, fatigue {gameState.player.fatigue}%, morale {gameState.player.morale}%.</p></div>
-        <div className="flex shrink-0 gap-2">
-          <button type="button" className="btn-primary px-3 py-2 text-xs" onClick={() => applyRecoveryPlan(selectedPlanTitle)}><BrainCircuit className="h-3.5 w-3.5" /> Apply Recovery Plan</button>
-          <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => applyRecoveryPlan(mentalData.actionPlan[1]?.title ?? selectedPlanTitle)}><Target className="h-3.5 w-3.5" /> Secondary Focus</button>
-          <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => navigate('/training')}><Flame className="h-3.5 w-3.5" /> Adjust Schedule</button>
-          <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={continueWeek}><ShieldAlert className="h-3.5 w-3.5" /> Continue</button>
+      <footer className="card flex shrink-0 flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between xl:py-2">
+        <p className="flex min-w-0 items-start gap-2 text-xs text-gray-400">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+          Confidence {gameState.player.confidence}%, fatigue{" "}
+          {gameState.player.fatigue}%, morale {gameState.player.morale}%.
+          Recovery choices update the live save.
+        </p>
+        <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-3">
+          <button
+            type="button"
+            className="btn-secondary min-h-10 justify-center text-xs"
+            onClick={() => navigate("/training")}
+          >
+            <Flame className="h-4 w-4" /> Training
+          </button>
+          <button
+            type="button"
+            className="btn-secondary min-h-10 justify-center text-xs"
+            onClick={continueWeek}
+          >
+            <Target className="h-4 w-4" /> Advance week
+          </button>
+          <button
+            type="button"
+            className="btn-primary min-h-10 justify-center text-xs"
+            onClick={() => applyRecoveryPlan(selectedPlanTitle)}
+          >
+            Apply plan
+          </button>
         </div>
-      </div>
+      </footer>
     </div>
-  )
+  );
 }

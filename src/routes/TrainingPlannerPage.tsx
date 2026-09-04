@@ -1,285 +1,506 @@
-import { Fragment, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Activity, Calendar, Copy, RotateCcw, Save, Zap } from 'lucide-react'
-import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/useGame'
-import { buildTrainingPlannerData } from '../utils/liveRouteData'
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Activity, Calendar, RotateCcw, Save, Sparkles } from "lucide-react";
+import { ProgressBar } from "../components/ui/ProgressBar";
+import { useGame } from "../context/useGame";
 import {
-  buildAutoTrainingPlan,
-  buildRecoveryTrainingPlan,
+  getFacilityTrainingMultiplier,
+  getTrainingAdaptationMultiplier,
+} from "../hooks/useGameState";
+import type { TrainingCell } from "../types/game";
+import { buildTrainingPlannerData } from "../utils/liveRouteData";
+import {
+  buildFocusedTrainingPlan,
   buildTrainingCell,
   cloneTrainingPlan,
   getTrainingSessionOption,
   getTrainingSessionOptionId,
   summarizeTrainingPlan,
+  TRAINING_FOCUS_PRESETS,
   TRAINING_SESSION_OPTIONS,
+  type TrainingFocusPresetId,
   type TrainingSessionKey,
-} from '../utils/trainingPlan'
-import type { TrainingCell } from '../types/game'
+} from "../utils/trainingPlan";
 
 const sessionRows = [
-  { key: 'morning', label: 'Morning', time: '08:00 - 11:00' },
-  { key: 'afternoon', label: 'Afternoon', time: '13:00 - 16:00' },
-  { key: 'evening', label: 'Evening', time: '18:00 - 21:00' },
-] as const
+  { key: "morning", label: "Morning", time: "08:00–11:00" },
+  { key: "afternoon", label: "Afternoon", time: "13:00–16:00" },
+  { key: "evening", label: "Evening", time: "18:00–21:00" },
+] as const;
 
-const categoryStyles: Record<TrainingCell['category'], string> = {
-  Technical: 'border-green-600/30 bg-green-600/10 text-green-400',
-  Mental: 'border-amber-600/30 bg-amber-600/10 text-amber-400',
-  Physical: 'border-blue-600/30 bg-blue-600/10 text-blue-400',
-  'Match Prep': 'border-violet-600/30 bg-violet-600/10 text-violet-400',
-  Recovery: 'border-sky-600/30 bg-sky-600/10 text-sky-400',
-  Travel: 'border-gray-500/30 bg-gray-500/10 text-gray-400',
-  Rest: 'border-gray-600/30 bg-gray-600/10 text-gray-400',
-}
+const categoryStyles: Record<TrainingCell["category"], string> = {
+  Technical: "border-green-600/30 bg-green-600/10 text-green-400",
+  Mental: "border-amber-600/30 bg-amber-600/10 text-amber-400",
+  Physical: "border-blue-600/30 bg-blue-600/10 text-blue-400",
+  "Match Prep": "border-violet-600/30 bg-violet-600/10 text-violet-400",
+  Recovery: "border-sky-600/30 bg-sky-600/10 text-sky-400",
+  Travel: "border-gray-500/30 bg-gray-500/10 text-gray-400",
+  Rest: "border-gray-600/30 bg-gray-600/10 text-gray-400",
+};
 
-const balanceColors = {
-  green: 'bg-green-500',
-  violet: 'bg-violet-500',
-  blue: 'bg-blue-500',
-  gold: 'bg-amber-500',
-}
-
-function getCategoryBadgeClass(category: TrainingCell['category']) {
-  return `inline-flex rounded border px-1.5 py-0.5 text-[9px] font-medium leading-none ${categoryStyles[category]}`
-}
-
-function getLoadPillClass(load: number) {
-  if (load >= 30) return 'rounded bg-red-600/20 px-1.5 py-0.5 text-[9px] font-medium text-red-400'
-  if (load >= 18) return 'rounded bg-amber-600/20 px-1.5 py-0.5 text-[9px] font-medium text-amber-400'
-  return 'rounded bg-green-600/20 px-1.5 py-0.5 text-[9px] font-medium text-green-400'
-}
-
-function getLoadLabel(load: number) {
-  if (load >= 30) return 'High'
-  if (load >= 18) return 'Med'
-  return 'Low'
-}
-
-function getRiskToneClass(value: number) {
-  if (value >= 70) return 'text-red-400'
-  if (value >= 50) return 'text-amber-400'
-  return 'text-green-400'
+function riskTone(value: number) {
+  if (value >= 70) return "text-red-400";
+  if (value >= 50) return "text-amber-400";
+  return "text-green-400";
 }
 
 export function TrainingPlannerPage() {
-  const { gameState } = useGame()
-  const plannerKey = `${gameState.currentDate}-${gameState.week}-${JSON.stringify(gameState.trainingPlan)}`
-  return <TrainingPlannerContent key={plannerKey} />
+  const { gameState } = useGame();
+  const plannerKey = `${gameState.currentDate}-${gameState.week}-${JSON.stringify(gameState.trainingPlan)}`;
+  return <TrainingPlannerContent key={plannerKey} />;
 }
 
 function TrainingPlannerContent() {
-  const { gameState, applyTrainingPlan } = useGame()
-  const navigate = useNavigate()
-  const plannerData = buildTrainingPlannerData(gameState)
-  const currentCoach = gameState.coaches.find((coach) => coach.id === gameState.currentCoachId)
-  const competitionPlan = plannerData.enteredCompetitions.map((competition) => ({
-    name: competition.name,
-    location: competition.location,
-    startDate: competition.date,
-  }))
-  const [plannerWeek, setPlannerWeek] = useState(cloneTrainingPlan(plannerData.week))
+  const { gameState, applyTrainingPlan } = useGame();
+  const navigate = useNavigate();
+  const plannerData = buildTrainingPlannerData(gameState);
+  const currentCoach = gameState.coaches.find(
+    (coach) => coach.id === gameState.currentCoachId,
+  );
+  const competitionPlan = plannerData.enteredCompetitions.map(
+    (competition) => ({
+      name: competition.name,
+      location: competition.location,
+      startDate: competition.date,
+    }),
+  );
+  const [plannerWeek, setPlannerWeek] = useState(
+    cloneTrainingPlan(plannerData.week),
+  );
+  const [selectedFocus, setSelectedFocus] = useState<
+    TrainingFocusPresetId | "custom"
+  >("balanced");
   const summary = summarizeTrainingPlan(
     plannerWeek,
-    { fatigue: gameState.player.fatigue, confidence: gameState.player.confidence },
+    {
+      fatigue: gameState.player.fatigue,
+      confidence: gameState.player.confidence,
+    },
     gameState.attributes,
     currentCoach?.compatibility ?? 0,
-  )
-  const nextCompetition = plannerData.enteredCompetitions[0] ?? null
-  const weekStart = plannerWeek[0]?.dateLabel ?? gameState.currentDate
-  const weekEnd = plannerWeek[plannerWeek.length - 1]?.dateLabel ?? gameState.currentDate
-  const visibleCompetitions = plannerData.enteredCompetitions.slice(0, 2)
-  const hiddenCompetitionCount = Math.max(0, plannerData.enteredCompetitions.length - visibleCompetitions.length)
-  const focusOfWeek = summary.expectedGains[0]
-  const supportMetrics = [
-    { label: 'Weekly Load', value: `${summary.weekLoad}%`, sub: summary.weekLoadLabel, tone: 'text-white' },
-    { label: 'Fatigue Risk', value: `${summary.fatigueRisk}%`, sub: `Trend ${summary.fatigueTrend > 0 ? '+' : ''}${summary.fatigueTrend}%`, tone: getRiskToneClass(summary.fatigueRisk) },
-    { label: 'Confidence', value: `+${summary.confidenceProjection}%`, sub: summary.confidenceLabel, tone: 'text-green-400' },
-    { label: 'Coach Bonus', value: `+${summary.coachImpact}%`, sub: currentCoach?.name ?? 'No active coach', tone: 'text-green-400' },
-  ]
+  );
+  const selectedPreset = TRAINING_FOCUS_PRESETS.find(
+    (preset) => preset.id === selectedFocus,
+  );
+  const adaptationMultiplier =
+    getTrainingAdaptationMultiplier(
+      gameState.player.fatigue,
+      gameState.trainingCondition.strain,
+      gameState.trainingCondition.burnout,
+    ) * getFacilityTrainingMultiplier(gameState.equipment);
+  const adaptationPreview = Math.round(adaptationMultiplier * 100);
+  const fatigueForecast = Math.max(
+    0,
+    Math.min(100, gameState.player.fatigue + summary.fatigueTrend),
+  );
+  const strainForecast = Math.max(
+    0,
+    Math.min(
+      100,
+      gameState.trainingCondition.strain +
+        Math.round(Math.max(0, summary.weekLoad - 55) / 6) -
+        Math.max(0, summary.restSessions - 4),
+    ),
+  );
+  const weekStart = plannerWeek[0]?.dateLabel ?? gameState.currentDate;
+  const weekEnd = plannerWeek.at(-1)?.dateLabel ?? gameState.currentDate;
 
-  function handleSessionChange(dayIndex: number, sessionKey: TrainingSessionKey, optionId: string) {
-    setPlannerWeek((currentWeek) => {
-      const nextWeek = cloneTrainingPlan(currentWeek)
-      nextWeek[dayIndex] = { ...nextWeek[dayIndex], [sessionKey]: buildTrainingCell(optionId) }
-      return nextWeek
-    })
+  function chooseFocus(focusId: TrainingFocusPresetId) {
+    setSelectedFocus(focusId);
+    setPlannerWeek(
+      buildFocusedTrainingPlan(
+        focusId,
+        gameState.currentDate,
+        gameState.player.fatigue,
+        competitionPlan,
+        plannerData.travelBooked,
+      ),
+    );
   }
 
-  function handleApplyPlan() {
-    applyTrainingPlan(plannerWeek)
+  function changeSession(
+    dayIndex: number,
+    sessionKey: TrainingSessionKey,
+    optionId: string,
+  ) {
+    setSelectedFocus("custom");
+    setPlannerWeek((currentWeek) => {
+      const nextWeek = cloneTrainingPlan(currentWeek);
+      nextWeek[dayIndex] = {
+        ...nextWeek[dayIndex],
+        [sessionKey]: buildTrainingCell(optionId),
+      };
+      return nextWeek;
+    });
   }
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
-      <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface/85 px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">Training Planner</p>
-          <h1 className="mt-1 text-2xl font-bold leading-tight text-white">Weekly Training Planner</h1>
-          <p className="mt-1 truncate text-xs text-gray-400">Week {gameState.week} · {weekStart} - {weekEnd}</p>
+    <div
+      className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 pb-8"
+      data-testid="training-planner"
+    >
+      <header className="flex flex-col gap-3 rounded-xl border border-border bg-surface/85 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">
+            Training Planner
+          </p>
+          <h1 className="mt-1 text-2xl font-bold leading-tight text-white">
+            Build This Week
+          </h1>
+          <p className="mt-1 text-xs text-gray-400">
+            Week {gameState.week} · {weekStart}–{weekEnd} · changes apply when
+            you confirm the plan
+          </p>
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2">
-          <button type="button" className="btn-secondary px-3 py-1.5 text-[11px]" onClick={() => setPlannerWeek(buildAutoTrainingPlan(gameState.currentDate, gameState.player.fatigue, competitionPlan, plannerData.travelBooked))}><Zap className="h-3.5 w-3.5" /> Auto-Plan</button>
-          <button type="button" className="btn-secondary px-3 py-1.5 text-[11px]" onClick={() => setPlannerWeek(buildRecoveryTrainingPlan(gameState.currentDate, competitionPlan))}><RotateCcw className="h-3.5 w-3.5" /> Recovery Plan</button>
-          <button type="button" className="btn-secondary px-3 py-1.5 text-[11px]" onClick={() => setPlannerWeek(cloneTrainingPlan(plannerData.week))}><Copy className="h-3.5 w-3.5" /> Reset Week</button>
-          <button type="button" className="btn-primary px-3 py-1.5 text-[11px]" onClick={handleApplyPlan}><Save className="h-3.5 w-3.5" /> Apply Plan</button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn-secondary text-[11px]"
+            onClick={() => {
+              setSelectedFocus("custom");
+              setPlannerWeek(cloneTrainingPlan(plannerData.week));
+            }}
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Reset
+          </button>
+          <button
+            type="button"
+            className="btn-primary text-[11px]"
+            onClick={() => applyTrainingPlan(plannerWeek)}
+          >
+            <Save className="h-3.5 w-3.5" /> Apply Plan
+          </button>
         </div>
+      </header>
+
+      <section className="card overflow-hidden">
+        <div className="card-header">
+          <div>
+            <h2 className="text-sm font-semibold text-white">
+              Auto-select a focus
+            </h2>
+            <p className="text-[10px] text-gray-500">
+              Choose the outcome you want; event and travel sessions stay
+              protected.
+            </p>
+          </div>
+          <Sparkles className="h-4 w-4 text-green-400" />
+        </div>
+        <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 xl:grid-cols-7">
+          {TRAINING_FOCUS_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              aria-pressed={selectedFocus === preset.id}
+              onClick={() => chooseFocus(preset.id)}
+              className={`min-h-16 rounded-lg border px-3 py-2 text-left transition-colors ${selectedFocus === preset.id ? "border-green-500 bg-green-500/10 text-white" : "border-border bg-surface-light/35 text-gray-300 hover:border-gray-600"}`}
+            >
+              <span className="block text-xs font-semibold">
+                {preset.label}
+              </span>
+              <span className="mt-1 block text-[9px] text-gray-500">
+                {preset.outcome}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-col gap-2 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold text-white">
+              {selectedPreset?.label ?? "Custom week"}
+            </p>
+            <p className="mt-0.5 text-[10px] text-gray-400">
+              {selectedPreset?.description ??
+                "You have manually adjusted one or more sessions."}
+            </p>
+          </div>
+          {selectedPreset ? (
+            <button
+              type="button"
+              className="btn-secondary shrink-0 text-[10px]"
+              onClick={() => chooseFocus(selectedPreset.id)}
+            >
+              Fill Week With This Focus
+            </button>
+          ) : null}
+        </div>
+      </section>
+
+      <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_330px]">
+        <section className="card overflow-hidden">
+          <div className="card-header">
+            <div>
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Calendar className="h-3.5 w-3.5 text-green-400" /> Weekly
+                Schedule
+              </h2>
+              <p className="text-[10px] text-gray-500">
+                Every session remains editable.
+              </p>
+            </div>
+            <span className="text-[10px] text-gray-400">
+              {plannerData.enteredCompetitions[0]?.name ?? "No event entered"}
+            </span>
+          </div>
+          <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
+            {plannerWeek.map((day, dayIndex) => (
+              <article
+                key={`${day.day}-${day.dateLabel}`}
+                className="min-w-0 rounded-lg border border-border bg-surface-light/30 p-2.5"
+              >
+                <div className="mb-2 flex items-start justify-between gap-2 border-b border-border pb-2">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
+                      {day.day}
+                    </p>
+                    <p
+                      className={
+                        day.competitionName
+                          ? "text-[10px] text-amber-400"
+                          : "text-[10px] text-gray-500"
+                      }
+                    >
+                      {day.dateLabel}
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[9px] ${day.load >= 70 ? "bg-red-500/10 text-red-400" : day.load >= 50 ? "bg-amber-500/10 text-amber-400" : "bg-green-500/10 text-green-400"}`}
+                  >
+                    {day.loadLabel}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {sessionRows.map((row) => {
+                    const session = day[row.key];
+                    const option = getTrainingSessionOption(
+                      getTrainingSessionOptionId(session),
+                    );
+                    return (
+                      <label key={row.key} className="block">
+                        <span className="mb-1 flex justify-between text-[9px]">
+                          <span className="font-medium text-gray-300">
+                            {row.label}
+                          </span>
+                          <span className="text-gray-600">{row.time}</span>
+                        </span>
+                        <select
+                          value={getTrainingSessionOptionId(session)}
+                          onChange={(event) =>
+                            changeSession(dayIndex, row.key, event.target.value)
+                          }
+                          className="min-h-9 w-full rounded-md border border-border bg-surface px-2 text-[10px] font-medium text-white focus:border-green-500/50 focus:outline-none"
+                        >
+                          {TRAINING_SESSION_OPTIONS.map((choice) => (
+                            <option key={choice.id} value={choice.id}>
+                              {choice.title}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="mt-1 flex items-center justify-between gap-2">
+                          <span
+                            className={`rounded border px-1.5 py-0.5 text-[8px] ${categoryStyles[session.category]}`}
+                          >
+                            {session.category}
+                          </span>
+                          <span className="truncate text-[8px] text-gray-500">
+                            Load {option.load}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {day.competitionName ? (
+                  <p className="mt-2 rounded bg-amber-500/10 px-2 py-1 text-[9px] text-amber-300">
+                    Event: {day.competitionName}
+                  </p>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <aside className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
+          <section className="card overflow-hidden">
+            <div className="card-header">
+              <h2 className="text-sm font-semibold text-white">
+                Plan Forecast
+              </h2>
+              <span className="text-[10px] text-gray-500">Before applying</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-3">
+              {[
+                ["Weekly load", `${summary.weekLoad}%`, summary.weekLoad],
+                [
+                  "Fatigue",
+                  `${gameState.player.fatigue}% → ${fatigueForecast}%`,
+                  fatigueForecast,
+                ],
+                [
+                  "Strain",
+                  `${gameState.trainingCondition.strain}% → ${strainForecast}%`,
+                  strainForecast,
+                ],
+                ["Adaptation", `${adaptationPreview}%`, adaptationPreview],
+              ].map(([label, value, score]) => (
+                <div
+                  key={label as string}
+                  className="rounded-lg bg-surface-light/45 p-2.5"
+                >
+                  <p className="text-[9px] uppercase tracking-[0.12em] text-gray-500">
+                    {label}
+                  </p>
+                  <p
+                    className={`mt-1 text-sm font-semibold ${label === "Fatigue" || label === "Strain" ? riskTone(Number(score)) : "text-white"}`}
+                  >
+                    {value}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2 border-t border-border p-3">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-gray-400">Fatigue risk</span>
+                <span className={riskTone(summary.fatigueRisk)}>
+                  {summary.fatigueRisk}%
+                </span>
+              </div>
+              <ProgressBar
+                value={summary.fatigueRisk}
+                tone={
+                  summary.fatigueRisk >= 70
+                    ? "red"
+                    : summary.fatigueRisk >= 50
+                      ? "amber"
+                      : "green"
+                }
+                compact
+              />
+              <p className="text-[10px] leading-relaxed text-gray-400">
+                Facility, current fatigue, body strain, burnout and coach fit
+                are included in this forecast.
+              </p>
+            </div>
+          </section>
+
+          <section className="card overflow-hidden">
+            <div className="card-header">
+              <h2 className="text-sm font-semibold text-white">
+                Expected Development
+              </h2>
+              <span className="text-[10px] text-green-400">Modified gains</span>
+            </div>
+            <div className="space-y-2 p-3">
+              {summary.expectedGains.map((gain) => {
+                const adjusted = Math.max(
+                  0,
+                  Math.round(
+                    gain.value *
+                      adaptationMultiplier *
+                      (1 + summary.coachImpact / 100) *
+                      10,
+                  ) / 10,
+                );
+                return (
+                  <div key={gain.label}>
+                    <div className="mb-1 flex justify-between text-[10px]">
+                      <span className="text-gray-400">{gain.label}</span>
+                      <span className="font-semibold text-green-400">
+                        +{adjusted}
+                      </span>
+                    </div>
+                    <ProgressBar value={Math.min(100, adjusted * 15)} compact />
+                  </div>
+                );
+              })}
+            </div>
+            <p className="border-t border-border px-3 py-2 text-[9px] leading-relaxed text-gray-500">
+              Preview values are estimates. Actual gains are applied when the
+              week advances.
+            </p>
+          </section>
+        </aside>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-12 gap-2">
-        <div className="col-span-9 grid min-h-0 grid-rows-[1.44fr_0.34fr_0.54fr] gap-2">
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Calendar className="h-3.5 w-3.5 text-green-400" /> Weekly Schedule</h3>
-              <span className="truncate text-[10px] text-gray-400">{nextCompetition ? `Next Competition: ${nextCompetition.name} · ${nextCompetition.date}` : 'No entered competition this week'}</span>
-            </div>
-            <div className="card-body flex min-h-0 flex-1 overflow-hidden p-2">
-              <div className="grid min-h-0 flex-1 grid-cols-[4.75rem_repeat(7,minmax(0,1fr))] grid-rows-[auto_repeat(3,minmax(0,1fr))] gap-1.5">
-                <div />
-                {plannerWeek.map((day) => (
-                  <div key={`${day.day}-header`} className="rounded-lg border border-border bg-surface-light/40 px-2 py-1.5">
-                    <p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-white">{day.day}</p>
-                    <p className={`mt-0.5 truncate text-[10px] ${day.competitionName ? 'text-amber-400' : 'text-gray-500'}`}>{day.dateLabel}</p>
-                  </div>
-                ))}
-                {sessionRows.map((row) => (
-                  <Fragment key={row.key}>
-                    <div className="rounded-lg border border-border bg-surface-light/35 px-2 py-1.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white">{row.label}</p>
-                      <p className="mt-0.5 text-[9px] text-gray-500">{row.time}</p>
-                    </div>
-                    {plannerWeek.map((day, dayIndex) => {
-                      const session = day[row.key]
-                      const option = getTrainingSessionOption(getTrainingSessionOptionId(session))
-
-                      return (
-                        <div key={`${day.day}-${row.key}`} className="min-w-0 rounded-lg border border-border bg-surface-light/50 p-1.5">
-                          <select
-                            value={getTrainingSessionOptionId(session)}
-                            onChange={(event) => handleSessionChange(dayIndex, row.key, event.target.value)}
-                            className="w-full rounded-md border border-border bg-surface px-2 py-1 text-[11px] font-medium text-white focus:border-green-500/50 focus:outline-none"
-                            title={session.title}
-                          >
-                            {TRAINING_SESSION_OPTIONS.map((optionItem) => <option key={optionItem.id} value={optionItem.id}>{optionItem.title}</option>)}
-                          </select>
-                          <div className="mt-1 flex items-center justify-between gap-1.5">
-                            <span className={getCategoryBadgeClass(session.category)}>{session.category}</span>
-                            <span className={getLoadPillClass(option.load)}>{getLoadLabel(option.load)}</span>
-                          </div>
-                          <p className="mt-1 truncate text-[9px] text-gray-400">{session.subtitle}</p>
-                        </div>
-                      )
-                    })}
-                  </Fragment>
-                ))}
-              </div>
-            </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <section className="card overflow-hidden">
+          <div className="card-header">
+            <h2 className="text-sm font-semibold text-white">
+              Competition Protection
+            </h2>
+            <button
+              type="button"
+              className="text-[10px] text-green-400"
+              onClick={() => navigate("/calendar")}
+            >
+              Open Calendar
+            </button>
           </div>
-
-          <div className="grid min-h-0 grid-cols-4 gap-2">
-            {supportMetrics.map((metric) => (
-              <div key={metric.label} className="card flex min-h-0 flex-col justify-center p-3 text-center">
-                <p className="metric-label">{metric.label}</p>
-                <p className={`mt-1 text-lg font-bold ${metric.tone}`}>{metric.value}</p>
-                <p className="truncate text-[10px] text-gray-400">{metric.sub}</p>
+          <div className="grid gap-2 p-3 sm:grid-cols-2">
+            {plannerData.enteredCompetitions.length ? (
+              plannerData.enteredCompetitions.slice(0, 4).map((competition) => (
+                <div
+                  key={competition.id}
+                  className="rounded-lg bg-surface-light/45 p-3"
+                >
+                  <div className="flex justify-between gap-2">
+                    <p className="truncate text-xs font-semibold text-white">
+                      {competition.name}
+                    </p>
+                    <span
+                      className={
+                        competition.travelBooked
+                          ? "text-[9px] text-green-400"
+                          : "text-[9px] text-amber-400"
+                      }
+                    >
+                      {competition.travelBooked
+                        ? "Travel booked"
+                        : "Travel pending"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[10px] text-gray-400">
+                    {competition.date} · {competition.location}
+                  </p>
+                  <p className="mt-1 text-[9px] text-gray-500">
+                    {competition.daysAway <= 0
+                      ? "Event week is live"
+                      : `${competition.daysAway} days away`}{" "}
+                    · protected in every preset
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-gray-400">
+                No entered event is currently shaping the plan.
+              </p>
+            )}
+          </div>
+        </section>
+        <section className="card overflow-hidden">
+          <div className="card-header">
+            <h2 className="text-sm font-semibold text-white">Weekly Balance</h2>
+            <button
+              type="button"
+              className="text-[10px] text-green-400"
+              onClick={() => navigate("/training/report")}
+            >
+              <Activity className="mr-1 inline h-3 w-3" /> Training Report
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-3 sm:grid-cols-4">
+            {summary.balance.map((item) => (
+              <div key={item.label}>
+                <div className="mb-1 flex justify-between text-[10px]">
+                  <span className="text-gray-400">{item.label}</span>
+                  <span className="text-white">{item.sessions}</span>
+                </div>
+                <ProgressBar value={item.value} compact />
               </div>
             ))}
           </div>
-
-          <div className="grid min-h-0 grid-cols-2 gap-2">
-            <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-              <div className="card-header"><h3 className="text-sm font-semibold text-white">Competition Commitments</h3><button type="button" className="text-[10px] text-green-400" onClick={() => navigate('/calendar')}>Calendar</button></div>
-              <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
-                {visibleCompetitions.length > 0 ? (
-                  <>
-                    <div className="space-y-2">
-                      {visibleCompetitions.map((competition) => (
-                        <div key={competition.id} className="rounded-lg border border-border bg-surface-light/45 p-2.5 text-xs">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate font-medium text-white">{competition.name}</p>
-                              <p className="mt-0.5 truncate text-[10px] text-gray-400">{competition.date} · {competition.location}</p>
-                            </div>
-                            <span className={competition.travelBooked ? 'rounded bg-green-600/20 px-1.5 py-0.5 text-[9px] text-green-400' : 'rounded bg-amber-600/20 px-1.5 py-0.5 text-[9px] text-amber-400'}>{competition.travelBooked ? 'Booked' : 'Pending'}</span>
-                          </div>
-                          <p className="mt-1 truncate text-[10px] text-gray-500">{competition.daysAway <= 0 ? 'Event week is live now' : `${competition.daysAway} days until start`}</p>
-                        </div>
-                      ))}
-                    </div>
-                    {hiddenCompetitionCount > 0 ? <p className="text-[10px] text-gray-500">{hiddenCompetitionCount} more competition{hiddenCompetitionCount === 1 ? '' : 's'} shaping the plan.</p> : null}
-                  </>
-                ) : <p className="text-xs text-gray-400">No entered competitions are currently shaping the week.</p>}
-              </div>
-            </div>
-
-            <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-              <div className="card-header"><h3 className="text-sm font-semibold text-white">Recovery Snapshot</h3><span className="text-[10px] text-gray-400">Plan health</span></div>
-              <div className="card-body grid h-full min-h-0 grid-cols-2 gap-x-4 gap-y-2 p-3 text-[10px]">
-                <div className="min-w-0"><p className="text-gray-500">Fatigue Risk</p><p className={`mt-1 truncate text-sm font-semibold ${getRiskToneClass(summary.fatigueRisk)}`}>{summary.fatigueRisk}%</p></div>
-                <div className="min-w-0"><p className="text-gray-500">Confidence</p><p className="mt-1 truncate text-sm font-semibold text-white">{gameState.player.confidence}%</p></div>
-                <div className="min-w-0"><p className="text-gray-500">Recovery Blocks</p><p className="mt-1 truncate text-sm font-semibold text-green-400">{summary.restSessions}</p></div>
-                <div className="min-w-0"><p className="text-gray-500">Travel Blocks</p><p className="mt-1 truncate text-sm font-semibold text-white">{summary.travelSessions}</p></div>
-                <div className="min-w-0"><p className="text-gray-500">Coach Fit</p><p className="mt-1 truncate text-sm font-semibold text-green-400">+{summary.coachImpact}%</p></div>
-                <div className="min-w-0"><p className="text-gray-500">Focus</p><p className="mt-1 truncate text-sm font-semibold text-white">{focusOfWeek?.label ?? 'Balanced'}</p></div>
-                <div className="col-span-2 min-w-0 border-t border-border pt-2"><p className="truncate text-[10px] text-gray-400">{currentCoach ? `${currentCoach.name} is adding structure to the week.` : 'No active coach is shaping the plan.'}</p></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-span-3 grid min-h-0 grid-rows-[0.84fr_0.62fr_0.72fr_0.72fr_auto] gap-2">
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header"><h3 className="text-xs font-semibold text-white">Training Load</h3><span className="text-[10px] text-gray-400">This week</span></div>
-            <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
-              <div className="space-y-2">
-                <div><div className="mb-1 flex justify-between text-[10px]"><span className="text-gray-400">Weekly Load</span><span className="text-white">{summary.weekLoad}%</span></div><ProgressBar value={summary.weekLoad} tone={summary.weekLoad >= 80 ? 'red' : summary.weekLoad >= 55 ? 'amber' : 'green'} compact /></div>
-                <div><div className="mb-1 flex justify-between text-[10px]"><span className="text-gray-400">Fatigue Impact</span><span className={getRiskToneClass(summary.fatigueRisk)}>{summary.fatigueTrend > 0 ? '+' : ''}{summary.fatigueTrend}%</span></div><ProgressBar value={summary.fatigueRisk} tone={summary.fatigueRisk >= 70 ? 'red' : 'amber'} compact /></div>
-                <div><div className="mb-1 flex justify-between text-[10px]"><span className="text-gray-400">Confidence Boost</span><span className="text-green-400">+{summary.confidenceProjection}%</span></div><ProgressBar value={Math.min(100, summary.confidenceProjection * 12)} compact /></div>
-                <div><div className="mb-1 flex justify-between text-[10px]"><span className="text-gray-400">Coach Bonus</span><span className="text-green-400">+{summary.coachImpact}%</span></div><ProgressBar value={Math.min(100, summary.coachImpact * 10)} compact /></div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 border-t border-border pt-2 text-center">
-                <div><p className="text-[9px] uppercase tracking-[0.16em] text-gray-500">Sessions</p><p className="mt-1 text-sm font-semibold text-white">{summary.totalSessions}</p></div>
-                <div><p className="text-[9px] uppercase tracking-[0.16em] text-gray-500">Intensity</p><p className="mt-1 text-sm font-semibold text-amber-400">{summary.averageIntensity}</p></div>
-                <div><p className="text-[9px] uppercase tracking-[0.16em] text-gray-500">Target</p><p className="mt-1 text-sm font-semibold text-green-400">80-90%</p></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header"><h3 className="text-xs font-semibold text-white">Focus Of The Week</h3></div>
-            <div className="card-body flex h-full min-h-0 flex-col gap-2 p-3 text-xs text-gray-400">
-              <div className="rounded-lg border border-green-600/20 bg-green-600/10 p-2"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-green-400">Primary</p><p className="mt-1 text-xs font-medium text-white">{focusOfWeek?.label ?? 'Match sharpness'}</p><p className="mt-0.5 text-[10px]">Lean into {focusOfWeek?.label?.toLowerCase() ?? 'pre-match sharpness'} while coach impact sits at +{summary.coachImpact}%.</p></div>
-              <div className="rounded-lg border border-amber-600/20 bg-amber-600/10 p-2"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-400">Watch</p><p className="mt-1 text-xs font-medium text-white">Fatigue management</p><p className="mt-0.5 text-[10px]">Risk is {summary.fatigueRisk}%. Recovery blocks protect readiness before the event.</p></div>
-            </div>
-          </div>
-
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header"><h3 className="text-xs font-semibold text-white">Weekly Focus Areas</h3></div>
-            <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
-              {summary.expectedGains.map((gain) => (
-                <div key={gain.label}>
-                  <div className="mb-1 flex justify-between text-[10px]"><span className="text-gray-400">{gain.label}</span><span className="text-green-400">+{gain.value}</span></div>
-                  <ProgressBar value={Math.min(100, gain.value * 14)} compact />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header"><h3 className="text-xs font-semibold text-white">Weekly Balance</h3></div>
-            <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
-              {summary.balance.map((item) => (
-                <div key={item.label}>
-                  <div className="mb-1 flex justify-between text-[10px]"><span className="text-gray-400">{item.label}</span><span className="text-white">{item.value}% ({item.sessions})</span></div>
-                  <div className="progress-bar h-1.5"><div className={`progress-fill ${balanceColors[item.tone]}`} style={{ width: `${item.value}%` }} /></div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <button type="button" className="btn-primary w-full justify-center py-2.5 text-sm" onClick={() => navigate('/training/report')}><Activity className="h-4 w-4" /> View Training Report</button>
-        </div>
+        </section>
       </div>
     </div>
-  )
+  );
 }

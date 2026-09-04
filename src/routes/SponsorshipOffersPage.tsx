@@ -20,7 +20,7 @@ function getOfferStatus(offer: { minimumReputation: number }, reputation: number
 }
 
 export function SponsorshipOffersPage() {
-  const { gameState, acceptSponsor, rejectSponsor } = useGame()
+  const { gameState, acceptSponsor, rejectSponsor, renewSponsor, renegotiateSponsor, declineSponsorRenewal } = useGame()
   const { currentSlots, brandMetrics, sponsorCapacity, activeRevenue } = buildSponsorshipOffersData(gameState)
   const availableOffers = useMemo(() => gameState.sponsorOffers.filter((offer) => offer.status === 'Available'), [gameState.sponsorOffers])
   const [filter, setFilter] = useState<'All' | 'Ready' | 'Low Risk'>('All')
@@ -41,7 +41,7 @@ export function SponsorshipOffersPage() {
 
   if (availableOffers.length === 0) {
     return (
-      <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
+      <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
         <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Support</p>
           <h1 className="mt-1 text-2xl font-bold leading-tight text-white">Sponsorship Offers</h1>
@@ -64,7 +64,7 @@ export function SponsorshipOffersPage() {
   }
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
+    <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
       <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -79,7 +79,7 @@ export function SponsorshipOffersPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {brandMetrics.map((metric) => (
           <div key={metric.label} className="card min-h-0 px-3 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{metric.label}</p>
@@ -92,8 +92,8 @@ export function SponsorshipOffersPage() {
         ))}
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-12 grid-rows-[0.63fr_0.37fr] gap-2">
-        <div className="col-span-3 card min-h-0 flex h-full flex-col overflow-hidden">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:grid-rows-[0.63fr_0.37fr] xl:gap-2">
+        <div className="card min-h-0 flex h-full flex-col overflow-hidden xl:col-span-3">
           <div className="card-header px-3 py-2"><h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Handshake className="h-4 w-4 text-green-400" /> Active Sponsors</h3></div>
           <div className="card-body flex h-full min-h-0 flex-col gap-2 overflow-auto px-3 py-3 scrollbar-thin">
             {currentSlots.map((slot) => (
@@ -109,11 +109,17 @@ export function SponsorshipOffersPage() {
             <div className="mt-auto border-t border-border pt-2.5">
               <div className="flex justify-between text-xs"><span className="text-gray-400">Total Sponsored Income</span><span className="font-bold text-green-400">{formatMoney(activeRevenue)}/mo</span></div>
               <div className="mt-1 flex justify-between text-xs"><span className="text-gray-400">Slots Used</span><span className="text-white">{gameState.sponsors.length} / {sponsorCapacity}</span></div>
+              {gameState.sponsors.filter((sponsor) => sponsor.renewalStatus === 'Offered').map((sponsor) => (
+                <div key={sponsor.id} className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[10px]">
+                  <p className="font-semibold text-amber-300">{sponsor.name} renewal: {formatMoney(sponsor.renewalOfferValue ?? sponsor.monthlyValue)}/mo</p>
+                  <div className="mt-2 flex flex-wrap gap-2"><button type="button" className="btn-primary px-2 py-1 text-[10px]" onClick={() => renewSponsor(sponsor.id)}>Renew 12 months</button><button type="button" className="btn-secondary px-2 py-1 text-[10px]" onClick={() => renegotiateSponsor(sponsor.id)}>Renegotiate</button><button type="button" className="btn-secondary px-2 py-1 text-[10px]" onClick={() => declineSponsorRenewal(sponsor.id)}>Decline</button></div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="col-span-9 card min-h-0 flex h-full flex-col overflow-hidden">
+        <div className="card min-h-0 flex h-full flex-col overflow-hidden xl:col-span-9">
           <div className="card-header px-3 py-2"><h3 className="text-sm font-semibold text-white">Available Offers</h3><span className="text-[10px] text-gray-500">{filteredOffers.length} shown</span></div>
           <div className="card-body flex h-full min-h-0 flex-col gap-2 overflow-auto px-3 py-3 scrollbar-thin">
             {filteredOffers.map((offer) => {
@@ -162,7 +168,7 @@ export function SponsorshipOffersPage() {
         </div>
 
         {compareOffers && filteredOffers.length > 0 ? (
-          <div className="col-span-12 card min-h-0 overflow-auto">
+          <div className="card min-h-0 overflow-auto xl:col-span-12">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-surface text-gray-500"><tr><th className="px-3 py-2 text-left">Sponsor</th><th className="px-3 py-2 text-right">Monthly</th><th className="px-3 py-2 text-right">Brand Fit</th><th className="px-3 py-2 text-right">Minimum Rep</th><th className="px-3 py-2 text-right">Risk</th><th className="px-3 py-2 text-right">Status</th></tr></thead>
               <tbody>{filteredOffers.map((offer) => {
@@ -173,7 +179,7 @@ export function SponsorshipOffersPage() {
           </div>
         ) : selectedOffer ? (
           <>
-            <div className="col-span-8 card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card min-h-0 flex h-full flex-col overflow-hidden xl:col-span-8">
               <div className="card-header px-3 py-2"><h3 className="text-sm font-semibold text-white">Selected Offer</h3><span className={`rounded px-2 py-0.5 text-[10px] ${riskClass(selectedOffer.risk)}`}>{selectedOffer.risk}</span></div>
               <div className="card-body flex h-full min-h-0 flex-col justify-between gap-3 px-3 py-3">
                 <div className="grid grid-cols-4 gap-3 text-xs">
@@ -191,7 +197,7 @@ export function SponsorshipOffersPage() {
               </div>
             </div>
 
-            <div className="col-span-4 card min-h-0 flex h-full flex-col overflow-hidden">
+            <div className="card min-h-0 flex h-full flex-col overflow-hidden xl:col-span-4">
               <div className="card-body flex h-full min-h-0 flex-col justify-between px-3 py-3">
                 <div>
                   <h3 className="mb-3 text-xs font-semibold text-white">Brand Notes</h3>

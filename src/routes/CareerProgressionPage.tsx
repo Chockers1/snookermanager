@@ -205,9 +205,9 @@ export function CareerProgressionPage() {
         <button type="button" className="btn-secondary ml-auto text-xs" onClick={() => navigate('/calendar')}><CalendarDays className="h-3.5 w-3.5" /> Calendar</button>
       </div>
 
-      <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-8 space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+      <div className="grid gap-4 xl:grid-cols-12">
+        <div className="space-y-4 xl:col-span-8">
+          <div className="grid gap-3 sm:grid-cols-3">
             {visibleStages.map((stage) => (
               <div key={stage.id} className={`card card-body relative ${stage.current ? 'border-green-500' : stage.complete ? 'border-green-600/30' : 'opacity-65'}`}>
                 <div className="mb-2 flex items-center gap-2">
@@ -225,7 +225,7 @@ export function CareerProgressionPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               ['Ranking', playerRankingText],
               ['Status', statusLabel],
@@ -240,13 +240,13 @@ export function CareerProgressionPage() {
 
           <div className="card">
             <div className="card-header"><h3 className="text-sm font-semibold text-white">Current Stage Events</h3><span className="text-[10px] text-gray-400">{currentStage.tourCircuit ?? currentStage.tournaments}</span></div>
-            <div className="card-body grid grid-cols-4 gap-3">
+            <div className="card-body grid grid-cols-2 gap-3 lg:grid-cols-4">
               {currentStageEvents.length > 0 ? currentStageEvents.map((event) => <div key={event.id} className="rounded bg-surface-light/50 p-3 text-xs"><p className="font-semibold text-white">{event.name}</p><p className="mt-1 text-gray-400">{event.month ?? ''} W{event.week ?? 1} - {event.status}</p><p className="mt-1 text-gray-500">{event.progressionImpact ?? 'Builds pathway momentum.'}</p></div>) : <div className="col-span-4 text-sm text-gray-400">No events are currently mapped to this stage.</div>}
             </div>
           </div>
         </div>
 
-        <div className="col-span-4 space-y-4">
+        <div className="space-y-4 xl:col-span-4">
           <div className="card">
             <div className="card-header"><h3 className="text-sm font-semibold text-white">{currentStage.name}</h3><span className="rounded bg-green-600 px-1.5 py-0.5 text-[10px] text-white">Current Stage</span></div>
             <div className="card-body space-y-3">

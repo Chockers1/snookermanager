@@ -4,9 +4,16 @@ import { Minus, Target, TrendingDown, TrendingUp } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useGame } from '../context/useGame'
 import { getNextEligibleTournament } from '../hooks/useGameState'
+import { getPlayableRounds, resolveTournamentFormat } from '../data/tournamentFormats'
 import type { PlayerAttributes } from '../types/game'
 import { calculateOverallRating, calculatePotentialRating } from '../utils/calculations'
 import { formatMoney } from '../utils/formatters'
+import {
+  buildTournamentRankingSources,
+  getProjectedTournamentRankingPoints,
+  projectRankingAfterEvent,
+  tournamentAffectsRankingTable,
+} from '../utils/rankingProjections'
 
 const rankingTabs = [
   { key: 'world', label: 'World Ranking', seasonLabel: 'Two-year list', rankField: 'worldRank' },
@@ -266,16 +273,41 @@ export function RankingsPage() {
   const playerRow = activeRowsWithRatings.find((row) => row.playerName === gameState.player.fullName) ?? activeRowsWithRatings[0]
   const nextTournament = getNextEligibleTournament(gameState)
   const nextTarget = activeRowsWithRatings.find((row) => row.ranking === Math.max(1, (playerRow?.ranking ?? 2) - 1))
-  const rankingSources = gameState.matches.slice(0, 4).map((match) => ({
-    label: `${match.round} vs ${match.opponentName}`,
-    points: match.rankingPointsGained,
-    prizeMoney: match.prizeMoneyEarned,
-  }))
-  const rankingScenarios = [
-    { label: 'Reach Last 16', points: Math.max(6, Math.round((nextTournament?.rankingValue ?? 0) * 0.12)), projectedRank: Math.max(1, (playerRow?.ranking ?? 1) - 1) },
-    { label: 'Semi Final', points: Math.max(14, Math.round((nextTournament?.rankingValue ?? 0) * 0.28)), projectedRank: Math.max(1, (playerRow?.ranking ?? 1) - 2) },
-    { label: 'Win Event', points: Math.max(24, Math.round((nextTournament?.rankingValue ?? 0) * 0.45)), projectedRank: Math.max(1, (playerRow?.ranking ?? 1) - 4) },
+  const rankingSources = buildTournamentRankingSources(
+    gameState.history.tournamentHistory,
+    gameState.tournaments,
+    activeTab,
+  )
+  const nextEventRounds = nextTournament
+    ? getPlayableRounds(resolveTournamentFormat(nextTournament))
+    : []
+  const firstScenarioRound = nextEventRounds.find((round) => /last\s*16/i.test(round))
+    ?? nextEventRounds[Math.max(0, nextEventRounds.length - 3)]
+    ?? 'Last 16'
+  const semiFinalRound = nextEventRounds.find((round) => /semi.?final/i.test(round))
+    ?? nextEventRounds[Math.max(0, nextEventRounds.length - 2)]
+    ?? 'Semi Final'
+  const eventAffectsActiveTable = tournamentAffectsRankingTable(nextTournament, activeTab)
+  const scenarioDefinitions = [
+    { label: `Reach ${firstScenarioRound}`, round: firstScenarioRound, champion: false },
+    { label: semiFinalRound, round: semiFinalRound, champion: false },
+    { label: 'Win Event', round: nextEventRounds.at(-1) ?? 'Final', champion: true },
   ]
+  const rankingScenarios = scenarioDefinitions.map((scenario) => {
+    const points = eventAffectsActiveTable
+      ? getProjectedTournamentRankingPoints(nextTournament, scenario.round, scenario.champion)
+      : 0
+    return {
+      label: scenario.label,
+      points,
+      projectedRank: projectRankingAfterEvent(
+        activeRowsWithRatings,
+        gameState.player.fullName,
+        eventAffectsActiveTable ? nextTournament : undefined,
+        points,
+      ),
+    }
+  })
   const playerArchive = gameState.worldPlayers.find((player) => player.playerName === gameState.player.fullName)
   const archivedMomentum = (playerArchive?.seasons ?? []).slice(0, 6).reverse().map((season) => ({
     label: season.season,
@@ -298,7 +330,7 @@ export function RankingsPage() {
   const movementLabel = playerMovement > 0 ? `+${playerMovement}` : `${playerMovement}`
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
+    <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
       <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -326,8 +358,8 @@ export function RankingsPage() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-12 gap-2">
-        <div className="col-span-8 grid min-h-0 grid-rows-[minmax(0,1fr)_84px] gap-2">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
+        <div className="grid min-h-0 gap-3 xl:col-span-8 xl:grid-rows-[minmax(0,1fr)_84px] xl:gap-2">
           <div className="card min-h-0 flex h-full flex-col overflow-hidden">
             <div className="card-header px-3 py-2.5"><h3 className="text-sm font-semibold text-white">{activeConfig.label}</h3><span className="text-[10px] text-gray-400">{activeConfig.seasonLabel}</span></div>
             <div className="min-h-0 flex-1 overflow-auto scrollbar-thin">
@@ -384,7 +416,7 @@ export function RankingsPage() {
           </div>
         </div>
 
-        <div className="col-span-4 grid min-h-0 grid-rows-[0.23fr_0.22fr_0.14fr_0.16fr_0.17fr_0.08fr] gap-2">
+        <div className="grid min-h-0 gap-3 xl:col-span-4 xl:grid-rows-[0.23fr_0.22fr_0.14fr_0.16fr_0.17fr_0.08fr] xl:gap-2">
           <div className="card min-h-0 overflow-hidden bg-gradient-to-b from-surface-light/80 to-surface/80 px-4 py-3 text-center">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{finalRankingTab ? 'Current Ranking After Final' : `Your ${activeConfig.label}`}</p>
             <p className="mt-1 text-5xl font-bold text-white">#{playerRow?.ranking ?? '-'}</p>

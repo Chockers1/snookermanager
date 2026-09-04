@@ -210,7 +210,7 @@ export function FinancePage() {
   }
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-5.5rem)] min-h-0 flex-col gap-2 overflow-hidden p-1.5">
+    <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
       <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface/85 px-4 py-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold leading-tight text-white">Finance Dashboard</h1>
@@ -230,7 +230,7 @@ export function FinancePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <div className="card min-h-0 p-3">
           <div className="flex items-center gap-2"><Wallet className="h-3.5 w-3.5 text-green-400" /><p className="metric-label">Current Balance</p></div>
           <p className="mt-2 truncate text-3xl font-bold text-white">{formatMoney(gameState.player.cash)}</p>
@@ -314,8 +314,8 @@ export function FinancePage() {
           ))}
         </div>
 
-        <div className="grid min-h-0 grid-cols-12 gap-2">
-          <div className="col-span-4 card min-h-0 flex h-full flex-col overflow-hidden">
+        <div className="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-12 lg:gap-2">
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden lg:col-span-4">
             <div className="card-header"><h3 className="text-sm font-semibold text-white">Recent Transactions</h3></div>
             <div className="card-body min-h-0 flex-1 overflow-auto p-0 scrollbar-thin">
               <table className="w-full text-[10px]">
@@ -346,7 +346,7 @@ export function FinancePage() {
             </div>
           </div>
 
-          <div className="col-span-4 card min-h-0 flex h-full flex-col overflow-hidden">
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden lg:col-span-4">
             <div className="card-header"><h3 className="text-sm font-semibold text-white">Monthly Budget Overview</h3></div>
             <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
               <div className="grid grid-cols-[1.1fr_0.55fr_0.55fr_0.55fr] gap-2 text-[9px] uppercase tracking-[0.16em] text-gray-500">
@@ -377,7 +377,7 @@ export function FinancePage() {
             </div>
           </div>
 
-          <div className="col-span-4 card min-h-0 flex h-full flex-col overflow-hidden">
+          <div className="card min-h-0 flex h-full flex-col overflow-hidden lg:col-span-4">
             <div className="card-header"><h3 className="text-sm font-semibold text-white">Upcoming Expenses</h3></div>
             <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
               <div className="space-y-2 overflow-auto pr-1 scrollbar-thin">
@@ -396,7 +396,7 @@ export function FinancePage() {
           </div>
         </div>
 
-        <div className="grid min-h-0 grid-cols-12 gap-2">
+        <div className="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-12 lg:gap-2">
           <div className="col-span-2 card min-h-0 p-3">
             <p className="metric-label">Year To Date Income</p>
             <p className="mt-2 truncate text-2xl font-bold text-white">{formatMoney(ytdIncome)}</p>

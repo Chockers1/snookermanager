@@ -95,8 +95,8 @@ export function LegacyStatsPage() {
         })}
       </div>
 
-      <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-3 space-y-4">
+      <div className="grid gap-4 xl:grid-cols-12">
+        <div className="space-y-4 xl:col-span-3">
           <div className="card card-body text-center">
             <p className="text-[10px] font-semibold uppercase text-gray-500">Legacy Score</p>
             <div className="mx-auto mt-3 flex h-28 w-28 flex-col items-center justify-center rounded-full border-4 border-green-500">
@@ -127,7 +127,7 @@ export function LegacyStatsPage() {
           </div>
         </div>
 
-        <div className="col-span-9 space-y-4">
+        <div className="space-y-4 xl:col-span-9">
           <div className="grid grid-cols-3 gap-4">
             <div className="card"><div className="card-header"><h3 className="text-sm font-semibold text-white">Ranking Over Time</h3></div><div className="card-body h-[170px]"><ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}><LineChart data={rankingTrend}><CartesianGrid stroke="#203449" vertical={false} /><XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} /><YAxis reversed tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} width={36} /><Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 11 }} /><Line type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2} dot={{ fill: '#22c55e', r: 3 }} /></LineChart></ResponsiveContainer></div></div>
             <div className="card"><div className="card-header"><h3 className="text-sm font-semibold text-white">Prize Trend</h3></div><div className="card-body h-[170px]"><ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}><AreaChart data={prizeTrend}><CartesianGrid stroke="#203449" vertical={false} /><XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} width={48} /><Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 11 }} /><Area type="monotone" dataKey="value" stroke="#22c55e" fill="#22c55e22" strokeWidth={2} /></AreaChart></ResponsiveContainer></div></div>

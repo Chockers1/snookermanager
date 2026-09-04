@@ -18,6 +18,7 @@ export function TrainingReportPage() {
   const technicalAverage = average(Object.values(gameState.attributes.technical))
   const mentalAverage = average(Object.values(gameState.attributes.mental))
   const physicalAverage = average(Object.values(gameState.attributes.physical))
+  const latestReport = gameState.trainingCondition.reportSnapshot?.lastReport
   const reportMetrics = [
     { label: 'Confidence', value: `${gameState.player.confidence}%`, subtitle: 'Current live value', tone: 'text-green-400' },
     { label: 'Fatigue', value: `${gameState.player.fatigue}%`, subtitle: 'Recovery pressure', tone: gameState.player.fatigue >= 70 ? 'text-red-400' : 'text-amber-400' },
@@ -27,22 +28,24 @@ export function TrainingReportPage() {
     { label: 'Physical Avg', value: physicalAverage, subtitle: 'Physical profile', tone: 'text-amber-400' },
   ]
   const reportGains = [
-    { label: 'Long Potting', current: gameState.attributes.technical['Long Potting'], change: gameState.trainingAppliedWeek === gameState.week ? 2 : 0 },
-    { label: 'Cue Ball Control', current: gameState.attributes.technical['Cue Ball Control'], change: gameState.trainingAppliedWeek === gameState.week ? 1 : 0 },
-    { label: 'Break Building', current: gameState.attributes.technical['Break Building'], change: gameState.trainingAppliedWeek === gameState.week ? 1 : 0 },
-    { label: 'Focus', current: gameState.attributes.mental.Focus, change: gameState.trainingAppliedWeek === gameState.week ? 1 : 0 },
-    { label: 'Stamina', current: gameState.attributes.physical.Stamina, change: gameState.trainingAppliedWeek === gameState.week ? 1 : 0 },
-  ]
+    { label: 'Long Potting', current: gameState.attributes.technical['Long Potting'] },
+    { label: 'Cue Ball Control', current: gameState.attributes.technical['Cue Ball Control'] },
+    { label: 'Break Building', current: gameState.attributes.technical['Break Building'] },
+    { label: 'Focus', current: gameState.attributes.mental.Focus },
+    { label: 'Stamina', current: gameState.attributes.physical.Stamina },
+  ].map((item) => ({
+    ...item,
+    change: latestReport?.changes.find((change) => change.label === item.label)?.delta ?? 0,
+  }))
   const trainingLoadChart = Array.from({ length: 7 }, (_, index) => ({
     label: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index],
     value: Math.max(30, Math.min(95, 58 + (index % 3) * 8 - (gameState.player.fatigue > 60 ? 6 : 0))),
     optimal: 64,
   }))
-  const trainingCategoryGains = [
-    { label: 'Technical', value: Math.max(1, Math.round(technicalAverage / 25)) },
-    { label: 'Mental', value: Math.max(1, Math.round(mentalAverage / 28)) },
-    { label: 'Physical', value: Math.max(1, Math.round(physicalAverage / 30)) },
-  ]
+  const trainingCategoryGains = (['technical', 'mental', 'physical'] as const).map((group) => ({
+    label: group[0].toUpperCase() + group.slice(1),
+    value: latestReport?.changes.filter((change) => change.group === group && change.delta > 0).reduce((sum, change) => sum + change.delta, 0) ?? 0,
+  }))
   const nextFocus = reportGains.slice().sort((left, right) => left.current - right.current).map((item) => item.label)
   const trainingRecoveryAdvice = [
     gameState.player.fatigue >= 60 ? 'Reduce one heavy session and add recovery early in the week.' : 'Keep the current rhythm but protect one full recovery block.',
@@ -55,8 +58,8 @@ export function TrainingReportPage() {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase text-gray-500">Training</p>
-          <h1 className="mt-1 text-2xl font-bold text-white">Weekly Training Report</h1>
-          <p className="mt-1 max-w-3xl text-sm text-gray-400">End-of-week feedback for {gameState.player.fullName}: gains, fatigue, and next-focus guidance before competition.</p>
+          <h1 className="mt-1 text-2xl font-bold text-white">Fortnightly Training Report</h1>
+          <p className="mt-1 max-w-3xl text-sm text-gray-400">Two-week feedback for {gameState.player.fullName}: actual attribute movement, fatigue, and next-focus guidance{latestReport ? ` from ${latestReport.startDate} to ${latestReport.endDate}` : ''}.</p>
         </div>
         <button type="button" onClick={() => navigate('/training')} className="btn-primary shrink-0 text-xs">View Next Week Plan</button>
       </div>
@@ -75,9 +78,9 @@ export function TrainingReportPage() {
         })}
       </div>
 
-      <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-8 space-y-4">
-          <div className="grid grid-cols-3 gap-4">
+      <div className="grid gap-4 xl:grid-cols-12">
+        <div className="space-y-4 xl:col-span-8">
+          <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
             <div className="card">
               <div className="card-header"><h3 className="text-sm font-semibold text-white">Attribute Improvement</h3></div>
               <div className="card-body space-y-3">
@@ -115,7 +118,7 @@ export function TrainingReportPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
             <div className="card">
               <div className="card-header"><h3 className="text-sm font-semibold text-white">Condition</h3></div>
               <div className="card-body space-y-3">
@@ -164,7 +167,7 @@ export function TrainingReportPage() {
           </div>
         </div>
 
-        <div className="col-span-4 space-y-4">
+        <div className="space-y-4 xl:col-span-4">
           <div className="card card-body">
             <div className="flex items-start gap-3 rounded-lg border border-red-600/30 bg-red-600/10 p-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />

@@ -8,13 +8,16 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium",
     "preview": "vite preview",
     "simulate:seasons": "tsx scripts/simulateFiveSeasons.ts",
     "simulate:five-seasons": "tsx scripts/simulateFiveSeasons.ts 5",
     "simulate:match-calibration": "tsx scripts/runMatchSimulationCalibration.ts",
     "simulate:match-experience-calibration": "tsx scripts/runMatchExperienceCalibration.ts",
     "simulate:match-live-visit": "tsx scripts/runMatchSimulationLiveVisitReport.ts",
-    "simulate:live-visit-bias-debug": "tsx scripts/runLiveVisitBiasDebug.ts"
+    "simulate:live-visit-bias-debug": "tsx scripts/runLiveVisitBiasDebug.ts",
+    "simulate:balance-matrix": "tsx scripts/runCareerBalanceMatrix.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -26,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",

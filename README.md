@@ -97,6 +97,10 @@ The main source tree under `src/` is split by responsibility:
 - `src/App.tsx`: defines the route tree and lazy-loaded pages
 - `src/context/GameStateContext.tsx`: wraps the game store in React context
 - `src/hooks/useGameState.ts`: canonical state engine and action surface
+- `src/game/trainingSystem.ts`: adaptation, load recovery, and facility effects
+- `src/game/equipmentSystem.ts`: performance profiles, familiarity, and match wear
+- `src/game/sponsorshipSystem.ts`: obligation profiles and match bonuses
+- `src/game/healthSystem.ts`: treatment effects shared by the store and UI
 - `src/data/gameSeedData.ts`: authored seed data and static option content
 - `src/data/gameContent.ts`: neutral re-exports over seed data
 - `src/data/catalogs.ts`: route-safe catalog exports
@@ -424,7 +428,9 @@ This is the most important practical section for development.
 ### Training impacts:
 
 - attributes
-- fatigue and recovery pressure
+- fatigue, rolling load, body strain, burnout, and short overload injuries
+- diminishing adaptation when fatigue or strain is high; recovery weeks restore capacity without awarding unrelated skill gains
+- active training-facility quality applies a bounded development modifier
 - route-level training summary selectors
 
 ### Coaches impact:
@@ -435,15 +441,18 @@ This is the most important practical section for development.
 
 ### Equipment impacts:
 
-- cue familiarity and condition
-- match strength calculations
+- cue familiarity, cue/tip condition, shaft wear, chalk usage, and case protection
+- bounded cue, chalk, and tip effects on match strength, control, long potting, break building, and miscues
+- travel comfort and training-facility quality
 - equipment route summaries
 - maintenance needs
 
 ### Sponsorship impacts:
 
 - weekly income
-- reputation changes
+- performance-bonus payments recorded in the finance ledger
+- weekly obligation fatigue, brand-fit morale, and publicity reputation
+- category perks for equipment protection, travel cost/readiness, and recovery
 - finance page and dashboard updates
 
 ### Tournament entry and travel impact:
@@ -902,7 +911,8 @@ The current build is substantial, but still pragmatic rather than fully exhausti
 Known tradeoffs include:
 
 - no backend or cloud sync
-- Vitest protects tournament eligibility, date/travel gating, legacy-save repair, withdrawal, finance actions, season rollover, CPU retirement, the complete tournament journey, and smoke-renders every application route in a browser-like DOM
+- Vitest protects tournament eligibility, date/travel gating, legacy-save repair, withdrawal, finance actions, training overload/recovery, persistent health issues, equipment stock/wear, sponsor obligations/renewals/bonuses, season rollover, CPU retirement, the complete tournament journey, and smoke-renders every application route in a browser-like DOM
+- Playwright exercises actual career-creation, save/reload, travel, multi-round tournament, and result-screen controls in Chromium
 - some selector code still assumes a primary ranking view for older routes
 - match and AI simulation remain simplified relative to a full sports sim
 - some late-career and tour-rule details are summarized rather than modeled at governing-body granularity
@@ -916,6 +926,7 @@ Install and run locally:
 npm install
 npm run dev
 npm test
+npm run test:e2e
 ```
 
 Production build validation:
@@ -929,7 +940,10 @@ Long-horizon simulation is deterministic by default (`20260903`) and accepts an 
 
 ```bash
 npm run simulate:seasons -- --seasons=30 --seed=20260904 --skip-player-snapshots
+npm run simulate:balance-matrix
 ```
+
+The balance matrix covers every starting path across three deterministic 30-season seeds and writes its review report to `artifacts/simulations/balance-matrix-latest.md`.
 
 Raw simulation output is written to the ignored `artifacts/simulations/` directory. Only compact, canonical audit summaries are retained in `docs/reports/`.
 
