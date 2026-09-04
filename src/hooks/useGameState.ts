@@ -343,6 +343,9 @@ type TournamentProgressState = {
   tournamentId: string | null;
   currentRound: TournamentRound | null;
   draw: BracketRound[];
+  rankingBaseline: Partial<
+    Record<CompetitionTableKey, Record<string, number>>
+  >;
   completedRounds: Array<{
     round: TournamentRound;
     opponentName: string;
@@ -775,6 +778,9 @@ type WorldPlayerRecord = {
   seniorTitles: number;
   highestBreak: number;
   highestWorldRank: number | null;
+  overallRating?: number;
+  ratingProgress?: number;
+  recentResults?: Array<"W" | "L">;
   developmentPotential?: number;
   coachQuality?: number;
   equipmentQuality?: number;
@@ -885,7 +891,7 @@ export type GameState = {
   lastAction: string;
 };
 
-export const SAVE_SCHEMA_VERSION = 5;
+export const SAVE_SCHEMA_VERSION = 6;
 const STORAGE_KEY = ACTIVE_SAVE_KEY;
 const TOURNAMENT_ROUNDS: TournamentRound[] = [
   "Last 16",
@@ -1270,6 +1276,7 @@ function createEmptyTournamentProgress(): TournamentProgressState {
     tournamentId: null,
     currentRound: null,
     draw: [],
+    rankingBaseline: {},
     completedRounds: [],
   };
 }
@@ -3902,6 +3909,58 @@ function inferWorldPlayerAge(
   return 20 + (seed % 12);
 }
 
+function inferWorldPlayerOverallRating(
+  record: WorldPlayerRecord,
+  tables: CompetitionTablesState,
+) {
+  const rankedCircuit = (
+    ["world", "qSchool", "qTour", "amateur", "senior", "youth"] as const
+  ).find((key) =>
+    tables[key].some((row) => row.playerName === record.playerName),
+  );
+  const row = rankedCircuit
+    ? getCompetitionRowForPlayer(tables, rankedCircuit, record.playerName)
+    : undefined;
+  const rank = row?.ranking ?? record.highestWorldRank ?? 128;
+  const base =
+    rankedCircuit === "world"
+      ? 68
+      : rankedCircuit === "qSchool"
+        ? 69
+        : rankedCircuit === "qTour"
+          ? 64
+          : rankedCircuit === "amateur"
+            ? 56
+            : rankedCircuit === "senior"
+              ? 54
+              : 48;
+  const weight =
+    rankedCircuit === "world"
+      ? 0.32
+      : rankedCircuit === "qSchool"
+        ? 0.3
+        : rankedCircuit === "qTour"
+          ? 0.28
+          : rankedCircuit === "amateur"
+            ? 0.22
+            : rankedCircuit === "senior"
+              ? 0.16
+              : 0.18;
+  const identityVariation = (hashString(record.playerName) % 7) - 3;
+
+  return clamp(Math.round(base + (100 - rank) * weight + identityVariation), 42, 97);
+}
+
+function buildLegacyRecentResults(record: WorldPlayerRecord) {
+  const matches = Math.min(8, Math.max(0, record.wins + record.losses));
+  if (matches === 0) return [];
+  const winRate = record.wins / Math.max(1, record.wins + record.losses);
+  return Array.from({ length: matches }, (_, index): "W" | "L" => {
+    const roll = seededNoise(hashString(record.playerName), index + 71);
+    return roll < winRate ? "W" : "L";
+  });
+}
+
 function normalizeWorldPlayerRecord(
   record: WorldPlayerRecord,
   tables: CompetitionTablesState,
@@ -3981,6 +4040,17 @@ function normalizeWorldPlayerRecord(
       typeof record.sponsorLevel === "number"
         ? record.sponsorLevel
         : clamp(Math.round(15 + Math.max(0, 96 - worldRank) * 0.7), 5, 95),
+    overallRating:
+      typeof record.overallRating === "number"
+        ? clamp(Math.round(record.overallRating), 35, 99)
+        : inferWorldPlayerOverallRating(record, tables),
+    ratingProgress:
+      typeof record.ratingProgress === "number" ? record.ratingProgress : 0,
+    recentResults: Array.isArray(record.recentResults)
+      ? record.recentResults.filter(
+          (result): result is "W" | "L" => result === "W" || result === "L",
+        ).slice(-10)
+      : buildLegacyRecentResults(record),
     retired: typeof record.retired === "boolean" ? record.retired : false,
     retiredSeason: record.retiredSeason ?? null,
   };
@@ -5025,9 +5095,7 @@ function getDisplayedRanking(
     state.player.worldRanking ??
     null;
   const effectiveWorldRanking =
-    worldRanking != null
-      ? Math.max(worldRanking, getHistoryPerformanceRankFloor(state.history))
-      : worldRanking;
+    worldRanking;
   const qSchoolRanking =
     state.competitionTables.qSchool.find(
       (row) => row.playerName === state.player.fullName,
@@ -5463,40 +5531,14 @@ function applySeasonRollover(state: GameState) {
     flooredLivingCompetitionTables,
     playerForNextSeason,
   );
-  const currentSeasonWorldTitle = archivedState.history.tournamentHistory.some(
-    (entry) =>
-      entry.season === state.season &&
-      entry.result === "Winner" &&
-      isWorldChampionshipMainDrawName(entry.tournamentName),
-  );
-  const playerWorldRankingCeiling = Math.max(
-    getPlayerWorldRankingCeiling(archivedState),
-    currentSeasonWorldTitle ? 1 : 2,
-  );
-  const rebuiltCompetitionTables = enforcePlayerWorldRankingCeiling(
-    ageEligibleCompetitionTables,
-    state.player.fullName,
-    playerWorldRankingCeiling,
-  );
+  const rebuiltCompetitionTables = ageEligibleCompetitionTables;
   const syncedCareerSystems = syncCareerSystems({
     competitionTables: rebuiltCompetitionTables,
     player: playerForNextSeason,
     careerSystems: careerSystemsSeed,
     history: archivedState.history,
   });
-  const adjustedWorldRank = Math.max(
-    syncedCareerSystems.pro.worldRank ?? 999,
-    playerWorldRankingCeiling,
-    getHistoryPerformanceRankFloor(archivedState.history),
-  );
-  const careerSystems = {
-    ...syncedCareerSystems,
-    pro: applyAdjustedWorldRankToProState(
-      syncedCareerSystems.pro,
-      playerForNextSeason,
-      adjustedWorldRank,
-    ),
-  };
+  const careerSystems = syncedCareerSystems;
   const primaryKey = getPrimaryCompetitionKey({
     player: playerForNextSeason,
     careerSystems,
@@ -5550,20 +5592,9 @@ function applySeasonRollover(state: GameState) {
           : null,
     },
   );
-  const verifiedWorldRank = currentSeasonWorldTitle
-    ? (nextPlayer.worldRanking ?? 999)
-    : Math.max(2, nextPlayer.worldRanking ?? 999);
-  const verifiedPlayer = {
-    ...nextPlayer,
-    worldRanking: verifiedWorldRank,
-  };
-  const verifiedCareerSystems = {
-    ...careerSystems,
-    pro: {
-      ...careerSystems.pro,
-      worldRank: verifiedWorldRank,
-    },
-  };
+  const verifiedWorldRank = nextPlayer.worldRanking ?? 999;
+  const verifiedPlayer = nextPlayer;
+  const verifiedCareerSystems = careerSystems;
   const previousWorldPlayers = new Map(
     state.worldPlayers.map((record) => [record.playerName, record]),
   );
@@ -6328,6 +6359,17 @@ export function enterTournamentState(
           previousState,
           tournament,
           getTournamentEntryRound(previousState, tournament),
+        ),
+        rankingBaseline: Object.fromEntries(
+          COMPETITION_TABLE_KEYS.map((key) => [
+            key,
+            Object.fromEntries(
+              previousState.competitionTables[key].map((row) => [
+                row.playerName,
+                row.ranking,
+              ]),
+            ),
+          ]),
         ),
         completedRounds: [],
       },
@@ -7475,12 +7517,11 @@ function getTravelReadinessModifier(state: GameState, tournamentId: string) {
 }
 
 function getCurrentRanking(state: GameState) {
-  const performanceRankFloor = getHistoryPerformanceRankFloor(state.history);
   if (
     state.player.rankingLabel === "World Ranking" &&
     state.careerSystems.pro.worldRank != null
   ) {
-    return Math.max(state.careerSystems.pro.worldRank, performanceRankFloor);
+    return state.careerSystems.pro.worldRank;
   }
 
   const rawRanking =
@@ -7489,9 +7530,7 @@ function getCurrentRanking(state: GameState) {
     state.player.amateurRanking ??
     state.player.worldRanking ??
     0;
-  return state.player.rankingLabel === "World Ranking"
-    ? Math.max(rawRanking, performanceRankFloor)
-    : rawRanking;
+  return rawRanking;
 }
 
 function getSponsorSlotLimit(state: GameState) {
@@ -8848,6 +8887,21 @@ export function repairGameState(state: GameState): GameState {
       keepProgress &&
       state.liveMatch.tournamentId === activeProgressTournament?.id,
     );
+  const repairedCompetitionTables = COMPETITION_TABLE_KEYS.reduce<CompetitionTablesState>(
+    (tables, key) => ({
+      ...tables,
+      [key]: rerankCompetitionRows(
+        state.competitionTables[key] ?? [],
+        state.player.fullName,
+      ),
+    }),
+    state.competitionTables,
+  );
+  const repairedRankingOrder = COMPETITION_TABLE_KEYS.some((key) =>
+    repairedCompetitionTables[key].some(
+      (row, index) => row.playerName !== state.competitionTables[key]?.[index]?.playerName,
+    ),
+  );
 
   return {
     ...state,
@@ -8860,9 +8914,10 @@ export function repairGameState(state: GameState): GameState {
     ),
     tournaments: repairedTournaments,
     matches: state.matches.filter((match) => !invalidMatchIds.has(match.id)),
+    competitionTables: repairedCompetitionTables,
     worldPlayers: normalizeWorldPlayers(
       state.worldPlayers,
-      state.competitionTables,
+      repairedCompetitionTables,
       state.player,
     ),
     travel: {
@@ -8878,7 +8933,10 @@ export function repairGameState(state: GameState): GameState {
       ),
     },
     tournamentProgress: keepProgress
-      ? state.tournamentProgress
+      ? {
+          ...state.tournamentProgress,
+          rankingBaseline: state.tournamentProgress.rankingBaseline ?? {},
+        }
       : createEmptyTournamentProgress(),
     liveMatch: keepLiveMatch ? state.liveMatch : null,
     history: {
@@ -8897,11 +8955,12 @@ export function repairGameState(state: GameState): GameState {
     },
     lastAction:
       invalidMatchIds.size > 0 ||
+      repairedRankingOrder ||
       repairedTournaments.some(
         (tournament, index) =>
           tournament.status !== state.tournaments[index]?.status,
       )
-        ? "Save upgraded: repaired invalid tournament entries and out-of-date match records."
+        ? "Save upgraded: repaired tournament records and rebuilt every ranking table strictly by points."
         : state.lastAction,
   };
 }
@@ -9149,6 +9208,7 @@ function updateCompetitionTables(
 function updateCompetitionTablesFromCpuDraw(
   tables: CompetitionTablesState,
   baselineTables: CompetitionTablesState,
+  rankingBaseline: TournamentProgressState["rankingBaseline"],
   tournament: Tournament,
   draw: BracketRound[],
   player: Player,
@@ -9231,8 +9291,11 @@ function updateCompetitionTablesFromCpuDraw(
 
   return keys.reduce<CompetitionTablesState>((nextTables, key) => {
     let rows = nextTables[key];
+    const storedBaseline = rankingBaseline[key];
     const baselineRankings = new Map(
-      baselineTables[key].map((row) => [row.playerName, row.ranking]),
+      storedBaseline
+        ? Object.entries(storedBaseline)
+        : baselineTables[key].map((row) => [row.playerName, row.ranking]),
     );
     participants.forEach((identity, name) => {
       if (
@@ -9269,6 +9332,83 @@ function updateCompetitionTablesFromCpuDraw(
       [key]: rerankCompetitionRows(rows, player.fullName, baselineRankings),
     };
   }, tables);
+}
+
+function updateWorldPlayersFromCompletedDraw(
+  players: WorldPlayerRecord[],
+  tables: CompetitionTablesState,
+  draw: BracketRound[],
+  humanPlayerName: string,
+) {
+  const results = new Map<string, Array<{ result: "W" | "L"; opponent: string }>>();
+  const addResult = (name: string, result: "W" | "L", opponent: string) => {
+    if (name === "TBD" || name === humanPlayerName) return;
+    results.set(name, [...(results.get(name) ?? []), { result, opponent }]);
+  };
+
+  draw.forEach((round) => {
+    round.matches.forEach((match) => {
+      if (
+        typeof match.top.score !== "number" ||
+        typeof match.bottom.score !== "number" ||
+        match.top.name === "TBD" ||
+        match.bottom.name === "TBD"
+      ) {
+        return;
+      }
+      const topWon = match.top.score > match.bottom.score;
+      addResult(match.top.name, topWon ? "W" : "L", match.bottom.name);
+      addResult(match.bottom.name, topWon ? "L" : "W", match.top.name);
+    });
+  });
+
+  const ratingByName = new Map(
+    players.map((record) => [
+      record.playerName,
+      record.overallRating ?? inferWorldPlayerOverallRating(record, tables),
+    ]),
+  );
+
+  return players.map((record) => {
+    const playerResults = results.get(record.playerName);
+    if (!playerResults || playerResults.length === 0) return record;
+    const currentOverall =
+      record.overallRating ?? inferWorldPlayerOverallRating(record, tables);
+    const performanceProgress = playerResults.reduce((sum, entry) => {
+      const opponentOverall = ratingByName.get(entry.opponent) ?? currentOverall;
+      const expected = 1 / (1 + Math.pow(10, (opponentOverall - currentOverall) / 12));
+      return sum + ((entry.result === "W" ? 1 : 0) - expected) * 0.42;
+    }, 0);
+    const developmentDrift =
+      record.age <= 24
+        ? 0.08 * playerResults.length
+        : record.age >= 42
+          ? -0.05 * playerResults.length
+          : 0;
+    const nextProgress =
+      (record.ratingProgress ?? 0) + performanceProgress + developmentDrift;
+    const wholeChange =
+      nextProgress >= 1
+        ? Math.floor(nextProgress)
+        : nextProgress <= -1
+          ? Math.ceil(nextProgress)
+          : 0;
+    const potential = getWorldPlayerDevelopmentPotential(record);
+
+    return {
+      ...record,
+      overallRating: clamp(
+        currentOverall + wholeChange,
+        35,
+        Math.max(currentOverall, potential),
+      ),
+      ratingProgress: nextProgress - wholeChange,
+      recentResults: [
+        ...(record.recentResults ?? []),
+        ...playerResults.map((entry) => entry.result),
+      ].slice(-10),
+    };
+  });
 }
 
 function seedCompetitionTableForStartingLevel(
@@ -12056,6 +12196,21 @@ function archiveWorldPlayersForSeason(
           88,
         );
     const performanceGrowth = seasonWins >= 5 ? 2 : seasonWins <= 1 ? -1 : 0;
+    const currentOverall =
+      existing.overallRating ?? inferWorldPlayerOverallRating(existing, tables);
+    const ageDevelopment =
+      existing.age <= 23
+        ? 2
+        : existing.age <= 28
+          ? 1
+          : existing.age >= 45
+            ? -2
+            : existing.age >= 39
+              ? -1
+              : 0;
+    const seasonalRatingChange = isHumanPlayer
+      ? 0
+      : clamp(performanceGrowth + ageDevelopment, -3, 3);
 
     return {
       ...existing,
@@ -12082,6 +12237,14 @@ function archiveWorldPlayersForSeason(
           : worldRow?.ranking != null
             ? Math.min(existing.highestWorldRank, worldRow.ranking)
             : existing.highestWorldRank,
+      overallRating: isHumanPlayer
+        ? existing.overallRating
+        : clamp(
+            currentOverall + seasonalRatingChange,
+            35,
+            Math.max(currentOverall, getWorldPlayerDevelopmentPotential(existing)),
+          ),
+      ratingProgress: isHumanPlayer ? existing.ratingProgress : 0,
       coachQuality: isHumanPlayer
         ? existing.coachQuality
         : clamp((existing.coachQuality ?? 55) + performanceGrowth, 30, 96),
@@ -12137,10 +12300,7 @@ function syncCareerSystems(
   );
   const qTourLeader = state.competitionTables.qTour[0]?.playerName ?? null;
   const qSchoolLeader = state.competitionTables.qSchool[0]?.playerName ?? null;
-  const historyRankFloor = state.history
-    ? getHistoryPerformanceRankFloor(state.history)
-    : 1;
-  const worldRank = Math.max(worldRow?.ranking ?? 999, historyRankFloor);
+  const worldRank = worldRow?.ranking ?? 999;
   const normalizedHasTourCard =
     state.careerSystems.pro.hasTourCard || worldRank <= TOP_64_RANK_CUTOFF;
   const proBase = {
@@ -12156,7 +12316,7 @@ function syncCareerSystems(
     worldRank:
       worldRow?.ranking == null
         ? null
-        : Math.max(worldRow.ranking, historyRankFloor),
+        : worldRow.ranking,
     oneYearRank: oneYearRow?.ranking ?? null,
   };
   let survivalStatus: ProCareerSystemState["survivalStatus"] =
@@ -12275,81 +12435,6 @@ function syncCareerSystems(
       currentTier,
     },
     lateCareer,
-  };
-}
-
-function applyAdjustedWorldRankToProState(
-  proState: CareerSystemsState["pro"],
-  player: Player,
-  adjustedWorldRank: number,
-): CareerSystemsState["pro"] {
-  const adjustedRetainedViaRanking = adjustedWorldRank <= TOP_64_RANK_CUTOFF;
-  const adjustedHasTourCard =
-    adjustedRetainedViaRanking ||
-    (proState.hasTourCard && proState.yearsRemaining > 0);
-  const adjustedProState: CareerSystemsState["pro"] = {
-    ...proState,
-    hasTourCard: adjustedHasTourCard,
-    cardSource: adjustedHasTourCard
-      ? adjustedRetainedViaRanking
-        ? "Ranking Retained"
-        : proState.cardSource
-      : null,
-    currentYear: adjustedHasTourCard ? proState.currentYear : 0,
-    yearsRemaining: adjustedHasTourCard ? proState.yearsRemaining : 0,
-    expiresAfterSeason: adjustedHasTourCard
-      ? proState.expiresAfterSeason
-      : null,
-    retainedViaRanking: adjustedRetainedViaRanking,
-  };
-  let survivalStatus: ProCareerSystemState["survivalStatus"] =
-    adjustedProState.hasTourCard
-      ? adjustedProState.yearsRemaining >= 2
-        ? "Rookie Year 1"
-        : adjustedProState.yearsRemaining === 1
-          ? "Rookie Year 2"
-          : adjustedProState.retainedViaRanking
-            ? "Safe"
-            : "At Risk"
-      : "Amateur";
-  let currentTier =
-    player.age < 18 ? "Junior Amateur Circuit" : "Amateur Circuit";
-
-  if (adjustedProState.hasTourCard || adjustedWorldRank <= TOP_64_RANK_CUTOFF) {
-    if (adjustedWorldRank <= TOP_16_RANK_CUTOFF) {
-      survivalStatus = "Top 16";
-      currentTier = "Top 16 Elite Player";
-    } else if (adjustedWorldRank <= TOP_32_RANK_CUTOFF) {
-      survivalStatus = "Top 32";
-      currentTier = "Top 32 Professional";
-    } else if (adjustedWorldRank <= TOP_64_RANK_CUTOFF) {
-      survivalStatus = "Safe";
-      currentTier = "Tour Survivor / Top 64";
-    } else if (adjustedProState.hasTourCard && adjustedWorldRank <= 96) {
-      survivalStatus = "Bubble";
-      currentTier = "Rookie Professional — Two-Year Tour Card";
-    } else if (
-      adjustedProState.hasTourCard &&
-      adjustedWorldRank <= MAIN_TOUR_POOL_SIZE
-    ) {
-      survivalStatus = "At Risk";
-      currentTier = "Rookie Professional — Two-Year Tour Card";
-    } else if (
-      !adjustedProState.hasTourCard &&
-      adjustedProState.yearsRemaining === 0 &&
-      adjustedProState.awardedBy
-    ) {
-      survivalStatus = "Lost Card";
-      currentTier = "Q School / Tour Fightback";
-    }
-  }
-
-  return {
-    ...adjustedProState,
-    worldRank: adjustedWorldRank,
-    survivalStatus,
-    tourSurvivalStatus: survivalStatus,
-    currentTier,
   };
 }
 
@@ -12693,7 +12778,7 @@ function getCareerStageFromSystems(
   return "Amateur";
 }
 
-function getPlayerWorldRankingCeiling(
+export function getPlayerWorldRankingCeiling(
   state: Pick<
     GameState,
     "history" | "competitionTables" | "player" | "attributes" | "equipment"
@@ -12820,39 +12905,6 @@ function getPlayerWorldRankingCeiling(
   const rankOneEligible = recentProProfile.latestSeasonWorldTitles > 0;
 
   return rankOneEligible ? 1 : 2;
-}
-
-function enforcePlayerWorldRankingCeiling(
-  tables: CompetitionTablesState,
-  playerName: string,
-  ceilingRank: number,
-) {
-  const currentIndex = tables.world.findIndex(
-    (row) => row.playerName === playerName,
-  );
-  if (currentIndex === -1 || currentIndex + 1 >= ceilingRank) {
-    return tables;
-  }
-
-  const nextWorldRows = [...tables.world];
-  const [playerRow] = nextWorldRows.splice(currentIndex, 1);
-  const targetIndex = Math.min(
-    nextWorldRows.length,
-    Math.max(ceilingRank - 1, 0),
-  );
-  nextWorldRows.splice(targetIndex, 0, playerRow);
-  const rerankedWorldRows = nextWorldRows.map((row, index) => ({
-    ...row,
-    movement: row.ranking - (index + 1),
-    ranking: index + 1,
-    highlighted: row.playerName === playerName,
-  }));
-
-  return {
-    ...tables,
-    world: rerankedWorldRows,
-    oneYear: buildOneYearCompetitionRows(rerankedWorldRows, tables, playerName),
-  };
 }
 
 function getRankingLabelForCompetitionKey(key: CompetitionTableKey) {
@@ -13338,11 +13390,18 @@ function createMatchSetup(state: GameState, tournament: Tournament) {
       (opponentProfile.fatigue ?? 30) / 35 -
       (opponentProfile.injuryWeeks ?? 0) * 3
     : 0;
+  const persistentAbilityModifier = opponentProfile
+    ? ((opponentProfile.overallRating ??
+        inferWorldPlayerOverallRating(opponentProfile, state.competitionTables)) -
+        inferWorldPlayerOverallRating(opponentProfile, state.competitionTables)) *
+      0.7
+    : 0;
   const opponentStrength = clamp(
     opponentBaseStrength +
       (100 - opponent.ranking) * rankingWeight +
       roundDifficulty +
       opponentSupportModifier +
+      persistentAbilityModifier +
       Math.random() * 8 -
       qSchoolAdvantage * 0.35 -
       seededBoost * 0.75 +
@@ -15516,6 +15575,7 @@ function finalizeLiveMatch(
     competitionTables = updateCompetitionTablesFromCpuDraw(
       competitionTables,
       state.competitionTables,
+      state.tournamentProgress.rankingBaseline,
       tournament,
       completedEventDraw,
       playerAfterMatch,
@@ -15579,6 +15639,15 @@ function finalizeLiveMatch(
   const rankings = competitionTables[
     getPrimaryCompetitionKey({ player: playerAfterMatch, careerSystems })
   ].map((row) => ({ ...row }));
+  const worldPlayers =
+    won && nextRound
+      ? state.worldPlayers
+      : updateWorldPlayersFromCompletedDraw(
+          state.worldPlayers,
+          competitionTables,
+          completedEventDraw,
+          state.player.fullName,
+        );
 
   const nextState = finalizeState(
     {
@@ -15603,7 +15672,7 @@ function finalizeLiveMatch(
       matches: [latestMatch, ...state.matches].slice(0, 24),
       rankings,
       competitionTables,
-      worldPlayers: state.worldPlayers,
+      worldPlayers,
       careerSystems,
       tournaments: state.tournaments.map((item) =>
         item.id === tournament.id
@@ -15621,12 +15690,14 @@ function finalizeLiveMatch(
               tournamentId: tournament.id,
               currentRound: nextRound,
               draw: drawAfterMatch,
+              rankingBaseline: state.tournamentProgress.rankingBaseline,
               completedRounds,
             }
           : {
               tournamentId: tournament.id,
               currentRound: null,
               draw: completedEventDraw,
+              rankingBaseline: state.tournamentProgress.rankingBaseline,
               completedRounds,
             },
       liveMatch,
@@ -15916,11 +15987,6 @@ function recalculateState(
   competitionTables = removeOveragePlayerFromYouthTable(
     competitionTables,
     state.player,
-  );
-  competitionTables = enforcePlayerWorldRankingCeiling(
-    competitionTables,
-    state.player.fullName,
-    getPlayerWorldRankingCeiling(state),
   );
   const careerSystems = syncCareerSystems({
     competitionTables,

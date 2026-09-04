@@ -582,6 +582,8 @@ describe("career lifecycle presets", () => {
     for (const record of legacy.worldPlayers) {
       delete (record as Partial<typeof record>).retired;
       delete (record as Partial<typeof record>).retiredSeason;
+      delete (record as Partial<typeof record>).overallRating;
+      delete (record as Partial<typeof record>).recentResults;
     }
 
     const repaired = repairGameState(legacy);
@@ -590,6 +592,39 @@ describe("career lifecycle presets", () => {
         (record) => record.retired === false && record.retiredSeason === null,
       ),
     ).toBe(true);
+    expect(
+      repaired.worldPlayers.every(
+        (record) =>
+          typeof record.overallRating === "number" &&
+          Array.isArray(record.recentResults),
+      ),
+    ).toBe(true);
+  });
+
+  it("repairs a points-rich player row that was artificially held down", () => {
+    const state = createProfessionalStart("start-bottom-tour");
+    const playerName = state.player.fullName;
+    const highestCpuPoints = Math.max(
+      ...state.competitionTables.world
+        .filter((row) => row.playerName !== playerName)
+        .map((row) => row.points),
+    );
+    state.competitionTables.world = state.competitionTables.world
+      .map((row) =>
+        row.playerName === playerName
+          ? { ...row, ranking: 65, points: highestCpuPoints + 100 }
+          : row,
+      )
+      .sort((left, right) => left.ranking - right.ranking);
+
+    const repaired = repairGameState(state);
+    const playerRow = repaired.competitionTables.world.find(
+      (row) => row.playerName === playerName,
+    );
+
+    expect(playerRow?.ranking).toBe(1);
+    expect(playerRow?.movement).toBe(64);
+    expect(repaired.lastAction).toMatch(/rebuilt every ranking table/i);
   });
 
   it("archives a season and explicitly retires an over-age CPU player", () => {
@@ -753,6 +788,12 @@ describe("complete tournament journey", () => {
     const entered = enterTournamentState(equipped, tournament.id);
     const atEvent = continueToNextTournamentState(entered);
     const travelled = bookTravelState(atEvent, tournament.id);
+    const cpuFormBefore = new Map(
+      travelled.worldPlayers.map((record) => [
+        record.playerName,
+        (record.recentResults ?? []).join(""),
+      ]),
+    );
     let randomState = 90210;
     vi.spyOn(Math, "random").mockImplementation(() => {
       randomState = (randomState * 16807) % 2147483647;
@@ -824,6 +865,14 @@ describe("complete tournament journey", () => {
         .every((change) => change.delta === 1),
     ).toBe(true);
     expect(eventCountChanges.every((change) => change.delta === 1)).toBe(true);
+    expect(
+      afterMatch.worldPlayers.some(
+        (record) =>
+          record.playerName !== afterMatch.player.fullName &&
+          (record.recentResults ?? []).join("") !==
+            cpuFormBefore.get(record.playerName),
+      ),
+    ).toBe(true);
     eventCountChanges.forEach((change) => {
       const tableKey =
         change.tableKey as keyof typeof travelled.competitionTables;

@@ -212,10 +212,10 @@ function formTone(result: string) {
   return 'bg-amber-500'
 }
 
-function buildFormDots(wins: number, losses: number) {
-  const total = Math.max(1, Math.min(8, wins + losses))
-  const winDots = Math.min(total, wins)
-  return Array.from({ length: total }, (_, index) => index < winDots ? 'W' : 'L')
+function buildFormDots(recentResults: readonly string[] | undefined): Array<'W' | 'L'> {
+  return recentResults
+    ?.filter((result): result is 'W' | 'L' => result === 'W' || result === 'L')
+    .slice(-8) ?? []
 }
 
 export function RankingsPage() {
@@ -261,13 +261,20 @@ export function RankingsPage() {
         ...row,
         overall: playerOverall,
         potential: playerPotential,
+        recentResults: gameState.player.form.slice(-10),
       }
     }
 
     const archive = worldPlayerByName.get(row.playerName)
+    const estimated = getEstimatedRatings(row.playerName, row.ranking, ratingCircuit, archive?.age)
     return {
       ...row,
-      ...getEstimatedRatings(row.playerName, row.ranking, ratingCircuit, archive?.age),
+      overall: archive?.overallRating ?? estimated.overall,
+      potential: Math.max(
+        archive?.overallRating ?? estimated.overall,
+        archive?.developmentPotential ?? estimated.potential,
+      ),
+      recentResults: archive?.recentResults,
     }
   })
   const playerRow = activeRowsWithRatings.find((row) => row.playerName === gameState.player.fullName) ?? activeRowsWithRatings[0]
@@ -393,10 +400,23 @@ export function RankingsPage() {
                       <td className="px-2 py-2 text-center text-gray-400">{row.eventsPlayed}</td>
                       <td className="px-2 py-2 text-center text-white">{row.titles}</td>
                       <td className="px-3 py-2">
-                        <div className="flex justify-center gap-1">
-                          {buildFormDots(row.wins, row.losses).map((result, index) => (
+                        <div
+                          className="flex justify-center gap-1"
+                          aria-label={`Recent form: ${(
+                            row.highlighted
+                              ? gameState.player.form.slice(-8)
+                              : buildFormDots(row.recentResults)
+                          ).join(', ') || 'No recent matches'}`}
+                        >
+                          {(row.highlighted
+                            ? gameState.player.form.slice(-8)
+                            : buildFormDots(row.recentResults)
+                          ).map((result, index) => (
                             <span key={`${row.id}-${result}-${index}`} className={`h-2 w-2 rounded-full ${formTone(result)}`} />
                           ))}
+                          {!row.highlighted && buildFormDots(row.recentResults).length === 0 ? (
+                            <span className="text-[9px] text-gray-600">No recent matches</span>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
