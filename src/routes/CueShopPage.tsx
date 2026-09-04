@@ -42,6 +42,47 @@ function StatLine({ label, value }: { label: string; value: number }) {
   );
 }
 
+function equipmentCardClass({
+  selected,
+  owned,
+  equipped,
+}: {
+  selected: boolean;
+  owned: boolean;
+  equipped: boolean;
+}) {
+  const stateClass = equipped
+    ? "border-green-400 bg-green-500/10 ring-1 ring-green-400/30"
+    : owned
+      ? "border-sky-500/70 bg-sky-500/[0.07] ring-1 ring-sky-400/15 hover:border-sky-400"
+      : selected
+        ? "border-green-500 bg-green-500/[0.04]"
+        : "hover:border-border-light";
+  return `card card-body relative text-left transition-colors ${stateClass}`;
+}
+
+function EquipmentStatusBadge({
+  owned,
+  equipped,
+}: {
+  owned: boolean;
+  equipped: boolean;
+}) {
+  if (equipped)
+    return (
+      <span className="flex shrink-0 items-center gap-1 rounded-full bg-green-400 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-green-950">
+        <Check className="h-3 w-3" /> Equipped
+      </span>
+    );
+  if (owned)
+    return (
+      <span className="flex shrink-0 items-center gap-1 rounded-full border border-sky-400/40 bg-sky-400/15 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-sky-300">
+        <Check className="h-3 w-3" /> Owned
+      </span>
+    );
+  return null;
+}
+
 export function CueShopPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -244,12 +285,17 @@ export function CueShopPage() {
     if (activeTab === "chalk")
       return visibleChalk.map((chalk) => {
         const owned = gameState.equipment.chalkOwned.includes(chalk.id);
+        const equipped = gameState.equipment.currentChalkId === chalk.id;
         return (
           <button
             key={chalk.id}
             type="button"
             onClick={() => setSelectedChalkId(chalk.id)}
-            className={`card card-body text-left ${selectedChalk.id === chalk.id ? "border-green-500" : "hover:border-border-light"}`}
+            className={equipmentCardClass({
+              selected: selectedChalk.id === chalk.id,
+              owned,
+              equipped,
+            })}
           >
             <div className="mb-3 flex items-start justify-between">
               <div>
@@ -260,9 +306,7 @@ export function CueShopPage() {
                   {formatMoney(chalk.cost)}
                 </p>
               </div>
-              {gameState.equipment.currentChalkId === chalk.id ? (
-                <Check className="h-5 w-5 rounded-full bg-green-600 p-1 text-white" />
-              ) : null}
+              <EquipmentStatusBadge owned={owned} equipped={equipped} />
             </div>
             <div className="space-y-1.5">
               <StatLine label="Grip" value={chalk.grip} />
@@ -274,7 +318,11 @@ export function CueShopPage() {
               <span className="text-gray-400">
                 Miscue reduction {chalk.miscueReduction}
               </span>
-              {owned ? <span className="text-green-400">Owned</span> : null}
+              {owned ? (
+                <span className={equipped ? "text-green-300" : "text-sky-300"}>
+                  {equipped ? "In current setup" : "Ready to equip"}
+                </span>
+              ) : null}
             </div>
           </button>
         );
@@ -282,12 +330,17 @@ export function CueShopPage() {
     if (activeTab === "tips")
       return visibleTips.map((tip) => {
         const owned = gameState.equipment.tipsOwned.includes(tip.id);
+        const equipped = gameState.equipment.currentTipId === tip.id;
         return (
           <button
             key={tip.id}
             type="button"
             onClick={() => setSelectedTipId(tip.id)}
-            className={`card card-body text-left ${selectedTip.id === tip.id ? "border-green-500" : "hover:border-border-light"}`}
+            className={equipmentCardClass({
+              selected: selectedTip.id === tip.id,
+              owned,
+              equipped,
+            })}
           >
             <div className="mb-3 flex items-start justify-between">
               <div>
@@ -296,9 +349,7 @@ export function CueShopPage() {
                   {formatMoney(tip.cost)}
                 </p>
               </div>
-              {gameState.equipment.currentTipId === tip.id ? (
-                <Check className="h-5 w-5 rounded-full bg-green-600 p-1 text-white" />
-              ) : null}
+              <EquipmentStatusBadge owned={owned} equipped={equipped} />
             </div>
             <div className="space-y-1.5">
               <StatLine label="Durability" value={tip.durability} />
@@ -308,7 +359,11 @@ export function CueShopPage() {
             </div>
             <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-[10px]">
               <span className="text-gray-400">Hardness: {tip.hardness}</span>
-              {owned ? <span className="text-green-400">Owned</span> : null}
+              {owned ? (
+                <span className={equipped ? "text-green-300" : "text-sky-300"}>
+                  {equipped ? "In current setup" : "Ready to equip"}
+                </span>
+              ) : null}
             </div>
           </button>
         );
@@ -316,12 +371,17 @@ export function CueShopPage() {
     if (activeTab === "cases")
       return visibleCases.map((entry) => {
         const owned = gameState.equipment.casesOwned.includes(entry.id);
+        const equipped = gameState.equipment.currentCaseId === entry.id;
         return (
           <button
             key={entry.id}
             type="button"
             onClick={() => setSelectedCaseId(entry.id)}
-            className={`card card-body text-left ${selectedCase.id === entry.id ? "border-green-500" : "hover:border-border-light"}`}
+            className={equipmentCardClass({
+              selected: selectedCase.id === entry.id,
+              owned,
+              equipped,
+            })}
           >
             <div className="mb-3 flex items-start justify-between">
               <div>
@@ -332,9 +392,7 @@ export function CueShopPage() {
                   {formatMoney(entry.price)}
                 </p>
               </div>
-              {gameState.equipment.currentCaseId === entry.id ? (
-                <Check className="h-5 w-5 rounded-full bg-green-600 p-1 text-white" />
-              ) : null}
+              <EquipmentStatusBadge owned={owned} equipped={equipped} />
             </div>
             <div className="space-y-1.5">
               <StatLine label="Protection" value={entry.protection} />
@@ -344,7 +402,11 @@ export function CueShopPage() {
             </div>
             <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-[10px]">
               <span className="text-gray-400">{entry.tier}</span>
-              {owned ? <span className="text-green-400">Owned</span> : null}
+              {owned ? (
+                <span className={equipped ? "text-green-300" : "text-sky-300"}>
+                  {equipped ? "In current setup" : "Ready to equip"}
+                </span>
+              ) : null}
             </div>
           </button>
         );
@@ -352,12 +414,17 @@ export function CueShopPage() {
     if (activeTab === "table-setup")
       return visibleTables.map((table) => {
         const owned = gameState.equipment.tablesOwned.includes(table.id);
+        const equipped = gameState.equipment.currentTableId === table.id;
         return (
           <button
             key={table.id}
             type="button"
             onClick={() => setSelectedTableId(table.id)}
-            className={`card card-body text-left ${selectedTable.id === table.id ? "border-green-500" : "hover:border-border-light"}`}
+            className={equipmentCardClass({
+              selected: selectedTable.id === table.id,
+              owned,
+              equipped,
+            })}
           >
             <div className="mb-3 flex items-start justify-between">
               <div>
@@ -368,9 +435,7 @@ export function CueShopPage() {
                   {formatMoney(table.monthlyRental)}/mo
                 </p>
               </div>
-              {gameState.equipment.currentTableId === table.id ? (
-                <Check className="h-5 w-5 rounded-full bg-green-600 p-1 text-white" />
-              ) : null}
+              <EquipmentStatusBadge owned={owned} equipped={equipped} />
             </div>
             <div className="space-y-1.5">
               <StatLine label="Cloth" value={table.clothSpeed} />
@@ -381,7 +446,9 @@ export function CueShopPage() {
             <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-[10px]">
               <span className="text-gray-400">{table.tier}</span>
               {owned ? (
-                <span className="text-green-400">Active option</span>
+                <span className={equipped ? "text-green-300" : "text-sky-300"}>
+                  {equipped ? "Active facility" : "Ready to activate"}
+                </span>
               ) : null}
             </div>
           </button>
@@ -425,12 +492,17 @@ export function CueShopPage() {
       ));
     return visibleCues.map((cue) => {
       const owned = gameState.equipment.cuesOwned.includes(cue.id);
+      const equipped = gameState.equipment.currentCueId === cue.id;
       return (
         <button
           key={cue.id}
           type="button"
           onClick={() => setSelectedCueId(cue.id)}
-          className={`card card-body text-left ${selectedCue.id === cue.id ? "border-green-500" : "hover:border-border-light"}`}
+          className={equipmentCardClass({
+            selected: selectedCue.id === cue.id,
+            owned,
+            equipped,
+          })}
         >
           <div className="mb-3 flex items-start justify-between">
             <div>
@@ -444,9 +516,7 @@ export function CueShopPage() {
                 </span>
               </div>
             </div>
-            {gameState.equipment.currentCueId === cue.id ? (
-              <Check className="h-5 w-5 rounded-full bg-green-600 p-1 text-white" />
-            ) : null}
+            <EquipmentStatusBadge owned={owned} equipped={equipped} />
           </div>
           <div className="space-y-1.5">
             <StatLine label="Touch" value={cue.touch} />
@@ -456,7 +526,11 @@ export function CueShopPage() {
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-[10px]">
             <span className="text-gray-400">Condition: {cue.condition}%</span>
-            {owned ? <span className="text-green-400">Owned</span> : null}
+            {owned ? (
+              <span className={equipped ? "text-green-300" : "text-sky-300"}>
+                {equipped ? "In current setup" : "Ready to equip"}
+              </span>
+            ) : null}
           </div>
         </button>
       );
@@ -706,6 +780,25 @@ export function CueShopPage() {
           </button>
         ))}
       </div>
+      {activeTab !== "maintenance" ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-border bg-surface/60 px-3 py-2 text-[10px] text-gray-400">
+          <span className="font-semibold uppercase tracking-wide text-gray-500">
+            Item status
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-green-400" />
+            Equipped
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-sky-400" />
+            Owned
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full border border-gray-500" />
+            Available to buy
+          </span>
+        </div>
+      ) : null}
       <div className="grid gap-4 xl:grid-cols-12">
         <div className="grid gap-3 sm:grid-cols-2 xl:col-span-8">
           {renderCards()}

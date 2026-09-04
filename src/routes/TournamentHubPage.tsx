@@ -1,10 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import {
+  Crown,
   MapPin,
   Maximize2,
   Play,
   Search,
   SkipForward,
+  Star,
   Trophy,
 } from "lucide-react";
 import { TournamentBracket } from "../components/tournaments/TournamentBracket";
@@ -59,6 +61,31 @@ export function TournamentHubPage() {
   );
   const equipmentReady = Boolean(currentCue && currentChalk && currentTip);
   const activeTournament = getNextEligibleTournament(gameState);
+  const tournamentName = activeTournament?.name.toLowerCase() ?? "";
+  const isQualifier = /qualif|q school/.test(tournamentName);
+  const isWorldChampionship =
+    /world championship/.test(tournamentName) && !isQualifier;
+  const isTripleCrown =
+    !isQualifier &&
+    (/world championship/.test(tournamentName) ||
+      /uk championship/.test(tournamentName) ||
+      /^masters$/.test(tournamentName));
+  const isMajorEvent =
+    !isQualifier &&
+    (isTripleCrown ||
+      (activeTournament?.prestige ?? 0) >= 5 ||
+      activeTournament?.eventClass === "Major" ||
+      activeTournament?.type === "Major");
+  const majorLabel = isWorldChampionship
+    ? "World Championship"
+    : isTripleCrown
+      ? "Triple Crown"
+      : "Major Event";
+  const majorMessage = isWorldChampionship
+    ? "The sport's defining stage · every session shapes your legacy"
+    : isTripleCrown
+      ? "A career-defining stage with history, pressure and prestige"
+      : "A season-defining tournament with elite rewards and pressure";
   const tournamentEntered = activeTournament?.status === "Entered";
   const playability = activeTournament
     ? getTournamentPlayability(gameState, activeTournament)
@@ -170,14 +197,53 @@ export function TournamentHubPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
-      <header className="flex shrink-0 flex-col gap-3 rounded-xl border border-border bg-surface/85 px-3 py-3 sm:flex-row sm:items-center sm:px-4">
+    <div className="relative flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+      {isMajorEvent ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-amber-500/[0.07] via-rose-950/[0.05] to-transparent"
+        />
+      ) : null}
+      <header
+        className={`relative flex shrink-0 flex-col gap-3 overflow-hidden rounded-xl border px-3 py-3 sm:flex-row sm:items-center sm:px-4 ${
+          isMajorEvent
+            ? "border-amber-500/40 bg-gradient-to-r from-[#211708] via-[#151923] to-[#1c1017] shadow-[0_0_32px_rgba(217,164,65,0.08)]"
+            : "border-border bg-surface/85"
+        }`}
+      >
+        {isMajorEvent ? (
+          <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-amber-300 via-amber-500 to-rose-800" />
+        ) : null}
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">
-            Tournament Hub
-          </p>
+          {isMajorEvent ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-amber-300">
+                <Crown className="h-3 w-3" /> {majorLabel}
+              </span>
+              <span className="flex items-center gap-0.5 text-amber-300/80">
+                {Array.from({ length: activeTournament?.prestige ?? 5 }).map(
+                  (_, index) => (
+                    <Star key={index} className="h-2.5 w-2.5 fill-current" />
+                  ),
+                )}
+                <span className="ml-1 text-[9px] uppercase tracking-wider text-amber-100/60">
+                  Prestige
+                </span>
+              </span>
+            </div>
+          ) : (
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">
+              Tournament Hub
+            </p>
+          )}
           <div className="mt-1 flex min-w-0 flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-3">
-            <h1 className="truncate text-xl font-bold leading-tight text-white sm:text-2xl">
+            <h1
+              className={`truncate font-bold leading-tight sm:text-2xl ${
+                isMajorEvent
+                  ? "font-serif text-2xl tracking-tight text-amber-50"
+                  : "text-xl text-white"
+              }`}
+            >
               {activeTournament?.name ?? "No Active Tournament"}
             </h1>
             <p className="truncate text-xs text-gray-400">
@@ -185,12 +251,25 @@ export function TournamentHubPage() {
               {activeTournament?.format ?? "Format pending"}
             </p>
           </div>
+          {isMajorEvent ? (
+            <p className="mt-1 text-[10px] text-amber-100/70">
+              {majorMessage}
+            </p>
+          ) : null}
         </div>
-        <div className="flex shrink-0 items-center justify-between rounded-lg border border-border bg-surface-light/60 px-4 py-2 sm:block sm:text-center">
+        <div
+          className={`flex shrink-0 items-center justify-between rounded-lg border px-4 py-2 sm:block sm:text-center ${
+            isMajorEvent
+              ? "border-amber-400/20 bg-amber-400/[0.07]"
+              : "border-border bg-surface-light/60"
+          }`}
+        >
           <p className="text-[9px] uppercase tracking-[0.16em] text-gray-500">
             Current Round
           </p>
-          <p className="text-lg font-bold text-green-400">
+          <p
+            className={`text-lg font-bold ${isMajorEvent ? "text-amber-300" : "text-green-400"}`}
+          >
             {activeRound ?? "Entry"}
           </p>
         </div>
@@ -205,7 +284,13 @@ export function TournamentHubPage() {
 
       <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-2">
         <div className="grid min-h-0 gap-3 xl:grid-rows-[12.25rem_minmax(0,1fr)] xl:gap-2">
-          <section className="card flex min-h-0 flex-col overflow-hidden border-green-600/40 bg-gradient-to-r from-green-600/10 via-surface to-surface">
+          <section
+            className={`card flex min-h-0 flex-col overflow-hidden ${
+              isMajorEvent
+                ? "border-amber-500/30 bg-gradient-to-r from-amber-500/[0.08] via-surface to-rose-950/10"
+                : "border-green-600/40 bg-gradient-to-r from-green-600/10 via-surface to-surface"
+            }`}
+          >
             <div className="card-header shrink-0">
               <h2 className="text-sm font-semibold text-white">
                 Next Match{" "}
@@ -262,7 +347,11 @@ export function TournamentHubPage() {
               <div className="grid gap-2">
                 <button
                   type="button"
-                  className="btn-primary min-h-11 w-full justify-center px-5 text-sm"
+                  className={`${
+                    isMajorEvent
+                      ? "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-amber-400 px-5 text-sm font-semibold text-slate-950 transition hover:bg-amber-300"
+                      : "btn-primary min-h-11 w-full justify-center px-5 text-sm"
+                  }`}
                   onClick={handlePlayLiveMatch}
                 >
                   <Play className="h-4 w-4" /> {primaryActionLabel}
@@ -305,15 +394,23 @@ export function TournamentHubPage() {
             </div>
           </section>
 
-          <section className="card flex min-h-[22rem] flex-col overflow-hidden xl:min-h-0">
+          <section
+            className={`card flex min-h-[22rem] flex-col overflow-hidden xl:min-h-0 ${isMajorEvent ? "border-amber-500/20 bg-[#121923]" : ""}`}
+          >
             <div className="card-header shrink-0">
               <div>
                 <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
-                  <Trophy className="h-3.5 w-3.5 text-green-400" /> Tournament
-                  Bracket
+                  {isMajorEvent ? (
+                    <Crown className="h-3.5 w-3.5 text-amber-300" />
+                  ) : (
+                    <Trophy className="h-3.5 w-3.5 text-green-400" />
+                  )}{" "}
+                  {isMajorEvent ? "Championship Draw" : "Tournament Bracket"}
                 </h2>
                 <p className="mt-0.5 text-[10px] text-gray-500">
-                  Live draw · your route is highlighted
+                  {isMajorEvent
+                    ? "Elite field · your route to the title is highlighted"
+                    : "Live draw · your route is highlighted"}
                 </p>
               </div>
               <button
@@ -462,6 +559,16 @@ export function TournamentHubPage() {
                 </b>
               </div>
               <div className="border-t border-border pt-3">
+                {isMajorEvent ? (
+                  <div className="mb-3 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-2.5">
+                    <p className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-amber-300">
+                      <Crown className="h-3 w-3" /> Championship stakes
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-amber-50/80">
+                      {activeTournament?.progressionImpact ?? majorMessage}
+                    </p>
+                  </div>
+                ) : null}
                 <p className="text-[9px] uppercase tracking-[0.16em] text-gray-500">
                   Objective
                 </p>

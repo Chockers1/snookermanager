@@ -148,8 +148,8 @@ export function MatchPreviewPage() {
 
   return (
     <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
-      <div className="flex shrink-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface/85 px-3 py-2">
-        <div className="min-w-0">
+      <div className="flex shrink-0 flex-col gap-2 rounded-lg border border-border bg-surface/85 px-3 py-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[11px] font-medium text-gray-500">
             <span className="truncate">{activeTournament?.name ?? 'Match Centre'}</span>
             <ChevronRight className="h-3 w-3" />
@@ -161,15 +161,27 @@ export function MatchPreviewPage() {
             <h1 className="shrink-0 text-xl font-bold leading-tight text-white">Match Preview</h1>
             <p className="hidden min-w-0 truncate text-xs text-gray-400 sm:block">{gameState.player.fullName} against {opponentName}</p>
           </div>
+          <p className="mt-1 truncate text-[10px] text-gray-400">
+            <span className="font-semibold uppercase tracking-wide text-gray-500">Recent opponent pattern</span>
+            <span className="mx-2 text-border">|</span>
+            Event {eventWins}-{eventLosses} · Frames {eventFrameDifferential > 0 ? '+' : ''}{eventFrameDifferential} · {opponentPatternText}
+          </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <div className="card flex h-11 w-[104px] flex-col items-center justify-center text-center">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <div className="card flex h-10 w-[96px] flex-col items-center justify-center text-center">
             <p className="text-[9px] font-semibold uppercase text-gray-500">Difficulty</p>
-            <p className="text-[13px] font-bold text-green-400">{difficultyLabel}</p>
+            <p className="text-xs font-bold text-green-400">{difficultyLabel}</p>
           </div>
-          <div className="card flex h-11 w-[92px] flex-col items-center justify-center text-center">
+          <div className="card flex h-10 w-[82px] flex-col items-center justify-center text-center">
             <p className="text-[9px] font-semibold uppercase text-gray-500">Readiness</p>
-            <p className="text-[13px] font-bold text-white">{readinessScore}%</p>
+            <p className="text-xs font-bold text-white">{readinessScore}%</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => navigate('/training')} className="btn-secondary h-10 whitespace-nowrap px-3 text-xs">Adjust Training</button>
+            <button type="button" onClick={() => navigate('/equipment/chalk-tips')} className="btn-secondary h-10 whitespace-nowrap px-3 text-xs">Change Equipment</button>
+            <button type="button" onClick={handleStartMatch} className="btn-primary h-10 whitespace-nowrap px-4 text-xs">
+              {activeLiveMatch ? 'Resume Match' : playability?.canPlay ? 'Start Match' : !playability?.travelBooked && (playability?.daysUntilStart ?? 0) <= 7 ? 'Book Travel' : 'Tournament Hub'} <ChevronRight className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       </div>
@@ -433,19 +445,6 @@ export function MatchPreviewPage() {
         </div>
       </div>
 
-      <div className="card card-body flex items-center justify-between gap-4 px-3 py-2.5">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase text-gray-500">Recent opponent pattern</p>
-          <p className="truncate text-xs text-gray-300">Event {eventWins}-{eventLosses} · Frames {eventFrameDifferential > 0 ? '+' : ''}{eventFrameDifferential} · {opponentPatternText}</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button type="button" onClick={() => navigate('/training')} className="btn-secondary px-3 py-2 text-xs">Adjust Training</button>
-          <button type="button" onClick={() => navigate('/equipment/chalk-tips')} className="btn-secondary px-3 py-2 text-xs">Change Equipment</button>
-          <button type="button" onClick={handleStartMatch} className="btn-primary px-4 py-2 text-xs">
-            {activeLiveMatch ? 'Resume Match' : playability?.canPlay ? 'Start Match' : !playability?.travelBooked && (playability?.daysUntilStart ?? 0) <= 7 ? 'Book Travel' : 'Tournament Hub'} <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

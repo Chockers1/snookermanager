@@ -63,6 +63,8 @@ export function CoachMarketPage() {
   const [showComparison, setShowComparison] = useState(false);
   const [selectedContractLabel, setSelectedContractLabel] =
     useState("8 Week Trial");
+  const [selectedHiringSlot, setSelectedHiringSlot] =
+    useState<(typeof COACH_SLOT_NAMES)[number]>("Lead Coach");
   const [negotiationTone, setNegotiationTone] = useState<
     "Conservative" | "Balanced" | "Ambitious"
   >("Balanced");
@@ -82,6 +84,14 @@ export function CoachMarketPage() {
       (slot) =>
         !gameState.coachContracts.some((contract) => contract.slot === slot),
     ) ?? null;
+  const selectedSlotIsOpen = Boolean(
+    selectedHiringSlot &&
+      COACH_SLOT_NAMES.slice(0, slotLimit).includes(selectedHiringSlot) &&
+      !gameState.coachContracts.some(
+        (contract) => contract.slot === selectedHiringSlot,
+      ),
+  );
+  const hiringSlot = selectedSlotIsOpen ? selectedHiringSlot : openSlot;
   const totalCoachCost = gameState.coachContracts.reduce(
     (sum, contract) => sum + contract.weeklyCost,
     0,
@@ -150,7 +160,7 @@ export function CoachMarketPage() {
   const canHire = Boolean(
     selectedCoach &&
     availability.available &&
-    openSlot &&
+    hiringSlot &&
     !alreadySigned &&
     forecast.affordable,
   );
@@ -223,11 +233,22 @@ export function CoachMarketPage() {
             <button
               key={slot}
               type="button"
-              disabled={!contract}
-              onClick={() => contract && setSelectedCoachId(contract.coachId)}
-              className={`card min-h-[72px] p-3 text-left ${contract ? "border-green-600/30 bg-green-600/10" : unlocked ? "border-dashed" : "border-red-600/20 opacity-60"}`}
+              disabled={!unlocked}
+              aria-pressed={selectedHiringSlot === slot}
+              onClick={() => {
+                setSelectedHiringSlot(slot);
+                if (contract) setSelectedCoachId(contract.coachId);
+              }}
+              className={`card min-h-[72px] p-3 text-left transition-colors ${selectedHiringSlot === slot ? "border-green-400 ring-1 ring-green-400/40" : contract ? "border-green-600/30 bg-green-600/10" : unlocked ? "border-dashed hover:border-green-500/60 hover:bg-green-500/5" : "border-red-600/20 opacity-60"}`}
             >
-              <p className="metric-label">{slot}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="metric-label">{slot}</p>
+                {selectedHiringSlot === slot && unlocked ? (
+                  <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[9px] font-semibold text-green-300">
+                    Selected
+                  </span>
+                ) : null}
+              </div>
               <p className="mt-1 truncate text-sm font-semibold text-white">
                 {contract?.coach?.name ?? (unlocked ? "Open slot" : "Locked")}
               </p>
@@ -235,7 +256,7 @@ export function CoachMarketPage() {
                 {contract
                   ? `${contract.weeksRemaining} weeks · ${formatMoney(contract.weeklyCost)}/wk`
                   : unlocked
-                    ? "Ready for a new appointment"
+                    ? "Click to hire into this slot"
                     : "Raise ranking or reputation"}
               </p>
             </button>
@@ -533,7 +554,7 @@ export function CoachMarketPage() {
                     Contract Options
                   </h2>
                   <p className="text-[9px] text-gray-500">
-                    {selectedContract?.slot ?? openSlot ?? "No open slot"}
+                    {selectedContract?.slot ?? hiringSlot ?? "No open slot"}
                   </p>
                 </div>
                 <span
@@ -626,11 +647,16 @@ export function CoachMarketPage() {
                       onClick={() =>
                         selectedCoach &&
                         canHire &&
-                        hireCoach(selectedCoach.id, selectedOption?.label)
+                        hiringSlot &&
+                        hireCoach(
+                          selectedCoach.id,
+                          selectedOption?.label,
+                          hiringSlot,
+                        )
                       }
                     >
                       {canHire
-                        ? `Hire as ${openSlot}`
+                        ? `Hire as ${hiringSlot}`
                         : forecast.affordable
                           ? "Unavailable"
                           : "Budget too tight"}

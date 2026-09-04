@@ -20,7 +20,6 @@ import {
 import { NavLink } from "react-router-dom";
 import clsx from "clsx";
 import { useGame } from "../../context/useGame";
-import { getNextEligibleTournament } from "../../hooks/useGameState";
 import { sidebarGroups } from "../../utils/routing";
 
 const iconMap: Record<string, typeof LayoutDashboard> = {
@@ -48,8 +47,6 @@ export function Sidebar() {
   const unreadInboxCount = gameState.inbox.filter(
     (message) => !message.read,
   ).length;
-  const nextEvent =
-    getNextEligibleTournament(gameState) ?? gameState.tournaments[0];
 
   return (
     <aside className="scrollbar-thin flex h-full w-[min(18rem,88vw)] shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar xl:w-52">
@@ -100,24 +97,6 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
-      <div className="shrink-0 border-t border-border p-2">
-        <div className="rounded-lg bg-surface p-2.5">
-          <p className="text-[9px] font-semibold uppercase text-gray-500">
-            Next Event
-          </p>
-          <p className="mt-0.5 truncate text-xs font-medium text-white">
-            {nextEvent?.name ?? gameState.player.nextEvent}
-          </p>
-          <p className="truncate text-[10px] text-gray-400">
-            {nextEvent?.location ?? gameState.player.careerStage}
-          </p>
-          <p className="mt-0.5 text-[10px] text-green-400">
-            {nextEvent
-              ? nextEvent.startDate
-              : `${gameState.player.daysUntilEvent} days`}
-          </p>
-        </div>
-      </div>
     </aside>
   );
 }

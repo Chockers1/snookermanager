@@ -89,6 +89,7 @@ test("shows player summary once in the global dashboard status bar", async ({
   await expect(sidebar.getByRole("link", { name: "Save Manager" })).toHaveCount(
     0,
   );
+  await expect(sidebar.getByText("Next Event", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Career and save options" }).click();
   await expect(page.getByRole("link", { name: "Save Manager" })).toBeVisible();
   await expect(
@@ -239,10 +240,8 @@ test("enters, travels to, and completes every round of a tournament", async ({
   await page.getByRole("button", { name: /Continue Career/ }).click();
   await page.getByRole("link", { name: "Tournament Hub" }).click();
   const primary = page
-    .locator("button.btn-primary")
-    .filter({
-      hasText:
-        /Enter Tournament|Book Travel|Advance to Tournament|Play Next Match/,
+    .getByRole("button", {
+      name: /Enter Tournament|Book Travel|Advance to Tournament|Play Next Match/,
     })
     .first();
   await expect(primary).toContainText("Enter Tournament");
@@ -330,10 +329,8 @@ test("live match is a score, tactics, and statistics workspace", async ({
   await page.getByRole("button", { name: /Continue Career/ }).click();
   await page.getByRole("link", { name: "Tournament Hub" }).click();
   const primary = page
-    .locator("button.btn-primary")
-    .filter({
-      hasText:
-        /Enter Tournament|Book Travel|Advance to Tournament|Play Next Match/,
+    .getByRole("button", {
+      name: /Enter Tournament|Book Travel|Advance to Tournament|Play Next Match/,
     })
     .first();
   await primary.click();

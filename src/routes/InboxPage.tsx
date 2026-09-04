@@ -284,9 +284,10 @@ export function InboxPage() {
           </div>
         </div>
 
-        <article className="scrollbar-thin flex min-h-0 min-w-0 flex-col overflow-y-auto overscroll-contain p-4 sm:p-6">
+        <article className="flex min-h-0 min-w-0 flex-col overflow-hidden p-4 sm:p-5">
           {selectedMessage ? (
             <>
+              <div data-testid="inbox-message-body" className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
               <div className="flex flex-wrap items-center gap-2 text-[10px] text-gray-500">
                 <Mail className="h-3.5 w-3.5 text-green-400" />
                 <span>{selectedMessage.sender}</span>
@@ -298,16 +299,16 @@ export function InboxPage() {
                   {selectedMessage.priority} priority
                 </span>
               </div>
-              <h2 className="mt-3 text-xl font-semibold text-white sm:text-2xl">
+              <h2 className="mt-2 text-xl font-semibold text-white sm:text-2xl">
                 {selectedMessage.subject}
               </h2>
-              <p className="mt-5 max-w-3xl text-sm leading-7 text-gray-300">
+              <p className="mt-3 max-w-3xl text-sm leading-5 text-gray-300">
                 {selectedMessage.preview}
               </p>
 
               {selectedSummary.length ? (
-                <div className="mt-5 max-w-3xl overflow-hidden rounded-lg border border-border bg-background/30">
-                  <div className="border-b border-border px-4 py-2.5">
+                <div className="mt-3 max-w-3xl shrink-0 rounded-lg border border-border bg-background/30">
+                  <div className="border-b border-border px-4 py-2">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
                       Report summary
                     </p>
@@ -316,7 +317,7 @@ export function InboxPage() {
                     {selectedSummary.map((item, index) => (
                       <li
                         key={`${item.label}-${index}`}
-                        className="grid gap-1 px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4"
+                        className="grid gap-1 px-4 py-1.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4"
                       >
                         <div className="min-w-0">
                           <p className="text-xs font-medium text-gray-300">
@@ -340,7 +341,7 @@ export function InboxPage() {
               ) : null}
 
               {relatedTournament ? (
-                <div className="mt-6 rounded-lg border border-border-light bg-background/40 p-4">
+                <div className="mt-3 shrink-0 rounded-lg border border-border-light bg-background/40 p-3">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-sm font-semibold text-white">
@@ -374,8 +375,9 @@ export function InboxPage() {
                   </div>
                 </div>
               ) : null}
+              </div>
 
-              <div className="mt-auto flex flex-wrap gap-2 border-t border-border pt-5">
+              <div data-testid="inbox-message-actions" className="mt-3 flex shrink-0 flex-wrap gap-2 border-t border-border bg-surface pt-3">
                 {relatedTournament?.status === "Available" ? (
                   <button
                     type="button"

@@ -485,16 +485,15 @@ export function summarizeTrainingPlan(
   const totalSessions = sessions.length;
   const weekLoad = average(normalizedWeek.map((day) => day.load));
   const fatigueTrend = clamp(
-    Math.round(
-      (weekLoad +
-        physicalSessions * 3 +
-        technicalSessions * 2 -
-        recoverySessions * 5 -
-        restSessions * 7) /
-        10,
-    ),
-    -18,
-    18,
+    technicalSessions * 2 +
+      physicalSessions * 3 +
+      matchPrepSessions * 2 +
+      mentalSessions -
+      recoverySessions * 3 -
+      restSessions * 4 -
+      travelSessions,
+    -30,
+    14,
   );
   const fatigueRisk = clamp(
     Math.round(
@@ -643,7 +642,7 @@ export function calculateTrainingEffects(week: TrainingPlannerDay[]) {
         recoverySessions * 3 -
         restSessions * 4 -
         travelSessions,
-      -18,
+      -30,
       14,
     ),
     confidenceDelta: clamp(

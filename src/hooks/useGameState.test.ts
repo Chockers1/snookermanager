@@ -49,6 +49,7 @@ import {
 import {
   buildTrainingCell,
   calculateTrainingEffects,
+  summarizeTrainingPlan,
 } from "../utils/trainingPlan";
 import {
   buildHealthCentreData,
@@ -404,6 +405,35 @@ describe("tournament entry and match-start rules", () => {
     expect(skipped.inbox[0]?.subject).toBe(
       nextTournament ? `Invitation: ${nextTournament.name}` : undefined,
     );
+    if (nextTournament) {
+      expect(skipped.inbox[0]?.preview).toMatch(/prize fund is £[\d,]+/i);
+      expect(skipped.inbox[0]?.preview).toMatch(/for the champion/i);
+      expect(skipped.inbox[0]?.summary).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ label: "Total prize fund" }),
+          expect.objectContaining({ label: "Winner's prize" }),
+          expect.objectContaining({ label: "Ranking value" }),
+          expect.objectContaining({ label: "Entry fee" }),
+          expect.objectContaining({ label: "Estimated travel" }),
+        ]),
+      );
+      const repaired = repairGameState({
+        ...skipped,
+        inbox: [
+          {
+            ...skipped.inbox[0],
+            preview: `${nextTournament.name} is your next eligible event.`,
+            summary: undefined,
+          },
+        ],
+      });
+      expect(repaired.inbox[0]?.preview).toMatch(/prize fund is £[\d,]+/i);
+      expect(repaired.inbox[0]?.summary).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ label: "Winner's prize" }),
+        ]),
+      );
+    }
     expect(skipped.lastAction).toMatch(/Skipped/);
   });
 });
@@ -855,6 +885,77 @@ describe("connected career systems", () => {
     expect(blocked.lastAction).toMatch(/outside the current coaching budget/i);
   });
 
+  it("hires a coach into the selected unlocked staff slot", () => {
+    const state = createStarterState();
+    const candidate = state.coaches.find(
+      (coach) =>
+        !state.coachContracts.some(
+          (contract) => contract.coachId === coach.id,
+        ),
+    );
+    expect(candidate).toBeDefined();
+    if (!candidate) return;
+
+    const staffed = hireCoachState(
+      {
+        ...state,
+        coachContracts: [],
+        player: {
+          ...state.player,
+          cash: 100_000,
+          reputation: 100,
+          worldRanking: 1,
+        },
+        finance: { ...state.finance, cash: 100_000, cashFlow: 10_000 },
+      },
+      candidate.id,
+      "4 Week Clinic",
+      "Specialist Coach",
+    );
+
+    expect(staffed.coachContracts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          coachId: candidate.id,
+          slot: "Specialist Coach",
+        }),
+      ]),
+    );
+  });
+
+  it("does not overwrite an occupied selected staff slot", () => {
+    const state = createStarterState();
+    const candidate = state.coaches.find(
+      (coach) =>
+        !state.coachContracts.some(
+          (contract) => contract.coachId === coach.id,
+        ),
+    );
+    expect(candidate).toBeDefined();
+    if (!candidate) return;
+
+    const attempted = hireCoachState(
+      {
+        ...state,
+        player: {
+          ...state.player,
+          cash: 100_000,
+          reputation: 100,
+          worldRanking: 1,
+        },
+        finance: { ...state.finance, cash: 100_000, cashFlow: 10_000 },
+      },
+      candidate.id,
+      "4 Week Clinic",
+      "Lead Coach",
+    );
+
+    expect(attempted.coachContracts).toHaveLength(
+      state.coachContracts.length,
+    );
+    expect(attempted.lastAction).toMatch(/already occupied/i);
+  });
+
   it("keeps safety tactical while still taking scoring chances", () => {
     const state = createStarterState();
     const result = simulateSyntheticLiveVisitMatch({
@@ -895,6 +996,54 @@ describe("connected career systems", () => {
     expect(playerVisits.some((visit) => visit.points > 0)).toBe(true);
   });
 
+  it("produces stronger break-building output for tour-level attributes", () => {
+    const state = createStarterState();
+    const withRating = (rating: number) => ({
+      technical: Object.fromEntries(
+        Object.keys(state.attributes.technical).map((key) => [key, rating]),
+      ),
+      mental: Object.fromEntries(
+        Object.keys(state.attributes.mental).map((key) => [key, rating]),
+      ),
+      physical: Object.fromEntries(
+        Object.keys(state.attributes.physical).map((key) => [key, rating]),
+      ),
+    });
+    const simulateBand = (rating: number) =>
+      Array.from({ length: 12 }, (_, seed) =>
+        simulateSyntheticLiveVisitMatch({
+          simulationMode: "liveVisitCalibration",
+          playerName: "Calibration Player",
+          opponentName: "Calibration Opponent",
+          playerTacticalPlan: "Balanced",
+          opponentTacticalPlan: "Balanced",
+          bestOf: 7,
+          seed: 7100 + seed,
+          playerAttributes: withRating(rating),
+          opponentAttributes: withRating(rating),
+          opponentProfileMode: "attributes",
+          playerConfidence: 70,
+          playerFatigue: 25,
+          playerClutch: rating,
+          playerStrength: rating,
+          opponentRanking: rating >= 80 ? 24 : 96,
+          opponentConfidence: 70,
+          opponentFatigue: 25,
+          opponentClutch: rating,
+          opponentStrength: rating,
+          plannedMatchWinChance: 50,
+        }).playerHighestBreak,
+      );
+    const clubBreaks = simulateBand(48);
+    const tourBreaks = simulateBand(82);
+    const average = (values: number[]) =>
+      values.reduce((sum, value) => sum + value, 0) / values.length;
+
+    expect(average(tourBreaks)).toBeGreaterThan(average(clubBreaks) + 12);
+    expect(average(tourBreaks)).toBeGreaterThan(45);
+    expect(tourBreaks.some((value) => value >= 70)).toBe(true);
+  });
+
   it("makes deliberate tempo a real disruption tradeoff", () => {
     expect(getLiveTempoEffects("Deliberate")).toEqual({
       playerShotModifier: -1.5,
@@ -912,7 +1061,7 @@ describe("connected career systems", () => {
 
   it("makes recovery weeks restorative without granting unrelated skill gains", () => {
     const state = createStarterState();
-    state.player.fatigue = 72;
+    state.player.fatigue = 92;
     const rest = buildTrainingCell("rest");
     const restWeek = state.trainingPlan.map((day) => ({
       ...day,
@@ -922,9 +1071,15 @@ describe("connected career systems", () => {
     }));
     const before = structuredClone(state.attributes);
     const effects = calculateTrainingEffects(restWeek);
+    const forecast = summarizeTrainingPlan(
+      restWeek,
+      state.player,
+      state.attributes,
+    );
     const after = applyTrainingPlanState(state, restWeek);
 
     expect(effects).toMatchObject({
+      fatigueDelta: -30,
       technicalGain: 0,
       cueControlGain: 0,
       breakBuildingGain: 0,
@@ -932,8 +1087,9 @@ describe("connected career systems", () => {
       staminaGain: 0,
       weekLoad: 0,
     });
+    expect(forecast.fatigueTrend).toBe(effects.fatigueDelta);
     expect(after.attributes).toEqual(before);
-    expect(after.player.fatigue).toBeLessThan(state.player.fatigue);
+    expect(after.player.fatigue).toBe(62);
   });
 
   it("automatically applies training and sends a detailed inbox report every two advanced weeks", () => {
@@ -986,6 +1142,28 @@ describe("connected career systems", () => {
         message.subject.startsWith("Fortnightly training report:"),
       ),
     ).toHaveLength(1);
+  });
+
+  it("reports exact weekly changes instead of a generic update", () => {
+    const state = createStarterState();
+    const advanced = advanceWeekState(state);
+    const report = advanced.inbox.find(
+      (message) => message.subject === `Week ${advanced.week} report`,
+    );
+
+    expect(report?.preview).toMatch(/Cash [+-]£[\d,]+/);
+    expect(report?.preview).toMatch(/confidence [+-]?\d+/i);
+    expect(report?.preview).toMatch(/fatigue [+-]?\d+/i);
+    expect(report?.preview).not.toMatch(/updated for the new week/i);
+    expect(report?.summary).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Weekly cash flow" }),
+        expect.objectContaining({ label: "Confidence" }),
+        expect.objectContaining({ label: "Fatigue" }),
+        expect.objectContaining({ label: "Training progress" }),
+        expect.objectContaining({ label: "Strain / burnout" }),
+      ]),
+    );
   });
 
   it("reduces adaptation when fatigue, strain, and burnout accumulate", () => {

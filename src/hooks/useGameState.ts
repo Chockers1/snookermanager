@@ -1455,6 +1455,7 @@ function getAutoOpponentVisitDecision(
   ) {
     return "Snooker Hunt";
   }
+  if (liveMatch.currentBreak > 0) return "Break Build";
   if (liveMatch.opponentApproach === "Pressing") return "Break Build";
   if (liveMatch.opponentApproach === "Tight") return "Safety Exchange";
   if (
@@ -1478,6 +1479,7 @@ function getDefaultManualVisitDecision(
   ) {
     return "Snooker Hunt";
   }
+  if (liveMatch.currentBreak > 0) return "Break Build";
   if (liveMatch.tacticalPlan === "Attack") return "Break Build";
   if (liveMatch.tacticalPlan === "Safety") {
     const attackingReadiness =
@@ -1873,10 +1875,31 @@ function simulateCareerFrameOutcome(
     forcedWinner ?? Math.random() * 100 < playerFrameWinChance;
   const winningStrength = playerWonFrame ? playerStrength : opponentStrength;
   const losingStrength = playerWonFrame ? opponentStrength : playerStrength;
+  const getFrameBreak = (strength: number, wonFrame: boolean) => {
+    const centuryRunChance = clamp((strength - 62) * 0.012, 0, 0.4);
+    const highRunBonus =
+      Math.random() < centuryRunChance ? 18 + Math.random() * 45 : 0;
+    const winnerAdjustment = wonFrame ? 5 : -7;
+    return clamp(
+      Math.round(
+        8 +
+          strength * 0.38 +
+          Math.random() * 30 +
+          highRunBonus +
+          winnerAdjustment,
+      ),
+      wonFrame ? 12 : 0,
+      147,
+    );
+  };
+  const winningBreak = getFrameBreak(winningStrength, true);
   const winningPoints = clamp(
-    Math.round(36 + winningStrength * 0.48 + Math.random() * 28),
+    Math.max(
+      winningBreak,
+      Math.round(32 + winningStrength * 0.4 + Math.random() * 38),
+    ),
     45,
-    132,
+    147,
   );
   const losingCap = Math.max(0, winningPoints - 5);
   const losingPoints = clamp(
@@ -1884,17 +1907,10 @@ function simulateCareerFrameOutcome(
     0,
     losingCap,
   );
-  const winningBreak = clamp(
-    Math.round(14 + winningStrength * 0.56 + Math.random() * 22),
-    8,
-    winningPoints,
-  );
   const losingBreak =
     losingPoints > 0
       ? clamp(
-          Math.round(
-            Math.random() * Math.min(losingPoints, 10 + losingStrength * 0.4),
-          ),
+          Math.min(getFrameBreak(losingStrength, false), losingPoints),
           0,
           losingPoints,
         )
@@ -2253,11 +2269,11 @@ function getLiveVisitRedClearance(
     activeProfile.consistency * 0.18 +
     activeProfile.focus * 0.12;
   const baseClearance =
-    scoringCeiling >= 84
+    scoringCeiling >= 80
       ? 4
-      : scoringCeiling >= 76
+      : scoringCeiling >= 70
         ? 3
-        : scoringCeiling >= 66
+        : scoringCeiling >= 60
           ? 2
           : 1;
   const extraClearance =
@@ -2266,6 +2282,101 @@ function getLiveVisitRedClearance(
       : 0;
 
   return Math.min(redsRemaining, baseClearance + extraClearance);
+}
+
+function getLiveScoringSuccessBaseline(
+  activeProfile: LiveVisitSkillProfile,
+  decision: LiveVisitDecision,
+) {
+  const skill =
+    decision === "Break Build"
+      ? activeProfile.breakBuilding * 0.34 +
+        activeProfile.cueBallControl * 0.28 +
+        activeProfile.consistency * 0.2 +
+        activeProfile.focus * 0.1 +
+        activeProfile.stamina * 0.08
+      : decision === "Pot Attempt" || decision === "Respotted Black"
+        ? activeProfile.longPotting * 0.34 +
+          activeProfile.cueBallControl * 0.24 +
+          activeProfile.consistency * 0.18 +
+          activeProfile.handSteadiness * 0.14 +
+          activeProfile.composure * 0.1
+        : activeProfile.safetyPlay * 0.36 +
+          activeProfile.focus * 0.22 +
+          activeProfile.composure * 0.18 +
+          activeProfile.cueBallControl * 0.14 +
+          activeProfile.bigMatchNerve * 0.1;
+
+  return clamp(35 + skill * 0.62, 55, 94);
+}
+
+function getLiveBreakContinuationChance(
+  activeProfile: LiveVisitSkillProfile,
+  decision: LiveVisitDecision,
+  fatigue: number,
+  pressureValue: number,
+) {
+  if (decision !== "Break Build" && decision !== "Pot Attempt") return 0;
+
+  const control =
+    activeProfile.breakBuilding * 0.38 +
+    activeProfile.cueBallControl * 0.3 +
+    activeProfile.consistency * 0.2 +
+    activeProfile.focus * 0.12;
+  const base = decision === "Break Build" ? 55 : 38;
+  return clamp(
+    base +
+      control * 0.42 -
+      Math.max(0, fatigue - 45) * 0.12 -
+      Math.max(0, pressureValue - 68) * 0.08,
+    decision === "Break Build" ? 66 : 46,
+    decision === "Break Build" ? 94 : 76,
+  );
+}
+
+function getRealisticMatchSuccessRate(
+  profile: LiveVisitSkillProfile,
+  discipline: "pot" | "long" | "safety",
+  stats: LiveMatchSideStats,
+  confidence: number,
+  fatigue: number,
+) {
+  const skill =
+    discipline === "pot"
+      ? profile.breakBuilding * 0.24 +
+        profile.cueBallControl * 0.28 +
+        profile.consistency * 0.22 +
+        profile.longPotting * 0.14 +
+        profile.handSteadiness * 0.12
+      : discipline === "long"
+        ? profile.longPotting * 0.48 +
+          profile.cueBallControl * 0.18 +
+          profile.consistency * 0.18 +
+          profile.composure * 0.16
+        : profile.safetyPlay * 0.46 +
+          profile.focus * 0.2 +
+          profile.composure * 0.18 +
+          profile.cueBallControl * 0.16;
+  const base =
+    discipline === "pot" ? 35 + skill * 0.62 : 27 + skill * 0.62;
+  const attempts =
+    discipline === "safety" ? stats.safetyAttempts : stats.potAttempts;
+  const successes =
+    discipline === "safety" ? stats.safetiesWon : stats.potsMade;
+  const observed = attempts > 0 ? (successes / attempts) * 100 : base;
+  const observedWeight = clamp(attempts / 40, 0, 0.28);
+  const conditionAdjustment =
+    (confidence - 65) * 0.05 - Math.max(0, fatigue - 35) * 0.05;
+
+  return clamp(
+    Math.round(
+      base * (1 - observedWeight) +
+        observed * observedWeight +
+        conditionAdjustment,
+    ),
+    discipline === "pot" ? 52 : 38,
+    discipline === "pot" ? 96 : 92,
+  );
 }
 
 function resolveLiveVisitScoring(
@@ -2405,6 +2516,8 @@ function getSyntheticCalibrationVisitDecision(
   if (liveMatch.tableState.redsRemaining === 0 && tacticalPlan === "Safety") {
     return "Safety Exchange";
   }
+
+  if (liveMatch.currentBreak > 0) return "Break Build";
 
   if (tacticalPlan === "Attack" && liveMatch.tableState.redsRemaining > 0) {
     return "Break Build";
@@ -5656,16 +5769,10 @@ export function startNextSeasonState(previousState: GameState): GameState {
       inbox: [
         ...(firstTournament
           ? [
-              createInboxMessage(
-                {
-                  sender: "Tournament Office",
-                  subject: `Invitation: ${firstTournament.name}`,
-                  preview: `${firstTournament.name} is the first eligible event of ${unlockedState.season}. Enter or skip it from your Dashboard, then book travel before advancing.`,
-                  priority: "High" as const,
-                  actionLabel: "Review Event",
-                  actionRoute: "/calendar",
-                },
-                "Today",
+              createTournamentInvitationMessage(
+                firstTournament,
+                unlockedState.currentDate,
+                "season",
               ),
             ]
           : []),
@@ -5968,6 +6075,103 @@ export function advanceWeekState(previousState: GameState): GameState {
     },
   };
 
+  const weeklyAttributeChanges = getTrainingAttributeChanges(
+    previousState.attributes,
+    nextState.attributes,
+  );
+  const weeklyImprovements = weeklyAttributeChanges
+    .filter((change) => change.delta > 0)
+    .sort((left, right) => right.delta - left.delta);
+  const confidenceDelta =
+    nextState.player.confidence - previousState.player.confidence;
+  const fatigueDelta = nextState.player.fatigue - previousState.player.fatigue;
+  const moraleDelta = nextState.player.morale - previousState.player.morale;
+  const cashFlow = nextState.finance.cashFlow;
+  const weeklyReportMessage = createInboxMessage(
+    {
+      sender: "Career Manager",
+      subject: `Week ${nextState.week} report`,
+      preview: `Cash ${cashFlow >= 0 ? "+" : "-"}£${Math.abs(cashFlow).toLocaleString("en-GB")} · confidence ${formatTrainingMetricChange(confidenceDelta)} · fatigue ${formatTrainingMetricChange(fatigueDelta)} · ${weeklyImprovements.length} attribute${weeklyImprovements.length === 1 ? "" : "s"} improved.`,
+      priority:
+        nextState.player.fatigue >= 75 ||
+        nextState.trainingCondition.strain >= 70
+          ? "High"
+          : "Medium",
+      actionLabel: "View Training Report",
+      actionRoute: "/training/report",
+      summary: [
+        {
+          label: "Weekly cash flow",
+          value: `${cashFlow >= 0 ? "+" : "-"}£${Math.abs(cashFlow).toLocaleString("en-GB")}`,
+          detail: `Balance £${nextState.player.cash.toLocaleString("en-GB")}`,
+          tone: cashFlow >= 0 ? "positive" : "negative",
+        },
+        {
+          label: "Confidence",
+          value: `${nextState.player.confidence}%`,
+          detail: `${formatTrainingMetricChange(confidenceDelta)} this week`,
+          tone:
+            confidenceDelta > 0
+              ? "positive"
+              : confidenceDelta < 0
+                ? "warning"
+                : "neutral",
+        },
+        {
+          label: "Fatigue",
+          value: `${nextState.player.fatigue}%`,
+          detail: `${formatTrainingMetricChange(fatigueDelta)} this week`,
+          tone:
+            nextState.player.fatigue >= 75
+              ? "negative"
+              : fatigueDelta > 0
+                ? "warning"
+                : "positive",
+        },
+        {
+          label: "Morale",
+          value: `${nextState.player.morale}%`,
+          detail: `${formatTrainingMetricChange(moraleDelta)} this week`,
+          tone:
+            moraleDelta > 0
+              ? "positive"
+              : moraleDelta < 0
+                ? "warning"
+                : "neutral",
+        },
+        {
+          label: "Training progress",
+          value:
+            weeklyImprovements.length > 0
+              ? `${weeklyImprovements.length} improved`
+              : "No rating change",
+          detail:
+            weeklyImprovements.length > 0
+              ? weeklyImprovements
+                  .slice(0, 4)
+                  .map(
+                    (change) =>
+                      `${change.label} +${change.delta} (now ${change.current})`,
+                  )
+                  .join(" · ")
+              : "Development may be accumulating toward a future rating increase.",
+          tone: weeklyImprovements.length > 0 ? "positive" : "neutral",
+        },
+        {
+          label: "Strain / burnout",
+          value: `${nextState.trainingCondition.strain}% / ${nextState.trainingCondition.burnout}%`,
+          detail: "Current training health",
+          tone:
+            nextState.trainingCondition.strain >= 70 ||
+            nextState.trainingCondition.burnout >= 70
+              ? "negative"
+              : "neutral",
+        },
+      ],
+    },
+    "Today",
+  );
+
   const enteredTournament =
     protectedState.tournaments.find((event) => event.status === "Entered") ??
     protectedState.tournaments.find((event) => event.status === "Booked");
@@ -5979,6 +6183,7 @@ export function advanceWeekState(previousState: GameState): GameState {
       {
         ...nextState,
         inbox: [
+          weeklyReportMessage,
           createInboxMessage(
             {
               sender: "Tournament Office",
@@ -6001,15 +6206,7 @@ export function advanceWeekState(previousState: GameState): GameState {
       {
         ...nextState,
         inbox: [
-          createInboxMessage(
-            {
-              sender: "Career Manager",
-              subject: `Week ${nextState.week} complete`,
-              preview: `Weekly cash flow settled at ${nextState.finance.cashFlow >= 0 ? "+" : ""}${nextState.finance.cashFlow}. Confidence and fatigue updated for the new week.`,
-              priority: "Medium",
-            },
-            "Today",
-          ),
+          weeklyReportMessage,
           ...nextState.inbox,
         ].slice(0, 18),
       },
@@ -6220,16 +6417,10 @@ export function skipTournamentState(
       inbox: [
         ...(nextTournament
           ? [
-              createInboxMessage(
-                {
-                  sender: "Tournament Office",
-                  subject: `Invitation: ${nextTournament.name}`,
-                  preview: `${nextTournament.name} is the next eligible event on your pathway. Review the event and enter when ready.`,
-                  priority: "High" as const,
-                  actionLabel: "Review Event",
-                  actionRoute: "/calendar",
-                },
-                "Today",
+              createTournamentInvitationMessage(
+                nextTournament,
+                skippedState.currentDate,
+                "next",
               ),
             ]
           : []),
@@ -6752,6 +6943,88 @@ function createInboxMessage(
   };
 }
 
+function buildTournamentInvitationContent(
+  tournament: Tournament,
+  currentDate: string,
+  context: "season" | "next" | "post-event" = "next",
+): Omit<InboxMessage, "id" | "date"> {
+  const prizeFund = tournament.totalPrizeFund ?? tournament.prizeMoney;
+  const winnerPrize =
+    tournament.winnerPrize ?? Math.round(tournament.prizeMoney * 0.5);
+  const estimatedTripCost = tournament.travelCost + tournament.hotelCost;
+  const startsIn = daysUntil(tournament.startDate, currentDate);
+  const contextLead =
+    context === "season"
+      ? `${tournament.name} is the first eligible event of the new season.`
+      : context === "post-event"
+        ? `${tournament.name} is your next eligible event.`
+        : `${tournament.name} is the next eligible event on your pathway.`;
+
+  return {
+    sender: "Tournament Office",
+    subject: `Invitation: ${tournament.name}`,
+    preview: `${contextLead} The prize fund is £${prizeFund.toLocaleString("en-GB")}, with £${winnerPrize.toLocaleString("en-GB")} for the champion${tournament.rankingValue > 0 ? ` and ${tournament.rankingValue.toLocaleString("en-GB")} ranking points at stake` : " in this non-ranking event"}. Enter or skip the event, then book travel if entering.`,
+    priority: "High",
+    actionLabel: "Review Event",
+    actionRoute: "/calendar",
+    summary: [
+        {
+          label: "Total prize fund",
+          value: `£${prizeFund.toLocaleString("en-GB")}`,
+          detail: tournament.name,
+          tone: "positive",
+        },
+        {
+          label: "Winner's prize",
+          value: `£${winnerPrize.toLocaleString("en-GB")}`,
+          detail: "Paid for winning the tournament",
+          tone: "positive",
+        },
+        {
+          label: "Ranking value",
+          value:
+            tournament.rankingValue > 0
+              ? `${tournament.rankingValue.toLocaleString("en-GB")} pts`
+              : "Non-ranking",
+          detail: tournament.rankingType ?? "No ranking points",
+          tone: tournament.rankingValue > 0 ? "positive" : "neutral",
+        },
+        {
+          label: "Format",
+          value: tournament.type,
+          detail: `${tournament.format} · ${tournament.location} · starts in ${startsIn} day${startsIn === 1 ? "" : "s"}`,
+          tone: "neutral",
+        },
+        {
+          label: "Entry fee",
+          value:
+            tournament.entryFee > 0
+              ? `£${tournament.entryFee.toLocaleString("en-GB")}`
+              : "Free",
+          detail: "Charged when entry is confirmed",
+          tone: tournament.entryFee > 0 ? "warning" : "positive",
+        },
+        {
+          label: "Estimated travel",
+          value: `£${estimatedTripCost.toLocaleString("en-GB")}`,
+          detail: "Base travel and hotel estimate before package selection",
+          tone: estimatedTripCost > 0 ? "warning" : "neutral",
+        },
+    ],
+  };
+}
+
+function createTournamentInvitationMessage(
+  tournament: Tournament,
+  currentDate: string,
+  context: "season" | "next" | "post-event" = "next",
+) {
+  return createInboxMessage(
+    buildTournamentInvitationContent(tournament, currentDate, context),
+    "Today",
+  );
+}
+
 function inferInboxAction(
   message: InboxMessage,
 ): Pick<InboxMessage, "actionLabel" | "actionRoute"> {
@@ -6825,9 +7098,31 @@ function inferInboxAction(
   return {};
 }
 
-function normalizeInboxMessages(messages: InboxMessage[]): InboxMessage[] {
+function normalizeInboxMessages(
+  messages: InboxMessage[],
+  tournaments: Tournament[] = [],
+  currentDate?: string,
+): InboxMessage[] {
   return messages.map((message) => {
     const normalizedMessage = { ...message, read: Boolean(message.read) };
+    if (message.subject.startsWith("Invitation: ")) {
+      const tournamentName = message.subject.slice("Invitation: ".length);
+      const tournament = tournaments.find(
+        (event) => event.name === tournamentName,
+      );
+      if (tournament) {
+        return {
+          ...normalizedMessage,
+          ...buildTournamentInvitationContent(
+            tournament,
+            currentDate ?? tournament.startDate,
+          ),
+          id: message.id,
+          date: message.date,
+          read: Boolean(message.read),
+        };
+      }
+    }
     if (message.actionLabel && message.actionRoute) {
       return normalizedMessage;
     }
@@ -8558,7 +8853,11 @@ export function repairGameState(state: GameState): GameState {
     ...state,
     schemaVersion: SAVE_SCHEMA_VERSION,
     coaches: mergeCoachCatalog(state.coaches),
-    inbox: normalizeInboxMessages(state.inbox),
+    inbox: normalizeInboxMessages(
+      state.inbox,
+      repairedTournaments,
+      state.currentDate,
+    ),
     tournaments: repairedTournaments,
     matches: state.matches.filter((match) => !invalidMatchIds.has(match.id)),
     worldPlayers: normalizeWorldPlayers(
@@ -14319,9 +14618,15 @@ export function advanceLiveVisit(
       ? tempoEffects.playerShotModifier
       : tempoEffects.opponentShotModifier
     : 0;
+  const scoringSuccessBaseline = getLiveScoringSuccessBaseline(
+    activeProfile,
+    resolvedDecision,
+  );
+  const expectationAdjustment = (actorFrameExpectation - 50) * 0.08;
   const successChance = clamp(
-    actorBaselineChance +
-      profileEdge +
+    scoringSuccessBaseline +
+      expectationAdjustment +
+      profileEdge * 0.35 +
       confidenceEdge +
       clutchEdge +
       tacticalEdge * (mode === "manual" ? 0.8 : 0.35) +
@@ -14361,12 +14666,12 @@ export function advanceLiveVisit(
   const foulPoints = foulOccurred
     ? clamp(4 + Math.round(Math.random() * 3), 4, 7)
     : 0;
-  const retainChance =
-    resolvedDecision === "Break Build"
-      ? 76
-      : resolvedDecision === "Pot Attempt"
-        ? 56
-        : 0;
+  const retainChance = getLiveBreakContinuationChance(
+    activeProfile,
+    resolvedDecision,
+    actorFatigue,
+    liveMatch.pressureValue,
+  );
   const retainedTable = success && Math.random() * 100 < retainChance;
   const visitScoring =
     success && !foulOccurred
@@ -14944,35 +15249,26 @@ function finalizeLiveMatch(
     opponentHighestBreak: liveMatch.opponentHighestBreak,
     fifties: liveMatch.playerFifties,
     centuries: liveMatch.playerCenturies,
-    potSuccess: clamp(
-      Math.round(
-        68 +
-          liveMatch.plannedMatchWinChance / 3 +
-          equipmentProfile.controlBonus +
-          Math.random() * 10,
-      ),
-      58,
-      96,
+    potSuccess: getRealisticMatchSuccessRate(
+      liveMatch.playerVisitProfile,
+      "pot",
+      liveMatch.playerStats,
+      liveMatch.playerConfidence,
+      liveMatch.playerFatigue,
     ),
-    longPotSuccess: clamp(
-      Math.round(
-        52 +
-          liveMatch.plannedMatchWinChance / 4 +
-          equipmentProfile.longPotBonus +
-          Math.random() * 12,
-      ),
-      44,
-      90,
+    longPotSuccess: getRealisticMatchSuccessRate(
+      liveMatch.playerVisitProfile,
+      "long",
+      liveMatch.playerStats,
+      liveMatch.playerConfidence,
+      liveMatch.playerFatigue,
     ),
-    safetySuccess: clamp(
-      Math.round(
-        60 +
-          liveMatch.plannedMatchWinChance / 4 +
-          equipmentProfile.controlBonus / 2 +
-          Math.random() * 10,
-      ),
-      48,
-      92,
+    safetySuccess: getRealisticMatchSuccessRate(
+      liveMatch.playerVisitProfile,
+      "safety",
+      liveMatch.playerStats,
+      liveMatch.playerConfidence,
+      liveMatch.playerFatigue,
     ),
     fouls: clamp(
       Math.round(Math.random() * 4 - equipmentProfile.miscueReduction / 2),
@@ -15480,16 +15776,10 @@ function finalizeLiveMatch(
       inbox: [
         ...(nextTournament
           ? [
-              createInboxMessage(
-                {
-                  sender: "Tournament Office",
-                  subject: `Invitation: ${nextTournament.name}`,
-                  preview: `${nextTournament.name} is your next eligible event. Enter first, then book travel before advancing to the tournament.`,
-                  priority: "High" as const,
-                  actionLabel: "Review Event",
-                  actionRoute: "/calendar",
-                },
-                "Today",
+              createTournamentInvitationMessage(
+                nextTournament,
+                completedMatchState.currentDate,
+                "post-event",
               ),
             ]
           : []),
@@ -16264,6 +16554,7 @@ export function hireCoachState(
   previousState: GameState,
   coachId: string,
   contractLabel?: string,
+  requestedSlot?: (typeof COACH_SLOT_NAMES)[number],
 ) {
   const coach = previousState.coaches.find((item) => item.id === coachId);
   if (!coach) return previousState;
@@ -16284,11 +16575,30 @@ export function hireCoachState(
     return recalculateState(previousState, availability.reason);
   }
 
-  const nextSlot = getNextCoachSlot(previousState);
+  const unlockedSlots = COACH_SLOT_NAMES.slice(
+    0,
+    getCoachSlotLimit(previousState),
+  );
+  const requestedSlotAvailable = Boolean(
+    requestedSlot &&
+      unlockedSlots.includes(requestedSlot) &&
+      !previousState.coachContracts.some(
+        (contract) => contract.slot === requestedSlot,
+      ),
+  );
+  const nextSlot = requestedSlotAvailable
+    ? requestedSlot
+    : requestedSlot
+      ? null
+      : getNextCoachSlot(previousState);
   if (!nextSlot) {
     return recalculateState(
       previousState,
-      "No staff slot is available for another coach yet.",
+      requestedSlot && !unlockedSlots.includes(requestedSlot)
+        ? `${requestedSlot} is not unlocked yet. Improve your ranking or reputation first.`
+        : requestedSlot
+          ? `${requestedSlot} is already occupied. Release that coach or choose another open slot.`
+          : "No staff slot is available for another coach yet.",
     );
   }
 
@@ -17583,9 +17893,18 @@ export function useGameState() {
       startNextSeason() {
         setGameState((previousState) => startNextSeasonState(previousState));
       },
-      hireCoach(coachId: string, contractLabel?: string) {
+      hireCoach(
+        coachId: string,
+        contractLabel?: string,
+        requestedSlot?: (typeof COACH_SLOT_NAMES)[number],
+      ) {
         setGameState((previousState) =>
-          hireCoachState(previousState, coachId, contractLabel),
+          hireCoachState(
+            previousState,
+            coachId,
+            contractLabel,
+            requestedSlot,
+          ),
         );
       },
       fireCoach(coachId: string) {

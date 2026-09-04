@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ACTIVE_SAVE_KEY } from "../src/game/saveStorage";
+import { cueMarketplaceCatalog } from "../src/data/catalogs";
 import {
   bookTravelState,
   continueToNextTournamentState,
@@ -106,7 +107,9 @@ test("laptop hub keeps the match action and live bracket in view", async ({
   await expect(primaryAction).toBeVisible();
   await expect(primaryAction).toBeInViewport();
   await expect(
-    page.getByRole("heading", { name: "Tournament Bracket" }),
+    page.getByRole("heading", {
+      name: /Tournament Bracket|Championship Draw/,
+    }),
   ).toBeInViewport();
   await expect(page.getByTestId("tournament-bracket")).toBeVisible();
   await expect(page.getByLabel(/Last 16 bracket/)).toBeVisible();
@@ -122,6 +125,150 @@ test("laptop hub keeps the match action and live bracket in view", async ({
     mainOverflow,
     `hub page scrolled by ${mainOverflow}px`,
   ).toBeLessThanOrEqual(1);
+});
+
+test("coach market lets the player choose and fill the specialist slot", async ({
+  page,
+}) => {
+  const career = createStarterState();
+  career.coachContracts = [];
+  career.player.reputation = 100;
+  career.player.cash = 1_000_000;
+  career.finance.cash = 1_000_000;
+  career.finance.cashFlow = 10_000;
+
+  await page.addInitScript(
+    ({ key, value }) => {
+      window.localStorage.clear();
+      window.localStorage.setItem(key, value);
+    },
+    { key: ACTIVE_SAVE_KEY, value: JSON.stringify(career) },
+  );
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /Continue Career/ }).click();
+  await page.evaluate(() => {
+    window.history.pushState({}, "", "/staff/coaches");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  await page
+    .getByRole("button", { name: /Specialist Coach Open slot/ })
+    .click();
+  const hireButton = page.getByRole("button", {
+    name: "Hire as Specialist Coach",
+  });
+  await expect(hireButton).toBeEnabled();
+  await hireButton.click();
+
+  await expect(
+    page.getByRole("button", {
+      name: new RegExp(`Specialist Coach.*${career.coaches[0].name}`),
+    }),
+  ).toBeVisible();
+});
+
+test("equipment cards clearly distinguish equipped and owned items", async ({
+  page,
+}) => {
+  const career = createStarterState();
+  const equippedCueId = career.equipment.currentCueId;
+  const ownedCue = cueMarketplaceCatalog.find(
+    (cue) => cue.id !== equippedCueId,
+  );
+  const equippedCue = cueMarketplaceCatalog.find(
+    (cue) => cue.id === equippedCueId,
+  );
+  expect(ownedCue).toBeDefined();
+  expect(equippedCue).toBeDefined();
+  if (!ownedCue || !equippedCue) return;
+  career.equipment.cuesOwned = [equippedCue.id, ownedCue.id];
+
+  await page.addInitScript(
+    ({ key, value }) => {
+      window.localStorage.clear();
+      window.localStorage.setItem(key, value);
+    },
+    { key: ACTIVE_SAVE_KEY, value: JSON.stringify(career) },
+  );
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /Continue Career/ }).click();
+  await page.evaluate(() => {
+    window.history.pushState({}, "", "/equipment/cues");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  const equippedCard = page
+    .getByRole("button", { name: new RegExp(equippedCue.name) })
+    .first();
+  const ownedCard = page
+    .getByRole("button", { name: new RegExp(ownedCue.name) })
+    .first();
+  await expect(equippedCard.getByText("Equipped", { exact: true })).toBeVisible();
+  await expect(ownedCard.getByText("Owned", { exact: true })).toBeVisible();
+  await expect(equippedCard).toHaveClass(/border-green-400/);
+  await expect(ownedCard).toHaveClass(/border-sky-500/);
+});
+
+test("major tournament hub uses a championship identity", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const career = createStarterState();
+  const tournament = career.tournaments.find(
+    (event) => event.name === "Saudi Arabia Masters",
+  );
+  expect(tournament).toBeDefined();
+  if (!tournament) return;
+  const majorCareer = {
+    ...career,
+    currentDate: tournament.startDate,
+    player: {
+      ...career.player,
+      worldRanking: 1,
+      careerStage: "World Champion",
+      competitiveStatus: "World Champion",
+    },
+    rankings: career.rankings.map((row) =>
+      row.playerName === career.player.fullName ? { ...row, ranking: 1 } : row,
+    ),
+    competitionTables: Object.fromEntries(
+      Object.entries(career.competitionTables).map(([key, rows]) => [
+        key,
+        rows.map((row) =>
+          row.playerName === career.player.fullName
+            ? { ...row, ranking: 1 }
+            : row,
+        ),
+      ]),
+    ),
+    tournaments: career.tournaments.map((event) =>
+      event.id === tournament.id
+        ? { ...event, status: "Available" as const }
+        : { ...event, status: "Skipped" as const },
+    ),
+  };
+  await page.addInitScript(
+    ({ key, value }) => {
+      window.localStorage.clear();
+      window.localStorage.setItem(key, value);
+    },
+    { key: ACTIVE_SAVE_KEY, value: JSON.stringify(majorCareer) },
+  );
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /Continue Career/ }).click();
+  await page.evaluate(() => {
+    window.history.pushState({}, "", "/tournaments/hub");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  await expect(
+    page.getByText("Saudi Arabia Masters", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(page.getByText("Major Event")).toBeVisible();
+  await expect(page.getByText(/season-defining tournament/i)).toBeVisible();
+  await expect(page.getByText("Championship Draw")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
 });
 
 test("laptop match preview keeps symmetrical profiles and the tactical plan visible", async ({
@@ -166,6 +313,16 @@ test("laptop match preview keeps symmetrical profiles and the tactical plan visi
     (element) => element.scrollHeight - element.clientHeight,
   );
   expect(tacticalOverflow).toBeLessThanOrEqual(1);
+  await expect(
+    page.getByText("Recent opponent pattern", { exact: true }),
+  ).toBeInViewport();
+  await expect(page.getByRole("button", { name: "Start Match" })).toBeInViewport();
+  await expect(
+    page.getByText("Match Profile Comparison", { exact: true }),
+  ).toBeInViewport();
+  await expect(
+    page.getByText("Equipment Check", { exact: true }),
+  ).toBeInViewport();
   await expectNoHorizontalOverflow(page);
 });
 
@@ -425,6 +582,57 @@ for (const viewport of [
   });
 }
 
+test("laptop inbox keeps a full training report accessible above its actions", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const career = createStarterState();
+  career.inbox = [
+    {
+      ...career.inbox[0],
+      id: "training-fit-report",
+      sender: "Head Coach",
+      subject: "Fortnightly training report: 2 improved",
+      preview:
+        "Cue Ball Control +1 (now 77), Focus +1 (now 77). Review your development, form, ranking and workload below.",
+      actionLabel: "View Training Report",
+      actionRoute: "/training/report",
+      summary: [
+        { label: "Cue Ball Control", value: "+1", tone: "positive" },
+        { label: "Focus", value: "+1", tone: "positive" },
+        { label: "Recent form", value: "11%", tone: "warning" },
+        { label: "World Ranking", value: "#65", tone: "neutral" },
+        { label: "Confidence", value: "99%", tone: "positive" },
+        { label: "Training load", value: "19%", tone: "neutral" },
+        { label: "Fatigue", value: "60%", tone: "warning" },
+        { label: "Adaptation", value: "51%", tone: "neutral" },
+      ],
+    },
+  ];
+  await page.addInitScript(
+    ({ key, value }) => {
+      window.localStorage.clear();
+      window.localStorage.setItem(key, value);
+    },
+    { key: ACTIVE_SAVE_KEY, value: JSON.stringify(career) },
+  );
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /Continue Career/ }).click();
+  await page.evaluate(() => {
+    window.history.pushState({}, "", "/inbox");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  const messageBody = page.getByTestId("inbox-message-body");
+  const actions = page.getByTestId("inbox-message-actions");
+  await expect(actions).toBeInViewport();
+  await expect(actions.getByRole("button", { name: "View Training Report" })).toBeVisible();
+  await messageBody.evaluate((element) => element.scrollTo(0, element.scrollHeight));
+  await expect(messageBody.getByText("Adaptation", { exact: true })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
 test("equipment categories share one responsive workspace", async ({
   page,
 }) => {
@@ -474,6 +682,7 @@ test("equipment categories share one responsive workspace", async ({
 });
 
 for (const viewport of [
+  { name: "desktop-training", width: 1920, height: 1080 },
   { name: "laptop-training", width: 1280, height: 720 },
   { name: "ipad-training", width: 768, height: 1024 },
   { name: "phone-training", width: 390, height: 844 },
@@ -507,7 +716,16 @@ for (const viewport of [
       page.getByRole("button", { name: /Recovery Freshness/ }),
     ).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByText("Expected Development")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Weekly Timetable" }),
+    ).toBeVisible();
     await expectNoHorizontalOverflow(page);
+    if (viewport.width >= 1280) {
+      const mainScrolls = await page.locator("#main-content").evaluate(
+        (main) => main.scrollHeight > main.clientHeight + 1,
+      );
+      expect(mainScrolls).toBe(false);
+    }
   });
 }
 
