@@ -32,7 +32,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
   const unreadInboxCount = gameState.inbox.filter(
     (message) => !message.read,
   ).length;
-  const recentForm = player.form.slice(0, 10);
+  const recentForm = player.form.slice(-10);
   const formPercent =
     recentForm.length > 0
       ? Math.round(

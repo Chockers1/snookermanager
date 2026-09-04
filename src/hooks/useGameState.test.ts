@@ -717,6 +717,68 @@ describe("career lifecycle presets", () => {
     expect(repaired.lastAction).toMatch(/rebuilt every ranking table/i);
   });
 
+  it("rebuilds recent player form from match history and removes temporary qualifiers", () => {
+    const state = createProfessionalStart("start-rookie-pro");
+    const equipped = buyTipState(
+      buyChalkState(
+        buyCueState(state, cueMarketplaceCatalog[0].id),
+        chalkCatalog[0].id,
+      ),
+      tipCatalog[0].id,
+    );
+    const tournament = getNextEligibleTournament(equipped);
+    expect(tournament).toBeDefined();
+    if (!tournament) return;
+
+    const entered = enterTournamentState(equipped, tournament.id);
+    const atEvent = continueToNextTournamentState(entered);
+    const travelled = bookTravelState(atEvent, tournament.id);
+    const afterMatch = simulateTournamentMatchState(travelled, tournament.id);
+    const baseLog = afterMatch.history.matchLog[0];
+    expect(baseLog).toBeDefined();
+    if (!baseLog) return;
+
+    const qualifierRow = {
+      ...afterMatch.competitionTables.world.at(-1)!,
+      id: "temporary-qualifier",
+      playerName: "Qualifier 144",
+      nation: tournament.location,
+      ranking: afterMatch.competitionTables.world.length + 1,
+    };
+    const legacy = {
+      ...afterMatch,
+      schemaVersion: 7,
+      player: { ...afterMatch.player, form: ["L" as const] },
+      history: {
+        ...afterMatch.history,
+        matchLog: [
+          { ...baseLog, id: "form-3", result: "Lost" as const },
+          { ...baseLog, id: "form-2", result: "Won" as const },
+          { ...baseLog, id: "form-1", result: "Won" as const },
+        ],
+      },
+      competitionTables: {
+        ...afterMatch.competitionTables,
+        world: [...afterMatch.competitionTables.world, qualifierRow],
+        oneYear: [...afterMatch.competitionTables.oneYear, qualifierRow],
+      },
+    };
+
+    const repaired = repairGameState(legacy);
+
+    expect(repaired.player.form).toEqual(["W", "W", "L"]);
+    expect(
+      repaired.competitionTables.world.some((row) =>
+        /^Qualifier \d+$/.test(row.playerName),
+      ),
+    ).toBe(false);
+    expect(
+      repaired.competitionTables.oneYear.some((row) =>
+        /^Qualifier \d+$/.test(row.playerName),
+      ),
+    ).toBe(false);
+  });
+
   it("archives a season and explicitly retires an over-age CPU player", () => {
     const state = createStarterState();
     state.currentDate = "2027-06-29";
@@ -804,6 +866,53 @@ describe("complete tournament journey", () => {
     expect(continued.feed).toHaveLength(openingFeedSize);
     expect(continued.feed[0]?.id).toBe(openingFeedId);
     expect(continued.feed[0]?.text).toMatch(/break reaches/i);
+  });
+
+  it("advances Auto Play one red or colour at a time", () => {
+    const career = createProfessionalStart("start-rookie-pro");
+    const equipped = buyTipState(
+      buyChalkState(
+        buyCueState(career, cueMarketplaceCatalog[0].id),
+        chalkCatalog[0].id,
+      ),
+      tipCatalog[0].id,
+    );
+    const tournament = getNextEligibleTournament(equipped);
+    expect(tournament).toBeDefined();
+    if (!tournament) return;
+
+    const entered = enterTournamentState(equipped, tournament.id);
+    const atEvent = continueToNextTournamentState(entered);
+    const travelled = bookTravelState(atEvent, tournament.id);
+    const started = startLiveMatchState(travelled, tournament.id);
+    expect(started.liveMatch).not.toBeNull();
+    if (!started.liveMatch) return;
+
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const red = advanceLiveVisit(
+      started.liveMatch,
+      "Break Build",
+      "manual",
+      "shot",
+    );
+    const colour = advanceLiveVisit(
+      red,
+      "Break Build",
+      "manual",
+      "shot",
+    );
+
+    expect(red.currentBreak).toBe(1);
+    expect(red.tableState.redsRemaining).toBe(14);
+    expect(red.tableState.ballOn).toBe("Colour");
+    expect(red.feed[0]?.text).toMatch(/potted a red/i);
+    expect(colour.currentBreak).toBeGreaterThan(red.currentBreak);
+    expect(colour.currentBreak - red.currentBreak).toBeLessThanOrEqual(7);
+    expect(colour.tableState.redsRemaining).toBe(14);
+    expect(colour.tableState.ballOn).toBe("Red");
+    expect(colour.feed).toHaveLength(red.feed.length + 1);
+    expect(colour.feed[0]?.id).not.toBe(red.feed[0]?.id);
+    expect(colour.feed[0]?.text).toMatch(/potted the/i);
   });
 
   it("creates a career, enters an event, books travel, plays, records a result, and advances the tournament state", () => {
@@ -1412,6 +1521,7 @@ describe("connected career systems", () => {
       strain: 72,
       burnout: 64,
       injuryWeeks: 3,
+      seasonStartAttributes: structuredClone(state.attributes),
     };
     state.health.activeIssue = {
       id: "injury-test",
@@ -1435,6 +1545,12 @@ describe("connected career systems", () => {
     );
     expect(treated.trainingCondition.injuryWeeks).toBe(1);
     expect(treated.health.activeIssue?.weeksRemaining).toBe(1);
+    expect(
+      treated.trainingCondition.seasonStartAttributes.physical["Shoulder Health"],
+    ).toBe(state.attributes.physical["Shoulder Health"]);
+    expect(treated.attributes.physical["Shoulder Health"]).toBeGreaterThan(
+      treated.trainingCondition.seasonStartAttributes.physical["Shoulder Health"],
+    );
     expect(treated.health.history[0]).toMatchObject({
       issue: "Shoulder strain",
       treatment: "Physio Treatment",

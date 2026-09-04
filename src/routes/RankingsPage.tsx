@@ -18,11 +18,11 @@ import {
 const rankingTabs = [
   { key: 'world', label: 'World Ranking', seasonLabel: 'Two-year list', rankField: 'worldRank' },
   { key: 'oneYear', label: 'One-Year Ranking', seasonLabel: 'Current season race', rankField: 'oneYearRank' },
+  { key: 'youth', label: 'Youth Ranking', seasonLabel: 'Junior development', rankField: 'youthRank' },
   { key: 'amateur', label: 'Amateur Ranking', seasonLabel: 'Amateur pathway', rankField: 'amateurRank' },
   { key: 'qTour', label: 'Q Tour Ranking', seasonLabel: 'Global Q Tour', rankField: 'qTourRank' },
   { key: 'qSchool', label: 'Q School OOM', seasonLabel: 'Top-up race', rankField: 'qSchoolRank' },
   { key: 'senior', label: 'Senior Ranking', seasonLabel: 'Late-career circuit', rankField: 'seniorRank' },
-  { key: 'youth', label: 'Youth Ranking', seasonLabel: 'Junior development', rankField: 'youthRank' },
 ] as const
 
 type RankingTabKey = (typeof rankingTabs)[number]['key']
@@ -497,7 +497,7 @@ export function RankingsPage() {
           <div className="card min-h-0 px-3 py-2.5">
             <h3 className="mb-2 text-xs font-semibold text-white">Form</h3>
             <div className="flex items-center gap-1">
-              {gameState.player.form.slice(0, 10).map((result, index) => <span key={`${result}-${index}`} className={`h-2.5 w-2.5 rounded-full ${formTone(result)}`} />)}
+              {gameState.player.form.slice(-10).map((result, index) => <span key={`${result}-${index}`} className={`h-2.5 w-2.5 rounded-full ${formTone(result)}`} />)}
             </div>
           </div>
         </div>

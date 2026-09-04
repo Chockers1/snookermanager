@@ -340,6 +340,7 @@ export type TrainingConditionState = {
   strain: number;
   injuryWeeks: number;
   burnout: number;
+  seasonStartAttributes: PlayerAttributes;
   reportSnapshot?: {
     weeksTracked: number;
     attributes: PlayerAttributes;

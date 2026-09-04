@@ -378,6 +378,7 @@ type LiveVisitActor = "Player" | "Opponent";
 type LiveFrameTableState = {
   redsRemaining: number;
   coloursRemaining: LiveEndgameColour[];
+  ballOn?: "Red" | "Colour" | "Colours";
 };
 
 type LiveMatchCoachPrompt = {
@@ -894,7 +895,7 @@ export type GameState = {
   lastAction: string;
 };
 
-export const SAVE_SCHEMA_VERSION = 7;
+export const SAVE_SCHEMA_VERSION = 8;
 const STORAGE_KEY = ACTIVE_SAVE_KEY;
 const TOURNAMENT_ROUNDS: TournamentRound[] = [
   "Last 16",
@@ -1302,9 +1303,13 @@ function normalizeLiveMatchState(
     stamina: 60,
   };
 
-  const normalizedTableState =
+  const sourceTableState =
     liveMatch.tableState ??
     createTableStateFromLegacyBallCount(liveMatch.ballsRemaining ?? 12);
+  const normalizedTableState: LiveFrameTableState = {
+    ...sourceTableState,
+    ballOn: getBallOn(sourceTableState),
+  };
 
   return {
     ...liveMatch,
@@ -1351,6 +1356,7 @@ function getFrameStartTableState(): LiveFrameTableState {
   return {
     redsRemaining: LIVE_FRAME_START_REDS,
     coloursRemaining: [...LIVE_ENDGAME_COLOURS],
+    ballOn: "Red",
   };
 }
 
@@ -1371,6 +1377,7 @@ function createTableStateFromLegacyBallCount(
     return {
       redsRemaining: safeBallCount - LIVE_ENDGAME_COLOURS.length,
       coloursRemaining: [...LIVE_ENDGAME_COLOURS],
+      ballOn: "Red",
     };
   }
 
@@ -1379,7 +1386,26 @@ function createTableStateFromLegacyBallCount(
     coloursRemaining: LIVE_ENDGAME_COLOURS.slice(
       LIVE_ENDGAME_COLOURS.length - safeBallCount,
     ),
+    ballOn: "Colours",
   };
+}
+
+function getBallOn(tableState: LiveFrameTableState) {
+  return (
+    tableState.ballOn ??
+    (tableState.redsRemaining > 0 ? "Red" : "Colours")
+  );
+}
+
+function getRemainingTablePointsFromState(tableState: LiveFrameTableState) {
+  return (
+    tableState.redsRemaining * 8 +
+    (getBallOn(tableState) === "Colour" ? 7 : 0) +
+    tableState.coloursRemaining.reduce(
+      (total, colour) => total + LIVE_ENDGAME_COLOUR_POINTS[colour],
+      0,
+    )
+  );
 }
 
 function getCurrentEndgameColour(tableState: LiveFrameTableState) {
@@ -1406,13 +1432,7 @@ function isRespottedBlackVisit(liveMatch: LiveMatchState) {
 }
 
 function getRemainingTablePoints(liveMatch: LiveMatchState) {
-  return (
-    liveMatch.tableState.redsRemaining * 8 +
-    liveMatch.tableState.coloursRemaining.reduce(
-      (total, colour) => total + LIVE_ENDGAME_COLOUR_POINTS[colour],
-      0,
-    )
-  );
+  return getRemainingTablePointsFromState(liveMatch.tableState);
 }
 
 function areSnookersRequired(
@@ -2398,6 +2418,7 @@ function resolveLiveVisitScoring(
   const nextTableState: LiveFrameTableState = {
     redsRemaining: tableState.redsRemaining,
     coloursRemaining: [...tableState.coloursRemaining],
+    ballOn: getBallOn(tableState),
   };
   let scoredPoints = 0;
   let tableProgressLabel: string;
@@ -2435,6 +2456,8 @@ function resolveLiveVisitScoring(
       0,
       nextTableState.redsRemaining - redsCleared,
     );
+    nextTableState.ballOn =
+      nextTableState.redsRemaining > 0 ? "Red" : "Colours";
     tableProgressLabel =
       redsCleared > 0
         ? `made ${scoredPoints} from ${redsCleared} red${redsCleared === 1 ? "" : "s"} and colour${redsCleared === 1 ? "" : "s"}`
@@ -2487,12 +2510,98 @@ function resolveLiveVisitScoring(
   nextTableState.coloursRemaining = nextTableState.coloursRemaining.slice(
     pottedColours.length,
   );
+  nextTableState.ballOn = "Colours";
   tableProgressLabel =
     pottedColours.length > 0
       ? `cleared ${pottedColours.map((colour) => colour.toLowerCase()).join(", ")}`
       : "cleared the table";
 
   return { scoredPoints, nextTableState, tableProgressLabel };
+}
+
+function resolveLiveShotScoring(
+  activeProfile: LiveVisitSkillProfile,
+  decision: LiveVisitDecision,
+  tableState: LiveFrameTableState,
+) {
+  const nextTableState: LiveFrameTableState = {
+    redsRemaining: tableState.redsRemaining,
+    coloursRemaining: [...tableState.coloursRemaining],
+    ballOn: getBallOn(tableState),
+  };
+
+  if (decision === "Snooker Hunt") {
+    const scoredPoints = clamp(4 + Math.round(Math.random() * 3), 4, 7);
+    return {
+      scoredPoints,
+      nextTableState,
+      tableProgressLabel: `forced ${scoredPoints} foul points`,
+    };
+  }
+
+  if (decision === "Respotted Black") {
+    return {
+      scoredPoints: 7,
+      nextTableState,
+      tableProgressLabel: "potted the respotted black",
+    };
+  }
+
+  if (decision === "Safety Exchange") {
+    return {
+      scoredPoints: 0,
+      nextTableState,
+      tableProgressLabel: "left the cue ball safe",
+    };
+  }
+
+  if (getBallOn(tableState) === "Colour") {
+    const scoredPoints = getLiveVisitColourChoice(activeProfile, decision);
+    nextTableState.ballOn =
+      nextTableState.redsRemaining > 0 ? "Red" : "Colours";
+    return {
+      scoredPoints,
+      nextTableState,
+      tableProgressLabel: `potted the ${getLiveColourName(scoredPoints)}`,
+    };
+  }
+
+  if (tableState.redsRemaining > 0) {
+    nextTableState.redsRemaining -= 1;
+    nextTableState.ballOn = "Colour";
+    return {
+      scoredPoints: 1,
+      nextTableState,
+      tableProgressLabel: "potted a red",
+    };
+  }
+
+  const colour = nextTableState.coloursRemaining[0];
+  if (!colour) {
+    return {
+      scoredPoints: 0,
+      nextTableState,
+      tableProgressLabel: "cleared the table",
+    };
+  }
+
+  const scoredPoints = LIVE_ENDGAME_COLOUR_POINTS[colour];
+  nextTableState.coloursRemaining = nextTableState.coloursRemaining.slice(1);
+  nextTableState.ballOn = "Colours";
+  return {
+    scoredPoints,
+    nextTableState,
+    tableProgressLabel: `potted the ${colour.toLowerCase()}`,
+  };
+}
+
+function getLiveColourName(points: number) {
+  if (points === 2) return "yellow";
+  if (points === 3) return "green";
+  if (points === 4) return "brown";
+  if (points === 5) return "blue";
+  if (points === 6) return "pink";
+  return "black";
 }
 
 function getSyntheticCalibrationVisitDecision(
@@ -2566,6 +2675,8 @@ function resolveCareerMatchResult(
   };
 }
 
+let liveFeedSequence = 0;
+
 function buildVisitFeedEntry(
   time: string,
   text: string,
@@ -2573,7 +2684,7 @@ function buildVisitFeedEntry(
   tone: "green" | "amber" | "red" | "blue",
 ): LiveFeedItem {
   return {
-    id: `feed-visit-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    id: `feed-visit-${Date.now()}-${Math.floor(Math.random() * 1000)}-${liveFeedSequence++}`,
     time,
     text,
     actor,
@@ -2595,6 +2706,7 @@ function buildRealisticVisitFeedText(input: {
   tableProgressLabel: string;
   redsRemaining: number;
   deliberateRhythmPressure: number;
+  ballOn: "Red" | "Colour" | "Colours";
 }) {
   const {
     actorName,
@@ -2610,8 +2722,14 @@ function buildRealisticVisitFeedText(input: {
     tableProgressLabel,
     redsRemaining,
     deliberateRhythmPressure,
+    ballOn,
   } = input;
-  const nextBall = redsRemaining > 0 ? "red" : "colour";
+  const nextBall =
+    ballOn === "Red"
+      ? "red"
+      : ballOn === "Colour"
+        ? "nominated colour"
+        : "colour";
   const tableProgress = tableProgressLabel
     ? tableProgressLabel.replace(/^made /, "")
     : `${scoredPoints} points`;
@@ -3027,15 +3145,8 @@ function getBracketMatchWinner(
     : { ...match.bottom, score: undefined };
 }
 
-function createFallbackBracketEntrant(
-  seed: number,
-  tournament: Tournament,
-): BracketPlayer {
-  return createBracketPlayer(
-    `Qualifier ${seed}`,
-    160 + seed,
-    tournament.location,
-  );
+function createFallbackBracketEntrant(seed: number): BracketPlayer {
+  return createBracketPlayer(`Qualifier ${seed}`, 160 + seed, "INT");
 }
 
 function buildTournamentDrawField(
@@ -3079,7 +3190,7 @@ function buildTournamentDrawField(
   }
 
   while (field.length < fieldSize) {
-    field.push(createFallbackBracketEntrant(field.length + 1, tournament));
+    field.push(createFallbackBracketEntrant(field.length + 1));
   }
 
   return field;
@@ -3391,6 +3502,10 @@ function rerankCompetitionRows(
     ranking: index + 1,
     highlighted: row.playerName === playerName,
   }));
+}
+
+function isTemporaryQualifierName(playerName: string) {
+  return /^Qualifier \d+$/i.test(playerName.trim());
 }
 
 function ensurePlayerSeedRow(rows: RankingRow[], player: Player): RankingRow[] {
@@ -5768,6 +5883,10 @@ function applySeasonRollover(state: GameState) {
     ...archivedState,
     player: verifiedPlayer,
     attributes: attributesForNextSeason,
+    trainingCondition: {
+      ...archivedState.trainingCondition,
+      seasonStartAttributes: deepCloneAttributes(attributesForNextSeason),
+    },
     season: nextSeasonLabel,
     tournaments: nextSeasonSchedule,
     rankings: rebuiltCompetitionTables[primaryKey].map((row) => ({ ...row })),
@@ -8920,6 +9039,25 @@ export function repairGameState(state: GameState): GameState {
       keepProgress &&
       state.liveMatch.tournamentId === activeProgressTournament?.id,
     );
+  const repairedMatches = state.matches.filter(
+    (match) => !invalidMatchIds.has(match.id),
+  );
+  const repairedMatchLog = state.history.matchLog.filter((entry) => {
+    const tournament = repairedTournaments.find(
+      (event) => event.id === entry.tournamentId,
+    );
+    return tournament ? isDateInsideTournament(entry.date, tournament) : true;
+  });
+  const recordedResults = (
+    repairedMatchLog.length > 0 ? repairedMatchLog : repairedMatches
+  )
+    .slice(0, 10)
+    .reverse()
+    .map((entry) => (entry.result === "Won" ? "W" : "L"));
+  const repairedPlayerForm =
+    recordedResults.length > 0 ? recordedResults : state.player.form.slice(-10);
+  const playerFormRepaired =
+    repairedPlayerForm.join("") !== state.player.form.join("");
   const migrateHumanTitles = state.schemaVersion < 7;
   const archivedCareerTitles = state.history.seasonRecords.reduce(
     (total, season) => total + season.titles,
@@ -8946,11 +9084,13 @@ export function repairGameState(state: GameState): GameState {
       return {
         ...tables,
         [key]: rerankCompetitionRows(
-          (state.competitionTables[key] ?? []).map((row) =>
-            migrateHumanTitles && row.playerName === state.player.fullName
-              ? { ...row, titles: canonicalHumanTitles }
-              : row,
-          ),
+          (state.competitionTables[key] ?? [])
+            .filter((row) => !isTemporaryQualifierName(row.playerName))
+            .map((row) =>
+              migrateHumanTitles && row.playerName === state.player.fullName
+                ? { ...row, titles: canonicalHumanTitles }
+                : row,
+            ),
           state.player.fullName,
         ),
       };
@@ -8966,6 +9106,10 @@ export function repairGameState(state: GameState): GameState {
   return {
     ...state,
     schemaVersion: SAVE_SCHEMA_VERSION,
+    player: {
+      ...state.player,
+      form: repairedPlayerForm,
+    },
     coaches: mergeCoachCatalog(state.coaches),
     inbox: normalizeInboxMessages(
       state.inbox,
@@ -8973,10 +9117,12 @@ export function repairGameState(state: GameState): GameState {
       state.currentDate,
     ),
     tournaments: repairedTournaments,
-    matches: state.matches.filter((match) => !invalidMatchIds.has(match.id)),
+    matches: repairedMatches,
     competitionTables: repairedCompetitionTables,
     worldPlayers: normalizeWorldPlayers(
-      state.worldPlayers,
+      state.worldPlayers.filter(
+        (record) => !isTemporaryQualifierName(record.playerName),
+      ),
       repairedCompetitionTables,
       state.player,
     ),
@@ -9001,27 +9147,21 @@ export function repairGameState(state: GameState): GameState {
     liveMatch: keepLiveMatch ? state.liveMatch : null,
     history: {
       ...state.history,
-      matchLog: state.history.matchLog.filter((entry) => {
-        const tournament = repairedTournaments.find(
-          (event) => event.id === entry.tournamentId,
-        );
-        return tournament
-          ? isDateInsideTournament(entry.date, tournament)
-          : true;
-      }),
+      matchLog: repairedMatchLog,
       tournamentHistory: state.history.tournamentHistory.filter(
         (entry) => !invalidTournamentIds.has(entry.tournamentId),
       ),
     },
     lastAction:
       invalidMatchIds.size > 0 ||
+      playerFormRepaired ||
       migrateHumanTitles ||
       repairedRankingOrder ||
       repairedTournaments.some(
         (tournament, index) =>
           tournament.status !== state.tournaments[index]?.status,
       )
-        ? "Save upgraded: repaired tournament records and title totals, then rebuilt every ranking table strictly by points."
+        ? "Save upgraded: repaired recent form, tournament records and title totals, then rebuilt every ranking table strictly by points."
         : state.lastAction,
   };
 }
@@ -9362,6 +9502,7 @@ function updateCompetitionTablesFromCpuDraw(
     );
     participants.forEach((identity, name) => {
       if (
+        isTemporaryQualifierName(name) ||
         name === player.fullName ||
         rows.some((row) => row.playerName === name)
       )
@@ -14618,6 +14759,7 @@ export function advanceLiveVisit(
   liveMatch: LiveMatchState,
   decision?: LiveVisitDecision,
   mode: LiveMatchResolutionMode = "manual",
+  granularity: "visit" | "shot" = "visit",
 ): LiveMatchState {
   const actorIsPlayer = liveMatch.playerAtTable === liveMatch.playerName;
   const actor: LiveVisitActor = actorIsPlayer ? "Player" : "Opponent";
@@ -14799,32 +14941,50 @@ export function advanceLiveVisit(
     actorFatigue,
     liveMatch.pressureValue,
   );
-  const retainedTable = success && Math.random() * 100 < retainChance;
+  const isScoringDecision =
+    resolvedDecision === "Pot Attempt" ||
+    resolvedDecision === "Break Build" ||
+    resolvedDecision === "Respotted Black";
+  const retainedTable =
+    success &&
+    (granularity === "shot" && isScoringDecision
+      ? true
+      : Math.random() * 100 < retainChance);
   const visitScoring =
     success && !foulOccurred
-      ? resolveLiveVisitScoring(
-          activeProfile,
-          resolvedDecision,
-          liveMatch.tableState,
-          retainedTable,
-        )
+      ? granularity === "shot"
+        ? resolveLiveShotScoring(
+            activeProfile,
+            resolvedDecision,
+            liveMatch.tableState,
+          )
+        : resolveLiveVisitScoring(
+            activeProfile,
+            resolvedDecision,
+            liveMatch.tableState,
+            retainedTable,
+          )
       : {
           scoredPoints: 0,
           nextTableState: {
             redsRemaining: liveMatch.tableState.redsRemaining,
             coloursRemaining: [...liveMatch.tableState.coloursRemaining],
+            ballOn: getBallOn(liveMatch.tableState),
           },
           tableProgressLabel: "",
         };
   const { scoredPoints, nextTableState, tableProgressLabel } = visitScoring;
+  if (
+    (!success || foulOccurred) &&
+    getBallOn(liveMatch.tableState) === "Colour"
+  ) {
+    nextTableState.ballOn =
+      nextTableState.redsRemaining > 0 ? "Red" : "Colours";
+  }
 
   const nextBallsRemaining = getLegacyBallUnitsFromTableState(nextTableState);
   const nextRemainingTablePoints =
-    nextTableState.redsRemaining * 8 +
-    nextTableState.coloursRemaining.reduce(
-      (total, colour) => total + LIVE_ENDGAME_COLOUR_POINTS[colour],
-      0,
-    );
+    getRemainingTablePointsFromState(nextTableState);
   const playerPointDelta = actorIsPlayer
     ? scoredPoints
     : foulOccurred
@@ -14851,9 +15011,16 @@ export function advanceLiveVisit(
     : actorIsPlayer
       ? liveMatch.opponentName
       : liveMatch.playerName;
+  const confidenceSwing = granularity === "shot" && retainedTable ? 0 : 1;
   const nextPlayerConfidence = clamp(
     liveMatch.playerConfidence +
-      (actorIsPlayer ? (success ? 1 : -1) : success ? -1 : 1),
+      (actorIsPlayer
+        ? success
+          ? confidenceSwing
+          : -confidenceSwing
+        : success
+          ? -confidenceSwing
+          : confidenceSwing),
     25,
     99,
   );
@@ -14872,16 +15039,20 @@ export function advanceLiveVisit(
     25,
     99,
   );
-  const actingFatigueCost = getLiveVisitFatigueCost(
-    activeProfile,
-    resolvedDecision,
-    resolvedDecision === "Break Build" ? 1.15 : 0.65,
-  );
+  const actingFatigueCost =
+    getLiveVisitFatigueCost(
+      activeProfile,
+      resolvedDecision,
+      resolvedDecision === "Break Build" ? 1.15 : 0.65,
+    ) * (granularity === "shot" ? 0.16 : 1);
   const nextPlayerFatigue = clamp(
     liveMatch.playerFatigue +
       (actorIsPlayer
         ? actingFatigueCost +
-          (deliberateTempoActive ? tempoEffects.playerFatigueCost : 0)
+          (deliberateTempoActive
+            ? tempoEffects.playerFatigueCost *
+              (granularity === "shot" ? 0.16 : 1)
+            : 0)
         : 0),
     0,
     100,
@@ -14891,8 +15062,10 @@ export function advanceLiveVisit(
     0,
     100,
   );
+  const pressureScale = granularity === "shot" ? 0.2 : 1;
   const nextPressureValue = clamp(
-    liveMatch.pressureValue + (success ? -2 : 3) + (retainedTable ? -1 : 2),
+    liveMatch.pressureValue +
+      ((success ? -2 : 3) + (retainedTable ? -1 : 2)) * pressureScale,
     24,
     96,
   );
@@ -14974,12 +15147,18 @@ export function advanceLiveVisit(
     tableProgressLabel,
     redsRemaining: nextTableState.redsRemaining,
     deliberateRhythmPressure,
+    ballOn: getBallOn(liveMatch.tableState),
   });
+  const elapsedIncrement =
+    granularity === "shot"
+      ? deliberateTempoActive
+        ? 2
+        : 1
+      : deliberateTempoActive
+        ? tempoEffects.visitMinutes
+        : 4;
   const feedEntry = buildVisitFeedEntry(
-    formatLiveClock(
-      liveMatch.timeElapsedMinutes +
-        (deliberateTempoActive ? tempoEffects.visitMinutes : 4),
-    ),
+    formatLiveClock(liveMatch.timeElapsedMinutes + elapsedIncrement),
     feedText,
     foulOccurred ? "System" : actor,
     foulOccurred
@@ -14991,7 +15170,9 @@ export function advanceLiveVisit(
         : "blue",
   );
   const continuesExistingBreak =
-    liveMatch.currentBreak > 0 && liveMatch.feed[0]?.actor === actor;
+    granularity === "visit" &&
+    liveMatch.currentBreak > 0 &&
+    liveMatch.feed[0]?.actor === actor;
   const nextFeed = continuesExistingBreak
     ? [
         {
@@ -15045,9 +15226,7 @@ export function advanceLiveVisit(
         : nextPressureValue >= 58
           ? "Building"
           : "Stable",
-    timeElapsedMinutes:
-      liveMatch.timeElapsedMinutes +
-      (deliberateTempoActive ? tempoEffects.visitMinutes : 4),
+    timeElapsedMinutes: liveMatch.timeElapsedMinutes + elapsedIncrement,
     intervalText: isRespottedBlackVisit({
       ...liveMatch,
       playerPoints: nextPlayerPoints,
@@ -15059,8 +15238,11 @@ export function advanceLiveVisit(
       : frameClinched
         ? "Frame is ready to be closed out."
         : `${getFrameTableSummary(nextTableState)} in ${frameLabel}. ${areSnookersRequired(Math.max(0, nextOpponentPoints - nextPlayerPoints), nextRemainingTablePoints) ? "You now need foul points." : nextPlayerAtTable === liveMatch.playerName ? "You are back in control." : `${liveMatch.opponentName} is back at the table.`}`,
-    feed: nextFeed.slice(0, 24),
-    visitHistory: [visitLogEntry, ...liveMatch.visitHistory].slice(0, 18),
+    feed: nextFeed.slice(0, granularity === "shot" ? 120 : 24),
+    visitHistory: [visitLogEntry, ...liveMatch.visitHistory].slice(
+      0,
+      granularity === "shot" ? 160 : 18,
+    ),
     playerStats: actorIsPlayer ? updatedSideStats : liveMatch.playerStats,
     opponentStats: actorIsPlayer ? liveMatch.opponentStats : updatedSideStats,
     lastVisitSummary: `${frameLabel} V${liveMatch.currentVisit}: ${visitLogEntry.outcome}${scoredPoints > 0 ? ` (${scoredPoints} pts)` : ""}`,
@@ -15591,7 +15773,7 @@ function finalizeLiveMatch(
     confidence: clamp(state.player.confidence + confidenceChange, 25, 99),
     fatigue: clamp(state.player.fatigue + fatigueChange, 0, 100),
     morale: clamp(state.player.morale + (won ? 3 : -2), 0, 100),
-    form: [...state.player.form.slice(1), won ? "W" : "L"],
+    form: [...state.player.form.slice(-9), won ? "W" : "L"],
     reputation: clamp(
       state.player.reputation + (won ? (nextRound ? 2 : 4) : 0),
       0,
@@ -16222,6 +16404,7 @@ export function createStarterState(): GameState {
       strain: 0,
       injuryWeeks: 0,
       burnout: 0,
+      seasonStartAttributes: deepCloneAttributes(starterAttributes),
     },
     health: { activeIssue: null, history: [] },
     lastAction: "Career loaded from the starter save.",
@@ -16434,6 +16617,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
       strain: 0,
       injuryWeeks: 0,
       burnout: 0,
+      seasonStartAttributes: deepCloneAttributes(attributes),
     },
     health: { activeIssue: null, history: [] },
     lastAction: `Created a new ${selectedBackground.name} career for ${careerConfig.fullName}.`,
@@ -16631,6 +16815,12 @@ function loadStoredState(): GameState {
       trainingCondition: {
         ...fallbackState.trainingCondition,
         ...(parsed.trainingCondition ?? {}),
+        seasonStartAttributes: deepCloneAttributes(
+          parsed.trainingCondition?.seasonStartAttributes ??
+            parsed.trainingCondition?.reportSnapshot?.attributes ??
+            parsed.attributes ??
+            fallbackState.attributes,
+        ),
       },
       health: {
         activeIssue: parsed.health?.activeIssue ?? null,
@@ -17254,6 +17444,7 @@ export function applyTrainingPlanState(
       trainingPlan: normalizedTrainingPlan,
       trainingAppliedWeek: previousState.week,
       trainingCondition: {
+        ...previousState.trainingCondition,
         rollingLoad: Math.round(
           previousState.trainingCondition.rollingLoad * 0.55 +
             trainingEffects.weekLoad * 0.45,
@@ -18504,6 +18695,32 @@ export function useGameState() {
             previousState.liveMatch,
             undefined,
             "simulated",
+          );
+          return progressedLiveMatch.status === "Completed"
+            ? finalizeLiveMatch(
+                { ...previousState, liveMatch: progressedLiveMatch },
+                progressedLiveMatch,
+              )
+            : finalizeState(
+                { ...previousState, liveMatch: progressedLiveMatch },
+                progressedLiveMatch.lastVisitSummary,
+              );
+        });
+      },
+      simulateLiveShot() {
+        setGameState((previousState) => {
+          if (!previousState.liveMatch) {
+            return finalizeState(
+              previousState,
+              "There is no live shot to simulate.",
+            );
+          }
+
+          const progressedLiveMatch: LiveMatchState = advanceLiveVisit(
+            previousState.liveMatch,
+            undefined,
+            "manual",
+            "shot",
           );
           return progressedLiveMatch.status === "Completed"
             ? finalizeLiveMatch(
