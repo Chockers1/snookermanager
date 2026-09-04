@@ -103,22 +103,19 @@ export function TournamentPreparationPage() {
   }
 
   function adjustAllocation(id: PreparationAllocationId, change: -5 | 5) {
-    setFocusId("balanced");
+    setFocusId("custom");
     setAllocations((current) => {
       const next = { ...current };
       if (change > 0) {
-        const donor = preparationAllocationMeta
-          .map((item) => item.id)
-          .filter((candidate) => candidate !== id && next[candidate] >= 5)
-          .sort((left, right) => next[right] - next[left])[0];
-        if (!donor || next[id] >= 100) return current;
+        const currentTotal = Object.values(next).reduce(
+          (total, value) => total + value,
+          0,
+        );
+        if (currentTotal >= 100 || next[id] >= 100) return current;
         next[id] += 5;
-        next[donor] -= 5;
       } else {
         if (next[id] < 5) return current;
-        const receiver = id === "recovery" ? "mental" : "recovery";
         next[id] -= 5;
-        next[receiver] += 5;
       }
       return next;
     });
@@ -229,7 +226,7 @@ export function TournamentPreparationPage() {
         <section className="card flex min-h-[520px] flex-col overflow-hidden xl:min-h-0">
           <div className="card-header shrink-0 py-2.5">
             <div><h2 className="flex items-center gap-2 text-xs font-semibold text-white"><SlidersHorizontal className="h-4 w-4 text-green-400" />Preparation allocation</h2><p className="text-[8px] text-gray-500">Every change updates the forecast immediately.</p></div>
-            <span className={totalAllocation === 100 ? "text-[9px] font-semibold text-green-400" : "text-[9px] font-semibold text-red-400"}>{totalAllocation}% allocated</span>
+            <span className={totalAllocation === 100 ? "text-[9px] font-semibold text-green-400" : totalAllocation < 100 ? "text-[9px] font-semibold text-amber-400" : "text-[9px] font-semibold text-red-400"}>{totalAllocation}% allocated{totalAllocation < 100 ? ` · ${100 - totalAllocation}% available` : ""}</span>
           </div>
           <div className="grid min-h-0 flex-1 gap-2 p-2.5 xl:grid-cols-[minmax(0,1fr)_310px] xl:grid-rows-[auto_minmax(0,1fr)]">
             <div className="grid grid-cols-2 gap-1.5 md:grid-cols-3">
@@ -239,7 +236,7 @@ export function TournamentPreparationPage() {
                 return (
                   <div key={item.id} className={`rounded-lg border p-2.5 ${recovery ? "border-green-500/35 bg-green-500/10" : "border-border bg-surface-light/35"}`}>
                     <div className="flex items-start justify-between gap-2"><div><p className="text-[10px] font-semibold text-white">{item.label}</p><p className={`text-[8px] ${recovery ? "text-green-400" : "text-gray-500"}`}>{item.description}</p></div><b className="text-sm text-green-400">{value}%</b></div>
-                    <div className="mt-2.5 flex gap-1"><button type="button" aria-label={`Decrease ${item.label}`} className="min-h-8 flex-1 rounded border border-border bg-surface text-xs text-gray-300 hover:border-green-500/40" onClick={() => adjustAllocation(item.id, -5)}>−</button><button type="button" aria-label={`Increase ${item.label}`} className="min-h-8 flex-1 rounded border border-border bg-surface text-xs text-gray-300 hover:border-green-500/40" onClick={() => adjustAllocation(item.id, 5)}>+</button></div>
+                    <div className="mt-2.5 flex gap-1"><button type="button" aria-label={`Decrease ${item.label}`} disabled={value === 0} className="min-h-8 flex-1 rounded border border-border bg-surface text-xs text-gray-300 hover:border-green-500/40 disabled:cursor-not-allowed disabled:opacity-35" onClick={() => adjustAllocation(item.id, -5)}>−</button><button type="button" aria-label={`Increase ${item.label}`} disabled={totalAllocation >= 100 || value >= 100} className="min-h-8 flex-1 rounded border border-border bg-surface text-xs text-gray-300 hover:border-green-500/40 disabled:cursor-not-allowed disabled:opacity-35" onClick={() => adjustAllocation(item.id, 5)}>+</button></div>
                   </div>
                 );
               })}

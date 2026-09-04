@@ -178,21 +178,34 @@ export function InboxPage() {
   }
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden sm:gap-3">
-      <header className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase text-gray-500">
-            Support
-          </p>
-          <h1 className="mt-1 text-2xl font-bold text-white">Inbox</h1>
-          <p className="mt-1 text-sm text-gray-400">
-            Career updates and decisions that need your attention.
-          </p>
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden">
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border">
+        <div
+          className="-ml-1 flex min-w-0 flex-1 gap-1 overflow-x-auto px-1"
+          role="tablist"
+          aria-label="Inbox filters"
+        >
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={categoryFilter === tab.id}
+              onClick={() => setCategoryFilter(tab.id)}
+              className={`h-9 flex-none whitespace-nowrap rounded-b-none px-2.5 text-[11px] ${categoryFilter === tab.id ? "tab-active" : "tab-inactive"}`}
+            >
+              {tab.label}{" "}
+              <span className="ml-1 rounded bg-surface-light px-1 py-0.5 text-[9px]">
+                {tab.count}
+              </span>
+            </button>
+          ))}
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-none">
+
+        <div className="flex shrink-0 gap-1.5 pb-1">
           <button
             type="button"
-            className="btn-secondary min-h-10 justify-center whitespace-nowrap text-xs"
+            className="btn-secondary min-h-8 justify-center whitespace-nowrap px-2.5 py-1.5 text-[11px]"
             onClick={markAllInboxRead}
           >
             <Check className="h-3.5 w-3.5" /> Mark All Read
@@ -200,34 +213,12 @@ export function InboxPage() {
           <button
             type="button"
             aria-pressed={showActionableOnly}
-            className={`btn-secondary min-h-10 justify-center whitespace-nowrap text-xs ${showActionableOnly ? "border-green-500/50 bg-green-600/10 text-green-300" : ""}`}
+            className={`btn-secondary min-h-8 justify-center whitespace-nowrap px-2.5 py-1.5 text-[11px] ${showActionableOnly ? "border-green-500/50 bg-green-600/10 text-green-300" : ""}`}
             onClick={() => setShowActionableOnly((value) => !value)}
           >
             {showActionableOnly ? "Showing Actionable" : "Actionable Only"}
           </button>
         </div>
-      </header>
-
-      <div
-        className="-mx-1 flex shrink-0 gap-1 overflow-x-auto border-b border-border px-1"
-        role="tablist"
-        aria-label="Inbox filters"
-      >
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={categoryFilter === tab.id}
-            onClick={() => setCategoryFilter(tab.id)}
-            className={`min-h-11 flex-none whitespace-nowrap rounded-b-none px-3 text-xs ${categoryFilter === tab.id ? "tab-active" : "tab-inactive"}`}
-          >
-            {tab.label}{" "}
-            <span className="ml-1 rounded bg-surface-light px-1.5 py-0.5 text-[10px]">
-              {tab.count}
-            </span>
-          </button>
-        ))}
       </div>
 
       <section className="card grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(9rem,0.8fr)_minmax(11rem,1.2fr)] overflow-hidden md:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.5fr)] md:grid-rows-1">

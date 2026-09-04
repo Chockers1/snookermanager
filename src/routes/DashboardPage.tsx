@@ -2,14 +2,8 @@ import {
   Activity,
   BadgePoundSterling,
   CalendarDays,
-  ChevronRight,
   Dumbbell,
-  Play,
-  Route,
-  SkipForward,
-  Swords,
   Target,
-  Trophy,
   Users,
   Wrench,
 } from "lucide-react";
@@ -25,7 +19,6 @@ import { useNavigate } from "react-router-dom";
 import { useGame } from "../context/useGame";
 import {
   getNextEligibleTournament,
-  getTournamentPlayability,
 } from "../hooks/useGameState";
 import { buildDashboardData } from "../utils/liveRouteData";
 import { formatMoney } from "../utils/formatters";
@@ -58,9 +51,6 @@ export function DashboardPage() {
   const {
     gameState,
     continueWeek,
-    continueToNextTournament,
-    enterTournament,
-    skipTournament,
   } = useGame();
   const navigate = useNavigate();
   const { currentCue, financeChart } = buildDashboardData(gameState);
@@ -72,27 +62,10 @@ export function DashboardPage() {
     )?.ranking ??
     gameState.player.worldRanking ??
     gameState.player.amateurRanking;
-  const tournamentPlayability = enteredEvent
-    ? getTournamentPlayability(gameState, enteredEvent)
-    : null;
-  const canPlayTournament = tournamentPlayability?.canPlay ?? false;
-  const hasLiveMatchInProgress = gameState.liveMatch?.status === "In Progress";
   const activeCoach = gameState.coaches.find(
     (coach) => coach.id === gameState.currentCoachId,
   );
   const latestMatches = gameState.matches.slice(0, 5);
-  const upcomingOpponent = gameState.tournamentProgress.draw
-    .flatMap((round) => round.matches)
-    .find(
-      (match) =>
-        match.top.name === gameState.player.fullName ||
-        match.bottom.name === gameState.player.fullName,
-    );
-  const opponentName = upcomingOpponent
-    ? upcomingOpponent.top.name === gameState.player.fullName
-      ? upcomingOpponent.bottom.name
-      : upcomingOpponent.top.name
-    : "Opponent TBD";
   const rankingTrend = gameState.history.snapshots
     .slice(-10)
     .map((snapshot) => ({
@@ -117,33 +90,6 @@ export function DashboardPage() {
     income: 0,
     expenses: 0,
   };
-  const eventStatusLabel = hasLiveMatchInProgress
-    ? "Match live"
-    : enteredEvent
-      ? canPlayTournament
-        ? "Ready to play"
-        : "Entry accepted"
-      : nextEvent
-        ? "Entry pending"
-        : "No event selected";
-  const eventStageLabel = hasLiveMatchInProgress
-    ? (gameState.liveMatch?.round ?? "Live match")
-    : (gameState.tournamentProgress.currentRound ?? "Entry");
-  const primaryEventActionLabel = hasLiveMatchInProgress
-    ? "Resume Live Match"
-    : enteredEvent
-      ? canPlayTournament
-        ? "Play Next Match"
-        : !tournamentPlayability?.travelBooked
-          ? "Book Travel"
-          : !tournamentPlayability?.preparationConfirmed
-            ? "Prepare Tournament"
-          : (tournamentPlayability?.daysUntilStart ?? 0) > 0
-            ? "Advance to Tournament"
-            : "Open Tournament Hub"
-      : nextEvent
-        ? "Enter Tournament"
-        : "View Tournament Calendar";
   const currentCueBonus = Object.entries(currentCue?.bonuses ?? {}).sort(
     (left, right) => right[1] - left[1],
   )[0];
@@ -169,130 +115,8 @@ export function DashboardPage() {
       .filter(Boolean)
       .join(" & ") || "Match readiness";
 
-  function handlePrimaryEventAction() {
-    if (hasLiveMatchInProgress) {
-      navigate("/match/live");
-      return;
-    }
-
-    if (enteredEvent) {
-      if (canPlayTournament) {
-        navigate("/match/preview");
-      } else if (!tournamentPlayability?.travelBooked) {
-        navigate("/travel");
-      } else if (!tournamentPlayability?.preparationConfirmed) {
-        navigate("/tournament/preparation");
-      } else if ((tournamentPlayability?.daysUntilStart ?? 0) > 0) {
-        continueToNextTournament();
-        navigate("/tournaments/hub");
-      } else {
-        navigate("/tournaments/hub");
-      }
-      return;
-    }
-
-    if (nextEvent) {
-      enterTournament(nextEvent.id);
-      navigate("/tournaments/hub");
-      return;
-    }
-
-    navigate("/calendar");
-  }
-
-  function handleSecondaryEventAction() {
-    if (enteredEvent || hasLiveMatchInProgress) {
-      navigate("/tournaments/hub");
-      return;
-    }
-
-    if (nextEvent) {
-      skipTournament(nextEvent.id);
-      return;
-    }
-
-    navigate("/calendar");
-  }
-
   return (
-    <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
-      <div className="card shrink-0 overflow-hidden border-green-600/30 bg-gradient-to-r from-green-600/10 via-surface to-surface">
-        <div className="grid gap-3 px-3 py-3 sm:grid-cols-2 sm:px-4 lg:grid-cols-12 lg:gap-2">
-          <div className="sm:col-span-2 lg:col-span-5">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-green-500/40 bg-green-600/10">
-                <Trophy className="h-5 w-5 text-green-400" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-green-400">
-                  Career Next Step
-                </p>
-                <h2 className="mt-1 truncate text-base font-bold text-white">
-                  {nextEvent?.name ?? "No tournament scheduled"}
-                </h2>
-                <p className="mt-1 truncate text-[11px] text-gray-400">
-                  {eventStageLabel} · {nextEvent?.format ?? "Awaiting format"} ·{" "}
-                  {eventStatusLabel}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 lg:col-span-3">
-            <div className="rounded-xl border border-border bg-surface/80 px-3 py-3 text-center">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                Required Action
-              </p>
-              <p className="mt-1 truncate text-sm font-bold text-white">
-                {primaryEventActionLabel}
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-surface/80 px-3 py-3 text-center">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                Opponent
-              </p>
-              <p className="mt-1 truncate text-sm font-bold text-white">
-                {opponentName}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end lg:col-span-4">
-            <button
-              type="button"
-              onClick={handleSecondaryEventAction}
-              className="btn-secondary text-xs"
-            >
-              {enteredEvent || hasLiveMatchInProgress ? (
-                <Route className="h-3.5 w-3.5" />
-              ) : nextEvent ? (
-                <SkipForward className="h-3.5 w-3.5" />
-              ) : (
-                <CalendarDays className="h-3.5 w-3.5" />
-              )}
-              {enteredEvent || hasLiveMatchInProgress
-                ? "Tournament Hub"
-                : nextEvent
-                  ? "Skip This Event"
-                  : "View Calendar"}
-            </button>
-            <button
-              type="button"
-              onClick={handlePrimaryEventAction}
-              className="btn-primary px-5 text-xs"
-            >
-              {hasLiveMatchInProgress || canPlayTournament ? (
-                <Play className="h-3.5 w-3.5" />
-              ) : (
-                <Swords className="h-3.5 w-3.5" />
-              )}
-              {primaryEventActionLabel}
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
+    <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-6.25rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
         <div className="grid min-h-0 gap-3 xl:col-span-4 xl:grid-rows-[1.18fr_0.92fr_0.62fr] xl:gap-2">
           <div className="card min-h-0 flex h-full flex-col overflow-hidden">

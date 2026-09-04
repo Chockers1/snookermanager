@@ -1,4 +1,5 @@
 export type PreparationFocusId =
+  | "custom"
   | "balanced"
   | "potting"
   | "safety"
@@ -86,6 +87,14 @@ export const preparationSupports: Array<{
 ];
 
 export function getPreparationFocus(id: PreparationFocusId) {
+  if (id === "custom") {
+    return {
+      id,
+      label: "Custom allocation",
+      description: "Your manual preparation mix",
+      allocations: getDefaultPreparationAllocations(),
+    };
+  }
   return preparationFocuses.find((focus) => focus.id === id) ?? preparationFocuses[0];
 }
 

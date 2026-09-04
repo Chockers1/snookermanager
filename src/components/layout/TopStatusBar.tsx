@@ -1,17 +1,26 @@
 import {
+  CalendarDays,
   CalendarClock,
+  ChevronRight,
   Mail,
+  Play,
+  Route,
   Save,
   Settings,
+  SkipForward,
+  Swords,
   TrendingDown,
   TrendingUp,
   UserPlus,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import type { Player } from "../../types/game";
 import { useGame } from "../../context/useGame";
-import { getNextEligibleTournament } from "../../hooks/useGameState";
+import {
+  getNextEligibleTournament,
+  getTournamentPlayability,
+} from "../../hooks/useGameState";
 import { formatMoney } from "../../utils/formatters";
 
 type TopStatusBarProps = {
@@ -19,9 +28,16 @@ type TopStatusBarProps = {
 };
 
 export function TopStatusBar({ player }: TopStatusBarProps) {
-  const { gameState } = useGame();
+  const {
+    gameState,
+    continueToNextTournament,
+    enterTournament,
+    skipTournament,
+  } = useGame();
   const navigate = useNavigate();
+  const location = useLocation();
   const [careerMenuOpen, setCareerMenuOpen] = useState(false);
+  const isDashboard = location.pathname === "/";
   const playerRankingRow = gameState.rankings.find(
     (row) => row.playerName === player.fullName,
   );
@@ -29,6 +45,24 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
     playerRankingRow?.ranking ?? player.worldRanking ?? player.amateurRanking;
   const rankingMovement = playerRankingRow?.movement ?? 0;
   const nextEvent = getNextEligibleTournament(gameState);
+  const enteredEvent = nextEvent?.status === "Entered" ? nextEvent : undefined;
+  const tournamentPlayability = enteredEvent
+    ? getTournamentPlayability(gameState, enteredEvent)
+    : null;
+  const canPlayTournament = tournamentPlayability?.canPlay ?? false;
+  const hasLiveMatchInProgress = gameState.liveMatch?.status === "In Progress";
+  const upcomingOpponent = gameState.tournamentProgress.draw
+    .flatMap((round) => round.matches)
+    .find(
+      (match) =>
+        match.top.name === player.fullName ||
+        match.bottom.name === player.fullName,
+    );
+  const opponentName = upcomingOpponent
+    ? upcomingOpponent.top.name === player.fullName
+      ? upcomingOpponent.bottom.name
+      : upcomingOpponent.top.name
+    : "Opponent TBD";
   const unreadInboxCount = gameState.inbox.filter(
     (message) => !message.read,
   ).length;
@@ -41,10 +75,78 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
             100,
         )
       : 0;
+  const eventStatusLabel = hasLiveMatchInProgress
+    ? "Match live"
+    : enteredEvent
+      ? canPlayTournament
+        ? "Ready to play"
+        : "Entry accepted"
+      : nextEvent
+        ? "Entry pending"
+        : "No event selected";
+  const eventStageLabel = hasLiveMatchInProgress
+    ? (gameState.liveMatch?.round ?? "Live match")
+    : (gameState.tournamentProgress.currentRound ?? "Entry");
+  const primaryEventActionLabel = hasLiveMatchInProgress
+    ? "Resume Live Match"
+    : enteredEvent
+      ? canPlayTournament
+        ? "Play Next Match"
+        : !tournamentPlayability?.travelBooked
+          ? "Book Travel"
+          : !tournamentPlayability?.preparationConfirmed
+            ? "Prepare Tournament"
+            : (tournamentPlayability?.daysUntilStart ?? 0) > 0
+              ? "Advance to Tournament"
+              : "Open Tournament Hub"
+      : nextEvent
+        ? "Enter Tournament"
+        : "View Tournament Calendar";
+
+  function handlePrimaryEventAction() {
+    if (hasLiveMatchInProgress) {
+      navigate("/match/live");
+      return;
+    }
+
+    if (enteredEvent) {
+      if (canPlayTournament) navigate("/match/preview");
+      else if (!tournamentPlayability?.travelBooked) navigate("/travel");
+      else if (!tournamentPlayability?.preparationConfirmed)
+        navigate("/tournament/preparation");
+      else if ((tournamentPlayability?.daysUntilStart ?? 0) > 0) {
+        continueToNextTournament();
+        navigate("/tournaments/hub");
+      } else navigate("/tournaments/hub");
+      return;
+    }
+
+    if (nextEvent) {
+      enterTournament(nextEvent.id);
+      navigate("/tournaments/hub");
+      return;
+    }
+
+    navigate("/calendar");
+  }
+
+  function handleSecondaryEventAction() {
+    if (enteredEvent || hasLiveMatchInProgress) {
+      navigate("/tournaments/hub");
+      return;
+    }
+
+    if (nextEvent) skipTournament(nextEvent.id);
+    else navigate("/calendar");
+  }
 
   return (
-    <header className="relative z-30 flex h-14 min-w-0 shrink-0 items-center border-b border-border bg-sidebar pl-14 pr-1 sm:pr-2 xl:px-4">
-      <div className="flex min-w-0 shrink items-center gap-2 border-r border-border pr-2 sm:shrink-0 sm:pr-4">
+    <header
+      className={`relative z-30 flex min-w-0 shrink-0 items-center border-b border-border bg-sidebar pl-14 pr-1 sm:pr-2 xl:px-4 ${isDashboard ? "h-[68px]" : "h-14"}`}
+    >
+      <div
+        className={`flex min-w-0 shrink items-center gap-2 border-r border-border pr-2 sm:pr-4 ${isDashboard ? "sm:w-48 xl:w-56 2xl:w-64" : "sm:shrink-0"}`}
+      >
         <button
           type="button"
           onClick={() => navigate("/career/progression")}
@@ -58,14 +160,20 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
           className="min-w-0 text-left"
         >
           <div className="flex items-center gap-1.5">
-            <span className="max-w-[100px] truncate text-xs font-semibold text-white sm:max-w-[120px]">
+            <span
+              title={player.fullName}
+              className={`truncate text-xs font-semibold text-white ${isDashboard ? "max-w-[110px] sm:max-w-[128px] xl:max-w-[158px] 2xl:max-w-[190px]" : "max-w-[100px] sm:max-w-[120px]"}`}
+            >
               {player.fullName}
             </span>
             <span className="hidden shrink-0 text-[10px] text-gray-500 sm:inline">
               {player.nationality}
             </span>
           </div>
-          <p className="hidden max-w-[140px] truncate text-[10px] text-gray-500 sm:block">
+          <p
+            title={player.careerStage}
+            className="hidden max-w-full truncate text-[10px] text-gray-500 sm:block"
+          >
             {player.careerStage}
           </p>
         </button>
@@ -98,7 +206,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
       <button
         type="button"
         onClick={() => navigate("/career/stats")}
-        className="hidden min-h-11 shrink-0 items-center gap-1.5 border-r border-border px-3 transition hover:bg-white/5 lg:flex"
+        className="hidden min-h-11 shrink-0 items-center gap-1.5 border-r border-border px-3 transition hover:bg-white/5 xl:flex"
       >
         <span className="whitespace-nowrap text-[9px] uppercase text-gray-500">
           Form
@@ -109,7 +217,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
       <button
         type="button"
         onClick={() => navigate("/mental")}
-        className="hidden min-h-11 shrink-0 items-center gap-1.5 border-r border-border px-3 transition hover:bg-white/5 lg:flex"
+        className="hidden min-h-11 shrink-0 items-center gap-1.5 border-r border-border px-3 transition hover:bg-white/5 xl:flex"
       >
         <span className="whitespace-nowrap text-[9px] uppercase text-gray-500">
           Confidence
@@ -147,21 +255,90 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
       <button
         type="button"
         onClick={() => navigate("/tournaments/hub")}
-        className="hidden min-w-0 shrink items-center gap-1.5 px-3 text-left transition hover:bg-white/5 md:flex"
+        className={`hidden min-w-0 flex-1 items-center gap-1.5 px-3 text-left transition hover:bg-white/5 md:flex ${isDashboard ? "border-r border-border" : "shrink"}`}
       >
         <CalendarClock className="h-3.5 w-3.5 shrink-0 text-green-400" />
         <span className="shrink-0 whitespace-nowrap text-[9px] uppercase text-gray-500">
           Next
         </span>
-        <div className="min-w-0">
-          <p className="truncate text-[11px] font-medium text-white">
+        <div className="min-w-0 flex-1">
+          <p
+            title={nextEvent?.name ?? player.nextEvent}
+            className="truncate text-[11px] font-medium text-white"
+          >
             {nextEvent?.name ?? player.nextEvent}
           </p>
           <p className="truncate text-[9px] text-gray-500">
-            {nextEvent?.format ?? "No event scheduled"}
+            {isDashboard
+              ? `${eventStageLabel} · ${nextEvent?.format ?? "Awaiting format"} · ${eventStatusLabel}`
+              : (nextEvent?.format ?? "No event scheduled")}
           </p>
         </div>
       </button>
+
+      {isDashboard ? (
+        <>
+          <div className="hidden min-h-11 w-32 shrink-0 flex-col justify-center border-r border-border px-3 xl:flex">
+            <span className="text-[9px] uppercase text-gray-500">
+              Required action
+            </span>
+            <span
+              title={primaryEventActionLabel}
+              className="truncate text-[11px] font-semibold text-white"
+            >
+              {primaryEventActionLabel}
+            </span>
+          </div>
+          <div className="hidden min-h-11 w-36 shrink-0 flex-col justify-center border-r border-border px-3 2xl:flex">
+            <span className="text-[9px] uppercase text-gray-500">Opponent</span>
+            <span
+              title={opponentName}
+              className="truncate text-[11px] font-semibold text-white"
+            >
+              {opponentName}
+            </span>
+          </div>
+          <div className="hidden shrink-0 items-center gap-2 px-2 xl:flex">
+            <button
+              type="button"
+              onClick={handleSecondaryEventAction}
+              className="btn-secondary h-9 whitespace-nowrap px-3 text-[11px]"
+            >
+              {enteredEvent || hasLiveMatchInProgress ? (
+                <Route className="h-3.5 w-3.5" />
+              ) : nextEvent ? (
+                <SkipForward className="h-3.5 w-3.5" />
+              ) : (
+                <CalendarDays className="h-3.5 w-3.5" />
+              )}
+              <span className="hidden 2xl:inline">
+                {enteredEvent || hasLiveMatchInProgress
+                  ? "Tournament Hub"
+                  : nextEvent
+                    ? "Skip This Event"
+                    : "View Calendar"}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={handlePrimaryEventAction}
+              title={primaryEventActionLabel}
+              className="btn-primary h-9 whitespace-nowrap px-3 text-[11px]"
+            >
+              {hasLiveMatchInProgress || canPlayTournament ? (
+                <Play className="h-3.5 w-3.5" />
+              ) : (
+                <Swords className="h-3.5 w-3.5" />
+              )}
+              <span className="hidden 2xl:inline">
+                {primaryEventActionLabel}
+              </span>
+              <span className="2xl:hidden">Continue</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </>
+      ) : null}
 
       <div className="ml-auto flex shrink-0 items-center gap-0 pl-1 sm:gap-1 sm:pl-2">
         <button
