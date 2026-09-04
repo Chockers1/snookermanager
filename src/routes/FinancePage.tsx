@@ -48,9 +48,9 @@ function getDateValue(dateValue: string) {
 }
 
 function statusPillClass(status: string) {
-  if (/complete|active/i.test(status)) return 'rounded bg-green-600/20 px-1.5 py-0.5 text-[9px] text-green-400'
-  if (/pending|booked/i.test(status)) return 'rounded bg-amber-600/20 px-1.5 py-0.5 text-[9px] text-amber-400'
-  return 'rounded bg-surface-light/70 px-1.5 py-0.5 text-[9px] text-gray-300'
+  if (/complete|active/i.test(status)) return 'rounded bg-green-600/20 px-2 py-1 text-[10px] font-medium text-green-300'
+  if (/pending|booked/i.test(status)) return 'rounded bg-amber-600/20 px-2 py-1 text-[10px] font-medium text-amber-300'
+  return 'rounded bg-surface-light/70 px-2 py-1 text-[10px] font-medium text-gray-300'
 }
 
 const incomeColors = ['#22c55e', '#16a34a', '#3b82f6', '#38bdf8']
@@ -210,7 +210,7 @@ export function FinancePage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+    <div className="flex min-h-full min-w-0 flex-col gap-3 pb-6 xl:-m-6 xl:p-2">
       <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface/85 px-4 py-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold leading-tight text-white">Finance Dashboard</h1>
@@ -225,39 +225,39 @@ export function FinancePage() {
       <div className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${alertToneClass}`}>
         <AlertTriangle className="h-4 w-4 shrink-0" />
         <div className="min-w-0">
-          <p className="truncate text-[11px] font-semibold">{alertTitle}</p>
-          <p className="truncate text-[10px] text-gray-300">{financeActionMessage}</p>
+          <p className="truncate text-xs font-semibold">{alertTitle}</p>
+          <p className="truncate text-[11px] text-gray-300">{financeActionMessage}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <div className="card min-h-0 p-3">
-          <div className="flex items-center gap-2"><Wallet className="h-3.5 w-3.5 text-green-400" /><p className="metric-label">Current Balance</p></div>
+          <div className="flex items-center gap-2"><Wallet className="h-4 w-4 text-green-400" /><p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Current Balance</p></div>
           <p className="mt-2 truncate text-3xl font-bold text-white">{formatMoney(gameState.player.cash)}</p>
-          <p className="mt-1 text-[10px] text-gray-400">Available funds</p>
+          <p className="mt-1 text-[11px] text-gray-400">Available funds</p>
         </div>
         <div className="card min-h-0 p-3">
-          <div className="flex items-center gap-2"><Coins className="h-3.5 w-3.5 text-green-400" /><p className="metric-label">Monthly Cash Flow</p></div>
+          <div className="flex items-center gap-2"><Coins className="h-4 w-4 text-green-400" /><p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Monthly Cash Flow</p></div>
           <p className={`mt-2 truncate text-3xl font-bold ${currentMonthNet >= 0 ? 'text-green-400' : 'text-red-400'}`}>{formatSignedMoney(currentMonthNet)}</p>
-          <p className="mt-1 text-[10px] text-gray-400">vs current month mix</p>
+          <p className="mt-1 text-[11px] text-gray-400">Income less recorded expenses</p>
         </div>
         <div className="card min-h-0 p-3">
-          <div className="flex items-center gap-2"><TrendingUp className="h-3.5 w-3.5 text-green-400" /><p className="metric-label">Projected Month End</p></div>
+          <div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-green-400" /><p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Projected Month End</p></div>
           <p className={`mt-2 truncate text-3xl font-bold ${projectedMonthEnd >= 0 ? 'text-green-400' : 'text-red-400'}`}>{projectedMonthEnd >= 0 ? '+' : '-'}{formatMoney(Math.abs(projectedMonthEnd))}</p>
-          <p className="mt-1 text-[10px] text-gray-400">Based on current trend</p>
+          <p className="mt-1 text-[11px] text-gray-400">Based on current trend</p>
         </div>
         <div className="card min-h-0 p-3">
-          <div className="flex items-center gap-2"><Receipt className="h-3.5 w-3.5 text-green-400" /><p className="metric-label">Pending Expenses</p></div>
+          <div className="flex items-center gap-2"><Receipt className="h-4 w-4 text-green-400" /><p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Pending Expenses</p></div>
           <p className={`mt-2 truncate text-3xl font-bold ${pendingExpensesTotal > 0 ? 'text-red-400' : 'text-white'}`}>{formatMoney(pendingExpensesTotal)}</p>
-          <p className="mt-1 text-[10px] text-gray-400">{pendingExpensesTotal > 0 ? `${upcomingExpenses.length} scheduled cost items` : 'No pending expenses'}</p>
+          <p className="mt-1 text-[11px] text-gray-400">{pendingExpensesTotal > 0 ? `${upcomingExpenses.length} scheduled cost items` : 'No pending expenses'}</p>
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-rows-[0.98fr_0.72fr_0.9fr_0.56fr] gap-2">
-        <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+      <div className="space-y-3">
+        <div className="card flex h-56 min-h-0 flex-col overflow-hidden sm:h-64">
           <div className="card-header">
             <h3 className="text-sm font-semibold text-white">Income vs Expenses (This Month)</h3>
-            <div className="flex items-center gap-3 text-[10px]">
+            <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px]">
               <span className="text-green-400">Income: {formatMoney(currentMonthIncome)}</span>
               <span className="text-red-400">Expenses: {formatMoney(currentMonthExpenses)}</span>
               <span className={currentMonthNet >= 0 ? 'text-green-400' : 'text-red-400'}>Net: {formatSignedMoney(currentMonthNet)}</span>
@@ -278,14 +278,14 @@ export function FinancePage() {
           </div>
         </div>
 
-        <div className="grid min-h-0 grid-cols-2 gap-2">
+        <div className="grid min-h-0 grid-cols-1 gap-3 md:grid-cols-2">
           {[{ title: 'Income Breakdown (This Month)', items: incomeBreakdown, total: currentMonthIncome, colors: incomeColors }, { title: 'Expense Breakdown (This Month)', items: expenseBreakdown, total: currentMonthExpenses, colors: expenseColors }].map((group) => (
-            <div key={group.title} className="card min-h-0 flex h-full flex-col overflow-hidden">
+            <div key={group.title} className="card flex min-h-52 flex-col overflow-hidden">
               <div className="card-header"><h3 className="text-sm font-semibold text-white">{group.title}</h3></div>
-              <div className="card-body grid h-full min-h-0 grid-cols-[0.95fr_0.7fr_1.1fr] gap-3 p-3">
+              <div className="card-body grid min-h-0 flex-1 grid-cols-[0.85fr_0.75fr_1.25fr] gap-4 p-4">
                 <div className="flex min-h-0 flex-col justify-center">
                   <p className="text-3xl font-bold text-white">{formatMoney(group.total)}</p>
-                  <p className="mt-1 text-[10px] text-gray-400">Total {group.title.startsWith('Income') ? 'income' : 'expenses'}</p>
+                  <p className="mt-1 text-[11px] text-gray-400">Total {group.title.startsWith('Income') ? 'income' : 'expenses'}</p>
                 </div>
                 <div className="min-h-0">
                   {group.items.length > 0 ? (
@@ -301,7 +301,7 @@ export function FinancePage() {
                 </div>
                 <div className="space-y-2 overflow-auto pr-1 scrollbar-thin">
                   {group.items.map((item, index) => (
-                    <div key={item.label} className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 text-[10px]">
+                    <div key={item.label} className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 text-[11px]">
                       <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: group.colors[index % group.colors.length] }} />
                       <span className="truncate text-gray-300">{item.label}</span>
                       <span className="whitespace-nowrap text-white">{formatMoney(item.value)}</span>
@@ -314,11 +314,11 @@ export function FinancePage() {
           ))}
         </div>
 
-        <div className="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-12 lg:gap-2">
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden lg:col-span-4">
+        <div className="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-12">
+          <div className="card flex min-h-72 flex-col overflow-hidden lg:col-span-5">
             <div className="card-header"><h3 className="text-sm font-semibold text-white">Recent Transactions</h3></div>
             <div className="card-body min-h-0 flex-1 overflow-auto p-0 scrollbar-thin">
-              <table className="w-full text-[10px]">
+              <table className="w-full text-[11px]">
                 <thead className="sticky top-0 z-10 bg-surface">
                   <tr className="border-b border-border bg-surface-light/50 text-gray-500">
                     <th className="px-3 py-2 text-left font-medium">Date</th>
@@ -334,7 +334,7 @@ export function FinancePage() {
                       <td className="px-3 py-2 text-gray-400">{formatCompactDate(transaction.date)}</td>
                       <td className="px-3 py-2">
                         <p className="truncate text-white">{transaction.description}</p>
-                        <p className="truncate text-[9px] text-gray-500">{transaction.category}</p>
+                        <p className="truncate text-[10px] text-gray-500">{transaction.category}</p>
                       </td>
                       <td className={transaction.type === 'Income' ? 'px-3 py-2 text-green-400' : 'px-3 py-2 text-red-400'}>{transaction.type}</td>
                       <td className={`px-3 py-2 text-right font-medium ${transaction.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>{formatSignedMoney(transaction.amount)}</td>
@@ -346,10 +346,10 @@ export function FinancePage() {
             </div>
           </div>
 
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden lg:col-span-4">
+          <div className="card flex min-h-72 flex-col overflow-hidden lg:col-span-4">
             <div className="card-header"><h3 className="text-sm font-semibold text-white">Monthly Budget Overview</h3></div>
             <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
-              <div className="grid grid-cols-[1.1fr_0.55fr_0.55fr_0.55fr] gap-2 text-[9px] uppercase tracking-[0.16em] text-gray-500">
+              <div className="grid grid-cols-[1.1fr_0.6fr_0.6fr_0.65fr] gap-2 text-[10px] uppercase tracking-[0.12em] text-gray-500">
                 <span>Category</span>
                 <span className="text-right">Budget</span>
                 <span className="text-right">Spent</span>
@@ -362,7 +362,7 @@ export function FinancePage() {
 
                   return (
                     <div key={item.label} className="rounded-lg bg-surface-light/45 p-2">
-                      <div className="grid grid-cols-[1.1fr_0.55fr_0.55fr_0.55fr] items-center gap-2 text-[10px]">
+                      <div className="grid grid-cols-[1.1fr_0.6fr_0.6fr_0.65fr] items-center gap-2 text-[11px]">
                         <span className="truncate text-white">{item.label}</span>
                         <span className="text-right text-gray-400">{formatMoney(budgetLimit)}</span>
                         <span className="text-right text-white">{formatMoney(item.amount)}</span>
@@ -377,12 +377,12 @@ export function FinancePage() {
             </div>
           </div>
 
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden lg:col-span-4">
+          <div className="card flex min-h-72 flex-col overflow-hidden lg:col-span-3">
             <div className="card-header"><h3 className="text-sm font-semibold text-white">Upcoming Expenses</h3></div>
             <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
               <div className="space-y-2 overflow-auto pr-1 scrollbar-thin">
                 {upcomingExpenses.length > 0 ? upcomingExpenses.map((item) => (
-                  <div key={item.id} className="flex items-start justify-between gap-3 rounded-lg bg-surface-light/45 p-2.5 text-[10px]">
+                  <div key={item.id} className="flex items-start justify-between gap-3 rounded-lg bg-surface-light/45 p-3 text-[11px]">
                     <div className="min-w-0">
                       <p className="text-gray-400">{formatCompactDate(item.date)}</p>
                       <p className="mt-1 truncate text-white">{item.description}</p>
@@ -396,37 +396,37 @@ export function FinancePage() {
           </div>
         </div>
 
-        <div className="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-12 lg:gap-2">
-          <div className="col-span-2 card min-h-0 p-3">
+        <div className="grid min-h-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
+          <div className="card min-h-32 p-4 lg:col-span-2">
             <p className="metric-label">Year To Date Income</p>
             <p className="mt-2 truncate text-2xl font-bold text-white">{formatMoney(ytdIncome)}</p>
-            <p className="mt-1 text-[10px] text-green-400">Prize money plus sponsor flow</p>
+            <p className="mt-1 text-[11px] text-green-400">Prize money plus sponsor flow</p>
           </div>
-          <div className="col-span-2 card min-h-0 p-3">
+          <div className="card min-h-32 p-4 lg:col-span-2">
             <p className="metric-label">Year To Date Expenses</p>
             <p className="mt-2 truncate text-2xl font-bold text-white">{formatMoney(ytdExpenses)}</p>
-            <p className="mt-1 text-[10px] text-red-400">Coaching, travel, and equipment</p>
+            <p className="mt-1 text-[11px] text-red-400">Coaching, travel, and equipment</p>
           </div>
-          <div className="col-span-2 card min-h-0 p-3">
+          <div className="card min-h-32 p-4 lg:col-span-2">
             <p className="metric-label">Net Profit (YTD)</p>
             <p className={`mt-2 truncate text-2xl font-bold ${ytdNet >= 0 ? 'text-green-400' : 'text-red-400'}`}>{formatSignedMoney(ytdNet)}</p>
-            <p className="mt-1 text-[10px] text-gray-400">Current season position</p>
+            <p className="mt-1 text-[11px] text-gray-400">Current season position</p>
           </div>
-          <div className="col-span-2 card min-h-0 p-3">
+          <div className="card min-h-32 p-4 lg:col-span-2">
             <div className="flex items-center gap-2"><PiggyBank className="h-3.5 w-3.5 text-green-400" /><p className="metric-label">Savings Goal Progress</p></div>
             <p className="mt-2 text-2xl font-bold text-white">{savingsProgress}%</p>
             <div className="mt-2"><ProgressBar value={savingsProgress} compact /></div>
-            <p className="mt-1 text-[10px] text-gray-400">{formatMoney(gameState.player.cash)} / {formatMoney(savingsTarget)}</p>
+            <p className="mt-1 text-[11px] text-gray-400">{formatMoney(gameState.player.cash)} / {formatMoney(savingsTarget)}</p>
           </div>
-          <div className="col-span-4 card min-h-0 p-3">
+          <div className="card min-h-32 p-4 sm:col-span-2 lg:col-span-4">
             <div className="flex items-center gap-2"><Landmark className="h-3.5 w-3.5 text-green-400" /><p className="metric-label">Quick Actions</p></div>
-            <div className="mt-3 grid grid-cols-4 gap-2">
-              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[10px]" onClick={() => navigate('/sponsorship')}><Coins className="h-3.5 w-3.5" /> Add Income</button>
-              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[10px]" onClick={() => setExpenseEditorOpen(true)}><TrendingDown className="h-3.5 w-3.5" /> Add Expense</button>
-              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[10px]" onClick={() => setBudgetEditorOpen(true)}><Wallet className="h-3.5 w-3.5" /> Transfer Funds</button>
-              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[10px]" onClick={() => setReportOpen(true)}><CalendarDays className="h-3.5 w-3.5" /> View Reports</button>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[11px]" onClick={() => navigate('/sponsorship')}><Coins className="h-3.5 w-3.5" /> Add Income</button>
+              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[11px]" onClick={() => setExpenseEditorOpen(true)}><TrendingDown className="h-3.5 w-3.5" /> Add Expense</button>
+              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[11px]" onClick={() => setBudgetEditorOpen(true)}><Wallet className="h-3.5 w-3.5" /> Manage Budget</button>
+              <button type="button" className="btn-secondary justify-center px-2 py-2 text-[11px]" onClick={() => setReportOpen(true)}><CalendarDays className="h-3.5 w-3.5" /> View Reports</button>
             </div>
-            <p className="mt-2 truncate text-[10px] text-gray-400">{financialIndicators.stability.status}</p>
+            <p className="mt-2 truncate text-[11px] text-gray-400">{financialIndicators.stability.status}</p>
           </div>
         </div>
       </div>

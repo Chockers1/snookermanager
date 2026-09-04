@@ -63,8 +63,7 @@ export function DashboardPage() {
     skipTournament,
   } = useGame();
   const navigate = useNavigate();
-  const { currentCue, financeChart, trainingWeek } =
-    buildDashboardData(gameState);
+  const { currentCue, financeChart } = buildDashboardData(gameState);
   const nextEvent = getNextEligibleTournament(gameState);
   const enteredEvent = nextEvent?.status === "Entered" ? nextEvent : undefined;
   const currentRanking =
@@ -82,7 +81,6 @@ export function DashboardPage() {
     (coach) => coach.id === gameState.currentCoachId,
   );
   const latestMatches = gameState.matches.slice(0, 5);
-  const weeklySchedule = trainingWeek.slice(0, 7);
   const upcomingOpponent = gameState.tournamentProgress.draw
     .flatMap((round) => round.matches)
     .find(
@@ -378,7 +376,11 @@ export function DashboardPage() {
             </div>
           </div>
 
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+          <button
+            type="button"
+            onClick={() => navigate("/training")}
+            className="card min-h-0 flex h-full flex-col overflow-hidden text-left transition hover:border-green-500/50"
+          >
             <div className="card-header">
               <h3 className="flex items-center gap-2 text-xs font-semibold text-white">
                 <Dumbbell className="h-3.5 w-3.5 shrink-0 text-green-400" />
@@ -388,7 +390,7 @@ export function DashboardPage() {
                 Week {gameState.week}
               </span>
             </div>
-            <div className="card-body flex h-full flex-col gap-3">
+            <div className="card-body flex min-h-0 flex-1 flex-col gap-2.5">
               <div className="flex items-center gap-2 text-[10px] text-gray-400">
                 <Users className="h-3 w-3 shrink-0" />
                 <span className="truncate">
@@ -418,28 +420,12 @@ export function DashboardPage() {
                   </div>
                 ))}
               </div>
-              <div className="mt-auto border-t border-border pt-2">
-                <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  Week Schedule
-                </p>
-                <div className="grid grid-cols-7 gap-1 text-[9px]">
-                  {weeklySchedule.map((day) => (
-                    <div key={day.day} className="text-center text-gray-500">
-                      {day.day.slice(0, 3)}
-                    </div>
-                  ))}
-                  {weeklySchedule.map((day) => (
-                    <div
-                      key={`${day.day}-focus`}
-                      className="truncate rounded bg-surface-light px-1 py-1 text-center text-gray-300"
-                    >
-                      {day.morning}
-                    </div>
-                  ))}
-                </div>
+              <div className="mt-auto flex items-center justify-between border-t border-border pt-2 text-[9px]">
+                <span className="text-gray-500">Detailed sessions are in Training</span>
+                <span className="font-semibold text-green-400">Open planner →</span>
               </div>
             </div>
-          </div>
+          </button>
 
           <button
             type="button"
@@ -499,13 +485,13 @@ export function DashboardPage() {
                 Attributes Summary
               </h3>
             </div>
-            <div className="card-body flex h-full flex-col gap-2.5">
+            <div className="card-body flex min-h-0 flex-1 flex-col gap-2">
               <div>
                 <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">
                   Technical Skills
                 </p>
                 <div className="space-y-1.5">
-                  {topTechnicalRows.slice(0, 4).map(([label, value]) => (
+                  {topTechnicalRows.slice(0, 3).map(([label, value]) => (
                     <div key={label}>
                       <div className="mb-0.5 flex items-center justify-between gap-2 text-[10px]">
                         <span className="truncate text-gray-300">{label}</span>
@@ -541,6 +527,9 @@ export function DashboardPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+              <div className="mt-auto flex justify-end border-t border-border pt-1.5 text-[9px] font-semibold text-green-400">
+                View all attributes →
               </div>
             </div>
           </button>

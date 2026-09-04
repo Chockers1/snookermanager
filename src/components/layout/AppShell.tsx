@@ -57,7 +57,7 @@ export function AppShell({ children }: AppShellProps) {
         <button
           type="button"
           aria-label="Open navigation"
-          className="absolute left-2 top-1.5 z-30 grid h-11 w-11 place-items-center rounded-lg border border-border bg-sidebar text-gray-300 xl:hidden"
+          className="absolute left-2 top-1.5 z-40 grid h-11 w-11 place-items-center rounded-lg border border-border bg-sidebar text-gray-300 xl:hidden"
           onClick={() => setMobileNavigationOpen(true)}
         >
           <Menu className="h-5 w-5" />

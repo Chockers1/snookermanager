@@ -10,6 +10,7 @@ import {
 } from "../data/gameContent";
 import {
   acceptSponsorState,
+  advanceLiveVisit,
   applyEquipmentMatchWear,
   applyTrainingPlanState,
   createNewCareerState,
@@ -39,6 +40,7 @@ import {
   scheduleTreatmentState,
   simulateSyntheticLiveVisitMatch,
   skipTournamentState,
+  startLiveMatchState,
   startNextSeasonState,
   simulateTournamentMatchState,
   updateBudgetTargetsState,
@@ -610,6 +612,45 @@ describe("career lifecycle presets", () => {
 });
 
 describe("complete tournament journey", () => {
+  it("keeps a continuous scoring break as one real visit in the live feed", () => {
+    const career = createProfessionalStart("start-rookie-pro");
+    const equipped = buyTipState(
+      buyChalkState(
+        buyCueState(career, cueMarketplaceCatalog[0].id),
+        chalkCatalog[0].id,
+      ),
+      tipCatalog[0].id,
+    );
+    const tournament = getNextEligibleTournament(equipped);
+    expect(tournament).toBeDefined();
+    if (!tournament) return;
+
+    const entered = enterTournamentState(equipped, tournament.id);
+    const atEvent = continueToNextTournamentState(entered);
+    const travelled = bookTravelState(atEvent, tournament.id);
+    const started = startLiveMatchState(travelled, tournament.id);
+    expect(started.liveMatch).not.toBeNull();
+    if (!started.liveMatch) return;
+
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const opening = advanceLiveVisit(started.liveMatch, "Break Build", "manual");
+    const openingFeedSize = opening.feed.length;
+    const openingFeedId = opening.feed[0]?.id;
+    const continued = advanceLiveVisit(opening, "Break Build", "manual");
+    const actorStats =
+      started.liveMatch.playerAtTable === started.liveMatch.playerName
+        ? continued.playerStats
+        : continued.opponentStats;
+
+    expect(opening.currentBreak).toBeGreaterThan(0);
+    expect(continued.currentBreak).toBeGreaterThan(opening.currentBreak);
+    expect(continued.currentVisit).toBe(1);
+    expect(actorStats.visits).toBe(1);
+    expect(continued.feed).toHaveLength(openingFeedSize);
+    expect(continued.feed[0]?.id).toBe(openingFeedId);
+    expect(continued.feed[0]?.text).toMatch(/break reaches/i);
+  });
+
   it("creates a career, enters an event, books travel, plays, records a result, and advances the tournament state", () => {
     let randomState = 11731;
     vi.spyOn(Math, "random").mockImplementation(() => {
@@ -774,6 +815,12 @@ describe("complete tournament journey", () => {
     ).toMatchObject({
       actionLabel: "View Completed Draw",
       actionRoute: `/tournaments/draw?tournament=${encodeURIComponent(tournament.id)}`,
+      summary: expect.arrayContaining([
+        expect.objectContaining({ label: "Tournament finish" }),
+        expect.objectContaining({ label: "Pot success" }),
+        expect.objectContaining({ label: "Safety success" }),
+        expect.objectContaining({ label: "Net finances" }),
+      ]),
     });
   });
 });
@@ -889,9 +936,9 @@ describe("connected career systems", () => {
     expect(after.player.fatigue).toBeLessThan(state.player.fatigue);
   });
 
-  it("sends one detailed training inbox report every two applied weeks", () => {
+  it("automatically applies training and sends a detailed inbox report every two advanced weeks", () => {
     const state = createStarterState();
-    const firstWeek = applyTrainingPlanState(state);
+    const firstWeek = advanceWeekState(state);
 
     expect(
       firstWeek.inbox.some((message) =>
@@ -900,7 +947,7 @@ describe("connected career systems", () => {
     ).toBe(false);
     expect(firstWeek.trainingCondition.reportSnapshot?.weeksTracked).toBe(1);
 
-    const secondWeek = applyTrainingPlanState(advanceWeekState(firstWeek));
+    const secondWeek = advanceWeekState(firstWeek);
     const report = secondWeek.inbox.find((message) =>
       message.subject.startsWith("Fortnightly training report:"),
     );
@@ -911,11 +958,16 @@ describe("connected career systems", () => {
       actionRoute: "/training/report",
       read: false,
     });
-    expect(report?.preview).toMatch(/Two-week performance:/);
-    expect(report?.preview).toMatch(/adaptation \d+%/);
-    expect(report?.preview).toMatch(/fatigue \d+%/);
-    expect(report?.preview).toMatch(/strain \d+%/);
-    expect(report?.preview).toMatch(/burnout \d+%/);
+    expect(report?.preview).toMatch(/Review your development/);
+    expect(report?.summary).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Recent form" }),
+        expect.objectContaining({ label: "Confidence" }),
+        expect.objectContaining({ label: "Training load" }),
+        expect.objectContaining({ label: "Fatigue" }),
+        expect.objectContaining({ label: "Strain / burnout" }),
+      ]),
+    );
     expect(secondWeek.trainingCondition.reportSnapshot?.weeksTracked).toBe(0);
     expect(
       secondWeek.trainingCondition.reportSnapshot?.lastReport,
@@ -999,9 +1051,11 @@ describe("connected career systems", () => {
 
     if (!deal) return;
     deal.weeklyFatigueCost = 3;
-    const fatigueBefore = accepted.player.fatigue;
+    const withoutSponsor = advanceWeekState({ ...accepted, sponsors: [] });
     const advanced = advanceWeekState(accepted);
-    expect(advanced.player.fatigue).toBeGreaterThanOrEqual(fatigueBefore + 2);
+    expect(advanced.player.fatigue).toBeGreaterThanOrEqual(
+      withoutSponsor.player.fatigue + 2,
+    );
   });
 
   it("turns sponsor performance clauses into bounded, auditable match bonuses", () => {

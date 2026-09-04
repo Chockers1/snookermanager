@@ -276,6 +276,12 @@ export type InboxMessage = {
   read?: boolean;
   actionLabel?: string;
   actionRoute?: string;
+  summary?: Array<{
+    label: string;
+    value: string;
+    detail?: string;
+    tone?: "positive" | "negative" | "warning" | "neutral";
+  }>;
 };
 
 export type SponsorDeal = {
@@ -340,6 +346,10 @@ export type TrainingConditionState = {
     strain: number;
     burnout: number;
     date: string;
+    confidence?: number;
+    morale?: number;
+    ranking?: number | null;
+    form?: number;
     lastReport?: {
       startDate: string;
       endDate: string;

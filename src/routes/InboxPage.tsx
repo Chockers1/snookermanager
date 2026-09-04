@@ -20,6 +20,52 @@ function priorityClass(priority: InboxMessage["priority"]) {
   return "bg-sky-600/20 text-sky-300";
 }
 
+function summaryToneClass(
+  tone: NonNullable<InboxMessage["summary"]>[number]["tone"],
+) {
+  if (tone === "positive")
+    return "border-green-500/35 bg-green-500/10 text-green-300";
+  if (tone === "negative")
+    return "border-red-500/35 bg-red-500/10 text-red-300";
+  if (tone === "warning")
+    return "border-amber-500/35 bg-amber-500/10 text-amber-300";
+  return "border-sky-500/25 bg-sky-500/5 text-sky-300";
+}
+
+function getMessageSummary(message: InboxMessage | null) {
+  if (!message) return [];
+  if (message.summary?.length) return message.summary;
+  if (!message.subject.startsWith("Post-event report:")) return [];
+
+  const finish = message.preview.match(/^(.+?)\.\s+(?:(?:World|Youth|Amateur|Senior|Q Tour|Q School|One Year) Ranking)/)?.[1];
+  const ranking = message.preview.match(/((?:World|Youth|Amateur|Senior|Q Tour|Q School|One Year) Ranking) #(\d+) \(([^)]+)\)/);
+  const performance = message.preview.match(/Performance:\s*(\d+)% pot success,\s*(\d+)% safety,\s*high break\s*(\d+)/i);
+  const finances = message.preview.match(/Finances:\s*£([\d,]+) income,\s*£([\d,]+) costs,\s*([+-])£([\d,]+) net/i);
+
+  return [
+    ...(finish
+      ? [{ label: "Tournament finish", value: finish, tone: /won|winner/i.test(finish) ? "positive" as const : "negative" as const }]
+      : []),
+    ...(ranking
+      ? [{ label: ranking[1], value: `#${ranking[2]}`, detail: ranking[3], tone: /up/i.test(ranking[3]) ? "positive" as const : /down/i.test(ranking[3]) ? "negative" as const : "neutral" as const }]
+      : []),
+    ...(performance
+      ? [
+          { label: "Pot success", value: `${performance[1]}%`, tone: Number(performance[1]) >= 80 ? "positive" as const : "warning" as const },
+          { label: "Safety success", value: `${performance[2]}%`, tone: Number(performance[2]) >= 70 ? "positive" as const : "warning" as const },
+          { label: "Highest break", value: performance[3], tone: Number(performance[3]) >= 50 ? "positive" as const : "neutral" as const },
+        ]
+      : []),
+    ...(finances
+      ? [
+          { label: "Event income", value: `£${finances[1]}`, tone: Number(finances[1].replaceAll(",", "")) > 0 ? "positive" as const : "neutral" as const },
+          { label: "Event costs", value: `-£${finances[2]}`, tone: "negative" as const },
+          { label: "Net finances", value: `${finances[3]}£${finances[4]}`, tone: finances[3] === "+" ? "positive" as const : "negative" as const },
+        ]
+      : []),
+  ];
+}
+
 function isStaffMessage(message: InboxMessage) {
   return /coach|staff|medical|psychologist/i.test(
     `${message.sender} ${message.subject}`,
@@ -65,6 +111,7 @@ export function InboxPage() {
     filteredInbox.find((message) => message.id === selectedMessageId) ??
     filteredInbox[0] ??
     null;
+  const selectedSummary = getMessageSummary(selectedMessage);
   const selectedText = selectedMessage
     ? `${selectedMessage.subject} ${selectedMessage.preview}`.toLowerCase()
     : "";
@@ -74,6 +121,10 @@ export function InboxPage() {
   const relatedTravel = relatedTournament
     ? gameState.travel.bookings[relatedTournament.id]
     : null;
+  const isCompletedEventReport = Boolean(
+    selectedMessage?.subject.startsWith("Post-event report:") ||
+      relatedTournament?.status === "Completed",
+  );
   const equipmentReady = Boolean(
     gameState.equipment.currentCueId &&
     gameState.equipment.currentChalkId &&
@@ -254,6 +305,40 @@ export function InboxPage() {
                 {selectedMessage.preview}
               </p>
 
+              {selectedSummary.length ? (
+                <div className="mt-5 max-w-3xl overflow-hidden rounded-lg border border-border bg-background/30">
+                  <div className="border-b border-border px-4 py-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                      Report summary
+                    </p>
+                  </div>
+                  <ul className="divide-y divide-border/70">
+                    {selectedSummary.map((item, index) => (
+                      <li
+                        key={`${item.label}-${index}`}
+                        className="grid gap-1 px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-gray-300">
+                            {item.label}
+                          </p>
+                          {item.detail ? (
+                            <p className="mt-0.5 truncate text-[10px] text-gray-500">
+                              {item.detail}
+                            </p>
+                          ) : null}
+                        </div>
+                        <span
+                          className={`w-fit rounded-md border px-2.5 py-1 text-xs font-bold ${summaryToneClass(item.tone)}`}
+                        >
+                          {item.value}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
               {relatedTournament ? (
                 <div className="mt-6 rounded-lg border border-border-light bg-background/40 p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -268,15 +353,23 @@ export function InboxPage() {
                         </span>
                         <span className="flex items-center gap-1.5">
                           <Clock3 className="h-3.5 w-3.5 text-green-400" />
-                          {daysUntilEvent} days
+                          {isCompletedEventReport
+                            ? "Event complete"
+                            : `${daysUntilEvent} days`}
                         </span>
-                        <span>{relatedTournament.status}</span>
+                        {!isCompletedEventReport ? (
+                          <span>{relatedTournament.status}</span>
+                        ) : null}
                       </div>
                     </div>
                     <span
                       className={`w-fit rounded px-2 py-1 text-[10px] font-semibold ${relatedTravel ? "bg-green-600/15 text-green-300" : "bg-amber-600/15 text-amber-300"}`}
                     >
-                      {relatedTravel ? "Travel booked" : "Travel not booked"}
+                      {isCompletedEventReport
+                        ? "Completed"
+                        : relatedTravel
+                          ? "Travel booked"
+                          : "Travel not booked"}
                     </span>
                   </div>
                 </div>

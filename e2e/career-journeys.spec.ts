@@ -58,12 +58,14 @@ test("creates and reloads a named save slot using real controls", async ({
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /Demo Career/ }).click();
+  await page.getByRole("button", { name: "Career and save options" }).click();
   await page.getByRole("link", { name: "Save Manager" }).click();
   await page.getByLabel("Save slot name").fill("E2E checkpoint");
   await page.getByRole("button", { name: /Create Slot/ }).click();
   await expect(page.getByText(/Saved “E2E checkpoint”/)).toBeVisible();
   await page.reload();
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await page.getByRole("button", { name: "Career and save options" }).click();
   await page.getByRole("link", { name: "Save Manager" }).click();
   await expect(page.getByText("E2E checkpoint")).toBeVisible();
   await page.getByRole("button", { name: /Load/ }).click();
@@ -77,6 +79,21 @@ test("shows player summary once in the global dashboard status bar", async ({
   await page.goto("/");
   await page.getByRole("button", { name: /Demo Career/ }).click();
   await expect(page.getByText(demoPlayerName, { exact: true })).toHaveCount(1);
+  await expect(
+    page.getByRole("button", { name: /Open notifications/ }),
+  ).toHaveCount(0);
+  const sidebar = page.locator("aside").first();
+  await expect(sidebar.getByRole("link", { name: "New Career" })).toHaveCount(
+    0,
+  );
+  await expect(sidebar.getByRole("link", { name: "Save Manager" })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "Career and save options" }).click();
+  await expect(page.getByRole("link", { name: "Save Manager" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Start New Career" }),
+  ).toBeVisible();
   await expect(page.getByText("Current Ranking", { exact: true })).toHaveCount(
     0,
   );

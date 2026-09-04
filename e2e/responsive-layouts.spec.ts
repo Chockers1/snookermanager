@@ -306,6 +306,24 @@ for (const viewport of [
       expect(["auto", "scroll"]).toContain(scrollState.overflowY);
       if (viewport.fitted) {
         expect(scrollState.scrollRange).toBeLessThanOrEqual(1);
+        const horizontalFit = await page.evaluate(
+          (testId) => {
+            const main = document.querySelector<HTMLElement>("#main-content");
+            const workspace = document.querySelector<HTMLElement>(
+              `[data-testid="${testId}"]`,
+            );
+            if (!main || !workspace) return null;
+            return {
+              mainRight: Math.round(main.getBoundingClientRect().right),
+              workspaceRight: Math.round(
+                workspace.getBoundingClientRect().right,
+              ),
+            };
+          },
+          route === "/mental" ? "mental-viewport" : "health-viewport",
+        );
+        expect(horizontalFit).not.toBeNull();
+        expect(horizontalFit?.workspaceRight).toBe(horizontalFit?.mainRight);
       } else {
         expect(scrollState.scrollRange).toBeGreaterThan(0);
         await page.locator("footer").last().scrollIntoViewIfNeeded();

@@ -434,8 +434,8 @@ export function CoachMarketPage() {
         </section>
 
         {selectedCoach ? (
-          <aside className="grid min-h-0 gap-2 xl:col-span-5 xl:grid-rows-[minmax(0,1fr)_230px]">
-            <section className="card flex min-h-[360px] flex-col overflow-hidden border-green-500/30 xl:min-h-0">
+          <aside className="scrollbar-thin flex min-h-0 flex-col gap-2 overflow-y-auto xl:col-span-5">
+            <section className="card flex min-h-[330px] shrink-0 flex-col overflow-hidden border-green-500/30">
               <div className="card-header">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-green-500/15 font-bold text-green-300">
@@ -457,74 +457,76 @@ export function CoachMarketPage() {
                   {availability.available ? "Available" : "Locked"}
                 </span>
               </div>
-              <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-3 sm:grid-cols-2 scrollbar-thin">
-                <div>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    {[
-                      ["Player fit", `${selectedCoach.compatibility}%`],
-                      ["Overall", overall],
-                      ["Base/wk", formatMoney(selectedCoach.weeklyCost)],
-                    ].map(([label, value]) => (
-                      <div key={label} className="rounded bg-surface-light p-2">
-                        <b className="block text-sm text-white">{value}</b>
-                        <span className="text-[8px] uppercase text-gray-500">
-                          {label}
-                        </span>
+              <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-3">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {[
+                    ["Player fit", `${selectedCoach.compatibility}%`],
+                    ["Overall", overall],
+                    ["Base/wk", formatMoney(selectedCoach.weeklyCost)],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-lg bg-surface-light p-2">
+                      <b className="block text-sm text-white">{value}</b>
+                      <span className="text-[9px] uppercase tracking-wide text-gray-500">
+                        {label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="mb-2 mt-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  Coach ratings
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                  {[
+                    ["Technical", selectedCoach.technical],
+                    ["Tactical", selectedCoach.tactical],
+                    ["Mental", selectedCoach.mental],
+                    ["Motivation", selectedCoach.motivation],
+                    ["Discipline", selectedCoach.discipline],
+                  ].map(([label, value]) => (
+                    <div key={label as string} className="rounded-lg border border-border bg-background/35 p-2">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="truncate text-[9px] text-gray-400">{label}</span>
+                        <b className="text-xs text-white">{value}</b>
                       </div>
-                    ))}
-                  </div>
-                  <p className="mb-2 mt-3 metric-label">Ratings</p>
-                  <div className="space-y-2">
-                    {[
-                      ["Technical", selectedCoach.technical],
-                      ["Tactical", selectedCoach.tactical],
-                      ["Mental", selectedCoach.mental],
-                      ["Motivation", selectedCoach.motivation],
-                    ].map(([label, value]) => (
-                      <div key={label as string}>
-                        <div className="mb-1 flex justify-between text-[10px]">
-                          <span className="text-gray-400">{label}</span>
-                          <b className="text-white">{value}</b>
-                        </div>
+                      <div className="mt-1.5">
                         <ProgressBar value={value as number} compact />
                       </div>
-                    ))}
+                    </div>
+                  ))}
+                </div>
+
+                <p className="mb-2 mt-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                  Projected weekly impact
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-3">
+                  <div className="flex justify-between gap-2 rounded-lg border border-green-500/20 bg-green-500/10 p-2.5">
+                    <span className="truncate">{impact?.primaryLabel}</span>
+                    <b className="shrink-0 text-green-300">+{impact?.primaryGain}</b>
+                  </div>
+                  <div className="flex justify-between gap-2 rounded-lg border border-green-500/20 bg-green-500/10 p-2.5">
+                    <span className="truncate">Tactical bonus</span>
+                    <b className="shrink-0 text-green-300">+{impact?.tacticalBonus}%</b>
+                  </div>
+                  <div className="flex justify-between gap-2 rounded-lg border border-green-500/20 bg-green-500/10 p-2.5">
+                    <span className="truncate">Fatigue support</span>
+                    <b className="shrink-0 text-green-300">-{impact?.fatigueReduction ?? 0}%</b>
                   </div>
                 </div>
-                <div>
-                  <p className="metric-label">Projected weekly impact</p>
-                  <div className="mt-2 rounded-lg border border-green-500/20 bg-green-500/10 p-2.5 text-[10px]">
-                    <div className="flex justify-between">
-                      <span>{impact?.primaryLabel}</span>
-                      <b className="text-green-300">+{impact?.primaryGain}</b>
-                    </div>
-                    <div className="mt-2 flex justify-between">
-                      <span>Tactical plan bonus</span>
-                      <b className="text-green-300">
-                        +{impact?.tacticalBonus}%
-                      </b>
-                    </div>
-                    {impact?.fatigueReduction ? (
-                      <div className="mt-2 flex justify-between">
-                        <span>Fatigue impact</span>
-                        <b className="text-green-300">
-                          -{impact.fatigueReduction}%
-                        </b>
-                      </div>
-                    ) : null}
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-lg bg-surface-light/50 p-2.5">
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-500">Strengths</p>
+                    <p className="mt-1 text-[10px] leading-relaxed text-gray-300">{selectedCoach.strengths.join(" · ")}</p>
                   </div>
-                  <p className="mt-3 metric-label">Strengths</p>
-                  <p className="mt-1 text-[10px] leading-relaxed text-gray-300">
-                    {selectedCoach.strengths.join(" · ")}
-                  </p>
-                  <p className="mt-3 metric-label">Limitation</p>
-                  <p className="mt-1 text-[10px] text-red-300">
-                    {selectedCoach.weaknesses.join(" · ")}
-                  </p>
+                  <div className="rounded-lg bg-red-500/5 p-2.5">
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-red-400">Limitations</p>
+                    <p className="mt-1 text-[10px] leading-relaxed text-red-300">{selectedCoach.weaknesses.join(" · ")}</p>
+                  </div>
                 </div>
               </div>
             </section>
-            <section className="card overflow-hidden p-3">
+            <section className="card min-h-[210px] shrink-0 overflow-hidden p-3">
               <div className="flex justify-between">
                 <div>
                   <h2 className="text-xs font-bold text-white">

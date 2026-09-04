@@ -2458,6 +2458,87 @@ function buildVisitFeedEntry(
   };
 }
 
+function buildRealisticVisitFeedText(input: {
+  actorName: string;
+  opponentName: string;
+  decision: LiveVisitDecision;
+  foulOccurred: boolean;
+  foulPoints: number;
+  success: boolean;
+  scoredPoints: number;
+  previousBreak: number;
+  completedBreakTotal: number;
+  retainedTable: boolean;
+  tableProgressLabel: string;
+  redsRemaining: number;
+  deliberateRhythmPressure: number;
+}) {
+  const {
+    actorName,
+    opponentName,
+    decision,
+    foulOccurred,
+    foulPoints,
+    success,
+    scoredPoints,
+    previousBreak,
+    completedBreakTotal,
+    retainedTable,
+    tableProgressLabel,
+    redsRemaining,
+    deliberateRhythmPressure,
+  } = input;
+  const nextBall = redsRemaining > 0 ? "red" : "colour";
+  const tableProgress = tableProgressLabel
+    ? tableProgressLabel.replace(/^made /, "")
+    : `${scoredPoints} points`;
+  const rhythmNote =
+    deliberateRhythmPressure > 0
+      ? " The deliberate pace disrupts the opponent's rhythm."
+      : "";
+
+  if (foulOccurred) {
+    const breakNote = previousBreak > 0 ? ` Break ends at ${previousBreak}.` : "";
+    return `Foul by ${actorName}: ${foulPoints} points conceded.${breakNote} ${opponentName} comes to the table.`;
+  }
+
+  if (decision === "Safety Exchange") {
+    return success
+      ? `${actorName} plays a containing safety. ${opponentName} must respond.${rhythmNote}`
+      : `${actorName}'s safety leaves a chance. ${opponentName} comes to the table.`;
+  }
+
+  if (decision === "Snooker Hunt") {
+    return success
+      ? `${actorName} lays a snooker and forces a ${scoredPoints}-point foul. ${opponentName} returns to the table.${rhythmNote}`
+      : `${actorName} cannot find the snooker. ${opponentName} comes to the table.`;
+  }
+
+  if (!success) {
+    return previousBreak > 0
+      ? `${actorName}'s break ends at ${previousBreak} after missing the next ${nextBall}. ${opponentName} comes to the table.`
+      : `${actorName} misses the opening ${nextBall}. ${opponentName} comes to the table.`;
+  }
+
+  if (decision === "Respotted Black") {
+    return `${actorName} pots the respotted black to decide the frame.`;
+  }
+
+  const redsNote =
+    redsRemaining > 0
+      ? ` ${redsRemaining} red${redsRemaining === 1 ? " remains" : "s remain"}.`
+      : " The colours remain.";
+  if (retainedTable) {
+    const opening =
+      previousBreak > 0
+        ? `${actorName}'s break reaches ${completedBreakTotal}`
+        : `${actorName} starts a break of ${completedBreakTotal}`;
+    return `${opening}: ${tableProgress}.${redsNote}${rhythmNote}`;
+  }
+
+  return `${actorName}'s break ends at ${completedBreakTotal}: ${tableProgress}. ${opponentName} comes to the table.${rhythmNote}`;
+}
+
 function playOutLiveFrame(
   liveMatch: LiveMatchState,
   mode: LiveMatchResolutionMode,
@@ -5616,7 +5697,11 @@ export function advanceWeekState(previousState: GameState): GameState {
       `Review ${previousState.seasonReview.completedSeason.season} before starting ${previousState.seasonReview.nextSeason}.`,
     );
   }
-  const protectedState = ensureLockedWorldChampionshipEntry(previousState);
+  const trainedState =
+    previousState.trainingAppliedWeek === previousState.week
+      ? previousState
+      : applyTrainingPlanState(previousState);
+  const protectedState = ensureLockedWorldChampionshipEntry(trainedState);
   const normalizedActiveSponsors = normalizeSponsors(protectedState.sponsors);
   const sponsorObligationFatigue = clamp(
     normalizedActiveSponsors.reduce(
@@ -13723,7 +13808,7 @@ export function simulateSyntheticLiveVisitMatch(
     let currentFrameVisits: SyntheticLiveVisitVisitLogEntry[] = [];
 
     while (liveMatch.status === "In Progress" && guard < 4000) {
-      if (liveMatch.currentVisit === 1) {
+      if (liveMatch.currentVisit === 1 && currentFrameVisits.length === 0) {
         const startingSide =
           liveMatch.playerAtTable === liveMatch.playerName
             ? debugMetrics.player
@@ -14103,7 +14188,7 @@ function resolveCompletedLiveFrame(
   };
 }
 
-function advanceLiveVisit(
+export function advanceLiveVisit(
   liveMatch: LiveMatchState,
   decision?: LiveVisitDecision,
   mode: LiveMatchResolutionMode = "manual",
@@ -14430,7 +14515,8 @@ function advanceLiveVisit(
     resolvedDecision === "Safety Exchange" ||
     resolvedDecision === "Snooker Hunt";
   const updatedSideStats: LiveMatchSideStats = {
-    visits: currentSideStats.visits + 1,
+    visits:
+      currentSideStats.visits + (liveMatch.currentBreak === 0 ? 1 : 0),
     pointsScored: currentSideStats.pointsScored + Math.max(0, scoredPoints),
     potAttempts: currentSideStats.potAttempts + (isPotDecision ? 1 : 0),
     potsMade: currentSideStats.potsMade + (isPotDecision && success ? 1 : 0),
@@ -14440,19 +14526,23 @@ function advanceLiveVisit(
       currentSideStats.safetiesWon + (isSafetyDecision && success ? 1 : 0),
     fouls: currentSideStats.fouls + (foulOccurred ? 1 : 0),
   };
-  const feedText =
-    (foulOccurred
-      ? `${actorIsPlayer ? "You" : liveMatch.opponentName} fouled during ${resolvedDecision.toLowerCase()} play. ${foulPoints} points conceded.`
-      : success
-        ? resolvedDecision === "Snooker Hunt"
-          ? `${actorIsPlayer ? "You" : liveMatch.opponentName} forced a foul with a snooker hunt and gained ${scoredPoints} points.`
-          : resolvedDecision === "Respotted Black"
-            ? `${actorIsPlayer ? "You" : liveMatch.opponentName} pots the respotted black.`
-            : `${actorIsPlayer ? "You" : liveMatch.opponentName} ${tableProgressLabel || `played ${resolvedDecision.toLowerCase()} for ${scoredPoints} points`}.${retainedTable ? " Stayed at the table." : " Turn changes."}`
-        : `${actorIsPlayer ? "You" : liveMatch.opponentName} tried ${resolvedDecision.toLowerCase()} and missed. Turn changes.`) +
-    (deliberateRhythmPressure > 0
-      ? " The deliberate pace unsettled the opponent's rhythm."
-      : "");
+  const feedText = buildRealisticVisitFeedText({
+    actorName: actorIsPlayer ? liveMatch.playerName : liveMatch.opponentName,
+    opponentName: actorIsPlayer
+      ? liveMatch.opponentName
+      : liveMatch.playerName,
+    decision: resolvedDecision,
+    foulOccurred,
+    foulPoints,
+    success,
+    scoredPoints,
+    previousBreak: liveMatch.currentBreak,
+    completedBreakTotal,
+    retainedTable,
+    tableProgressLabel,
+    redsRemaining: nextTableState.redsRemaining,
+    deliberateRhythmPressure,
+  });
   const feedEntry = buildVisitFeedEntry(
     formatLiveClock(
       liveMatch.timeElapsedMinutes +
@@ -14468,6 +14558,17 @@ function advanceLiveVisit(
           : "amber"
         : "blue",
   );
+  const continuesExistingBreak =
+    liveMatch.currentBreak > 0 && liveMatch.feed[0]?.actor === actor;
+  const nextFeed = continuesExistingBreak
+    ? [
+        {
+          ...feedEntry,
+          id: liveMatch.feed[0].id,
+        },
+        ...liveMatch.feed.slice(1),
+      ]
+    : [feedEntry, ...liveMatch.feed];
   const frameClinched =
     (nextRemainingTablePoints === 0 &&
       nextPlayerPoints !== nextOpponentPoints) ||
@@ -14479,7 +14580,7 @@ function advanceLiveVisit(
     ...liveMatch,
     playerPoints: nextPlayerPoints,
     opponentPoints: nextOpponentPoints,
-    currentVisit: liveMatch.currentVisit + 1,
+    currentVisit: liveMatch.currentVisit + (retainedTable ? 0 : 1),
     currentBreak: nextCurrentBreak,
     tableState: nextTableState,
     ballsRemaining: nextBallsRemaining,
@@ -14526,7 +14627,7 @@ function advanceLiveVisit(
       : frameClinched
         ? "Frame is ready to be closed out."
         : `${getFrameTableSummary(nextTableState)} in ${frameLabel}. ${areSnookersRequired(Math.max(0, nextOpponentPoints - nextPlayerPoints), nextRemainingTablePoints) ? "You now need foul points." : nextPlayerAtTable === liveMatch.playerName ? "You are back in control." : `${liveMatch.opponentName} is back at the table.`}`,
-    feed: [feedEntry, ...liveMatch.feed].slice(0, 16),
+    feed: nextFeed.slice(0, 24),
     visitHistory: [visitLogEntry, ...liveMatch.visitHistory].slice(0, 18),
     playerStats: actorIsPlayer ? updatedSideStats : liveMatch.playerStats,
     opponentStats: actorIsPlayer ? liveMatch.opponentStats : updatedSideStats,
@@ -15396,10 +15497,69 @@ function finalizeLiveMatch(
           {
             sender: "Tournament Office",
             subject: `Post-event report: ${tournament.name}`,
-            preview: `${finish}. ${rankingSummary}. Performance: ${latestMatch.potSuccess}% pot success, ${latestMatch.safetySuccess}% safety, high break ${latestMatch.highestBreak}. Finances: £${eventIncome.toLocaleString("en-GB")} income, £${eventCosts.toLocaleString("en-GB")} costs, ${eventNet >= 0 ? "+" : "-"}£${Math.abs(eventNet).toLocaleString("en-GB")} net.`,
+            preview: `${finish} after a ${latestMatch.playerFrames}-${latestMatch.opponentFrames} result. Review the performance, ranking and financial outcome below.`,
             priority: won ? "High" : "Medium",
             actionLabel: "View Completed Draw",
             actionRoute: `/tournaments/draw?tournament=${encodeURIComponent(tournament.id)}`,
+            summary: [
+              {
+                label: "Tournament finish",
+                value: finish,
+                detail: `${latestMatch.playerFrames}-${latestMatch.opponentFrames} against ${latestMatch.opponentName}`,
+                tone: won ? "positive" : "negative",
+              },
+              {
+                label: rankingSummary.split(" #")[0],
+                value: currentRank ? `#${currentRank}` : "Unranked",
+                detail:
+                  rankingMovement === 0
+                    ? "No movement"
+                    : `${rankingMovement > 0 ? "Up" : "Down"} ${Math.abs(rankingMovement)} place${Math.abs(rankingMovement) === 1 ? "" : "s"}`,
+                tone:
+                  rankingMovement > 0
+                    ? "positive"
+                    : rankingMovement < 0
+                      ? "negative"
+                      : "neutral",
+              },
+              {
+                label: "Pot success",
+                value: `${latestMatch.potSuccess}%`,
+                tone: latestMatch.potSuccess >= 80 ? "positive" : "warning",
+              },
+              {
+                label: "Safety success",
+                value: `${latestMatch.safetySuccess}%`,
+                tone: latestMatch.safetySuccess >= 70 ? "positive" : "warning",
+              },
+              {
+                label: "Highest break",
+                value: `${latestMatch.highestBreak}`,
+                tone: latestMatch.highestBreak >= 50 ? "positive" : "neutral",
+              },
+              {
+                label: "Prize money",
+                value: `£${prizeMoneyEarned.toLocaleString("en-GB")}`,
+                tone: prizeMoneyEarned > 0 ? "positive" : "neutral",
+              },
+              {
+                label: "Sponsor bonus",
+                value: `£${sponsorBonusTotal.toLocaleString("en-GB")}`,
+                tone: sponsorBonusTotal > 0 ? "positive" : "neutral",
+              },
+              {
+                label: "Event costs",
+                value: `-£${eventCosts.toLocaleString("en-GB")}`,
+                detail: `Entry £${entryCost.toLocaleString("en-GB")} · travel £${travelCost.toLocaleString("en-GB")}`,
+                tone: eventCosts > 0 ? "negative" : "neutral",
+              },
+              {
+                label: "Net finances",
+                value: `${eventNet >= 0 ? "+" : "-"}£${Math.abs(eventNet).toLocaleString("en-GB")}`,
+                detail: `£${eventIncome.toLocaleString("en-GB")} total income`,
+                tone: eventNet >= 0 ? "positive" : "negative",
+              },
+            ],
           },
           "Today",
         ),
@@ -16552,6 +16712,22 @@ export function applyTrainingPlanState(
       adaptedGain(trainingEffects.staminaGain),
     ),
   );
+  const currentCareerRank =
+    previousState.rankings.find(
+      (row) => row.playerName === previousState.player.fullName,
+    )?.ranking ??
+    previousState.player.worldRanking ??
+    previousState.player.amateurRanking ??
+    null;
+  const recentMatches = previousState.matches.slice(0, 10);
+  const currentForm =
+    recentMatches.length > 0
+      ? Math.round(
+          (recentMatches.filter((match) => match.result === "Won").length /
+            recentMatches.length) *
+            100,
+        )
+      : 0;
   const previousReportSnapshot = previousState.trainingCondition
     .reportSnapshot ?? {
     weeksTracked: 0,
@@ -16560,6 +16736,10 @@ export function applyTrainingPlanState(
     strain: previousState.trainingCondition.strain,
     burnout: previousState.trainingCondition.burnout,
     date: previousState.currentDate,
+    confidence: previousState.player.confidence,
+    morale: previousState.player.morale,
+    ranking: currentCareerRank,
+    form: currentForm,
   };
   const reportWeeksTracked = previousReportSnapshot.weeksTracked + 1;
   const fortnightlyReportDue = reportWeeksTracked >= 2;
@@ -16586,6 +16766,18 @@ export function applyTrainingPlanState(
     0,
     100,
   );
+  const nextPlayerConfidence = clamp(
+    previousState.player.confidence + trainingEffects.confidenceDelta,
+    0,
+    100,
+  );
+  const nextPlayerMorale = clamp(
+    previousState.player.morale +
+      trainingEffects.moraleDelta -
+      (nextBurnout >= 70 ? 3 : 0),
+    0,
+    100,
+  );
   const improvementSummary =
     improvements.length > 0
       ? improvements
@@ -16596,17 +16788,6 @@ export function applyTrainingPlanState(
           )
           .join(", ")
       : "No attributes increased in this block";
-  const declineSummary =
-    declines.length > 0
-      ? ` Declines: ${declines
-          .slice(0, 4)
-          .map(
-            (change) =>
-              `${change.label} ${change.delta} (now ${change.current})`,
-          )
-          .join(", ")}.`
-      : " No attributes declined.";
-  const fortnightlyTrainingPreview = `Two-week performance: ${improvementSummary}.${declineSummary} Current training load ${trainingEffects.weekLoad}%, adaptation ${Math.round(adaptationMultiplier * facilityMultiplier * 100)}%, fatigue ${nextPlayerFatigue}% (${formatTrainingMetricChange(nextPlayerFatigue - previousReportSnapshot.fatigue)}), strain ${nextStrain}% (${formatTrainingMetricChange(nextStrain - previousReportSnapshot.strain)}), burnout ${nextBurnout}% (${formatTrainingMetricChange(nextBurnout - previousReportSnapshot.burnout)}).`;
   const trainingPreview = overloadInjury
     ? "The training load exceeded your recovery capacity. A one-week strain injury has been recorded; reduce intensity before returning."
     : adaptationMultiplier < 0.7
@@ -16639,6 +16820,10 @@ export function applyTrainingPlanState(
               strain: nextStrain,
               burnout: nextBurnout,
               date: previousState.currentDate,
+              confidence: nextPlayerConfidence,
+              morale: nextPlayerMorale,
+              ranking: currentCareerRank,
+              form: currentForm,
               lastReport: {
                 startDate: previousReportSnapshot.date,
                 endDate: previousState.currentDate,
@@ -16661,19 +16846,9 @@ export function applyTrainingPlanState(
       health: { ...previousState.health, activeIssue: overloadIssue },
       player: {
         ...previousState.player,
-        confidence: clamp(
-          previousState.player.confidence + trainingEffects.confidenceDelta,
-          0,
-          100,
-        ),
+        confidence: nextPlayerConfidence,
         fatigue: nextPlayerFatigue,
-        morale: clamp(
-          previousState.player.morale +
-            trainingEffects.moraleDelta -
-            (nextBurnout >= 70 ? 3 : 0),
-          0,
-          100,
-        ),
+        morale: nextPlayerMorale,
       },
       inbox: [
         ...(fortnightlyReportDue
@@ -16682,13 +16857,98 @@ export function applyTrainingPlanState(
                 {
                   sender: "Head Coach",
                   subject: `Fortnightly training report: ${improvements.length} improved`,
-                  preview: fortnightlyTrainingPreview,
+                  preview: `${improvementSummary}. Review your development, form, ranking and workload below.`,
                   priority:
                     overloadInjury || declines.length > improvements.length
                       ? "High"
                       : "Medium",
                   actionLabel: "View Training Report",
                   actionRoute: "/training/report",
+                  summary: [
+                    ...improvements.slice(0, 6).map((change) => ({
+                      label: change.label,
+                      value: `+${change.delta}`,
+                      detail: `Now ${change.current} · ${change.group}`,
+                      tone: "positive" as const,
+                    })),
+                    ...declines.slice(0, 4).map((change) => ({
+                      label: change.label,
+                      value: `${change.delta}`,
+                      detail: `Now ${change.current} · ${change.group}`,
+                      tone: "negative" as const,
+                    })),
+                    {
+                      label: "Recent form",
+                      value: `${currentForm}%`,
+                      detail: `${recentMatches.filter((match) => match.result === "Won").length}-${recentMatches.filter((match) => match.result === "Lost").length} across the last ${recentMatches.length} match${recentMatches.length === 1 ? "" : "es"}`,
+                      tone:
+                        currentForm >= 60
+                          ? ("positive" as const)
+                          : currentForm < 40
+                            ? ("warning" as const)
+                            : ("neutral" as const),
+                    },
+                    {
+                      label: previousState.player.rankingLabel,
+                      value: currentCareerRank ? `#${currentCareerRank}` : "Unranked",
+                      detail:
+                        previousReportSnapshot.ranking && currentCareerRank
+                          ? currentCareerRank < previousReportSnapshot.ranking
+                            ? `Up ${previousReportSnapshot.ranking - currentCareerRank}`
+                            : currentCareerRank > previousReportSnapshot.ranking
+                              ? `Down ${currentCareerRank - previousReportSnapshot.ranking}`
+                              : "No movement"
+                          : "Current position",
+                      tone:
+                        previousReportSnapshot.ranking &&
+                        currentCareerRank &&
+                        currentCareerRank < previousReportSnapshot.ranking
+                          ? ("positive" as const)
+                          : ("neutral" as const),
+                    },
+                    {
+                      label: "Confidence",
+                      value: `${nextPlayerConfidence}%`,
+                      detail: `${formatTrainingMetricChange(nextPlayerConfidence - (previousReportSnapshot.confidence ?? previousState.player.confidence))}% over two weeks`,
+                      tone:
+                        nextPlayerConfidence >=
+                        (previousReportSnapshot.confidence ??
+                          previousState.player.confidence)
+                          ? ("positive" as const)
+                          : ("warning" as const),
+                    },
+                    {
+                      label: "Training load",
+                      value: `${trainingEffects.weekLoad}%`,
+                      detail: `${Math.round(adaptationMultiplier * facilityMultiplier * 100)}% adaptation`,
+                      tone:
+                        trainingEffects.weekLoad > 80
+                          ? ("warning" as const)
+                          : ("neutral" as const),
+                    },
+                    {
+                      label: "Fatigue",
+                      value: `${nextPlayerFatigue}%`,
+                      detail: `${formatTrainingMetricChange(nextPlayerFatigue - previousReportSnapshot.fatigue)}% over two weeks`,
+                      tone:
+                        nextPlayerFatigue >= 70
+                          ? ("negative" as const)
+                          : nextPlayerFatigue >= 50
+                            ? ("warning" as const)
+                            : ("positive" as const),
+                    },
+                    {
+                      label: "Strain / burnout",
+                      value: `${nextStrain}% / ${nextBurnout}%`,
+                      detail: `${formatTrainingMetricChange(nextStrain - previousReportSnapshot.strain)} strain · ${formatTrainingMetricChange(nextBurnout - previousReportSnapshot.burnout)} burnout`,
+                      tone:
+                        nextStrain >= 70 || nextBurnout >= 70
+                          ? ("negative" as const)
+                          : nextStrain >= 50 || nextBurnout >= 50
+                            ? ("warning" as const)
+                            : ("positive" as const),
+                    },
+                  ],
                 },
                 "Today",
               ),

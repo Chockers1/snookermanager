@@ -45,7 +45,7 @@ export function MentalStatePage() {
 
   return (
     <div
-      className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 pb-4 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:max-w-none xl:gap-2 xl:overflow-hidden xl:p-1.5 xl:pb-1.5"
+      className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 pb-4 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:w-[calc(100%+3rem)] xl:max-w-none xl:gap-2 xl:overflow-hidden xl:p-1.5 xl:pb-1.5"
       data-testid="mental-viewport"
     >
       <header className="card flex shrink-0 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between xl:py-2">

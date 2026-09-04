@@ -684,7 +684,7 @@ export function CueShopPage() {
         </div>
       </div>
       <div
-        className="-mx-1 flex gap-1 overflow-x-auto border-b border-border px-1"
+        className="-mx-1 grid grid-flow-col auto-cols-[minmax(8.5rem,1fr)] gap-1 overflow-x-auto border-b border-border px-1 sm:grid-flow-row sm:grid-cols-6"
         role="tablist"
         aria-label="Equipment categories"
       >
@@ -696,7 +696,7 @@ export function CueShopPage() {
             aria-selected={activeTab === tab.id}
             aria-current={activeTab === tab.id ? "page" : undefined}
             onClick={() => navigate(tab.path)}
-            className={`min-h-11 flex-none whitespace-nowrap rounded-b-none px-3 ${
+            className={`min-h-12 w-full whitespace-nowrap rounded-b-none px-3 ${
               activeTab === tab.id
                 ? "tab-active text-xs"
                 : "tab-inactive text-xs"
