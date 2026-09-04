@@ -332,6 +332,7 @@ export type NewCareerConfig = {
   fullName: string;
   nationality: string;
   age: number;
+  dateOfBirth?: string;
   handedness: Player["handedness"];
   cueStyle: string;
   playingStyle: string;
@@ -16251,6 +16252,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
     fullName: config?.fullName?.trim() || createPlayerIdentitySeed.name,
     nationality: config?.nationality || createPlayerIdentitySeed.nationality,
     age: config?.age ?? createPlayerIdentitySeed.age,
+    dateOfBirth: config?.dateOfBirth,
     handedness:
       config?.handedness ??
       (createPlayerIdentitySeed.handedness as Player["handedness"]),
@@ -16323,6 +16325,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
     fullName: careerConfig.fullName,
     nationality: careerConfig.nationality,
     age: careerConfig.age,
+    dateOfBirth: careerConfig.dateOfBirth,
     handedness: careerConfig.handedness,
     cueStyle: careerConfig.cueStyle,
     careerStage: selectedStartingLevel.careerStage,

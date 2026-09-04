@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { AppRoutes } from './App'
@@ -84,5 +84,28 @@ describe('application recovery', () => {
 
     expect(document.body).toHaveTextContent('The table view failed to load')
     expect(document.body).toHaveTextContent('Your career remains saved in this browser')
+  })
+})
+
+describe('new career identity', () => {
+  it('offers the complete country list and derives age from date of birth', async () => {
+    render(
+      <GameStateProvider>
+        <MemoryRouter initialEntries={['/new-career']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </GameStateProvider>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /New Career/ }))
+    const nationality = await screen.findByLabelText('Nationality') as HTMLSelectElement
+    expect(nationality.options.length).toBeGreaterThanOrEqual(250)
+    expect(Array.from(nationality.options).some((option) => option.value === 'New Zealand')).toBe(true)
+    expect(Array.from(nationality.options).some((option) => option.value === 'Wales')).toBe(true)
+
+    fireEvent.change(screen.getByLabelText('Date of Birth'), {
+      target: { value: '2000-05-12' },
+    })
+    expect(document.body).toHaveTextContent('Age 25 when the career starts')
   })
 })

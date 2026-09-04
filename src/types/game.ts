@@ -5,6 +5,7 @@ export type Player = {
   fullName: string;
   nationality: string;
   age: number;
+  dateOfBirth?: string;
   handedness: "Right-handed" | "Left-handed";
   cueStyle?: string;
   careerStage: string;

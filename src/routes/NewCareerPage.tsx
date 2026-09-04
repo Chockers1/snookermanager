@@ -10,6 +10,7 @@ import {
   createPlayerStartingLevelCatalog,
   starterAttributes,
 } from '../data/catalogs'
+import { nationalityOptions } from '../data/nationalities'
 import { formatMoney } from '../utils/formatters'
 import {
   applyPlayingStyleToSliders,
@@ -28,13 +29,9 @@ import { calculateOverallRating, calculatePotentialRating } from '../utils/calcu
 const steps = ['Identity', 'Background', 'Attributes', 'Confirm'] as const
 const cueStyles = ['Traditional', 'Touch Focus', 'Power Delivery', 'Compact Rhythm']
 const playingStyles = ['Balanced', 'Measured Break Builder', 'Attacking Scorer', 'Safety First']
-const nationalities = [
-  'Australia', 'Belgium', 'Brazil', 'Canada', 'China', 'England', 'France',
-  'Germany', 'Hong Kong', 'India', 'Iran', 'Ireland', 'Italy', 'Japan',
-  'Malaysia', 'Netherlands', 'New Zealand', 'Northern Ireland', 'Norway',
-  'Pakistan', 'Poland', 'Scotland', 'South Africa', 'Spain', 'Sweden',
-  'Switzerland', 'Thailand', 'United States', 'Wales',
-] as const
+const careerStartDate = '2026-05-11'
+const earliestDateOfBirth = '1945-05-12'
+const latestDateOfBirth = '2014-05-11'
 const minSliderValue = 20
 const maxSliderValue = 90
 const sliderBudget = createPlayerSliderCatalog.reduce((sum, slider) => sum + slider.value, 0)
@@ -45,9 +42,21 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))
 }
 
-function normalizeAgeInput(value: string | number) {
-  const parsed = Number(value)
-  return clamp(Number.isFinite(parsed) ? parsed : 12, 12, 80)
+function dateOfBirthForAge(age: number) {
+  return `${2026 - age}-01-01`
+}
+
+function getAgeAtCareerStart(dateOfBirth: string) {
+  const birthDate = new Date(`${dateOfBirth}T00:00:00Z`)
+  const startDate = new Date(`${careerStartDate}T00:00:00Z`)
+  if (Number.isNaN(birthDate.getTime())) return createPlayerIdentitySeed.age
+  let age = startDate.getUTCFullYear() - birthDate.getUTCFullYear()
+  const birthdayHasPassed =
+    startDate.getUTCMonth() > birthDate.getUTCMonth() ||
+    (startDate.getUTCMonth() === birthDate.getUTCMonth() &&
+      startDate.getUTCDate() >= birthDate.getUTCDate())
+  if (!birthdayHasPassed) age -= 1
+  return clamp(age, 12, 80)
 }
 
 function buildBudgetedRandomSliders() {
@@ -86,7 +95,7 @@ export function NewCareerPage() {
   const [form, setForm] = useState({
     fullName: createPlayerIdentitySeed.name,
     nationality: createPlayerIdentitySeed.nationality,
-    age: String(createPlayerIdentitySeed.age),
+    dateOfBirth: dateOfBirthForAge(createPlayerIdentitySeed.age),
     handedness: createPlayerIdentitySeed.handedness as 'Right-handed' | 'Left-handed',
     cueStyle: createPlayerIdentitySeed.cueStyle,
     playingStyle: createPlayerIdentitySeed.playingStyle,
@@ -96,7 +105,7 @@ export function NewCareerPage() {
   })
   const [selectedBackgroundId, setSelectedBackgroundId] = useState(createPlayerBackgroundCatalog[1]?.id ?? createPlayerBackgroundCatalog[0]?.id ?? '')
   const [previewBackgroundId, setPreviewBackgroundId] = useState(createPlayerBackgroundCatalog[1]?.id ?? createPlayerBackgroundCatalog[0]?.id ?? '')
-  const normalizedAge = useMemo(() => normalizeAgeInput(form.age), [form.age])
+  const normalizedAge = useMemo(() => getAgeAtCareerStart(form.dateOfBirth), [form.dateOfBirth])
   const selectedBackground = createPlayerBackgroundCatalog.find((background) => background.id === selectedBackgroundId) ?? createPlayerBackgroundCatalog[0]
   const previewBackground = createPlayerBackgroundCatalog.find((background) => background.id === previewBackgroundId) ?? selectedBackground
   const eligibleStartingLevels = useMemo(() => getEligibleStartingLevels(createPlayerStartingLevelCatalog, normalizedAge), [normalizedAge])
@@ -112,7 +121,7 @@ export function NewCareerPage() {
   const attributePreview = useMemo(() => buildAttributeSnapshots(previewAttributes, previewLabels), [previewAttributes])
   const startingRating = useMemo(() => calculateOverallRating({ attributes: previewAttributes, personalityTraits: effectiveSliders, playingStyle: form.playingStyle }), [effectiveSliders, form.playingStyle, previewAttributes])
   const startingPotential = useMemo(() => calculatePotentialRating({ attributes: previewAttributes, personalityTraits: effectiveSliders, age: normalizedAge, playingStyle: form.playingStyle, personalityType: derivedPersonality, overallRating: startingRating }), [derivedPersonality, effectiveSliders, form.playingStyle, normalizedAge, previewAttributes, startingRating])
-  const canContinueFromIdentity = form.fullName.trim().length > 1 && form.nationality.trim().length > 1
+  const canContinueFromIdentity = form.fullName.trim().length > 1 && form.nationality.trim().length > 1 && form.dateOfBirth.length === 10
 
   const updateField = <T extends keyof typeof form,>(field: T, value: (typeof form)[T]) => setForm((previous) => ({ ...previous, [field]: value }))
 
@@ -136,7 +145,7 @@ export function NewCareerPage() {
     setCurrentStep(0)
     setForm((previous) => ({
       ...previous,
-      age: String(randomAge),
+      dateOfBirth: dateOfBirthForAge(randomAge),
       handedness: Math.random() > 0.2 ? 'Right-handed' : 'Left-handed',
       cueStyle: cueStyles[Math.floor(Math.random() * cueStyles.length)],
       playingStyle: playingStyles[Math.floor(Math.random() * playingStyles.length)],
@@ -151,6 +160,7 @@ export function NewCareerPage() {
       fullName: form.fullName,
       nationality: form.nationality,
       age: normalizedAge,
+      dateOfBirth: form.dateOfBirth,
       handedness: form.handedness,
       cueStyle: form.cueStyle,
       playingStyle: form.playingStyle,
@@ -168,7 +178,7 @@ export function NewCareerPage() {
     setForm({
       fullName: createPlayerIdentitySeed.name,
       nationality: createPlayerIdentitySeed.nationality,
-      age: String(createPlayerIdentitySeed.age),
+      dateOfBirth: dateOfBirthForAge(createPlayerIdentitySeed.age),
       handedness: createPlayerIdentitySeed.handedness as 'Right-handed' | 'Left-handed',
       cueStyle: createPlayerIdentitySeed.cueStyle,
       playingStyle: createPlayerIdentitySeed.playingStyle,
@@ -221,8 +231,8 @@ export function NewCareerPage() {
               <div className="card-body min-h-0 flex-1 overflow-auto px-3 py-3 scrollbar-thin">
                 <div className="grid grid-cols-2 gap-3">
                   <div><label className="mb-1 block text-xs text-gray-400">Name</label><input value={form.fullName} onChange={(event) => updateField('fullName', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500" /></div>
-                  <div><label className="mb-1 block text-xs text-gray-400" htmlFor="career-nationality">Nationality</label><select id="career-nationality" value={form.nationality} onChange={(event) => updateField('nationality', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500">{nationalities.map((nationality) => <option key={nationality} value={nationality}>{nationality}</option>)}</select></div>
-                  <div><label className="mb-1 block text-xs text-gray-400">Age</label><input type="number" min={12} max={80} value={form.age} onChange={(event) => updateField('age', event.target.value)} onBlur={() => updateField('age', String(normalizedAge))} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500" /></div>
+                  <div><label className="mb-1 block text-xs text-gray-400" htmlFor="career-nationality">Nationality</label><select id="career-nationality" value={form.nationality} onChange={(event) => updateField('nationality', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500">{nationalityOptions.map((nationality) => <option key={nationality} value={nationality}>{nationality}</option>)}</select></div>
+                  <div><label className="mb-1 block text-xs text-gray-400" htmlFor="career-date-of-birth">Date of Birth</label><input id="career-date-of-birth" type="date" min={earliestDateOfBirth} max={latestDateOfBirth} value={form.dateOfBirth} onChange={(event) => updateField('dateOfBirth', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500" /><p className="mt-1 text-[10px] text-gray-500">Age {normalizedAge} when the career starts on 11 May 2026</p></div>
                   <div><label className="mb-1 block text-xs text-gray-400">Handedness</label><select value={form.handedness} onChange={(event) => updateField('handedness', event.target.value as 'Right-handed' | 'Left-handed')} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500"><option>Right-handed</option><option>Left-handed</option></select></div>
                   <div><label className="mb-1 block text-xs text-gray-400">Cue Style</label><select value={form.cueStyle} onChange={(event) => updateField('cueStyle', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500">{cueStyles.map((style) => <option key={style}>{style}</option>)}</select></div>
                   <div><label className="mb-1 block text-xs text-gray-400">Playing Style</label><select value={form.playingStyle} onChange={(event) => updateField('playingStyle', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500">{playingStyles.map((style) => <option key={style}>{style}</option>)}</select></div>
@@ -274,7 +284,7 @@ export function NewCareerPage() {
               <div className="card-header px-3 py-2"><h2 className="text-sm font-semibold uppercase tracking-wider text-white">4. Confirm</h2><span className="text-[10px] text-gray-500">Ready to start</span></div>
               <div className="card-body min-h-0 flex-1 overflow-auto px-3 py-3 scrollbar-thin">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  {[['Name', form.fullName], ['Nationality', form.nationality], ['Age', String(normalizedAge)], ['Handedness', form.handedness], ['Background', selectedBackground.name], ['Starting Level', selectedStartingLevel.name], ['Starting Overall', `${startingRating} / 100`], ['Potential', `${startingPotential} / 100`], ['Starting Funds', formatMoney(selectedBackground.funds)]].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-surface-light/35 px-3 py-2"><span className="text-gray-400">{label}</span><span className="text-right text-white">{value}</span></div>)}
+                  {[['Name', form.fullName], ['Nationality', form.nationality], ['Date of Birth', form.dateOfBirth], ['Starting Age', String(normalizedAge)], ['Handedness', form.handedness], ['Background', selectedBackground.name], ['Starting Level', selectedStartingLevel.name], ['Starting Overall', `${startingRating} / 100`], ['Potential', `${startingPotential} / 100`], ['Starting Funds', formatMoney(selectedBackground.funds)]].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-surface-light/35 px-3 py-2"><span className="text-gray-400">{label}</span><span className="text-right text-white">{value}</span></div>)}
                 </div>
                 <p className="mt-3 text-xs text-green-300">This career will be saved in its own autosaving slot. Your other careers remain available from Load Career.</p>
               </div>
