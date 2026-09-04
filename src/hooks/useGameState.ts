@@ -105,9 +105,11 @@ import {
 } from "../game/tournamentScheduling";
 import {
   ACTIVE_SAVE_KEY,
+  readActiveSaveSlotId,
   readSaveSlotIndex,
   SAVE_SLOT_PREFIX,
   type SaveSlotSummary,
+  writeActiveSaveSlotId,
   writeSaveSlotIndex,
 } from "../game/saveStorage";
 import {
@@ -17861,6 +17863,56 @@ export type { SaveSlotSummary };
 
 export type CareerSessionMode = "launcher" | "creating" | "active";
 
+function createSaveSlotId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+}
+
+function getUniqueSaveSlotName(baseName: string, excludedId?: string) {
+  const trimmedName = baseName.trim() || "Snooker Career";
+  const existingNames = new Set(
+    readSaveSlotIndex()
+      .filter((slot) => slot.id !== excludedId)
+      .map((slot) => slot.name.toLocaleLowerCase()),
+  );
+  if (!existingNames.has(trimmedName.toLocaleLowerCase())) return trimmedName;
+
+  let suffix = 2;
+  while (existingNames.has(`${trimmedName} (${suffix})`.toLocaleLowerCase())) {
+    suffix += 1;
+  }
+  return `${trimmedName} (${suffix})`;
+}
+
+function persistCareerSlot(
+  state: GameState,
+  options: { id?: string; name?: string } = {},
+) {
+  const id = options.id ?? createSaveSlotId();
+  const existing = readSaveSlotIndex().find((slot) => slot.id === id);
+  const name = options.name
+    ? getUniqueSaveSlotName(options.name, id)
+    : existing?.name ?? getUniqueSaveSlotName(state.player.fullName, id);
+  const summary: SaveSlotSummary = {
+    id,
+    name,
+    playerName: state.player.fullName,
+    season: state.season,
+    date: state.currentDate,
+    updatedAt: new Date().toISOString(),
+  };
+  window.localStorage.setItem(
+    `${SAVE_SLOT_PREFIX}${id}`,
+    JSON.stringify({ ...state, schemaVersion: SAVE_SCHEMA_VERSION }),
+  );
+  writeSaveSlotIndex([
+    summary,
+    ...readSaveSlotIndex().filter((slot) => slot.id !== id),
+  ]);
+  return summary;
+}
+
 export function useGameState() {
   const [gameState, setGameState] = useState<GameState>(() =>
     loadStoredState(),
@@ -17872,11 +17924,24 @@ export function useGameState() {
       typeof window !== "undefined" &&
       Boolean(window.localStorage.getItem(STORAGE_KEY)),
   );
+  const [activeSaveSlotId, setActiveSaveSlotId] = useState<string | null>(() => {
+    const existingId = readActiveSaveSlotId();
+    if (existingId || !hasActiveCareer || typeof window === "undefined") {
+      return existingId;
+    }
+    const slot = persistCareerSlot(gameState, {
+      id: "migrated-active-career",
+      name: `${gameState.player.fullName} · ${gameState.season}`,
+    });
+    writeActiveSaveSlotId(slot.id);
+    return slot.id;
+  });
 
   useEffect(() => {
     if (typeof window === "undefined" || careerSessionMode !== "active") return;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
-  }, [careerSessionMode, gameState]);
+    if (activeSaveSlotId) persistCareerSlot(gameState, { id: activeSaveSlotId });
+  }, [activeSaveSlotId, careerSessionMode, gameState]);
 
   const actions = useMemo(
     () => ({
@@ -17889,12 +17954,26 @@ export function useGameState() {
           !window.localStorage.getItem(STORAGE_KEY)
         )
           return false;
-        setGameState(loadStoredState());
+        const storedState = loadStoredState();
+        let slotId = readActiveSaveSlotId();
+        if (!slotId) {
+          const slot = persistCareerSlot(storedState, {
+            name: `${storedState.player.fullName} · ${storedState.season}`,
+          });
+          slotId = slot.id;
+          writeActiveSaveSlotId(slotId);
+        }
+        setActiveSaveSlotId(slotId);
+        setGameState(storedState);
         setCareerSessionMode("active");
         return true;
       },
       startDemoCareer() {
         const demoState = createStarterState();
+        const slot = persistCareerSlot(demoState, { name: "Demo Career" });
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(demoState));
+        writeActiveSaveSlotId(slot.id);
+        setActiveSaveSlotId(slot.id);
         setGameState(demoState);
         setCareerSessionMode("active");
         setHasActiveCareer(true);
@@ -17906,20 +17985,10 @@ export function useGameState() {
         if (typeof window === "undefined") return null;
         const normalizedName =
           name.trim() || `${gameState.player.fullName} · ${gameState.season}`;
-        const id = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-        const summary: SaveSlotSummary = {
-          id,
-          name: normalizedName,
-          playerName: gameState.player.fullName,
-          season: gameState.season,
-          date: gameState.currentDate,
-          updatedAt: new Date().toISOString(),
-        };
-        window.localStorage.setItem(
-          `${SAVE_SLOT_PREFIX}${id}`,
-          JSON.stringify({ ...gameState, schemaVersion: SAVE_SCHEMA_VERSION }),
-        );
-        writeSaveSlotIndex([summary, ...readSaveSlotIndex()].slice(0, 20));
+        const summary = persistCareerSlot(gameState, { name: normalizedName });
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
+        writeActiveSaveSlotId(summary.id);
+        setActiveSaveSlotId(summary.id);
         return summary;
       },
       loadSaveSlot(id: string) {
@@ -17927,6 +17996,8 @@ export function useGameState() {
         const saved = window.localStorage.getItem(`${SAVE_SLOT_PREFIX}${id}`);
         if (!saved) return false;
         window.localStorage.setItem(STORAGE_KEY, saved);
+        writeActiveSaveSlotId(id);
+        setActiveSaveSlotId(id);
         setGameState(loadStoredState());
         setCareerSessionMode("active");
         setHasActiveCareer(true);
@@ -17938,6 +18009,13 @@ export function useGameState() {
         writeSaveSlotIndex(
           readSaveSlotIndex().filter((slot) => slot.id !== id),
         );
+        if (id === activeSaveSlotId) {
+          window.localStorage.removeItem(STORAGE_KEY);
+          writeActiveSaveSlotId(null);
+          setActiveSaveSlotId(null);
+          setHasActiveCareer(false);
+          setCareerSessionMode("launcher");
+        }
       },
       exportCareer() {
         return JSON.stringify(
@@ -17957,7 +18035,13 @@ export function useGameState() {
           )
             return false;
           window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-          setGameState(loadStoredState());
+          const importedState = loadStoredState();
+          const slot = persistCareerSlot(importedState, {
+            name: `${importedState.player.fullName} · Imported`,
+          });
+          writeActiveSaveSlotId(slot.id);
+          setActiveSaveSlotId(slot.id);
+          setGameState(importedState);
           setCareerSessionMode("active");
           setHasActiveCareer(true);
           return true;
@@ -18014,7 +18098,14 @@ export function useGameState() {
         );
       },
       resetCareer(config?: NewCareerConfig) {
-        setGameState(createNewCareerState(config));
+        const newCareer = createNewCareerState(config);
+        const slot = persistCareerSlot(newCareer, {
+          name: newCareer.player.fullName,
+        });
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(newCareer));
+        writeActiveSaveSlotId(slot.id);
+        setActiveSaveSlotId(slot.id);
+        setGameState(newCareer);
         setCareerSessionMode("active");
         setHasActiveCareer(true);
       },
@@ -19246,7 +19337,7 @@ export function useGameState() {
         });
       },
     }),
-    [gameState],
+    [activeSaveSlotId, gameState],
   );
 
   return useMemo(
@@ -19254,8 +19345,9 @@ export function useGameState() {
       gameState,
       careerSessionMode,
       hasActiveCareer,
+      activeSaveSlotId,
       ...actions,
     }),
-    [actions, careerSessionMode, gameState, hasActiveCareer],
+    [actions, activeSaveSlotId, careerSessionMode, gameState, hasActiveCareer],
   );
 }

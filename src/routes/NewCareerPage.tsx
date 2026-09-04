@@ -28,6 +28,13 @@ import { calculateOverallRating, calculatePotentialRating } from '../utils/calcu
 const steps = ['Identity', 'Background', 'Attributes', 'Confirm'] as const
 const cueStyles = ['Traditional', 'Touch Focus', 'Power Delivery', 'Compact Rhythm']
 const playingStyles = ['Balanced', 'Measured Break Builder', 'Attacking Scorer', 'Safety First']
+const nationalities = [
+  'Australia', 'Belgium', 'Brazil', 'Canada', 'China', 'England', 'France',
+  'Germany', 'Hong Kong', 'India', 'Iran', 'Ireland', 'Italy', 'Japan',
+  'Malaysia', 'Netherlands', 'New Zealand', 'Northern Ireland', 'Norway',
+  'Pakistan', 'Poland', 'Scotland', 'South Africa', 'Spain', 'Sweden',
+  'Switzerland', 'Thailand', 'United States', 'Wales',
+] as const
 const minSliderValue = 20
 const maxSliderValue = 90
 const sliderBudget = createPlayerSliderCatalog.reduce((sum, slider) => sum + slider.value, 0)
@@ -73,7 +80,7 @@ function difficultyClass(difficulty: string) {
 }
 
 export function NewCareerPage() {
-  const { resetCareer, gameState } = useGame()
+  const { resetCareer } = useGame()
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(0)
   const [form, setForm] = useState({
@@ -214,7 +221,7 @@ export function NewCareerPage() {
               <div className="card-body min-h-0 flex-1 overflow-auto px-3 py-3 scrollbar-thin">
                 <div className="grid grid-cols-2 gap-3">
                   <div><label className="mb-1 block text-xs text-gray-400">Name</label><input value={form.fullName} onChange={(event) => updateField('fullName', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500" /></div>
-                  <div><label className="mb-1 block text-xs text-gray-400">Nationality</label><input value={form.nationality} onChange={(event) => updateField('nationality', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500" /></div>
+                  <div><label className="mb-1 block text-xs text-gray-400" htmlFor="career-nationality">Nationality</label><select id="career-nationality" value={form.nationality} onChange={(event) => updateField('nationality', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500">{nationalities.map((nationality) => <option key={nationality} value={nationality}>{nationality}</option>)}</select></div>
                   <div><label className="mb-1 block text-xs text-gray-400">Age</label><input type="number" min={12} max={80} value={form.age} onChange={(event) => updateField('age', event.target.value)} onBlur={() => updateField('age', String(normalizedAge))} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500" /></div>
                   <div><label className="mb-1 block text-xs text-gray-400">Handedness</label><select value={form.handedness} onChange={(event) => updateField('handedness', event.target.value as 'Right-handed' | 'Left-handed')} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500"><option>Right-handed</option><option>Left-handed</option></select></div>
                   <div><label className="mb-1 block text-xs text-gray-400">Cue Style</label><select value={form.cueStyle} onChange={(event) => updateField('cueStyle', event.target.value)} className="w-full rounded-lg border border-border bg-surface-light px-3 py-2 text-sm text-white outline-none focus:border-green-500">{cueStyles.map((style) => <option key={style}>{style}</option>)}</select></div>
@@ -269,7 +276,7 @@ export function NewCareerPage() {
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   {[['Name', form.fullName], ['Nationality', form.nationality], ['Age', String(normalizedAge)], ['Handedness', form.handedness], ['Background', selectedBackground.name], ['Starting Level', selectedStartingLevel.name], ['Starting Overall', `${startingRating} / 100`], ['Potential', `${startingPotential} / 100`], ['Starting Funds', formatMoney(selectedBackground.funds)]].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-surface-light/35 px-3 py-2"><span className="text-gray-400">{label}</span><span className="text-right text-white">{value}</span></div>)}
                 </div>
-                <div className="mt-3 rounded border border-amber-600/30 bg-amber-600/10 p-3 text-xs text-amber-100">Creating a new career overwrites the current local save.</div>
+                <p className="mt-3 text-xs text-green-300">This career will be saved in its own autosaving slot. Your other careers remain available from Load Career.</p>
               </div>
             </div>
           ) : null}
@@ -345,7 +352,7 @@ export function NewCareerPage() {
       </div>
 
       <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-light/40 px-3 py-2.5">
-        <div className="text-xs text-gray-500">Active save: <span className="text-white">{gameState.player.fullName}</span></div>
+        <div className="text-xs text-gray-500">New save: <span className="text-white">{form.fullName.trim() || 'Unnamed career'}</span> <span className="text-green-400">· separate autosave</span></div>
         <div className="flex gap-2"><button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => { if (currentStep > 0) setCurrentStep((step) => step - 1); else resetForm() }}><ChevronLeft className="h-3.5 w-3.5" /> {currentStep > 0 ? 'Back' : 'Reset'}</button>{currentStep < steps.length - 1 ? <button type="button" className="btn-primary px-3 py-2 text-xs" disabled={currentStep === 0 && !canContinueFromIdentity} onClick={continueStep}>Continue <ChevronRight className="h-3.5 w-3.5" /></button> : <button type="button" className="btn-primary px-3 py-2 text-xs" onClick={handleConfirm}>Start Career <ChevronRight className="h-3.5 w-3.5" /></button>}</div>
       </div>
     </div>

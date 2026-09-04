@@ -4,17 +4,17 @@ import { useGame } from '../context/useGame'
 import type { SaveSlotSummary } from '../hooks/useGameState'
 
 export function SaveManagerPage() {
-  const { gameState, listSaveSlots, saveToSlot, loadSaveSlot, deleteSaveSlot, exportCareer, importCareer } = useGame()
+  const { gameState, activeSaveSlotId, listSaveSlots, saveToSlot, loadSaveSlot, deleteSaveSlot, exportCareer, importCareer } = useGame()
   const [slots, setSlots] = useState<SaveSlotSummary[]>(() => listSaveSlots())
   const [slotName, setSlotName] = useState(`${gameState.player.fullName} · ${gameState.season}`)
-  const [message, setMessage] = useState('The active career saves automatically after every state change.')
+  const [message, setMessage] = useState('Each career autosaves independently. Loading a slot makes it the active career.')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   function createSlot() {
     const slot = saveToSlot(slotName)
     if (!slot) return
     setSlots(listSaveSlots())
-    setMessage(`Saved “${slot.name}”.`)
+    setMessage(`Created and switched to “${slot.name}”.`)
   }
 
   function downloadSave() {
@@ -46,7 +46,7 @@ export function SaveManagerPage() {
       <header className="rounded-xl border border-border bg-surface/85 p-5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-green-400">Career Data</p>
         <h1 className="mt-1 text-2xl font-bold text-white">Save Manager</h1>
-        <p className="mt-1 text-sm text-gray-400">Create named local slots or move a career between devices with JSON import and export.</p>
+        <p className="mt-1 text-sm text-gray-400">Manage independent autosaving careers or move one between devices with JSON import and export.</p>
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
@@ -55,12 +55,12 @@ export function SaveManagerPage() {
           <div className="mt-3 flex gap-2">
             <label className="sr-only" htmlFor="save-slot-name">Save slot name</label>
             <input id="save-slot-name" className="min-w-0 flex-1 rounded border border-border bg-surface-light px-3 py-2 text-sm text-white" value={slotName} onChange={(event) => setSlotName(event.target.value)} />
-            <button type="button" className="btn-primary" onClick={createSlot}><Save className="h-4 w-4" /> Create Slot</button>
+            <button type="button" className="btn-primary" onClick={createSlot}><Save className="h-4 w-4" /> Create Copy</button>
           </div>
           <div className="mt-4 space-y-2">
             {slots.length === 0 ? <p className="rounded-lg bg-surface-light/50 p-4 text-sm text-gray-400">No named saves yet.</p> : slots.map((slot) => (
               <div key={slot.id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-light/40 p-3">
-                <div className="min-w-0"><p className="truncate font-medium text-white">{slot.name}</p><p className="mt-0.5 text-xs text-gray-400">{slot.playerName} · {slot.season} · {slot.date}</p></div>
+                <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate font-medium text-white">{slot.name}</p>{slot.id === activeSaveSlotId ? <span className="rounded bg-green-600/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-green-400">Active · autosaving</span> : null}</div><p className="mt-0.5 text-xs text-gray-400">{slot.playerName} · {slot.season} · {slot.date}</p></div>
                 <div className="flex shrink-0 gap-2"><button type="button" className="btn-secondary text-xs" onClick={() => { if (loadSaveSlot(slot.id)) setMessage(`Loaded “${slot.name}”.`) }}><FolderOpen className="h-3.5 w-3.5" /> Load</button><button type="button" className="btn-secondary text-xs text-red-300" onClick={() => removeSlot(slot)} aria-label={`Delete ${slot.name}`}><Trash2 className="h-3.5 w-3.5" /></button></div>
               </div>
             ))}
