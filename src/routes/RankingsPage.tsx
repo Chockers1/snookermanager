@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { QualificationRacesPanel } from '../components/career/RealismPanels'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Minus, Target, TrendingDown, TrendingUp } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useGame } from '../context/useGame'
 import { getNextEligibleTournament } from '../hooks/useGameState'
 import { getPlayableRounds, resolveTournamentFormat } from '../data/tournamentFormats'
+import { rankingEarningsSummary } from '../game/rollingRankings'
 import type { PlayerAttributes } from '../types/game'
 import { calculateOverallRating, calculatePotentialRating } from '../utils/calculations'
 import { formatMoney } from '../utils/formatters'
@@ -280,7 +282,9 @@ export function RankingsPage() {
   const playerRow = activeRowsWithRatings.find((row) => row.playerName === gameState.player.fullName) ?? activeRowsWithRatings[0]
   const nextTournament = getNextEligibleTournament(gameState)
   const nextTarget = activeRowsWithRatings.find((row) => row.ranking === Math.max(1, (playerRow?.ranking ?? 2) - 1))
-  const rankingSources = buildTournamentRankingSources(
+  const moneyRanking = activeTab === 'world' || activeTab === 'oneYear'
+  const earningsSummary = rankingEarningsSummary(gameState, gameState.player.fullName)
+  const rankingSources = moneyRanking ? earningsSummary.recent.filter(e => activeTab !== 'oneYear' || e.season === gameState.season).map(e => ({ label: `${gameState.rollingRankings?.events[e.eventKey]?.name ?? e.eventKey} · ${e.earnedOn}`, points: e.amount, prizeMoney: e.amount })) : buildTournamentRankingSources(
     gameState.history.tournamentHistory,
     gameState.tournaments,
     activeTab,
@@ -320,12 +324,10 @@ export function RankingsPage() {
     label: season.season,
     value: season[activeConfig.rankField] ?? playerRow?.ranking ?? 1,
   }))
-  const rankingMomentum = archivedMomentum.length > 0
+  const liveMomentum = moneyRanking ? (gameState.rollingRankings?.revisions ?? []).slice(-10).map(revision => ({ label: revision.date.slice(5), value: (activeTab === 'oneYear' ? revision.oneYear : revision.world)[gameState.player.fullName] ?? playerRow?.ranking ?? 1 })) : []
+  const rankingMomentum = liveMomentum.length > 0 ? liveMomentum : archivedMomentum.length > 0
     ? archivedMomentum
-    : Array.from({ length: 6 }, (_, index) => ({
-        label: `W${index + 1}`,
-        value: Math.max(1, (playerRow?.ranking ?? 1) + (5 - index) - Math.max(0, playerRow?.movement ?? 0)),
-      }))
+    : [{ label: gameState.currentDate.slice(5), value: playerRow?.ranking ?? 1 }]
   const rankingCards = [
     { title: 'Tour Card', body: gameState.careerSystems.pro.hasTourCard ? `${gameState.careerSystems.pro.survivalStatus} - ${gameState.careerSystems.pro.yearsRemaining > 0 ? `${gameState.careerSystems.pro.yearsRemaining} season(s) left` : 'retained on merit'}` : 'No active main-tour card yet.' },
     { title: 'Q Tour', body: gameState.careerSystems.qTour.playerRank ? `Rank ${gameState.careerSystems.qTour.playerRank} - ${gameState.careerSystems.qTour.playerPoints} pts${gameState.careerSystems.qTour.directCardAwarded ? ' - card secured' : ''}` : 'No Q Tour points logged yet.' },
@@ -338,6 +340,7 @@ export function RankingsPage() {
 
   return (
     <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+      <QualificationRacesPanel />
       <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -379,7 +382,7 @@ export function RankingsPage() {
                     <th className="px-2 py-2 text-left font-medium">Nation</th>
                     <th className="px-2 py-2 text-center font-medium">OVR</th>
                     <th className="px-2 py-2 text-center font-medium">POT</th>
-                    <th className="px-3 py-2 text-right font-medium">Points</th>
+                    <th className="px-3 py-2 text-right font-medium">{moneyRanking ? 'Ranking earnings' : 'Points'}</th>
                     <th className="px-3 py-2 text-right font-medium">Prize Money</th>
                     <th className="px-2 py-2 text-center font-medium">Events</th>
                     <th className="px-2 py-2 text-center font-medium">Titles</th>
@@ -395,7 +398,7 @@ export function RankingsPage() {
                       <td className="px-2 py-2 text-gray-400">{row.nation}</td>
                       <td className="px-2 py-2 text-center font-semibold text-white">{row.overall}</td>
                       <td className="px-2 py-2 text-center font-semibold text-green-400">{row.potential}</td>
-                      <td className="px-3 py-2 text-right text-white">{row.points}</td>
+                      <td className="px-3 py-2 text-right text-white">{moneyRanking ? formatMoney(row.points) : row.points}</td>
                       <td className="px-3 py-2 text-right text-white">{formatMoney(row.prizeMoney)}</td>
                       <td className="px-2 py-2 text-center text-gray-400">{row.eventsPlayed}</td>
                       <td className="px-2 py-2 text-center text-white">{row.titles}</td>
@@ -445,7 +448,8 @@ export function RankingsPage() {
               <span>{movementLabel} movement</span>
             </div>
             <p className="mt-1 text-[11px] text-gray-300">OVR <span className="font-semibold text-white">{playerRow?.overall ?? '-'}</span> <span className="mx-1 text-border">|</span> POT <span className="font-semibold text-green-400">{playerRow?.potential ?? '-'}</span></p>
-            <p className="mt-1 text-[10px] text-gray-400">{playerRow?.points ?? 0} points <span className="mx-1 text-border">•</span> {formatMoney(playerRow?.prizeMoney ?? 0)}</p>
+            <p className="mt-1 text-[10px] text-gray-400">{moneyRanking ? `${formatMoney(playerRow?.points ?? 0)} counting earnings` : `${playerRow?.points ?? 0} points`}</p>
+            {activeTab === 'world' && <p className="mt-1 text-[10px] text-amber-300">Next 30 days expiring: {formatMoney(earningsSummary.expiring)}</p>}
           </div>
 
           <div className="card min-h-0 flex h-full flex-col overflow-hidden">
@@ -466,16 +470,18 @@ export function RankingsPage() {
           <div className="card min-h-0 px-3 py-2.5 text-center">
             <h3 className="text-xs font-semibold text-white">Next Target</h3>
             <p className="mt-1 text-3xl font-bold text-white">#{nextTarget?.ranking ?? Math.max(1, (playerRow?.ranking ?? 2) - 1)}</p>
-            <p className="mt-1 text-xs text-green-400">Needs {Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)} pts</p>
+            <p className="mt-1 text-xs text-green-400">Needs {moneyRanking ? formatMoney(Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)) : `${Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)} pts`}</p>
             <p className="mt-1 truncate text-[10px] text-gray-500">{nextTournament?.name ?? 'Next event'} can shift this race.</p>
           </div>
 
           <div className="card min-h-0 flex h-full flex-col overflow-hidden px-3 py-2.5">
             <h3 className="mb-2 text-xs font-semibold text-white">Recent Ranking Sources</h3>
             <div className="min-h-0 flex-1 space-y-1.5 overflow-auto text-[10px] text-gray-400 scrollbar-thin">
+              {activeTab === 'world' && earningsSummary.estimated > 0 && <p className="text-amber-300">Estimated opening carry-over: {formatMoney(earningsSummary.estimated)}. Replaced by recorded results as it expires. New awards post at the event's scheduled finish.</p>}
+              {moneyRanking && <p className="text-sky-300">Latest world update: {gameState.rollingRankings?.revisions.at(-1)?.date ?? 'Opening list'} · {Object.values(gameState.rollingRankings?.events ?? {}).filter(e => e.applied && e.ranking && e.season === gameState.season).length} ranking events settled this season.</p>}
               {rankingSources.length > 0 ? rankingSources.map((item) => (
                 <div key={item.label} className="rounded bg-surface-light/70 px-2.5 py-2">
-                  <span className="text-white">{item.label}</span> <span className="text-gray-500">•</span> {item.points} pts <span className="text-gray-500">•</span> {formatMoney(item.prizeMoney)}
+                  <span className="text-white">{item.label}</span> <span className="text-gray-500">•</span> {moneyRanking ? formatMoney(item.points) : `${item.points} pts`}
                 </div>
               )) : <div className="rounded bg-surface-light/70 px-2.5 py-2">No ranked matches logged yet.</div>}
             </div>
@@ -487,7 +493,7 @@ export function RankingsPage() {
               {rankingScenarios.map((scenario) => (
                 <div key={scenario.label} className="flex min-h-0 flex-col items-center justify-center rounded bg-surface-light/70 px-2 py-1.5 text-center">
                   <p className="text-[9px] text-gray-500">{scenario.label}</p>
-                  <p className="text-sm font-bold text-green-400">+{scenario.points}</p>
+                  <p className="text-sm font-bold text-green-400">+{moneyRanking ? formatMoney(scenario.points) : scenario.points}</p>
                   <p className="text-[10px] text-gray-400">Rank {scenario.projectedRank}</p>
                 </div>
               ))}

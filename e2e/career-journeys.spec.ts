@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readCareerSave } from './read-career-save';
 import {
   chalkCatalog,
   cueMarketplaceCatalog,
@@ -38,7 +39,7 @@ test("creates a career through the visible setup flow and survives reload", asyn
   await page.getByRole("button", { name: /New Career/ }).click();
   await expect(page).toHaveURL(/\/new-career/);
   await page.locator("input").nth(0).fill("Browser Journey");
-  await page.locator("input").nth(1).fill("New Zealand");
+  await page.getByLabel("Nationality").selectOption("New Zealand");
   await page.getByRole("button", { name: /Continue/ }).click();
   await page.getByRole("button", { name: /Continue/ }).click();
   await page.getByRole("button", { name: /Continue/ }).click();
@@ -61,14 +62,14 @@ test("creates and reloads a named save slot using real controls", async ({
   await page.getByRole("button", { name: "Career and save options" }).click();
   await page.getByRole("link", { name: "Save Manager" }).click();
   await page.getByLabel("Save slot name").fill("E2E checkpoint");
-  await page.getByRole("button", { name: /Create Slot/ }).click();
-  await expect(page.getByText(/Saved “E2E checkpoint”/)).toBeVisible();
+  await page.getByRole("button", { name: /Create Copy/ }).click();
+  await expect(page.getByText(/Created and switched to “E2E checkpoint”/)).toBeVisible();
   await page.reload();
   await page.getByRole("button", { name: /Continue Career/ }).click();
   await page.getByRole("button", { name: "Career and save options" }).click();
   await page.getByRole("link", { name: "Save Manager" }).click();
   await expect(page.getByText("E2E checkpoint")).toBeVisible();
-  await page.getByRole("button", { name: /Load/ }).click();
+  await page.getByText("E2E checkpoint", { exact: true }).locator("../../..").getByRole("button", { name: "Load", exact: true }).click();
   await expect(page.getByText(/Loaded “E2E checkpoint”/)).toBeVisible();
 });
 
@@ -133,10 +134,10 @@ test("inbox uses selected-message actions and persists read state", async ({
   );
   await page.goto("/inbox");
   await page.getByRole("button", { name: /Continue Career/ }).click();
-  await page.getByRole("link", { name: "Inbox" }).click();
+  await page.getByRole("navigation").getByRole("link", { name: /^Inbox/ }).click();
 
   await expect(
-    page.getByRole("heading", { name: "Inbox", exact: true }),
+    page.getByRole("tablist", { name: "Inbox filters" }),
   ).toBeVisible();
   await expect(page.getByText("Latest News")).toHaveCount(0);
   await expect(page.getByText("Tournament Invite")).toHaveCount(0);
@@ -148,25 +149,19 @@ test("inbox uses selected-message actions and persists read state", async ({
   await page.getByRole("button", { name: /Book Travel/ }).click();
   await expect(page).toHaveURL(/\/travel/);
 
-  await page.getByRole("link", { name: "Inbox" }).click();
+  await page.getByRole("navigation").getByRole("link", { name: /^Inbox/ }).click();
   await page.getByRole("button", { name: /Mark All Read/ }).click();
   await expect(page.getByText("0 unread")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Open inbox (0 unread messages)" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Dashboard" }).click();
-  await page.getByRole("link", { name: "Inbox" }).click();
+  await page.getByRole("navigation").getByRole("link", { name: /^Inbox/ }).click();
   await expect(page.getByText("0 unread")).toBeVisible();
-  await page.waitForFunction((key) => {
-    const saved = window.localStorage.getItem(key);
-    if (!saved) return false;
-    return JSON.parse(saved).inbox.every(
-      (message: { read?: boolean }) => message.read,
-    );
-  }, ACTIVE_SAVE_KEY);
+  await expect.poll(async () => (await readCareerSave(page)).inbox.every(message => message.read)).toBe(true);
   await page.reload();
   await page.getByRole("button", { name: /Continue Career/ }).click();
-  await page.getByRole("link", { name: "Inbox" }).click();
+  await page.getByRole("navigation").getByRole("link", { name: /^Inbox/ }).click();
   await expect(page.getByText("0 unread")).toBeVisible();
 });
 
@@ -197,8 +192,8 @@ test("requires the end-of-season world report before starting the next season", 
 
   await page.getByRole("button", { name: "Start New Season" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText("Career Next Step")).toBeVisible();
-  await page.getByRole("link", { name: "Inbox" }).click();
+  await expect(page.getByRole("button", { name: "Enter Tournament", exact: true })).toBeVisible();
+  await page.getByRole("navigation").getByRole("link", { name: /^Inbox/ }).click();
   await expect(
     page.getByRole("button", { name: /Invitation:/ }).first(),
   ).toBeVisible();
@@ -250,6 +245,10 @@ test("enters, travels to, and completes every round of a tournament", async ({
   await primary.click();
   await expect(page).toHaveURL(/\/travel/);
   await page.getByRole("button", { name: "Confirm Travel" }).first().click();
+  await expect(page).toHaveURL(/\/tournament\/preparation/);
+  await page.getByRole("button", { name: "Confirm plan" }).click();
+  await expect(page).toHaveURL(/\/match\/preview/);
+  await page.getByRole("link", { name: "Tournament Hub" }).click();
   await expect(page).toHaveURL(/\/tournaments\/hub/);
   await expect(primary).toContainText("Advance to Tournament");
   await primary.click();
@@ -291,8 +290,8 @@ test("enters, travels to, and completes every round of a tournament", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Back to Dashboard" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText("Career Next Step")).toBeVisible();
-  await page.getByRole("link", { name: "Inbox" }).click();
+  await expect(page.getByRole("button", { name: "Enter Tournament", exact: true })).toBeVisible();
+  await page.getByRole("navigation").getByRole("link", { name: /^Inbox/ }).click();
   await expect(
     page.getByRole("button", {
       name: new RegExp(`Post-event report: ${eliteTournament.name}`),
@@ -336,6 +335,10 @@ test("live match is a score, tactics, and statistics workspace", async ({
   await primary.click();
   await primary.click();
   await page.getByRole("button", { name: "Confirm Travel" }).first().click();
+  await expect(page).toHaveURL(/\/tournament\/preparation/);
+  await page.getByRole("button", { name: "Confirm plan" }).click();
+  await expect(page).toHaveURL(/\/match\/preview/);
+  await page.getByRole("link", { name: "Tournament Hub" }).click();
   await expect(page).toHaveURL(/\/tournaments\/hub/);
   await page.getByRole("button", { name: "Advance to Tournament" }).click();
   await page.getByRole("button", { name: "Play Next Match" }).click();
@@ -372,15 +375,10 @@ test("live match is a score, tactics, and statistics workspace", async ({
   await expect(
     page.getByRole("button", { name: /^Pause Auto Play/ }),
   ).toHaveAttribute("aria-pressed", "true");
-  await page.waitForFunction((key) => {
-    const saved = window.localStorage.getItem(key);
-    if (!saved) return false;
-    const liveMatch = JSON.parse(saved).liveMatch;
-    return (
-      liveMatch &&
-      liveMatch.playerStats.visits + liveMatch.opponentStats.visits > 0
-    );
-  }, ACTIVE_SAVE_KEY);
+  await expect.poll(async () => {
+    const liveMatch = (await readCareerSave(page)).liveMatch;
+    return Boolean(liveMatch && liveMatch.playerStats.visits + liveMatch.opponentStats.visits > 0);
+  }).toBe(true);
   await page.getByRole("button", { name: /^Pause Auto Play/ }).click();
   await expect(page.getByTestId("frame-log-current-break")).toBeVisible();
 
@@ -412,13 +410,8 @@ test("live match is a score, tactics, and statistics workspace", async ({
   await expect(
     page.getByText("Attack · Confident · Quick").first(),
   ).toBeVisible();
-  await page.waitForFunction((key) => {
-    const saved = window.localStorage.getItem(key);
-    if (!saved) return false;
-    const liveMatch = JSON.parse(saved).liveMatch;
-    return (
-      liveMatch &&
-      liveMatch.playerStats.visits + liveMatch.opponentStats.visits > 0
-    );
-  }, ACTIVE_SAVE_KEY);
+  await expect.poll(async () => {
+    const liveMatch = (await readCareerSave(page)).liveMatch;
+    return Boolean(liveMatch && liveMatch.playerStats.visits + liveMatch.opponentStats.visits > 0);
+  }).toBe(true);
 });

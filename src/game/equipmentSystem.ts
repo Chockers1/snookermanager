@@ -46,10 +46,12 @@ export function applyEquipmentMatchWear(equipment: EquipmentState, framesPlayed:
   const currentChalkStock = equipment.currentChalkId ? equipment.chalkStock[equipment.currentChalkId] ?? 0 : 0
   const nextChalkStock = equipment.currentChalkId && chalkDepleted ? { ...equipment.chalkStock, [equipment.currentChalkId]: Math.max(0, currentChalkStock - 1) } : equipment.chalkStock
   const remainingChalkStock = equipment.currentChalkId ? nextChalkStock[equipment.currentChalkId] ?? 0 : 0
+  const nextChalkCondition = chalkDepleted && remainingChalkStock > 0 ? 100 : clamp(equipment.chalkCondition - chalkWear, 0, 100)
 
   return {
     ...equipment,
-    chalkCondition: chalkDepleted && remainingChalkStock > 0 ? 100 : clamp(equipment.chalkCondition - chalkWear, 0, 100),
+    chalkCondition: nextChalkCondition,
+    chalkConditions: equipment.currentChalkId ? { ...equipment.chalkConditions, [equipment.currentChalkId]: nextChalkCondition } : equipment.chalkConditions,
     chalkStock: nextChalkStock,
     cueStates: {
       ...equipment.cueStates,

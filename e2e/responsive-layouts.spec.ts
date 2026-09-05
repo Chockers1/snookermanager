@@ -1,8 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ACTIVE_SAVE_KEY } from "../src/game/saveStorage";
+import { getDefaultPreparationAllocations } from "../src/game/tournamentPreparation";
 import { cueMarketplaceCatalog } from "../src/data/catalogs";
 import {
   bookTravelState,
+  confirmTournamentPreparationState,
   continueToNextTournamentState,
   createStarterState,
   enterTournamentState,
@@ -280,8 +282,9 @@ test("laptop match preview keeps symmetrical profiles and the tactical plan visi
   expect(tournament).toBeDefined();
   if (!tournament) return;
   career = enterTournamentState(career, tournament.id);
-  career = continueToNextTournamentState(career);
   career = bookTravelState(career, tournament.id);
+  career = confirmTournamentPreparationState(career, tournament.id, "balanced", getDefaultPreparationAllocations(), []);
+  career = continueToNextTournamentState(career);
 
   await page.addInitScript(
     ({ key, value }) => {
@@ -339,8 +342,9 @@ for (const viewport of viewports) {
     expect(tournament).toBeDefined();
     if (!tournament) return;
     career = enterTournamentState(career, tournament.id);
-    career = continueToNextTournamentState(career);
     career = bookTravelState(career, tournament.id);
+    career = confirmTournamentPreparationState(career, tournament.id, "balanced", getDefaultPreparationAllocations(), []);
+    career = continueToNextTournamentState(career);
     career = startLiveMatchState(career, tournament.id);
     expect(career.liveMatch).not.toBeNull();
 
@@ -499,8 +503,9 @@ test("Play Next Match opens preview before the live match", async ({
   expect(tournament).toBeDefined();
   if (!tournament) return;
   career = enterTournamentState(career, tournament.id);
-  career = continueToNextTournamentState(career);
   career = bookTravelState(career, tournament.id);
+  career = confirmTournamentPreparationState(career, tournament.id, "balanced", getDefaultPreparationAllocations(), []);
+  career = continueToNextTournamentState(career);
   await page.addInitScript(
     ({ key, value }) => {
       window.localStorage.clear();
@@ -558,7 +563,7 @@ for (const viewport of [
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
     await expect(
-      page.getByRole("heading", { name: "Inbox", exact: true }),
+      page.getByRole("tablist", { name: "Inbox filters" }),
     ).toBeVisible();
 
     const layout = await page.evaluate(() => {
@@ -738,8 +743,9 @@ test("completed match review opens the matching resolved bracket", async ({
   expect(tournament).toBeDefined();
   if (!tournament) return;
   career = enterTournamentState(career, tournament.id);
-  career = continueToNextTournamentState(career);
   career = bookTravelState(career, tournament.id);
+  career = confirmTournamentPreparationState(career, tournament.id, "balanced", getDefaultPreparationAllocations(), []);
+  career = continueToNextTournamentState(career);
   let randomState = 90210;
   const originalRandom = Math.random;
   Math.random = () => {
@@ -821,10 +827,10 @@ for (const viewport of viewports) {
       page.getByRole("button", { name: "Confirm Travel" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Match Preview" }),
+      page.getByRole("button", { name: "Preparation", exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Back To Calendar" }),
+      page.getByRole("button", { name: "Back To Calendar", exact: true }),
     ).toBeVisible();
     await expectNoHorizontalOverflow(page);
 

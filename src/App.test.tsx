@@ -43,8 +43,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('application routes', () => {
-  it.each(routes)('renders %s without crashing', async (route) => {
+describe('career entry routing', () => {
+  it.each(routes)('opens the launcher at %s before a career is selected', async (route) => {
     render(
       <GameStateProvider>
         <MemoryRouter initialEntries={[route]}>
@@ -54,8 +54,7 @@ describe('application routes', () => {
     )
 
     await waitFor(() => {
-      expect(document.body.textContent).not.toContain('Loading table view...')
-      expect((document.body.textContent ?? '').trim().length).toBeGreaterThan(20)
+      expect(screen.getByRole('heading', { name: 'Your career starts here.' })).toBeVisible()
     }, { timeout: 5_000 })
   })
 

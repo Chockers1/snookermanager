@@ -3,6 +3,7 @@ import { Activity, AlertTriangle, BrainCircuit, HeartPulse, ShieldAlert, Target 
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { useGame } from '../context/useGame'
+import { formatPercent } from '../utils/formatters'
 
 const metricIcons = [Activity, HeartPulse, BrainCircuit, Activity, ShieldAlert, Target]
 
@@ -20,7 +21,7 @@ export function TrainingReportPage() {
   const physicalAverage = average(Object.values(gameState.attributes.physical))
   const latestReport = gameState.trainingCondition.reportSnapshot?.lastReport
   const reportMetrics = [
-    { label: 'Confidence', value: `${gameState.player.confidence}%`, subtitle: 'Current live value', tone: 'text-green-400' },
+    { label: 'Confidence', value: formatPercent(gameState.player.confidence), subtitle: 'Current live value', tone: 'text-green-400' },
     { label: 'Fatigue', value: `${gameState.player.fatigue}%`, subtitle: 'Recovery pressure', tone: gameState.player.fatigue >= 70 ? 'text-red-400' : 'text-amber-400' },
     { label: 'Morale', value: `${gameState.player.morale}%`, subtitle: 'Current morale', tone: 'text-green-400' },
     { label: 'Technical Avg', value: technicalAverage, subtitle: 'Technical profile', tone: 'text-sky-400' },
@@ -129,7 +130,7 @@ export function TrainingReportPage() {
                   { label: 'Match Fitness', value: Math.max(0, 100 - gameState.player.fatigue), tone: 'green' as const },
                 ].map((condition) => (
                   <div key={condition.label}>
-                    <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{condition.label}</span><span className="text-white">{condition.value}%</span></div>
+                    <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{condition.label}</span><span className="text-white">{formatPercent(condition.value)}</span></div>
                     <ProgressBar value={condition.value} tone={condition.tone} compact />
                   </div>
                 ))}

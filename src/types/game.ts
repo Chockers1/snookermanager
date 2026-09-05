@@ -139,6 +139,9 @@ export type TableSetup = {
 };
 
 export type Tournament = {
+  sessionFrames?: Record<number, number[]>;
+  overnightAfterSessions?: number[];
+  venueConditions?: import('../game/realism/types').VenueConditions;
   id: string;
   name: string;
   type:
@@ -175,6 +178,9 @@ export type Tournament = {
   location: string;
   startDate: string;
   endDate?: string;
+  /** Designated draw lock and ranking removal dates; absent dates use the game calendar defaults. */
+  seedingCutoffDate?: string;
+  rankingExpiryDate?: string;
   entryFee: number;
   travelCost: number;
   hotelCost: number;
@@ -196,6 +202,7 @@ export type Tournament = {
     | "Senior";
   rankingValue: number;
   prestige?: 1 | 2 | 3 | 4 | 5;
+  televisedRounds?: string[];
   unlockRequirement?: string;
   progressionImpact?: string;
   seasonOpenAccessLock?: "worldMainDraw" | "worldQualifying" | null;
@@ -212,6 +219,10 @@ export type Tournament = {
 };
 
 export type Match = {
+  sourceMatchId?: string;
+  season?: string;
+  opponentId?: string;
+  playerTactic?: "Attack" | "Balanced" | "Safety";
   id: string;
   tournamentId: string;
   playedOn?: string;
@@ -332,6 +343,8 @@ export type EquipmentState = {
   cueStates: Record<string, CueConditionState>;
   chalkCondition: number;
   chalkStock: Record<string, number>;
+  /** Condition of the active unit for each owned product; stock includes that unit. */
+  chalkConditions?: Record<string, number>;
   tipStock: Record<string, number>;
 };
 
@@ -512,6 +525,7 @@ export type TrainingCell = {
 };
 
 export type TrainingPlannerDay = {
+  careerCommitmentId?: string;
   day: string;
   dateLabel: string;
   morning: TrainingCell;

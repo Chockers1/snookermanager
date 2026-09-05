@@ -456,7 +456,7 @@ export function summarizeTrainingPlan(
       loadLabel: getLoadLabel(load),
     };
   });
-  const sessions = normalizedWeek.flatMap((day) => [
+  const sessions = normalizedWeek.filter(day => !day.careerCommitmentId).flatMap((day) => [
     day.morning,
     day.afternoon,
     day.evening,
@@ -595,7 +595,7 @@ export function summarizeTrainingPlan(
 }
 
 export function calculateTrainingEffects(week: TrainingPlannerDay[]) {
-  const sessions = week.flatMap((day) => [
+  const sessions = week.filter(day => !day.careerCommitmentId).flatMap((day) => [
     day.morning,
     day.afternoon,
     day.evening,

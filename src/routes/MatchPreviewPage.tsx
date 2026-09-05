@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { RivalryContext } from '../components/career/CareerDepthPanels'
+import { VenueScoutingPanel } from '../components/career/RealismPanels'
+import { scoutingReport } from '../game/realism/scouting'
 import {
   AlertTriangle,
   BarChart3,
@@ -20,7 +23,7 @@ import { ProgressBar } from '../components/ui/ProgressBar'
 import { useGame } from '../context/useGame'
 import { getTournamentPlayability } from '../hooks/useGameState'
 import { buildMatchPreviewData } from '../utils/liveRouteData'
-import { formatMoney } from '../utils/formatters'
+import { formatMoney, formatPercent } from '../utils/formatters'
 
 const FRAME_PLANS = ['Attack', 'Balanced', 'Safety'] as const
 const MENTAL_FOCUS_OPTIONS = ['Composed', 'Confident', 'Counter'] as const
@@ -88,8 +91,6 @@ export function MatchPreviewPage() {
     nextOpponent,
     playerOverall,
     playerPotential,
-    opponentOverall,
-    opponentPotential,
     opponentConfidence,
     opponentFatigue,
     opponentPressure,
@@ -120,6 +121,8 @@ export function MatchPreviewPage() {
   const activeLiveMatch = gameState.liveMatch?.status === 'In Progress' ? gameState.liveMatch : null
   const playability = activeTournament ? getTournamentPlayability(gameState, activeTournament) : null
   const opponentName = nextOpponent?.playerName ?? 'Opponent TBD'
+  const scouting = scoutingReport(gameState, opponentName)
+  const estimateRange = (value: number | null | undefined) => value == null ? 'Unknown' : `${Math.max(1, Math.round(value / 5) * 5 - scouting.uncertainty)}–${Math.min(99, Math.round(value / 5) * 5 + scouting.uncertainty)}`
   const opponentRank = nextOpponent?.ranking
   const readinessScore = getReadinessScore(gameState.player.confidence, gameState.player.fatigue, cueFamiliarity, pressureLevel)
   const difficultyLabel = getDifficultyLabel(playerRank, opponentRank)
@@ -148,6 +151,8 @@ export function MatchPreviewPage() {
 
   return (
     <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+      <RivalryContext opponent={opponentName} />
+      <VenueScoutingPanel tournament={activeTournament} opponent={opponentName} />
       <div className="flex shrink-0 flex-col gap-2 rounded-lg border border-border bg-surface/85 px-3 py-2 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[11px] font-medium text-gray-500">
@@ -230,9 +235,9 @@ export function MatchPreviewPage() {
             </div>
           </div>
           <div className="mt-2 grid grid-cols-3 border-t border-border/60 pt-1.5 text-center">
-            <div><p className="text-[10px] text-gray-400">Confidence</p><p className={`text-[15px] font-bold ${metricTone(gameState.player.confidence)}`}>{gameState.player.confidence}%</p></div>
-            <div className="border-x border-border"><p className="text-[10px] text-gray-400">Fatigue</p><p className={`text-[15px] font-bold ${metricTone(gameState.player.fatigue, true)}`}>{gameState.player.fatigue}%</p></div>
-            <div><p className="text-[10px] text-gray-400">Pressure</p><p className={`text-[15px] font-bold ${metricTone(pressureLevel, true)}`}>{pressureLevel}%</p></div>
+            <div><p className="text-[10px] text-gray-400">Confidence</p><p className={`text-[15px] font-bold ${metricTone(gameState.player.confidence)}`}>{formatPercent(gameState.player.confidence)}</p></div>
+            <div className="border-x border-border"><p className="text-[10px] text-gray-400">Fatigue</p><p className={`text-[15px] font-bold ${metricTone(gameState.player.fatigue, true)}`}>{formatPercent(gameState.player.fatigue)}</p></div>
+            <div><p className="text-[10px] text-gray-400">Pressure</p><p className={`text-[15px] font-bold ${metricTone(pressureLevel, true)}`}>{formatPercent(pressureLevel)}</p></div>
           </div>
         </div>
 
@@ -253,16 +258,16 @@ export function MatchPreviewPage() {
                 Scout <span className={`font-bold ${metricTone(scoutConfidence)}`}>{scoutConfidence}%</span>
               </p>
               <p className="mt-0.5 text-[11px] text-gray-400">
-                OVR <span className="font-bold text-white">{opponentOverall ?? '--'}</span>
+                OVR <span className="font-bold text-white">{scouting.ability}</span>
                 <span className="mx-2 text-border">|</span>
-                POT <span className="font-bold text-amber-400">{opponentPotential ?? '--'}</span>
+                <span className="text-amber-400">Estimated · {scouting.samples} observations</span>
               </p>
             </div>
           </div>
           <div className="mt-2 grid grid-cols-3 border-t border-border/60 pt-1.5 text-center">
-            <div><p className="text-[10px] text-gray-400">Confidence</p><p className={`text-[15px] font-bold ${metricTone(opponentConfidence)}`}>{opponentConfidence}%</p></div>
-            <div className="border-x border-border"><p className="text-[10px] text-gray-400">Fatigue</p><p className={`text-[15px] font-bold ${metricTone(opponentFatigue, true)}`}>{opponentFatigue}%</p></div>
-            <div><p className="text-[10px] text-gray-400">Pressure</p><p className={`text-[15px] font-bold ${metricTone(opponentPressure, true)}`}>{opponentPressure}%</p></div>
+            <div><p className="text-[10px] text-gray-400">Confidence</p><p className={`text-[15px] font-bold ${metricTone(opponentConfidence)}`}>{formatPercent(opponentConfidence)}</p></div>
+            <div className="border-x border-border"><p className="text-[10px] text-gray-400">Fatigue</p><p className={`text-[15px] font-bold ${metricTone(opponentFatigue, true)}`}>{formatPercent(opponentFatigue)}</p></div>
+            <div><p className="text-[10px] text-gray-400">Pressure</p><p className={`text-[15px] font-bold ${metricTone(opponentPressure, true)}`}>{formatPercent(opponentPressure)}</p></div>
           </div>
         </div>
       </div>
@@ -397,7 +402,7 @@ export function MatchPreviewPage() {
                     <p className="text-[15px] font-bold text-white">
                       <span className="text-green-400">{item.player}</span>
                       <span className="px-1 text-gray-500">/</span>
-                      <span className="text-red-400">{item.opponent ?? '--'}</span>
+                      <span className="text-red-400 text-xs">{estimateRange(item.opponent)}</span>
                     </p>
                     <p className={`mt-0.5 text-[9px] font-semibold uppercase ${getEdgeTone(item.edge)}`}>{formatEdgeLabel(item.edge)}</p>
                   </div>
@@ -417,7 +422,7 @@ export function MatchPreviewPage() {
                         <ProgressBar value={item.opponent ?? 0} tone="amber" compact />
                       </div>
                     </div>
-                    <span className="w-8 shrink-0 text-right text-[11px] font-bold text-red-400">{item.opponent ?? '--'}</span>
+                    <span className="w-12 shrink-0 text-right text-[10px] font-bold text-red-400">{estimateRange(item.opponent)}</span>
                   </div>
                 ))}
               </div>

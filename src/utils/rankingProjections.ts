@@ -1,5 +1,6 @@
 import { getPlayableRounds, resolveTournamentFormat } from "../data/tournamentFormats";
 import type { Tournament } from "../types/game";
+import { countsForWorldRanking, isMajorQualifying } from '../game/rollingRankings';
 
 export type RankingTableKey =
   | "world"
@@ -33,7 +34,7 @@ export function tournamentAffectsRankingTable(
   if (tournament.rankingType === "World Ranking") {
     return tableKey === "world" || tableKey === "oneYear";
   }
-  if (tournament.rankingType === "One-Year") return tableKey === "oneYear";
+  if (tournament.rankingType === "One-Year") return tableKey === "oneYear" || tableKey === "world";
   if (tournament.rankingType === "Youth") return tableKey === "youth";
   if (tournament.rankingType === "Amateur") return tableKey === "amateur";
   if (tournament.rankingType === "Q Tour") return tableKey === "qTour";
@@ -85,6 +86,14 @@ export function getProjectedTournamentRankingPoints(
     return 0;
   }
   const rounds = getPlayableRounds(resolveTournamentFormat(tournament));
+  if (countsForWorldRanking(tournament)) {
+    if (champion && isMajorQualifying(tournament)) return 0;
+    if (champion) return tournament.winnerPrize ?? Math.round(tournament.prizeMoney * 0.5);
+    if (/^final$/i.test(round)) return tournament.runnerUpPrize ?? Math.round(tournament.prizeMoney * 0.22);
+    if (/semi.?final/i.test(round)) return tournament.semiFinalPrize ?? Math.round(tournament.prizeMoney * 0.08);
+    if (/quarter.?final/i.test(round)) return tournament.quarterFinalPrize ?? Math.round(tournament.prizeMoney * 0.03);
+    return tournament.firstRoundPrize ?? Math.round(tournament.prizeMoney * getPlacementShare(round, false, rounds));
+  }
   return Math.max(
     0,
     Math.round(
@@ -102,7 +111,7 @@ export function projectRankingAfterEvent(
   const fieldSize = tournament
     ? Math.min(resolveTournamentFormat(tournament).fieldSize ?? rows.length, rows.length)
     : 0;
-  const eventValue = tournament?.rankingValue ?? 0;
+  const eventValue = tournament && countsForWorldRanking(tournament) ? tournament.winnerPrize ?? tournament.prizeMoney * 0.5 : tournament?.rankingValue ?? 0;
   const rankingEvent =
     tournament && tournament.rankingType !== "None" && eventValue > 0;
   const projected = rows.map((row) => {

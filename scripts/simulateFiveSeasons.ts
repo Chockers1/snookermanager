@@ -1,4 +1,6 @@
 import fs from 'node:fs'
+import { careerDepthAction } from '../src/game/careerDepth'
+import { depthOf, pendingStory } from '../src/game/careerDepth/shared'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { CALENDAR_MODEL, getCalendarModelSummary, getEventVolumeThresholdForBand } from './calendarModel'
@@ -15,12 +17,14 @@ import {
   resolveTournamentFormat,
 } from '../src/data/tournamentFormats'
 import type { Chalk, Coach, Cue, Tip, Tournament } from '../src/types/game'
-import { buildCanonicalTournamentResult, type CanonicalTournamentResult, isNonCompetitiveTournamentResult } from '../src/utils/canonicalTournamentResult'
+import { buildCanonicalTournamentResult, type CanonicalTournamentResult, isNonCompetitiveTournamentResult, getBestRecordedFinish } from '../src/utils/canonicalTournamentResult'
 import {
   acceptSponsorState,
   advanceWeekState,
   applyTrainingPlanState,
   bookTravelState,
+  confirmTournamentPreparationState,
+  startNextSeasonState,
   buyChalkState,
   buyCueState,
   buyTipState,
@@ -31,6 +35,7 @@ import {
   getEquipmentPerformanceProfile,
   getTournamentEntryAccess,
   getTournamentEntryCashRequirement,
+  getTravelPackageCost,
   getTournamentEntryRound,
   hireCoachState,
   scheduleTreatmentState,
@@ -62,6 +67,7 @@ import {
 import { getExpectedWinRateBand, getExpectedWinRateTier, getOpponentRankBand, type ExpectedWinRateTier, type OpponentRankBand } from '../src/utils/matchOutcomeModel'
 import { getValidatedStartingLevel } from '../src/utils/newCareerConfig'
 import { getSimulationOutputDirectories, writeSimulationArtifacts } from './simulationOutput'
+import { getDefaultPreparationAllocations } from '../src/game/tournamentPreparation'
 
 type CircuitSnapshot = Record<'world' | 'youth' | 'amateur' | 'qTour' | 'qSchool' | 'senior', string[]>
 
@@ -2927,17 +2933,13 @@ function buildTournamentSelectionAnalysis(state: GameState, profile: ManagedSupp
     .map((tournament) => {
       const classification = getTournamentClassification(tournament)
       const budgetCost = getTournamentBudgetCost(state, tournament)
-      const entryCost = getTournamentEntryCashRequirement(state, tournament)
-      const qSchoolCampaignAffordable = classification.isQSchool
-        && !/review|order of merit/i.test(tournament.name)
-        && entryCost <= state.player.cash
       return {
         tournament,
         classification,
         score: scoreTournament(state, tournament, profile),
         budgetCost,
         inSchedulingWindow: daysUntil(tournament.startDate, state.currentDate) <= schedulingWindowDays,
-        isAffordable: budgetCost <= state.player.cash || qSchoolCampaignAffordable,
+        isAffordable: budgetCost <= state.player.cash,
         isCoreTracked: isEliteSelectionTrackedTournament(classification),
         classificationError: hasTournamentSelectionClassificationError(tournament, classification),
         fatigueCost: getTournamentFatigueCost(tournament),
@@ -3845,13 +3847,8 @@ function isEliteHostedMainDrawTournament(tournament: Pick<Tournament, 'name' | '
 }
 
 function getTournamentBudgetCost(state: GameState, tournament: Tournament) {
-  const access = getTournamentEntryAccess(state, tournament)
   const entryCost = getTournamentEntryCashRequirement(state, tournament)
-  const hostedTravelShare = access.accessBand === 'top16' && isEliteHostedMainDrawTournament(tournament)
-    ? Math.round((tournament.travelCost + tournament.hotelCost) * 0.25)
-    : tournament.travelCost + tournament.hotelCost
-
-  return entryCost + hostedTravelShare
+  return entryCost + getTravelPackageCost(state)
 }
 
 function getExpectedMainTourMinimum(worldRank: number) {
@@ -3887,12 +3884,7 @@ function getProfessionalEventsEntered(summary: PlayerEventSummary) {
 }
 
 function getBestFinishLabel(tournaments: SeasonReport['tournaments']) {
-  if (tournaments.some((tournament) => /winner/i.test(tournament.result))) return 'Winner'
-  if (tournaments.some((tournament) => /final/i.test(tournament.result))) return 'Final'
-  if (tournaments.some((tournament) => /semi/i.test(tournament.result))) return 'Semi Final'
-  if (tournaments.some((tournament) => /quarter/i.test(tournament.result))) return 'Quarter Final'
-  if (tournaments.some((tournament) => /last 16/i.test(tournament.result))) return 'Last 16'
-  return 'No main draw win'
+  return getBestRecordedFinish(tournaments)
 }
 
 function getConfirmedWorldChampionshipWinsFromHistory(history?: GameState['history']) {
@@ -4352,44 +4344,8 @@ function buildSeasonReport(
       const tournament = openingTournamentById.get(entry.tournamentId)
       const classification = tournament ? getTournamentClassification(tournament) : null
       const levelBucket = tournament && classification ? getCompetitionLevelBucket(tournament, classification) : 'rankingEvents'
-      let canonicalResult = getSeasonReportCanonicalResult(entry, tournament, classification, levelBucket)
-      const priorProfessionalFinals = nextSeasonState.history.tournamentHistory.filter(
-        (historyEntry) => isProfessionalEventType(historyEntry.eventType)
-          && getHistoryEntryResultTier(historyEntry) >= 4
-          && (historyEntry.season !== archivedSeason || historyEntry.startDate < entry.startDate),
-      ).length
-      const priorProfessionalTitles = nextSeasonState.history.tournamentHistory.filter(
-        (historyEntry) => isProfessionalEventType(historyEntry.eventType)
-          && historyEntry.result === 'Winner'
-          && (historyEntry.season !== archivedSeason || historyEntry.startDate < entry.startDate),
-      ).length
-      const shouldReportBreakthroughTitle = canonicalResult.isFinal
-        && !canonicalResult.isTitle
-        && isProfessionalEventType(entry.eventType)
-        && !classification?.isWorldMainDraw
-        && openingState.player.age >= 24
-        && priorProfessionalTitles === 0
-        && priorProfessionalFinals >= 3
-
-      if (shouldReportBreakthroughTitle) {
-        canonicalResult = {
-          ...canonicalResult,
-          roundReached: 'Winner',
-          resultLabel: 'Winner',
-          wins: Math.max(canonicalResult.matchesPlayed, canonicalResult.wins + 1),
-          losses: 0,
-          isTitle: true,
-          isFinal: true,
-          isSemiFinal: true,
-          isQuarterFinal: true,
-          isDeepRun: true,
-          isRankingTitle: Boolean(classification?.isRankingEvent && !classification.isQualifyingEvent),
-          isMajorTitle: Boolean(classification?.isMajor && !classification.isQualifyingEvent),
-          isWorldTitle: false,
-          prizeMoney: Math.max(canonicalResult.prizeMoney, tournament?.winnerPrize ?? Math.round(canonicalResult.prizeMoney * 1.75)),
-          rankingPoints: Math.max(canonicalResult.rankingPoints, Math.round(canonicalResult.rankingPoints * 1.35)),
-        }
-      }
+      // Reports describe recorded results, never manufacture a breakthrough title.
+      const canonicalResult = getSeasonReportCanonicalResult(entry, tournament, classification, levelBucket)
       const seasonMatches = seasonMatchLogByTournamentId.get(entry.tournamentId) ?? []
       const tournamentMetrics = getTournamentAverageMetrics(seasonMatches)
       const titleAwarded = canonicalResult.isTitle
@@ -7961,10 +7917,20 @@ function main() {
   const seasonAuditSummaries: SeasonAuditSummary[] = []
   const worldAccessDebugStore = loadWorldAccessDebugStore()
   const eliteEventSelectionDebugStore = loadEliteEventSelectionDebugStore()
-  const maxWeeks = seasonsRequested * 70
+  const maxWeeks = seasonsRequested * 200
+  let calendarSteps = 0
+  let confidenceTotal = 0
+  let confidenceSamples = 0
+  let saturatedConfidenceWeeks = 0
+  let equipmentWithdrawals = 0
   let stopAfterSeasonReached = false
+  let stalledSteps = 0
 
-  while (seasons.length < seasonsRequested && weeksSimulated < maxWeeks) {
+  while (seasons.length < seasonsRequested && calendarSteps < maxWeeks) {
+    calendarSteps += 1
+    const waitingStory = pendingStory(state)
+    if (waitingStory) state = careerDepthAction(state, { type: 'decision', id: waitingStory.id, choice: waitingStory.kind === 'deciders' || waitingStory.kind === 'early-exits' ? 'continue' : 'protect' })
+    if (state.seasonReview?.pending) state = startNextSeasonState(state)
     if (managedScenario) {
       state = runManagedWeeklyCare(state, currentSeasonFinance, managedSupportProfile)
     }
@@ -7997,13 +7963,12 @@ function main() {
 
     let eventResolvedState = supportedState
     const enteredTournament = eventResolvedState.tournaments.find((tournament) => tournament.status === 'Entered')
-    const enteredTournamentDaysUntilStart = enteredTournament ? daysUntil(enteredTournament.startDate, eventResolvedState.currentDate) : null
-    if (enteredTournament && enteredTournamentDaysUntilStart != null && enteredTournamentDaysUntilStart > 0 && enteredTournamentDaysUntilStart <= 7) {
-      eventResolvedState = {
-        ...eventResolvedState,
-        currentDate: enteredTournament.startDate,
-      }
+    if (enteredTournament && !eventResolvedState.travel.bookings[enteredTournament.id]) {
+      const booked = bookTravelState(eventResolvedState, enteredTournament.id)
+      recordCashDelta(currentSeasonFinance, 'travelHotelCosts', eventResolvedState, booked)
+      eventResolvedState = booked.travel.bookings[enteredTournament.id] ? booked : withdrawTournamentState(booked, enteredTournament.id)
     }
+    if (enteredTournament && eventResolvedState.travel.bookings[enteredTournament.id] && !eventResolvedState.travel.bookings[enteredTournament.id].preparation) eventResolvedState = confirmTournamentPreparationState(eventResolvedState, enteredTournament.id, 'balanced', getDefaultPreparationAllocations(), [])
     let tournamentRoundGuard = 0
     while (tournamentRoundGuard < 10) {
       const activeEnteredTournament = eventResolvedState.tournaments.find((tournament) => tournament.status === 'Entered')
@@ -8017,6 +7982,7 @@ function main() {
       const entryAccess = getTournamentEntryAccess(eventResolvedState, activeEnteredTournament)
       if (!entryAccess.allowed) {
         const withdrawnState = withdrawTournamentState(eventResolvedState, activeEnteredTournament.id)
+        if (withdrawnState.tournaments.find(t => t.id === activeEnteredTournament.id)?.status === 'Entered') seasonIssues.add(`${archivedSeason}: eligibility changed during ${activeEnteredTournament.name}: ${entryAccess.reason}; withdrawal: ${withdrawnState.lastAction}`)
         recordCashDelta(currentSeasonFinance, 'tournamentEntryFees', eventResolvedState, withdrawnState)
         eventResolvedState = withdrawnState
         break
@@ -8026,6 +7992,10 @@ function main() {
         const bookedState = bookTravelState(eventResolvedState, activeEnteredTournament.id)
         recordCashDelta(currentSeasonFinance, 'travelHotelCosts', eventResolvedState, bookedState)
         eventResolvedState = bookedState
+        if (!bookedState.travel.bookings[activeEnteredTournament.id]) {
+          seasonIssues.add(`${archivedSeason}: ${activeEnteredTournament.name} travel booking rejected: ${bookedState.lastAction} (cash £${bookedState.player.cash}).`)
+          break
+        }
       }
 
       if (managedScenario) {
@@ -8034,11 +8004,23 @@ function main() {
         eventResolvedState = servicedState
       }
 
+      if (!eventResolvedState.travel.bookings[activeEnteredTournament.id]?.preparation) {
+        eventResolvedState = confirmTournamentPreparationState(eventResolvedState, activeEnteredTournament.id, 'balanced', getDefaultPreparationAllocations(), [])
+      }
+
       const preMatchState = eventResolvedState
       const simulatedState = simulateTournamentMatchState(eventResolvedState, activeEnteredTournament.id)
+      if (JSON.stringify(preMatchState.attributes) !== JSON.stringify(simulatedState.attributes)) seasonIssues.add(`${archivedSeason}: a match changed permanent attributes outside training.`)
       const matchWasAdded = simulatedState.matches[0]?.id !== preMatchState.matches[0]?.id
       if (!matchWasAdded) {
-        seasonIssues.add(`${archivedSeason}: ${activeEnteredTournament.name} could not simulate after travel was booked: ${simulatedState.lastAction}`)
+        if (/equip a|not enough cash/i.test(simulatedState.lastAction)) {
+          // The audit agent must make the same explicit withdrawal decision as a player.
+          // The game must never silently advance through an unplayable entered event.
+          eventResolvedState = withdrawTournamentState(simulatedState, activeEnteredTournament.id)
+          equipmentWithdrawals += 1
+          break
+        }
+        seasonIssues.add(`${archivedSeason}: ${activeEnteredTournament.name} match could not start: ${simulatedState.lastAction}`)
         break
       }
 
@@ -8048,9 +8030,28 @@ function main() {
       tournamentRoundGuard += 1
     }
 
+    const matchStory = pendingStory(eventResolvedState)
+    if (matchStory) eventResolvedState = careerDepthAction(eventResolvedState, { type: 'decision', id: matchStory.id, choice: matchStory.kind === 'deciders' || matchStory.kind === 'early-exits' ? 'continue' : 'protect' })
     const advancedState = advanceWeekState(eventResolvedState)
+    stalledSteps = advancedState.currentDate === state.currentDate && advancedState.matches[0]?.id === state.matches[0]?.id && !advancedState.seasonReview?.pending ? stalledSteps + 1 : 0
+    if (stalledSteps >= 3) {
+      seasonIssues.add(`${archivedSeason}: calendar stalled on ${advancedState.currentDate}: ${advancedState.lastAction}. Entered: ${advancedState.tournaments.filter(t => t.status === 'Entered').map(t => `${t.name} (${t.startDate}, preparation ${Boolean(advancedState.travel.bookings[t.id]?.preparation)})`).join(', ') || 'none'}.`)
+      state = advancedState
+      break
+    }
     recordWeeklyFinanceDelta(currentSeasonFinance, eventResolvedState, advancedState)
-    weeksSimulated += 1
+    const settledWeek = advancedState.week !== eventResolvedState.week
+    weeksSimulated += Number(settledWeek)
+    if (settledWeek) {
+      confidenceSamples += 1
+      confidenceTotal += advancedState.player.confidence
+      saturatedConfidenceWeeks += Number(advancedState.player.confidence >= 98)
+    }
+    const depth = depthOf(advancedState)
+    if (depth.stories.some((s, i) => i > 0 && Date.parse(s.createdDate) - Date.parse(depth.stories[i - 1].createdDate) < 28 * 86400000)) seasonIssues.add(`${archivedSeason}: career stories exceeded the four-week cadence.`)
+    const rewardIds = advancedState.finance.ledger.filter(row => /^(commitment-|story:)/.test(row.id)).map(row => row.id)
+    if (new Set(rewardIds).size !== rewardIds.length) seasonIssues.add(`${archivedSeason}: a career opportunity reward was applied twice.`)
+    if (depth.schedule && depth.schedule.spent > depth.schedule.cap) seasonIssues.add(`${archivedSeason}: assistance exceeded the approved cap.`)
 
     if (advancedState.player.cash < 0) {
       seasonIssues.add(`${archivedSeason}: player cash dropped below zero (${advancedState.player.cash}).`)
@@ -8103,6 +8104,7 @@ function main() {
     state = advancedState
   }
 
+  issues.push(...Array.from(seasonIssues))
   if (!stopAfterSeasonReached && seasons.length < seasonsRequested) {
     issues.push(`Simulation stopped after ${weeksSimulated} weeks and only completed ${seasons.length} archived seasons.`)
   }
@@ -8165,6 +8167,7 @@ function main() {
     rankingLabel: state.careerSystems.lateCareer.retired ? 'Retired' : rawFinalSnapshot.rankingLabel,
   }
 
+  if (confidenceSamples > 20 && saturatedConfidenceWeeks / confidenceSamples > 0.25) issues.push('Confidence saturation: at least 25% of settled weeks remained at 98% or higher.')
   const report: SimulationReport = {
     generatedAt: new Date().toISOString(),
     scenario,
@@ -8211,6 +8214,7 @@ function main() {
   const comparisonReportPath = managedYouthScenario ? writeSupportComparisonReportIfReady(seasonsRequested) : null
 
   console.log(JSON.stringify({
+    careerDepthAudit: { policy: 'conservative authored choices; explicit withdrawal if equipment cannot be serviced; no paid commitments or autonomous spending', stories: depthOf(state).stories.length, equipmentWithdrawals, calendarSteps, confidenceSamples, averageConfidence: confidenceSamples ? Math.round(confidenceTotal / confidenceSamples * 10) / 10 : 0, saturatedConfidenceWeeks },
     reportPath: path.join('artifacts', 'simulations', `${reportBaseName}.md`),
     jsonPath: path.join('artifacts', 'simulations', `${reportBaseName}.json`),
     comparisonReportPath: comparisonReportPath ? path.join('artifacts', 'simulations', path.basename(comparisonReportPath)) : null,

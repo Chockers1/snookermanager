@@ -1,3 +1,5 @@
+import { CareerDecisionNotice } from '../components/career/CareerDepthPanels';
+import { DashboardCareerSummary, DashboardFinanceSummary } from '../components/game/DashboardSummaryCards';
 import {
   Activity,
   BadgePoundSterling,
@@ -21,7 +23,6 @@ import {
   getNextEligibleTournament,
 } from "../hooks/useGameState";
 import { buildDashboardData } from "../utils/liveRouteData";
-import { formatMoney } from "../utils/formatters";
 
 function compactMoney(value: number) {
   const sign = value < 0 ? "-" : "";
@@ -32,14 +33,6 @@ function compactMoney(value: number) {
   return `${sign}£${absolute}`;
 }
 
-function formatFinanceValue(
-  value: number | null | undefined,
-  fallback = "TBA",
-) {
-  return typeof value === "number" && Number.isFinite(value)
-    ? compactMoney(value)
-    : fallback;
-}
 
 function attributeRows(attributes: Record<string, number>, count: number) {
   return Object.entries(attributes)
@@ -53,7 +46,7 @@ export function DashboardPage() {
     continueWeek,
   } = useGame();
   const navigate = useNavigate();
-  const { currentCue, financeChart } = buildDashboardData(gameState);
+  const { currentCue } = buildDashboardData(gameState);
   const nextEvent = getNextEligibleTournament(gameState);
   const enteredEvent = nextEvent?.status === "Entered" ? nextEvent : undefined;
   const currentRanking =
@@ -86,10 +79,6 @@ export function DashboardPage() {
   ).length;
   const seasonWinRate =
     seasonMatches > 0 ? Math.round((seasonWins / seasonMatches) * 100) : 0;
-  const latestFinancePoint = financeChart[financeChart.length - 1] ?? {
-    income: 0,
-    expenses: 0,
-  };
   const currentCueBonus = Object.entries(currentCue?.bonuses ?? {}).sort(
     (left, right) => right[1] - left[1],
   )[0];
@@ -117,6 +106,7 @@ export function DashboardPage() {
 
   return (
     <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-6.25rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+      <CareerDecisionNotice />
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
         <div className="grid min-h-0 gap-3 xl:col-span-4 xl:grid-rows-[1.18fr_0.92fr_0.62fr] xl:gap-2">
           <div className="card min-h-0 flex h-full flex-col overflow-hidden">
@@ -509,40 +499,7 @@ export function DashboardPage() {
                 Career Details
               </h3>
             </div>
-            <div className="card-body grid h-full grid-cols-2 content-center gap-x-4 gap-y-2 text-[10px]">
-              <div>
-                <p className="text-gray-500">Age</p>
-                <p className="mt-0.5 font-semibold text-white">
-                  {gameState.player.age}
-                </p>
-              </div>
-              <div>
-                <p className="text-gray-500">Hand</p>
-                <p className="mt-0.5 truncate font-semibold text-white">
-                  {gameState.player.handedness}
-                </p>
-              </div>
-              <div>
-                <p className="text-gray-500">Coach</p>
-                <p className="mt-0.5 truncate font-semibold text-green-400">
-                  {activeCoach?.name ?? "Open slot"}
-                </p>
-              </div>
-              <div>
-                <p className="text-gray-500">Status</p>
-                <p className="mt-0.5 truncate font-semibold text-white">
-                  {gameState.player.competitiveStatus ??
-                    gameState.player.rankingLabel}
-                </p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-gray-500">Style</p>
-                <p className="mt-0.5 truncate font-semibold text-white">
-                  {gameState.player.playingStyle} ·{" "}
-                  {gameState.player.cueStyle ?? "Traditional Cue Action"}
-                </p>
-              </div>
-            </div>
+            <DashboardCareerSummary state={gameState} coachName={activeCoach?.name} />
           </button>
 
           <button
@@ -557,46 +514,7 @@ export function DashboardPage() {
               </h3>
               <span className="text-[9px] text-gray-400">This Month</span>
             </div>
-            <div className="card-body flex h-full flex-col justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-[0.16em] text-gray-500">
-                  Balance
-                </p>
-                <p className="mt-1.5 truncate text-2xl font-bold text-white">
-                  {formatMoney(gameState.player.cash)}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]">
-                <div className="min-w-0">
-                  <p className="truncate text-gray-500">Winnings</p>
-                  <p className="mt-1 truncate font-semibold text-green-400">
-                    {formatFinanceValue(latestFinancePoint.income, "TBA")}
-                  </p>
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-gray-500">Expenses</p>
-                  <p className="mt-1 truncate font-semibold text-red-400">
-                    {formatFinanceValue(latestFinancePoint.expenses, "TBA")}
-                  </p>
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-gray-500">Entries</p>
-                  <p className="mt-1 truncate font-semibold text-white">
-                    {nextEvent ? formatFinanceValue(nextEvent.entryFee) : "TBA"}
-                  </p>
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-gray-500">Status</p>
-                  <p className="mt-1 truncate font-semibold text-green-400">
-                    {gameState.player.cash >= 10_000
-                      ? "Stable"
-                      : gameState.player.cash >= 5_000
-                        ? "Caution"
-                        : "Tight"}
-                  </p>
-                </div>
-              </div>
-            </div>
+            <DashboardFinanceSummary state={gameState} />
           </button>
 
           <div className="card min-h-0 flex h-full flex-col">

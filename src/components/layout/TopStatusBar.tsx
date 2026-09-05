@@ -21,7 +21,8 @@ import {
   getNextEligibleTournament,
   getTournamentPlayability,
 } from "../../hooks/useGameState";
-import { formatMoney } from "../../utils/formatters";
+import { formatMoney, formatPercent } from "../../utils/formatters";
+import { tournamentCommitmentConflict } from "../../game/careerDepth/commitments";
 
 type TopStatusBarProps = {
   player: Player;
@@ -37,6 +38,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [careerMenuOpen, setCareerMenuOpen] = useState(false);
+  const [eventMenuOpen, setEventMenuOpen] = useState(false);
   const isDashboard = location.pathname === "/";
   const playerRankingRow = gameState.rankings.find(
     (row) => row.playerName === player.fullName,
@@ -46,12 +48,14 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
   const rankingMovement = playerRankingRow?.movement ?? 0;
   const nextEvent = getNextEligibleTournament(gameState);
   const enteredEvent = nextEvent?.status === "Entered" ? nextEvent : undefined;
+  const entryConflict = nextEvent && !enteredEvent ? tournamentCommitmentConflict(gameState, nextEvent) : null;
   const tournamentPlayability = enteredEvent
     ? getTournamentPlayability(gameState, enteredEvent)
     : null;
   const canPlayTournament = tournamentPlayability?.canPlay ?? false;
   const hasLiveMatchInProgress = gameState.liveMatch?.status === "In Progress";
   const upcomingOpponent = gameState.tournamentProgress.draw
+    .filter((round) => gameState.tournamentProgress.tournamentId === enteredEvent?.id && round.label === gameState.tournamentProgress.currentRound)
     .flatMap((round) => round.matches)
     .find(
       (match) =>
@@ -86,7 +90,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
         : "No event selected";
   const eventStageLabel = hasLiveMatchInProgress
     ? (gameState.liveMatch?.round ?? "Live match")
-    : (gameState.tournamentProgress.currentRound ?? "Entry");
+    : (enteredEvent && gameState.tournamentProgress.tournamentId === enteredEvent.id ? gameState.tournamentProgress.currentRound ?? "Entry" : "Entry");
   const primaryEventActionLabel = hasLiveMatchInProgress
     ? "Resume Live Match"
     : enteredEvent
@@ -100,10 +104,11 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
               ? "Advance to Tournament"
               : "Open Tournament Hub"
       : nextEvent
-        ? "Enter Tournament"
+        ? entryConflict ? "Manage Calendar Clash" : "Enter Tournament"
         : "View Tournament Calendar";
 
   function handlePrimaryEventAction() {
+    setEventMenuOpen(false);
     if (hasLiveMatchInProgress) {
       navigate("/match/live");
       return;
@@ -122,6 +127,10 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
     }
 
     if (nextEvent) {
+      if (entryConflict) {
+        navigate("/calendar?commitments=1");
+        return;
+      }
       enterTournament(nextEvent.id);
       navigate("/tournaments/hub");
       return;
@@ -131,6 +140,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
   }
 
   function handleSecondaryEventAction() {
+    setEventMenuOpen(false);
     if (enteredEvent || hasLiveMatchInProgress) {
       navigate("/tournaments/hub");
       return;
@@ -145,7 +155,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
       className={`relative z-30 flex min-w-0 shrink-0 items-center border-b border-border bg-sidebar pl-14 pr-1 sm:pr-2 xl:px-4 ${isDashboard ? "h-[68px]" : "h-14"}`}
     >
       <div
-        className={`flex min-w-0 shrink items-center gap-2 border-r border-border pr-2 sm:pr-4 ${isDashboard ? "sm:w-48 xl:w-56 2xl:w-64" : "sm:shrink-0"}`}
+        className={`flex min-w-0 shrink items-center gap-2 border-r border-border pr-2 sm:pr-4 ${isDashboard ? "sm:shrink-0 sm:w-44 2xl:w-56" : "sm:shrink-0"}`}
       >
         <button
           type="button"
@@ -206,7 +216,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
       <button
         type="button"
         onClick={() => navigate("/career/stats")}
-        className="hidden min-h-11 shrink-0 items-center gap-1.5 border-r border-border px-3 transition hover:bg-white/5 xl:flex"
+        className={`hidden min-h-11 shrink-0 items-center gap-1.5 border-r border-border px-3 transition hover:bg-white/5 ${isDashboard ? "2xl:flex" : "xl:flex"}`}
       >
         <span className="whitespace-nowrap text-[9px] uppercase text-gray-500">
           Form
@@ -217,13 +227,13 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
       <button
         type="button"
         onClick={() => navigate("/mental")}
-        className="hidden min-h-11 shrink-0 items-center gap-1.5 border-r border-border px-3 transition hover:bg-white/5 xl:flex"
+        className={`hidden min-h-11 shrink-0 items-center gap-1.5 border-r border-border px-3 transition hover:bg-white/5 ${isDashboard ? "2xl:flex" : "xl:flex"}`}
       >
         <span className="whitespace-nowrap text-[9px] uppercase text-gray-500">
           Confidence
         </span>
         <span className="text-xs font-bold text-white">
-          {player.confidence}%
+          {formatPercent(player.confidence)}
         </span>
         <div className="h-1.5 w-12 overflow-hidden rounded-full bg-gray-700">
           <div
@@ -278,7 +288,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
 
       {isDashboard ? (
         <>
-          <div className="hidden min-h-11 w-32 shrink-0 flex-col justify-center border-r border-border px-3 xl:flex">
+          <div className="hidden min-h-11 w-32 shrink-0 flex-col justify-center border-r border-border px-3 2xl:flex">
             <span className="text-[9px] uppercase text-gray-500">
               Required action
             </span>
@@ -289,7 +299,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
               {primaryEventActionLabel}
             </span>
           </div>
-          <div className="hidden min-h-11 w-36 shrink-0 flex-col justify-center border-r border-border px-3 2xl:flex">
+          <div className="hidden min-h-11 w-36 shrink-0 flex-col justify-center border-r border-border px-3 min-[1800px]:flex">
             <span className="text-[9px] uppercase text-gray-500">Opponent</span>
             <span
               title={opponentName}
@@ -302,6 +312,8 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
             <button
               type="button"
               onClick={handleSecondaryEventAction}
+              aria-label={enteredEvent || hasLiveMatchInProgress ? "Tournament Hub" : nextEvent ? "Skip This Event" : "View Calendar"}
+              title={enteredEvent || hasLiveMatchInProgress ? "Tournament Hub" : nextEvent ? "Skip This Event" : "View Calendar"}
               className="btn-secondary h-9 whitespace-nowrap px-3 text-[11px]"
             >
               {enteredEvent || hasLiveMatchInProgress ? (
@@ -323,6 +335,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
               type="button"
               onClick={handlePrimaryEventAction}
               title={primaryEventActionLabel}
+              aria-label={primaryEventActionLabel}
               className="btn-primary h-9 whitespace-nowrap px-3 text-[11px]"
             >
               {hasLiveMatchInProgress || canPlayTournament ? (
@@ -330,12 +343,28 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
               ) : (
                 <Swords className="h-3.5 w-3.5" />
               )}
-              <span className="hidden 2xl:inline">
-                {primaryEventActionLabel}
-              </span>
-              <span className="2xl:hidden">Continue</span>
+              <span>{primaryEventActionLabel}</span>
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
+          </div>
+          <div className="relative ml-auto shrink-0 xl:hidden">
+            <button
+              type="button"
+              aria-label="Tournament next step"
+              aria-expanded={eventMenuOpen}
+              onClick={() => setEventMenuOpen((open) => !open)}
+              className="grid h-11 w-11 place-items-center rounded-lg text-green-400 hover:bg-white/5"
+            >
+              <Swords className="h-5 w-5" />
+            </button>
+            {eventMenuOpen ? (
+              <div className="absolute right-0 top-12 z-50 w-56 max-w-[calc(100vw-6rem)] space-y-2 rounded-lg border border-border bg-sidebar p-3 shadow-2xl">
+                <p className="break-words text-xs font-semibold text-white">{nextEvent?.name ?? player.nextEvent}</p>
+                <p className="text-[10px] text-gray-400">{eventStatusLabel}</p>
+                <button type="button" onClick={handlePrimaryEventAction} className="btn-primary min-h-11 w-full text-xs">{primaryEventActionLabel}</button>
+                <button type="button" onClick={handleSecondaryEventAction} className="btn-secondary min-h-11 w-full text-xs">{enteredEvent || hasLiveMatchInProgress ? "Tournament Hub" : nextEvent ? "Skip This Event" : "View Calendar"}</button>
+              </div>
+            ) : null}
           </div>
         </>
       ) : null}

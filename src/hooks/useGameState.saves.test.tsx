@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createPlayerBackgroundCatalog,
   createPlayerIdentitySeed,
@@ -9,6 +9,8 @@ import {
 } from "../data/gameContent";
 import {
   ACTIVE_SAVE_SLOT_KEY,
+  ACTIVE_SAVE_KEY,
+  decodeCareerSave,
   readSaveSlotIndex,
   SAVE_SLOT_PREFIX,
 } from "../game/saveStorage";
@@ -36,6 +38,7 @@ function buildCareerConfig(fullName: string): NewCareerConfig {
 beforeEach(() => {
   window.localStorage.clear();
 });
+afterEach(() => vi.restoreAllMocks());
 
 describe("career save slots", () => {
   it("creates independent autosave slots and can load either career", () => {
@@ -52,7 +55,7 @@ describe("career save slots", () => {
     const secondSlot = slots.find((slot) => slot.playerName === "Ben Safety");
     expect(slots).toHaveLength(2);
     expect(secondSlot).toBeDefined();
-    expect(window.localStorage.getItem(`${SAVE_SLOT_PREFIX}${firstSlot.id}`)).toContain(
+    expect(decodeCareerSave(window.localStorage.getItem(`${SAVE_SLOT_PREFIX}${firstSlot.id}`)!)).toContain(
       "Alice Breaker",
     );
 
@@ -61,5 +64,21 @@ describe("career save slots", () => {
     });
     expect(result.current.gameState.player.fullName).toBe("Alice Breaker");
     expect(window.localStorage.getItem(ACTIVE_SAVE_SLOT_KEY)).toBe(firstSlot.id);
-  });
+  }, 30000);
+  it('keeps the previous career and removes only the incomplete new slot when activation fails', () => {
+    const { result } = renderHook(() => useGameState());
+    act(() => result.current.resetCareer(buildCareerConfig('Existing Career')));
+    const previousSlot = readSaveSlotIndex()[0];
+    const previousSave = window.localStorage.getItem(ACTIVE_SAVE_KEY);
+    const originalSetItem = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key, value) {
+      if (key === ACTIVE_SAVE_SLOT_KEY && value !== previousSlot.id) throw new DOMException('Blocked', 'SecurityError');
+      originalSetItem.call(window.localStorage, key, value);
+    });
+    act(() => expect(() => result.current.resetCareer(buildCareerConfig('Unfinished Career'))).toThrow('browser could not save'));
+    expect(result.current.gameState.player.fullName).toBe('Existing Career');
+    expect(readSaveSlotIndex()).toEqual([previousSlot]);
+    expect(window.localStorage.getItem(ACTIVE_SAVE_KEY)).toBe(previousSave);
+    expect(Object.keys(window.localStorage).filter(key => key.startsWith(SAVE_SLOT_PREFIX))).toHaveLength(1);
+  }, 30000);
 });

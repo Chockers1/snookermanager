@@ -49,6 +49,21 @@ const NON_COMPETITIVE_RESULT_LABELS = [
   'Completed',
 ] as const
 
+/** Describe the best recorded finish without confusing a semi-final with a final. */
+export function getBestRecordedFinish(results: ReadonlyArray<{ result: string }>) {
+  const tiers: Array<[RegExp, string]> = [
+    [/\b(winner|champion)\b/i, 'Winner'],
+    [/^(?:lost in |reached )?final$|^runner[- ]?up$/i, 'Final'],
+    [/semi[- ]?final/i, 'Semi Final'],
+    [/quarter[- ]?final/i, 'Quarter Final'],
+    [/last 16/i, 'Last 16'],
+  ]
+  for (const [pattern, label] of tiers) {
+    if (results.some((entry) => pattern.test(entry.result))) return label
+  }
+  return 'No main draw win'
+}
+
 export function isNonCompetitiveTournamentResult(resultLabel: string) {
   return NON_COMPETITIVE_RESULT_LABELS.some((label) => label.toLowerCase() === resultLabel.trim().toLowerCase())
 }

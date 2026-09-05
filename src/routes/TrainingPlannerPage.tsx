@@ -1,4 +1,11 @@
 import { useState } from "react";
+import { DevelopmentPanel } from "../components/career/CareerDepthPanels";
+import { TrainingBasePanel } from '../components/career/RealismPanels';
+import { developmentTrainingBonus } from "../game/careerDepth/developmentProjects";
+import { baseTrainingMultiplier } from '../game/realism/base';
+import { protectPartnerSessions } from "../game/careerDepth/developmentProjects";
+import { protectCommitmentSessions } from "../game/careerDepth/commitments";
+import { depthOf, plusDays } from "../game/careerDepth/shared";
 import { useNavigate } from "react-router-dom";
 import { Activity, Calendar, RotateCcw, Save, Sparkles } from "lucide-react";
 import { ProgressBar } from "../components/ui/ProgressBar";
@@ -90,7 +97,7 @@ function TrainingPlannerContent() {
       gameState.player.fatigue,
       gameState.trainingCondition.strain,
       gameState.trainingCondition.burnout,
-    ) * getFacilityTrainingMultiplier(gameState.equipment);
+    ) * Math.min(1.15, getFacilityTrainingMultiplier(gameState.equipment) * baseTrainingMultiplier({ ...gameState, trainingPlan: plannerWeek }));
   const adaptationPreview = Math.round(adaptationMultiplier * 100);
   const fatigueForecast = Math.max(
     0,
@@ -111,13 +118,13 @@ function TrainingPlannerContent() {
   function chooseFocus(focusId: TrainingFocusPresetId) {
     setSelectedFocus(focusId);
     setPlannerWeek(
-      buildFocusedTrainingPlan(
+      protectCommitmentSessions(gameState, protectPartnerSessions(gameState, buildFocusedTrainingPlan(
         focusId,
-        gameState.currentDate,
+        plusDays(depthOf(gameState).nextSettlementDate, -7),
         gameState.player.fatigue,
         competitionPlan,
         plannerData.travelBooked,
-      ),
+      ))),
     );
   }
   function changeSession(
@@ -171,6 +178,8 @@ function TrainingPlannerContent() {
       className="mx-auto flex w-full max-w-[1680px] flex-col gap-2 pb-5 xl:h-full xl:min-h-0 xl:overflow-hidden xl:pb-0"
       data-testid="training-planner"
     >
+      <DevelopmentPanel />
+      <TrainingBasePanel />
       <header className="flex shrink-0 flex-col gap-2 rounded-xl border border-border bg-surface/85 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-green-400">
@@ -300,6 +309,8 @@ function TrainingPlannerContent() {
                         >
                           <select
                             aria-label={`${day.day} ${row.label}`}
+                            disabled={Boolean(day.careerCommitmentId)}
+                            title={day.careerCommitmentId ? session.subtitle : session.subtitle.startsWith('Practice partner:') ? session.subtitle : undefined}
                             value={getTrainingSessionOptionId(session)}
                             onChange={(event) =>
                               changeSession(
@@ -360,8 +371,10 @@ function TrainingPlannerContent() {
                             <span className="mb-1 block text-[8px] uppercase text-gray-500">
                               {row.label}
                             </span>
-                            <select
+                              <select
                               aria-label={`${day.day} ${row.label}`}
+                              disabled={Boolean(day.careerCommitmentId)}
+                              title={day.careerCommitmentId ? session.subtitle : undefined}
                               value={getTrainingSessionOptionId(session)}
                               onChange={(event) =>
                                 changeSession(
@@ -452,6 +465,7 @@ function TrainingPlannerContent() {
                     Math.round(
                       gain.value *
                         adaptationMultiplier *
+                        developmentTrainingBonus(gameState, plannerWeek, gain.label) *
                         (1 + summary.coachImpact / 100) *
                         10,
                     ) / 10,

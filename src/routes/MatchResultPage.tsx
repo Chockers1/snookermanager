@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { RivalryContext, CareerDecisionNotice } from "../components/career/CareerDepthPanels";
 import {
   Award,
   ChevronRight,
@@ -11,7 +12,8 @@ import {
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
 import { buildMatchResultData } from "../utils/liveRouteData";
-import { formatMoney } from "../utils/formatters";
+import { formatMoney, formatPercent } from "../utils/formatters";
+import { countsForWorldRanking, rankingEventKey } from "../game/rollingRankings";
 
 function getInitials(name: string) {
   return name
@@ -99,15 +101,18 @@ export function MatchResultPage() {
       icon: Award,
     },
     {
-      label: "Ranking Points",
-      value: signedValue(latestMatch?.rankingPointsGained),
+      label: latestTournament && countsForWorldRanking(latestTournament) ? "Ranking Earnings" : "Ranking Points",
+      value: latestTournament && countsForWorldRanking(latestTournament)
+        ? formatMoney(gameState.rollingRankings?.earnings.find(e => e.eventKey === rankingEventKey(latestTournament) && e.playerName === playerName)?.amount ?? 0)
+        : signedValue(latestMatch?.rankingPointsGained),
+      sub: latestTournament && countsForWorldRanking(latestTournament) ? tournamentContinues ? "Final award decided on event exit" : `Counts at event finish: ${latestTournament.endDate ?? latestTournament.startDate}` : undefined,
       color: "text-white",
       icon: TrendingUp,
     },
     {
       label: "Confidence",
       value: signedValue(latestMatch?.confidenceChange, "%"),
-      sub: `Now ${gameState.player.confidence}%`,
+      sub: `Now ${formatPercent(gameState.player.confidence)}`,
       color:
         (latestMatch?.confidenceChange ?? 0) >= 0
           ? "text-green-400"
@@ -205,6 +210,8 @@ export function MatchResultPage() {
 
   return (
     <div className="space-y-3 pb-8">
+      <CareerDecisionNotice />
+      <RivalryContext opponent={latestMatch.opponentName} />
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
         <div className="min-w-0">
           <p className="truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-green-400">

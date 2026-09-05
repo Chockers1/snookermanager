@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { StoryDecisionPanel } from "../components/career/CareerDepthPanels";
+import { WorldDigestPanel } from '../components/career/RealismPanels';
 import {
   Check,
   ChevronRight,
@@ -294,8 +296,10 @@ export function InboxPage() {
                 {selectedMessage.subject}
               </h2>
               <p className="mt-3 max-w-3xl text-sm leading-5 text-gray-300">
-                {selectedMessage.preview}
+                {gameState.realism?.digest.some(d => d.id === selectedMessage.id) ? 'Results and milestones from your simulated tour.' : selectedMessage.preview}
               </p>
+              <StoryDecisionPanel messageId={selectedMessage.id} />
+              <WorldDigestPanel messageId={selectedMessage.id} />
 
               {selectedSummary.length ? (
                 <div className="mt-3 max-w-3xl shrink-0 rounded-lg border border-border bg-background/30">

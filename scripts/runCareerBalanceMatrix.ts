@@ -11,6 +11,7 @@ type MatrixRow = {
   issues: string[]
   reportPath: string
   exitCode: number
+  careerDepthAudit?: { stories: number; averageConfidence: number; saturatedConfidenceWeeks: number; confidenceSamples: number; policy: string }
 }
 
 function readNumberArg(name: string, fallback: number) {
@@ -36,8 +37,8 @@ async function runScenario(level: (typeof createPlayerStartingLevelCatalog)[numb
     child.on('close', (code) => {
       try {
         const jsonStart = stdout.lastIndexOf('\n{')
-        const result = JSON.parse(stdout.slice(jsonStart >= 0 ? jsonStart + 1 : 0)) as { reportPath: string; issues?: string[] }
-        resolve({ startingLevelId: level.id, startingLevel: level.name, seed, seasons, issues: result.issues ?? [], reportPath: result.reportPath, exitCode: code ?? 1 })
+        const result = JSON.parse(stdout.slice(jsonStart >= 0 ? jsonStart + 1 : 0)) as { reportPath: string; issues?: string[]; careerDepthAudit?: MatrixRow['careerDepthAudit'] }
+        resolve({ startingLevelId: level.id, startingLevel: level.name, seed, seasons, issues: result.issues ?? [], reportPath: result.reportPath, exitCode: code ?? 1, careerDepthAudit: result.careerDepthAudit })
       } catch {
         resolve({ startingLevelId: level.id, startingLevel: level.name, seed, seasons, issues: [stderr.trim() || 'Simulation output could not be parsed.'], reportPath: '', exitCode: code ?? 1 })
       }

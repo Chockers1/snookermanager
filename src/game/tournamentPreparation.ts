@@ -1,3 +1,5 @@
+import { supportedConfidence } from './confidenceSystem';
+
 export type PreparationFocusId =
   | "custom"
   | "balanced"
@@ -37,6 +39,7 @@ export type PreparationEffects = {
 };
 
 export type TournamentPreparationPlan = {
+  confidenceBaseline?: number;
   focusId: PreparationFocusId;
   allocations: PreparationAllocations;
   supportIds: PreparationSupportId[];
@@ -109,6 +112,7 @@ function boundedBonus(value: number, divisor: number, maximum: number) {
 export function calculatePreparationEffects(
   allocations: PreparationAllocations,
   supportIds: PreparationSupportId[],
+  confidence?: number,
 ): PreparationEffects {
   const support = new Set(supportIds);
   const practiceLoad = allocations.potting + allocations.breakBuilding + allocations.tactical;
@@ -116,7 +120,8 @@ export function calculatePreparationEffects(
   const sharpnessDelta = boundedBonus(practiceLoad, 22, 5) + (support.has("table-hire") ? 1 : 0);
   const fatigueDelta = Math.round(overload / 8) - boundedBonus(allocations.recovery, 6, 10) - (support.has("physio") ? 5 : 0);
   const strainDelta = Math.round(overload / 10) - boundedBonus(allocations.recovery, 12, 6) - (support.has("physio") ? 4 : 0);
-  const confidenceDelta = boundedBonus(allocations.mental, 18, 3) + (support.has("psychologist") ? 3 : 0);
+  const rawConfidence = boundedBonus(allocations.mental, 18, 3) + (support.has("psychologist") ? 3 : 0);
+  const confidenceDelta = confidence == null ? rawConfidence : Math.round((supportedConfidence(confidence, rawConfidence) - confidence) * 10) / 10;
   const tacticalSupport = support.has("coach") ? 2 : 0;
   const familiarityBonus = support.has("equipment-service") ? 2 : 0;
   const recoveryReadiness = Math.max(0, -fatigueDelta) + Math.max(0, -strainDelta);

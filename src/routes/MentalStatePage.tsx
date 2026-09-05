@@ -19,6 +19,7 @@ import {
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
 import { buildMentalStateData } from "../utils/liveRouteData";
+import { formatPercent } from "../utils/formatters";
 
 function toneClass(tone: "green" | "amber" | "red") {
   if (tone === "red") return "text-red-400";
@@ -86,7 +87,7 @@ export function MentalStatePage() {
               </span>
             </div>
             <p className="my-2 text-2xl font-bold leading-none text-white xl:my-1 xl:text-xl">
-              {metric.value}%
+              {formatPercent(metric.value)}
             </p>
             <ProgressBar value={metric.value} tone={metric.tone} compact />
           </article>
@@ -300,7 +301,7 @@ export function MentalStatePage() {
                 <div key={item.label}>
                   <div className="mb-1 flex justify-between gap-3 text-xs">
                     <span className="truncate text-gray-400">{item.label}</span>
-                    <span className="text-white">{item.value}%</span>
+                    <span className="text-white">{formatPercent(item.value)}</span>
                   </div>
                   <ProgressBar
                     value={item.value}
@@ -341,7 +342,7 @@ export function MentalStatePage() {
       <footer className="card flex shrink-0 flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between xl:py-2">
         <p className="flex min-w-0 items-start gap-2 text-xs text-gray-400">
           <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
-          Confidence {gameState.player.confidence}%, fatigue{" "}
+          Confidence {formatPercent(gameState.player.confidence)}, fatigue{" "}
           {gameState.player.fatigue}%, morale {gameState.player.morale}%.
           Recovery choices update the live save.
         </p>

@@ -32,6 +32,7 @@ import {
   getTrainingAdaptationMultiplier,
   getTournamentEntryAccess,
   getTournamentPlayability,
+  getTravelPackageCost,
   hireCoachState,
   recordFinanceExpenseState,
   renegotiateSponsorState,
@@ -230,6 +231,15 @@ describe("new career records", () => {
 });
 
 describe("tournament entry and match-start rules", () => {
+  it("quotes the same travel cost that booking actually charges", () => {
+    const career = createStarterState();
+    const tournament = getNextEligibleTournament(career)!;
+    const entered = enterTournamentState(career, tournament.id);
+    const quote = getTravelPackageCost(entered);
+    const booked = bookTravelState(entered, tournament.id);
+    expect(booked.travel.bookings[tournament.id].totalCost).toBe(quote);
+    expect(entered.player.cash - booked.player.cash).toBe(quote);
+  });
   it("builds configured real-world fields and seeded entry rounds", () => {
     const state = createStarterState();
     state.player.worldRanking = 12;
@@ -259,6 +269,8 @@ describe("tournament entry and match-start rules", () => {
       status: "Available",
     }));
 
+    // This fixture intentionally replaces the initial ranking before the draw lock.
+    state.rollingRankings = undefined;
     const shanghai = state.tournaments.find(
       (event) => event.name === "Shanghai Masters",
     );
@@ -407,8 +419,8 @@ describe("tournament entry and match-start rules", () => {
     if (!tournament) return;
 
     const entered = enterTournamentState(state, tournament.id);
-    const atEvent = continueToNextTournamentState(entered);
-    const travelled = bookTravelState(atEvent, tournament.id);
+    const booked = bookTravelState(entered, tournament.id);
+    const travelled = { ...booked, currentDate: tournament.startDate };
     const cashBefore = travelled.player.cash;
     const confidenceBefore = travelled.player.confidence;
     const prepared = confirmTournamentPreparationState(
@@ -524,7 +536,7 @@ describe("tournament entry and match-start rules", () => {
     expect(withdrawn.player.cash).toBeGreaterThanOrEqual(entered.player.cash);
   });
 
-  it("advances to an entered event without auto-playing or bypassing travel", () => {
+  it("stops before an unbooked departure without auto-playing or bypassing travel", () => {
     const state = createStarterState();
     const tournament = getNextEligibleTournament(state);
     expect(tournament).toBeDefined();
@@ -533,7 +545,7 @@ describe("tournament entry and match-start rules", () => {
     const entered = enterTournamentState(state, tournament.id);
     const advanced = continueToNextTournamentState(entered);
 
-    expect(advanced.currentDate).toBe(tournament.startDate);
+    expect(advanced.currentDate < tournament.startDate).toBe(true);
     expect(
       advanced.tournaments.find((event) => event.id === tournament.id)?.status,
     ).toBe("Entered");
@@ -803,8 +815,8 @@ describe("career lifecycle presets", () => {
     if (!tournament) return;
 
     const entered = enterTournamentState(equipped, tournament.id);
-    const atEvent = continueToNextTournamentState(entered);
-    const travelled = bookAndPrepareTournament(atEvent, tournament.id);
+    const booked = bookAndPrepareTournament(entered, tournament.id);
+    const travelled = continueToNextTournamentState(booked);
     const afterMatch = simulateTournamentMatchState(travelled, tournament.id);
     const baseLog = afterMatch.history.matchLog[0];
     expect(baseLog).toBeDefined();
@@ -915,8 +927,8 @@ describe("complete tournament journey", () => {
     if (!tournament) return;
 
     const entered = enterTournamentState(equipped, tournament.id);
-    const atEvent = continueToNextTournamentState(entered);
-    const travelled = bookAndPrepareTournament(atEvent, tournament.id);
+    const booked = bookAndPrepareTournament(entered, tournament.id);
+    const travelled = continueToNextTournamentState(booked);
     const started = startLiveMatchState(travelled, tournament.id);
     expect(started.liveMatch).not.toBeNull();
     if (!started.liveMatch) return;
@@ -954,8 +966,8 @@ describe("complete tournament journey", () => {
     if (!tournament) return;
 
     const entered = enterTournamentState(equipped, tournament.id);
-    const atEvent = continueToNextTournamentState(entered);
-    const travelled = bookAndPrepareTournament(atEvent, tournament.id);
+    const booked = bookAndPrepareTournament(entered, tournament.id);
+    const travelled = continueToNextTournamentState(booked);
     const started = startLiveMatchState(travelled, tournament.id);
     expect(started.liveMatch).not.toBeNull();
     if (!started.liveMatch) return;
@@ -1006,8 +1018,8 @@ describe("complete tournament journey", () => {
     if (!tournament) return;
 
     const entered = enterTournamentState(equipped, tournament.id);
-    const atEvent = continueToNextTournamentState(entered);
-    const travelled = bookAndPrepareTournament(atEvent, tournament.id);
+    const booked = bookAndPrepareTournament(entered, tournament.id);
+    const travelled = continueToNextTournamentState(booked);
     expect(
       getTournamentPlayability(
         travelled,
@@ -1057,8 +1069,8 @@ describe("complete tournament journey", () => {
     if (!tournament) return;
 
     const entered = enterTournamentState(equipped, tournament.id);
-    const atEvent = continueToNextTournamentState(entered);
-    const travelled = bookAndPrepareTournament(atEvent, tournament.id);
+    const booked = bookAndPrepareTournament(entered, tournament.id);
+    const travelled = continueToNextTournamentState(booked);
     const cpuFormBefore = new Map(
       travelled.worldPlayers.map((record) => [
         record.playerName,
@@ -1154,7 +1166,10 @@ describe("complete tournament journey", () => {
         (row) => row.playerName === change.playerName,
       );
       if (beforeRow && afterRow) {
-        expect(afterRow.movement).toBe(beforeRow.ranking - afterRow.ranking);
+        if (tableKey === 'world' || tableKey === 'oneYear') {
+          // Early elimination resolves the draw, but official earnings post at event end.
+          expect(afterRow.points).toBe(beforeRow.points);
+        } else expect(afterRow.movement).toBe(beforeRow.ranking - afterRow.ranking);
       }
     });
 

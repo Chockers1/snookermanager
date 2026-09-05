@@ -71,7 +71,7 @@ describe("live ranking projections", () => {
   });
 
   it("recalculates projected position against expected competitor results", () => {
-    const tournament = createTournament({ rankingValue: 400 });
+    const tournament = createTournament({ rankingValue: 400, winnerPrize: 400 });
     const rows = [
       { playerName: "Leader", ranking: 1, points: 1_050 },
       { playerName: "Target", ranking: 2, points: 1_000 },

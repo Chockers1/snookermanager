@@ -2,8 +2,10 @@ import type { CareerPathStage, Tournament } from '../types/game'
 import { inferTournamentFormatId } from './tournamentFormats'
 
 function createTournament(entry: Tournament): Tournament {
+  const broadcastFormats = ['ukMajor', 'mastersInvitational', 'shanghaiMasters', 'worldChampionshipMain', 'saudiArabiaMasters', 'britishOpen', 'homeNationsRanking', 'internationalChampionship', 'playersSeriesTop16', 'tourChampionshipTop8', 'championOfChampions'];
   return {
     formatId: entry.formatId ?? inferTournamentFormatId(entry),
+    televisedRounds: broadcastFormats.includes(entry.formatId ?? inferTournamentFormatId(entry)) ? ['Quarter Final', 'Semi Final', 'Final'] : [],
     totalPrizeFund: entry.prizeMoney,
     winnerPrize: Math.round(entry.prizeMoney * 0.5),
     runnerUpPrize: Math.round(entry.prizeMoney * 0.22),

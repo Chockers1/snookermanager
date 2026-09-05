@@ -6,6 +6,7 @@ import { useGame } from "../context/useGame";
 import { buildSponsorshipContractData } from "../utils/liveRouteData";
 import { formatMoney } from "../utils/formatters";
 import { getSponsorObligationProfile } from "../hooks/useGameState";
+import { depthOf } from "../game/careerDepth/shared";
 
 function probabilityClass(value: number) {
   if (value >= 65) return "bg-green-600/20 text-green-400";
@@ -29,6 +30,7 @@ export function SponsorshipContractPage() {
   const { gameState, acceptSponsor, rejectSponsor, negotiateSponsor } =
     useGame();
   const selectedOfferId = searchParams.get("offer");
+  const introduction = depthOf(gameState).commercialIntroduction;
   const selectedSponsorSlot = searchParams.get("slot") ?? undefined;
   const selectedOffer = useMemo(
     () =>
@@ -283,8 +285,9 @@ export function SponsorshipContractPage() {
             <h3 className="mb-3 text-xs font-semibold text-white">
               Negotiation Options
             </h3>
-            <div className="space-y-3">
-              {contractData.negotiationOptions.map((item) => (
+              <div className="space-y-3">
+                {introduction?.offerId === selectedOffer.id && !introduction.used && introduction.expiresDate >= gameState.currentDate && <p className="rounded border border-green-500/30 bg-green-500/10 p-2 text-xs text-green-400">Warm introduction: +5 percentage points on your next negotiation, available until {introduction.expiresDate}. Existing contract and slot rules still apply.</p>}
+                {contractData.negotiationOptions.map((item) => (
                 <button
                   key={item.label}
                   type="button"

@@ -92,6 +92,8 @@ export function NewCareerPage() {
   const { resetCareer } = useGame()
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(0)
+  const [isCreating, setIsCreating] = useState(false)
+  const [creationError, setCreationError] = useState<string | null>(null)
   const [form, setForm] = useState({
     fullName: createPlayerIdentitySeed.name,
     nationality: createPlayerIdentitySeed.nationality,
@@ -155,8 +157,19 @@ export function NewCareerPage() {
     }))
   }
 
-  function handleConfirm() {
-    resetCareer({
+  async function handleConfirm() {
+    if (isCreating) return
+    if (!canContinueFromIdentity) {
+      setCreationError('Enter a player name, nationality and date of birth before starting your career.')
+      setCurrentStep(0)
+      return
+    }
+    setCreationError(null)
+    setIsCreating(true)
+    // Give the browser a chance to paint feedback before building the world.
+    await new Promise(resolve => setTimeout(resolve, 0))
+    try {
+      resetCareer({
       fullName: form.fullName,
       nationality: form.nationality,
       age: normalizedAge,
@@ -169,7 +182,12 @@ export function NewCareerPage() {
       backgroundId: selectedBackground.id,
       startingLevelId: selectedStartingLevel.id,
     })
-    navigate('/')
+      navigate('/')
+    } catch (error) {
+      setCreationError(error instanceof Error ? error.message : 'Career creation failed. Your player setup is still here; please try again.')
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   function resetForm() {
@@ -361,9 +379,10 @@ export function NewCareerPage() {
         </div>
       </div>
 
+      {creationError && <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{creationError}</p>}
       <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-light/40 px-3 py-2.5">
         <div className="text-xs text-gray-500">New save: <span className="text-white">{form.fullName.trim() || 'Unnamed career'}</span> <span className="text-green-400">· separate autosave</span></div>
-        <div className="flex gap-2"><button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => { if (currentStep > 0) setCurrentStep((step) => step - 1); else resetForm() }}><ChevronLeft className="h-3.5 w-3.5" /> {currentStep > 0 ? 'Back' : 'Reset'}</button>{currentStep < steps.length - 1 ? <button type="button" className="btn-primary px-3 py-2 text-xs" disabled={currentStep === 0 && !canContinueFromIdentity} onClick={continueStep}>Continue <ChevronRight className="h-3.5 w-3.5" /></button> : <button type="button" className="btn-primary px-3 py-2 text-xs" onClick={handleConfirm}>Start Career <ChevronRight className="h-3.5 w-3.5" /></button>}</div>
+        <div className="flex gap-2"><button type="button" disabled={isCreating} className="btn-secondary px-3 py-2 text-xs" onClick={() => { if (currentStep > 0) setCurrentStep((step) => step - 1); else resetForm() }}><ChevronLeft className="h-3.5 w-3.5" /> {currentStep > 0 ? 'Back' : 'Reset'}</button>{currentStep < steps.length - 1 ? <button type="button" className="btn-primary px-3 py-2 text-xs" disabled={currentStep === 0 && !canContinueFromIdentity} onClick={continueStep}>Continue <ChevronRight className="h-3.5 w-3.5" /></button> : <button type="button" className="btn-primary px-3 py-2 text-xs" disabled={isCreating} onClick={handleConfirm}>{isCreating ? 'Creating Career…' : 'Start Career'} <ChevronRight className="h-3.5 w-3.5" /></button>}</div>
       </div>
     </div>
   )

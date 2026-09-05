@@ -1,3 +1,9 @@
+import { protectCommitmentSessions } from '../game/careerDepth/commitments';
+import { travelOptionsFor } from '../game/realism/travel';
+import { scoutingReport, recordedOpponentResults } from '../game/realism/scouting';
+import { protectRealismSessions } from '../game/realism';
+import { formatPercent } from './formatters';
+import { protectPartnerSessions } from '../game/careerDepth/developmentProjects';
 import {
   chalkCatalog,
   cueCatalog,
@@ -5,7 +11,6 @@ import {
   hotelOptionCatalog,
   negotiationOptionCatalog,
   tipCatalog,
-  travelOptionCatalog,
   treatmentOptionCatalog,
 } from "../data/catalogs";
 import {
@@ -894,7 +899,7 @@ export function buildMatchPreviewData(state: GameState) {
   const currentChalk = getCurrentChalk(state);
   const currentTip = getCurrentTip(state);
   const technicalValues = Object.values(state.attributes.technical);
-  const mentalValues = Object.values(state.attributes.mental);
+
   const physicalValues = Object.values(state.attributes.physical);
   const h2hMatches = state.matches.filter(
     (match) => match.opponentName === nextOpponent?.playerName,
@@ -920,9 +925,9 @@ export function buildMatchPreviewData(state: GameState) {
     ? state.travel.bookings[activeTournament.id]
     : undefined;
   const travelOption =
-    travelOptionCatalog.find(
+    travelOptionsFor(state, activeTournament ?? undefined).find(
       (option) => option.id === travelBooking?.travelOptionId,
-    ) ?? travelOptionCatalog[0];
+    ) ?? travelOptionsFor(state, activeTournament ?? undefined)[0];
   const hotelOption =
     hotelOptionCatalog.find(
       (option) => option.id === travelBooking?.hotelOptionId,
@@ -998,20 +1003,7 @@ export function buildMatchPreviewData(state: GameState) {
     result: match.result === "Won" ? "W" : "L",
     score: `${match.playerFrames}-${match.opponentFrames}`,
   }));
-  const recentOpponentResults = state.rankings
-    .filter((row) => row.playerName !== state.player.fullName)
-    .slice(0, 4)
-    .map((row, index) => ({
-      id: `${row.id}-${index}`,
-      date: `W${Math.max(1, state.week - index)}`,
-      opponent: row.playerName,
-      result:
-        row.ranking < (nextOpponent?.ranking ?? row.ranking + 1) ? "W" : "L",
-      score:
-        row.ranking < (nextOpponent?.ranking ?? row.ranking + 1)
-          ? "4-2"
-          : "2-4",
-    }));
+  const recentOpponentResults = recordedOpponentResults(state, nextOpponent?.playerName ?? '');
   const playerOverall = calculateOverallRating({
     attributes: state.attributes,
     personalityTraits: state.player.personalityTraits,
@@ -1202,11 +1194,7 @@ export function buildMatchPreviewData(state: GameState) {
       0,
     ),
     scoutNotes: `${nextOpponent?.playerName ?? "The next opponent"} sits near your current ranking band. Travel planning is ${travelBooking ? "booked" : "not yet booked"}, and your readiness profile is shaped by ${hotelOption.name.toLowerCase()} plus ${travelOption.name.toLowerCase()}.`,
-    scoutConfidence: clamp(
-      Math.round((average(mentalValues) + average(technicalValues)) / 2),
-      45,
-      92,
-    ),
+    scoutConfidence: scoutingReport(state, nextOpponent?.playerName ?? '').confidence,
     tacticalPlan,
     strengths,
     weaknesses,
@@ -2161,7 +2149,7 @@ export function buildMentalStateData(state: GameState) {
       factors: [
         `Fatigue currently sits at ${state.player.fatigue}%.`,
         `Training strain is ${state.trainingCondition.strain}% and burnout is ${state.trainingCondition.burnout}%.`,
-        `Confidence is ${state.player.confidence}% with morale at ${state.player.morale}%.`,
+        `Confidence is ${formatPercent(state.player.confidence)} with morale at ${formatPercent(state.player.morale)}.`,
         `${state.matches.length} competitive results are currently logged.`,
         `${state.sponsors.length} active sponsor deals add off-table expectation.`,
       ],
@@ -2284,7 +2272,7 @@ export function buildTrainingPlannerData(state: GameState) {
   const travelBooked = activeTournament
     ? state.travel.bookings[activeTournament.id]
     : null;
-  const week: TrainingPlannerDay[] = state.trainingPlan;
+  const week: TrainingPlannerDay[] = protectRealismSessions(state, protectCommitmentSessions(state, protectPartnerSessions(state, state.trainingPlan)));
   const enteredCompetitions = state.tournaments
     .filter((tournament) => tournament.status === "Entered")
     .map((tournament) => ({

@@ -1,4 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
+import type { CareerDepthState, CareerDepthAction } from "../game/careerDepth/types";
+import { initializeCareerDepth, reconcileCareerDepth, careerDepthAction, nextCareerBoundary } from "../game/careerDepth";
+import { depthOf, pendingStory, plusDays, uniqueOpponentId } from "../game/careerDepth/shared";
+import { initializeRollingRankings, recordRankingEvent, rebuildRollingRankings, lockTournamentSeedings, seedingRows, rankingEventKey, rankingCutoffDate, countsForWorldRanking, scheduleRankingExpiries, compactRankingLedger, isMajorQualifying, recordedMajorQualifiers, type RollingRankingsState } from "../game/rollingRankings";
+import { runScheduleAssistance } from "../game/careerDepth/seasonPlanning";
+import { developmentTrainingBonus, effectiveCareerAttributes, progressDevelopment, protectPartnerSessions } from "../game/careerDepth/developmentProjects";
+import { realismAction, reconcileRealism, realismOf, protectRealismSessions, overseasWeeklyCost } from '../game/realism';
+import type { RealismAction } from '../game/realism/types';
+import { sessionPlan, pendingMatchBreak, resolveSessionBreak } from '../game/realism/sessions';
+import { venueConditions, conditionAdjustment, familiarisedFor } from '../game/realism/conditions';
+import { travelOptionsFor, journeyQuote } from '../game/realism/travel';
+import { trainingBaseCost, baseTrainingMultiplier } from '../game/realism/base';
+import { protectCommitmentSessions, tournamentCommitmentConflict } from "../game/careerDepth/commitments";
+import { learnedCounter, coachNegotiationAdjustment } from "../game/careerDepth/relationships";
+import { recordProjectOutcome } from "../game/careerDepth/developmentProjects";
+import { matchConfidenceChange, settledConfidence, supportedConfidence } from "../game/confidenceSystem";
 import {
   caseCatalog,
   chalkCatalog,
@@ -108,6 +124,12 @@ import {
   readActiveSaveSlotId,
   readSaveSlotIndex,
   SAVE_SLOT_PREFIX,
+  encodeCareerSave,
+  decodeCareerSave,
+  writeCareerStorage,
+  writeCareerStorageBatch,
+  SAVE_SLOT_INDEX_KEY,
+  ACTIVE_SAVE_SLOT_KEY,
   type SaveSlotSummary,
   writeActiveSaveSlotId,
   writeSaveSlotIndex,
@@ -488,6 +510,10 @@ type LiveVisitSkillProfile = {
 };
 
 type LiveMatchState = {
+  sessions?: import('../game/realism/types').MatchSessions;
+  venue?: import('../game/realism/types').VenueConditions;
+  conditionEffect?: number;
+  sessionId?: string;
   tournamentId: string;
   round: TournamentRound;
   bestOf: number;
@@ -705,7 +731,7 @@ type SeasonReviewTransition = {
 type CompetitionTableKey =
   "world" | "oneYear" | "amateur" | "qTour" | "qSchool" | "senior" | "youth";
 
-type CompetitionTableRow = RankingRow & {
+export type CompetitionTableRow = RankingRow & {
   eventsPlayed: number;
   titles: number;
   wins: number;
@@ -869,6 +895,9 @@ type CareerSystemsState = {
 };
 
 export type GameState = {
+  realism?: import('../game/realism/types').RealismState;
+  rollingRankings?: RollingRankingsState;
+  careerDepth?: CareerDepthState;
   schemaVersion: number;
   worldSeed: number;
   currentDate: string;
@@ -903,7 +932,7 @@ export type GameState = {
   lastAction: string;
 };
 
-export const SAVE_SCHEMA_VERSION = 8;
+export const SAVE_SCHEMA_VERSION = 11;
 const STORAGE_KEY = ACTIVE_SAVE_KEY;
 const TOURNAMENT_ROUNDS: TournamentRound[] = [
   "Last 16",
@@ -947,7 +976,7 @@ function getTournamentRoundMatchCount(
   let priorWinners = 0;
   for (let index = 0; index <= roundIndex; index += 1) {
     const entrantsAtRound = Array.from({ length: fieldSize }, (_, rankIndex) =>
-      getConfiguredEntryRoundForRank(tournament, rankIndex + 1, rounds),
+      getConfiguredEntryRoundForRank(tournament, rankIndex + 1 + (isMajorQualifying(tournament) ? 16 : 0), rounds),
     ).filter((entryRound) => entryRound === rounds[index]).length;
     const matchCount = Math.max(
       1,
@@ -1183,6 +1212,9 @@ function getTournamentPlacementAwards(
   round: TournamentRound,
   champion: boolean,
 ) {
+  // Qualifying is not a championship title or an extra winner's purse.
+  // Successful qualifiers receive their eventual main-draw finishing award.
+  if (champion && isMajorQualifying(tournament)) return { prizeMoney: 0, rankingPoints: 0 };
   const plan = getTournamentRoundPlan(tournament, round);
   const normalizedRound = normalizeTournamentRoundLabel(round);
   const prizeMoney = champion
@@ -1203,7 +1235,9 @@ function getTournamentPlacementAwards(
             ));
   const awardsRankingPoints =
     tournament.rankingValue > 0 && tournament.rankingType !== "None";
-  const rankingPoints = !awardsRankingPoints
+  const rankingPoints = countsForWorldRanking(tournament)
+    ? prizeMoney
+    : !awardsRankingPoints
     ? 0
     : champion
       ? tournament.rankingValue
@@ -1321,6 +1355,7 @@ function normalizeLiveMatchState(
 
   return {
     ...liveMatch,
+    sessions: liveMatch.sessions ?? sessionPlan(liveMatch.bestOf),
     currentVisit: liveMatch.currentVisit ?? 1,
     tableState: normalizedTableState,
     ballsRemaining: getLegacyBallUnitsFromTableState(normalizedTableState),
@@ -2798,6 +2833,7 @@ function playOutLiveFrame(
 
   while (
     nextLiveMatch.status === "In Progress" &&
+    !pendingMatchBreak(nextLiveMatch) &&
     nextLiveMatch.currentFrame === startingFrame &&
     guard < 60
   ) {
@@ -2814,6 +2850,7 @@ function playOutLiveFrame(
 }
 
 function buildPlayerLiveVisitProfile(state: GameState): LiveVisitSkillProfile {
+  state = { ...state, attributes: effectiveCareerAttributes(state, state.attributes) };
   return buildLiveVisitProfile({
     side: "player",
     name: state.player.fullName,
@@ -3047,6 +3084,9 @@ function getConfiguredEntryRoundForRank(
   if (format.id === "shanghaiMasters") {
     return playerRank <= 8 ? (findRound(/last\s*16/i) ?? rounds[0]) : rounds[0];
   }
+  if (isMajorQualifying(tournament)) {
+    return playerRank <= 48 ? rounds[2] ?? rounds[0] : playerRank <= 80 ? rounds[1] ?? rounds[0] : rounds[0];
+  }
   if (format.id === "saudiArabiaMasters") {
     if (playerRank <= 16)
       return findRound(/last\s*32/i) ?? rounds.at(-5) ?? rounds[0];
@@ -3161,8 +3201,10 @@ function buildTournamentDrawField(
   state: GameState,
   tournament: Tournament,
   fieldSize: number,
+  includePlayer = true,
 ): BracketPlayer[] {
-  const rankingRows = getCompetitionRowsForTournament(state, tournament);
+  const liveRows = getCompetitionRowsForTournament(state, tournament);
+  const rankingRows = countsForWorldRanking(tournament) || tournament.type === 'Invitational' ? seedingRows(state, tournament, liveRows) : liveRows;
   const playerRow = rankingRows.find(
     (row) => row.playerName === state.player.fullName,
   );
@@ -3177,8 +3219,12 @@ function buildTournamentDrawField(
     state.player.nationality,
     true,
   );
+  const qualified = recordedMajorQualifiers(state, tournament);
   const opponentEntries = rankingRows
     .filter((row) => row.playerName !== state.player.fullName)
+    .filter(row => !state.worldPlayers.find(p => p.playerName === row.playerName)?.retired)
+    .filter(row => !isMajorQualifying(tournament) || row.ranking > 16)
+    .filter(row => qualified === null || row.ranking <= 16 || qualified.includes(row.playerName))
     .filter(
       (row, index, rows) =>
         rows.findIndex((entry) => entry.playerName === row.playerName) ===
@@ -3187,11 +3233,22 @@ function buildTournamentDrawField(
     .sort((left, right) => left.ranking - right.ranking)
     .map((row) => createBracketPlayer(row.playerName, row.ranking, row.nation));
 
-  let field = [playerEntry, ...opponentEntries]
+  // Main-tour fields can include amateur top-ups. Use real persisted identities,
+  // so every simulated entrant can receive an auditable finishing award.
+  if (countsForWorldRanking(tournament) && opponentEntries.length < fieldSize) {
+    const topUps = [...state.competitionTables.qSchool, ...state.competitionTables.amateur];
+    for (const row of topUps) {
+      if (opponentEntries.length >= fieldSize) break;
+      if (row.playerName === state.player.fullName || opponentEntries.some(p => p.name === row.playerName) || state.worldPlayers.find(p => p.playerName === row.playerName)?.retired) continue;
+      if (qualified !== null && !qualified.includes(row.playerName)) continue;
+      opponentEntries.push(createBracketPlayer(row.playerName, opponentEntries.length + 1 + (isMajorQualifying(tournament) ? 16 : 0), row.nation));
+    }
+  }
+  let field = [...(includePlayer ? [playerEntry] : []), ...opponentEntries]
     .sort((left, right) => left.rank - right.rank)
     .slice(0, fieldSize);
 
-  if (!field.some((entry) => entry.name === state.player.fullName)) {
+  if (includePlayer && !field.some((entry) => entry.name === state.player.fullName)) {
     field = [...field.slice(0, fieldSize - 1), playerEntry].sort(
       (left, right) => left.rank - right.rank,
     );
@@ -3208,6 +3265,7 @@ function buildTournamentDraw(
   state: GameState,
   tournament: Tournament,
   entryRound: TournamentRound,
+  includePlayer = true,
 ): BracketRound[] {
   const roundLabels = getTournamentRounds(tournament);
   const format = resolveTournamentFormat(tournament);
@@ -3217,7 +3275,7 @@ function buildTournamentDraw(
       16,
       getTournamentRoundMatchCount(tournament, roundLabels[0], 0) * 2,
     );
-  const field = buildTournamentDrawField(state, tournament, fieldSize);
+  const field = buildTournamentDrawField(state, tournament, fieldSize, includePlayer);
   const playerEntry = getConfiguredEntryRoundForRank(
     tournament,
     field.find((entrant) => entrant.name === state.player.fullName)?.rank ??
@@ -3282,7 +3340,7 @@ function buildTournamentDraw(
   });
 
   let preparedRounds = rounds;
-  const entryIndex = roundLabels.indexOf(playerEntry || entryRound);
+  const entryIndex = includePlayer ? roundLabels.indexOf(playerEntry || entryRound) : 0;
   for (let roundIndex = 0; roundIndex < entryIndex; roundIndex += 1) {
     preparedRounds = resolveTournamentDrawRound(
       preparedRounds,
@@ -3299,14 +3357,15 @@ function simulateBracketScore(
   round: TournamentRound,
   topRank: number,
   bottomRank: number,
+  random = Math.random,
 ) {
   const bestOf = getTournamentRoundPlan(tournament, round).bestOf;
   const framesNeeded = Math.ceil(bestOf / 2);
   const topWinChance = clamp(50 + (bottomRank - topRank) * 1.2, 18, 82);
-  const topWon = Math.random() * 100 < topWinChance;
+  const topWon = random() * 100 < topWinChance;
   const loserFrames = clamp(
     Math.round(
-      Math.random() * Math.max(0, framesNeeded - 1) +
+      random() * Math.max(0, framesNeeded - 1) +
         Math.max(0, 4 - Math.abs(bottomRank - topRank) / 12),
     ),
     0,
@@ -3323,6 +3382,7 @@ function resolveTournamentDrawRound(
   tournament: Tournament,
   roundLabel: TournamentRound,
   playerName: string,
+  random = Math.random,
 ) {
   const roundIndex = rounds.findIndex((round) => round.label === roundLabel);
   if (roundIndex === -1) return rounds;
@@ -3351,6 +3411,7 @@ function resolveTournamentDrawRound(
       roundLabel,
       match.top.rank,
       match.bottom.rank,
+      random,
     );
     return {
       ...match,
@@ -3464,6 +3525,49 @@ function completeRemainingTournamentDraw(
   }
 
   return completedDraw;
+}
+
+/** Complete the world calendar in date order, independently of human entry.
+ * This function never advances training, cash settlement or the player's match. */
+export function processRankingCalendar(input: GameState): GameState {
+  let state = scheduleRankingExpiries(initializeRollingRankings(input));
+  const through = state.currentDate;
+  const ledger = state.rollingRankings!;
+  const dates = new Set<string>();
+  for (const t of state.tournaments) {
+    const date = t.endDate ?? t.startDate;
+    const key = rankingEventKey(t);
+    if (date <= through && !ledger.events[key]?.applied && !ledger.legacyEventKeys.includes(key) && t.status !== 'Entered') dates.add(date);
+    const cutoff = rankingCutoffDate(t);
+    if (cutoff > ledger.processedThrough && cutoff <= through && !ledger.seedings[key]) dates.add(cutoff);
+  }
+  for (const e of ledger.earnings) if (e.expiresOn > ledger.processedThrough && e.expiresOn <= through) dates.add(e.expiresOn);
+  for (const date of [...dates].sort()) {
+    state = lockTournamentSeedings(state, new Date(Date.parse(`${date}T12:00:00Z`) - 86400000).toISOString().slice(0, 10));
+    const events = state.tournaments.filter(t => (t.endDate ?? t.startDate) === date && t.status !== 'Entered');
+    for (const t of events) {
+      const key = rankingEventKey(t);
+      if (state.rollingRankings!.legacyEventKeys.includes(key) || state.rollingRankings!.events[key]) continue;
+      // The random stream is event-local: reloads and advancing in larger steps agree.
+      let seed = [...`${state.worldSeed}:${key}`].reduce((s, c) => Math.imul(s ^ c.charCodeAt(0), 16777619), 2166136261) >>> 0;
+      const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+      const draw = buildTournamentDraw(state, t, getTournamentRounds(t)[0], false);
+      for (const round of draw) resolveTournamentDrawRound(draw, t, round.label, state.player.fullName, random);
+      const tables = updateCompetitionTablesFromCpuDraw(state.competitionTables, state.competitionTables, {}, t, draw, state.player, []);
+      state = recordRankingEvent({ ...state, competitionTables: tables, worldPlayers: updateWorldPlayersFromCompletedDraw(state.worldPlayers, tables, draw, state.player.fullName) }, t, draw, getTournamentPlacementAwards);
+      state = { ...state, tournaments: state.tournaments.map(item => item.id === t.id && item.status !== 'Skipped' ? { ...item, status: 'Completed' } : item) };
+    }
+    const hasRevision = events.some(t => countsForWorldRanking(t)) || state.rollingRankings!.earnings.some(e => e.expiresOn === date);
+    state = rebuildRollingRankings(state, date, hasRevision);
+    state = lockTournamentSeedings(state, date);
+  }
+  state = lockTournamentSeedings(state, through);
+  const entered = state.tournaments.find(t => t.id === state.tournamentProgress.tournamentId && t.status === 'Entered');
+  if (entered && !state.liveMatch && state.tournamentProgress.completedRounds.length === 0 && !ledger.seedings[rankingEventKey(entered)] && state.rollingRankings!.seedings[rankingEventKey(entered)]) {
+    const currentRound = getTournamentEntryRound(state, entered);
+    state = { ...state, tournamentProgress: { ...state.tournamentProgress, currentRound, draw: buildTournamentDraw(state, entered, currentRound) } };
+  }
+  return compactRankingLedger({ ...state, rollingRankings: { ...state.rollingRankings!, processedThrough: through } });
 }
 
 function createEmptyTravelState(): TravelState {
@@ -4582,7 +4686,7 @@ function applySeasonOpenWorldChampionshipAccess(
   state: Pick<
     GameState,
     "player" | "careerSystems" | "competitionTables" | "history"
-  >,
+  > & Partial<Pick<GameState, 'rollingRankings'>>,
   options?: {
     seasonOpenWorldRankOverride?: number | null;
   },
@@ -5529,6 +5633,7 @@ function applySeasonRollover(state: GameState) {
     state.competitionTables,
     state.player.fullName,
     state.worldPlayers,
+    Boolean(state.rollingRankings),
   );
   const fallbackCompetitionTables =
     lostCardFallbackEligible && !playerHasTourCardNextSeason
@@ -5687,7 +5792,7 @@ function applySeasonRollover(state: GameState) {
     flooredLivingCompetitionTables,
     playerForNextSeason,
   );
-  const rebuiltCompetitionTables = ageEligibleCompetitionTables;
+  const rebuiltCompetitionTables = rebuildRollingRankings({ ...state, season: formatSeasonLabel(nextSeasonStartYear), competitionTables: ageEligibleCompetitionTables }, state.currentDate, false).competitionTables;
   const syncedCareerSystems = syncCareerSystems({
     competitionTables: rebuiltCompetitionTables,
     player: playerForNextSeason,
@@ -5989,6 +6094,28 @@ export function startNextSeasonState(previousState: GameState): GameState {
 }
 
 export function advanceWeekState(previousState: GameState): GameState {
+  previousState = processRankingCalendar(previousState);
+  previousState = reconcileCareerDepth(previousState);
+  if (depthOf(previousState).nextSettlementDate <= previousState.currentDate) {
+    // Imported/legacy simulations may move the date outside the recorded weekly clock.
+    // Re-anchor without retroactive cash or training and never move the date backwards.
+    previousState = { ...previousState, careerDepth: { ...depthOf(previousState), nextSettlementDate: plusDays(previousState.currentDate, 7) } };
+  }
+  if (previousState.seasonReview?.pending) return { ...previousState, lastAction: 'Complete the Season Review before advancing.' };
+  if (pendingStory(previousState)) return { ...previousState, lastAction: 'A career decision is waiting in your inbox. Choose a response before advancing.' };
+  const assistanceWasEnabled = depthOf(previousState).schedule?.enabled;
+  previousState = runScheduleAssistance(previousState);
+  if (assistanceWasEnabled && !depthOf(previousState).schedule?.enabled) return previousState;
+  const entered = previousState.tournaments.find(t => t.status === 'Entered');
+  if (entered && previousState.currentDate >= entered.startDate && previousState.currentDate <= (entered.endDate ?? entered.startDate)) return { ...previousState, lastAction: 'Your tournament is ready. Complete preparation and play, or explicitly withdraw, before advancing.' };
+  if (entered && previousState.travel.bookings[entered.id] && !previousState.travel.bookings[entered.id].preparation) return { ...previousState, lastAction: 'Choose and confirm your tournament preparation before advancing.' };
+  const boundary = nextCareerBoundary(previousState);
+  if (entered && !previousState.travel.bookings[entered.id] && boundary >= journeyQuote(previousState, entered, '').departure) return { ...previousState, lastAction: 'Book travel before advancing through the departure window.' };
+  if (boundary < depthOf(previousState).nextSettlementDate) return finalizeState({ ...previousState, currentDate: boundary }, 'Reached a career calendar commitment. Review your calendar before continuing.');
+  return advanceWholeWeekState(previousState);
+}
+
+function advanceWholeWeekState(previousState: GameState): GameState {
   if (previousState.seasonReview?.pending) {
     return finalizeState(
       previousState,
@@ -6210,7 +6337,8 @@ export function advanceWeekState(previousState: GameState): GameState {
   });
   let nextState: GameState = {
     ...protectedState,
-    currentDate: addDays(protectedState.currentDate, 7),
+    currentDate: depthOf(protectedState).nextSettlementDate,
+    careerDepth: { ...depthOf(protectedState), nextSettlementDate: plusDays(depthOf(protectedState).nextSettlementDate, 7) },
     week: protectedState.week + 1,
     sponsors: activeSponsors,
     coachContracts: activeCoachContracts,
@@ -6222,7 +6350,8 @@ export function advanceWeekState(previousState: GameState): GameState {
     ].slice(0, 18),
     player: {
       ...protectedState.player,
-      cash: protectedState.player.cash + protectedState.finance.cashFlow,
+      cash: protectedState.player.cash + protectedState.finance.cashFlow + trainingBaseCost(protectedState) + overseasWeeklyCost(protectedState),
+      confidence: settledConfidence(protectedState.player.confidence, protectedState.player.form, protectedState.attributes.mental.Composure ?? 60),
       fatigue: clamp(
         protectedState.player.fatigue +
           sponsorObligationFatigue -
@@ -6426,6 +6555,7 @@ export function enterTournamentState(
   previousState: GameState,
   tournamentId: string,
 ): GameState {
+  previousState = lockTournamentSeedings(processRankingCalendar(previousState), previousState.currentDate);
   const tournament = previousState.tournaments.find(
     (item) => item.id === tournamentId,
   );
@@ -6458,6 +6588,10 @@ export function enterTournamentState(
   const existingEntry = previousState.tournaments.find(
     (item) => item.id !== tournamentId && item.status === "Entered",
   );
+  const commitmentBlocker = tournamentCommitmentConflict(previousState, tournament);
+  if (commitmentBlocker) {
+    return finalizeState(previousState, commitmentBlocker);
+  }
   if (existingEntry) {
     return finalizeState(
       previousState,
@@ -7121,12 +7255,6 @@ function buildPersistedPersonalityTraits(
   );
 }
 
-function addDays(dateString: string, days: number) {
-  const date = new Date(`${dateString}T00:00:00`);
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
 function daysUntil(dateString: string, currentDate: string) {
   const target = new Date(`${dateString}T00:00:00`).getTime();
   const current = new Date(`${currentDate}T00:00:00`).getTime();
@@ -7499,6 +7627,18 @@ function getTripCost(travelOption: TravelOption, hotelOption: HotelOption) {
   return travelOption.cost + hotelOption.cost + 20 + 35;
 }
 
+export function getTravelPackageCost(state: GameState, travelOptionId?: string, hotelOptionId?: string, tournamentId?: string) {
+  const event = state.tournaments.find(t => t.id === tournamentId) ?? state.tournaments.find(t => t.status === 'Entered');
+  const lockedJourney = event && state.realism?.journeys[`${event.id}:${event.startDate}`];
+  const booking = event && state.travel.bookings[event.id];
+  if (booking && lockedJourney && (lockedJourney.applied || lockedJourney.departure <= state.currentDate)) return booking.totalCost;
+  const options = travelOptionsFor(state, event);
+  const option = options.find(o => o.id === travelOptionId) ?? options[0];
+  const discount = state.sponsors.some((sponsor) => normalizeSponsor(sponsor, 0).perk === "Travel") ? 0.12 : 0;
+  const nights = event ? Math.max(1, Math.round((Date.parse(event.endDate ?? event.startDate) - Date.parse(journeyQuote(state, event, option.id).arrival)) / 86400000) + 1) : 1;
+  return Math.round((getTripCost(option, getHotelOption(hotelOptionId)) + (nights - 1) * getHotelOption(hotelOptionId).cost) * (1 - discount));
+}
+
 function normalizeSponsor(sponsor: SponsorDeal, index: number): SponsorDeal {
   const profile = getSponsorObligationProfile(sponsor);
   return {
@@ -7560,17 +7700,20 @@ export function bookTravelState(
     );
   }
 
-  const travelOption = getTravelOption(travelOptionId);
+  if (previousState.liveMatch?.status === 'In Progress') return finalizeState(previousState, 'Finish the current match before changing travel.');
+  const options = travelOptionsFor(previousState, tournament);
+  const travelOption = options.find(o => o.id === travelOptionId) ?? options[0];
   const hotelOption = getHotelOption(hotelOptionId);
-  const travelSponsorDiscount = previousState.sponsors.some(
-    (sponsor) => normalizeSponsor(sponsor, 0).perk === "Travel",
-  )
-    ? 0.12
-    : 0;
-  const totalCost = Math.round(
-    getTripCost(travelOption, hotelOption) * (1 - travelSponsorDiscount),
-  );
+  const totalCost = getTravelPackageCost(previousState, travelOption.id, hotelOption.id, tournament.id);
   const existingBooking = previousState.travel.bookings[tournament.id];
+  const realism = realismOf(previousState);
+  const journey = journeyQuote(previousState, tournament, travelOption.id);
+  if (journey.arrival > tournament.startDate) return finalizeState(previousState, 'This journey cannot arrive before the tournament starts. Choose a later event.');
+  const oldJourney = realism.journeys[journey.eventKey];
+  if (oldJourney?.applied || (oldJourney && oldJourney.departure <= previousState.currentDate)) return finalizeState(previousState, 'This journey has started. Its package is now locked.');
+  if (Object.values(realism.journeys).some(j => j.eventKey !== journey.eventKey && !j.applied && j.departure <= journey.arrival && j.arrival >= journey.departure)) return finalizeState(previousState, 'This journey overlaps another booked trip.');
+  if (previousState.careerDepth?.commitments.some(c => c.status === 'scheduled' && c.startDate <= journey.arrival && c.endDate >= journey.departure)) return finalizeState(previousState, 'Travel conflicts with a protected career commitment.');
+  if (existingBooking && Object.values(realism.journeys).some(j => j.eventKey !== journey.eventKey && !j.applied && j.departure > journey.arrival)) return finalizeState(previousState, 'A later journey depends on this itinerary; keep the existing booking.');
   const delta = totalCost - (existingBooking?.totalCost ?? 0);
   if (previousState.player.cash < delta)
     return finalizeState(
@@ -7581,21 +7724,12 @@ export function bookTravelState(
   return finalizeState(
     {
       ...previousState,
+      realism: { ...realism, journeys: { ...realism.journeys, [journey.eventKey]: journey } },
       player: {
         ...previousState.player,
         cash: previousState.player.cash - delta,
-        fatigue: clamp(
-          previousState.player.fatigue -
-            Math.round((100 - travelOption.fatigueValue) / 25),
-          0,
-          100,
-        ),
-        confidence: clamp(
-          previousState.player.confidence +
-            Math.round(hotelOption.preparationValue / 40),
-          0,
-          100,
-        ),
+        fatigue: previousState.player.fatigue,
+        confidence: previousState.player.confidence,
       },
       travel: {
         bookings: {
@@ -7633,7 +7767,7 @@ export function bookTravelState(
           {
             sender: "Travel Desk",
             subject: `${tournament.name} travel booked`,
-            preview: `${travelOption.name} and ${hotelOption.name} are now locked in for £${totalCost}. Match-day readiness has improved.`,
+            preview: `${travelOption.name} and ${hotelOption.name} are now locked in for £${totalCost}. Arrival ${journey.arrival}; accommodation through ${journey.hotelThrough}.`,
             priority: "Medium",
             actionLabel: "Review Travel",
             actionRoute: "/travel",
@@ -7687,8 +7821,9 @@ export function confirmTournamentPreparationState(
   }
 
   const uniqueSupportIds = [...new Set(supportIds)];
-  const effects = calculatePreparationEffects(allocations, uniqueSupportIds);
   const previousEffects = booking.preparation?.effects;
+  const confidenceBaseline = booking.preparation?.confidenceBaseline ?? previousState.player.confidence - (previousEffects?.confidenceDelta ?? 0);
+  const effects = calculatePreparationEffects(allocations, uniqueSupportIds, confidenceBaseline);
   const costDelta = effects.cost - (previousEffects?.cost ?? 0);
   if (costDelta > previousState.player.cash) {
     return finalizeState(
@@ -7703,6 +7838,7 @@ export function confirmTournamentPreparationState(
     effects.fatigueDelta - (previousEffects?.fatigueDelta ?? 0);
   const strainDelta = effects.strainDelta - (previousEffects?.strainDelta ?? 0);
   const plan: TournamentPreparationPlan = {
+    confidenceBaseline,
     focusId,
     allocations: { ...allocations },
     supportIds: uniqueSupportIds,
@@ -8633,10 +8769,17 @@ export function getTournamentEntryAccess(
   state: Pick<
     GameState,
     "player" | "careerSystems" | "competitionTables" | "history"
-  >,
+  > & Partial<Pick<GameState, 'rollingRankings'>>,
   tournament: Tournament,
 ): TournamentEntryAccess {
   const profile = getPlayerTournamentProfile(state);
+  const frozen = state.rollingRankings?.seedings[rankingEventKey(tournament)];
+  const lockedWorldRank = frozen?.world[state.player.fullName];
+  if (lockedWorldRank && (countsForWorldRanking(tournament) || tournament.type === 'Invitational')) {
+    profile.worldRank = lockedWorldRank;
+    profile.isTop16 = lockedWorldRank <= 16;
+    profile.isTop32 = lockedWorldRank <= 32;
+  }
   const accessBand = profile.accessBand;
   const seededProtection = getSeededProtectionForBand(accessBand);
   const hasMajorWin = state.history.tournamentHistory.some(
@@ -8654,6 +8797,13 @@ export function getTournamentEntryAccess(
       seededProtection,
       reason: "This player is retired from competitive events.",
     };
+  }
+
+  // Entry rules select a field; ranking changes during that same event must not
+  // disqualify an established entrant. Date, travel and equipment still gate play.
+  if (tournament.status === "Entered" && state.history.tournamentHistory.some(entry =>
+    entry.tournamentId === tournament.id && entry.startDate === tournament.startDate && entry.matchesPlayed > 0)) {
+    return { allowed: true, accessBand, seededProtection, reason: null };
   }
 
   if (
@@ -8770,6 +8920,10 @@ export function getTournamentEntryAccess(
       };
     }
     case "worldChampionshipMain": {
+      if (frozen) {
+        const allowed = profile.hasMainTourStatus && (profile.isTop16 || Boolean(recordedMajorQualifiers(state, tournament)?.includes(state.player.fullName)));
+        return { allowed, accessBand, seededProtection, reason: allowed ? null : 'Requires a top-16 place at the seeding cut-off or a completed qualifying win.' };
+      }
       if (tournament.seasonOpenAccessLock === "worldMainDraw") {
         return { allowed: true, accessBand, seededProtection, reason: null };
       }
@@ -8799,6 +8953,10 @@ export function getTournamentEntryAccess(
       };
     }
     case "worldChampionshipQualifying": {
+      if (frozen) {
+        const allowed = profile.hasMainTourStatus && !profile.isTop16 && profile.worldRank <= MAIN_TOUR_POOL_SIZE;
+        return { allowed, accessBand, seededProtection, reason: allowed ? null : 'Qualifying is for players outside the top 16 at the designated cut-off.' };
+      }
       if (tournament.seasonOpenAccessLock === "worldMainDraw") {
         return {
           allowed: false,
@@ -8891,6 +9049,7 @@ export function getTournamentEntryAccess(
     }
     case "playersSeries": {
       const oneYearRank =
+        state.rollingRankings?.seedings[rankingEventKey(tournament)]?.oneYear[state.player.fullName] ??
         state.careerSystems.pro.oneYearRank ??
         getCompetitionRowForPlayer(
           state.competitionTables,
@@ -8910,6 +9069,10 @@ export function getTournamentEntryAccess(
       };
     }
     case "ukMajor": {
+      if (state.rollingRankings) {
+        const allowed = profile.hasMainTourStatus && (profile.isTop16 || Boolean(recordedMajorQualifiers(state, tournament)?.includes(state.player.fullName)));
+        return { allowed, accessBand, seededProtection, reason: allowed ? null : 'Requires a top-16 place at the seeding cut-off or a completed qualifying win.' };
+      }
       const allowed =
         profile.hasMainTourStatus && profile.worldRank <= MAIN_TOUR_POOL_SIZE;
       return {
@@ -9125,6 +9288,17 @@ function isDateInsideTournament(
 }
 
 export function repairGameState(state: GameState): GameState {
+  state = initializeRollingRankings(state);
+  if (!state.equipment.chalkConditions && state.equipment.currentChalkId) {
+    const id = state.equipment.currentChalkId;
+    state = { ...state, equipment: { ...state.equipment,
+      chalkConditions: { [id]: state.equipment.chalkCondition },
+      chalkStock: { ...state.equipment.chalkStock, [id]: Math.max(state.equipment.chalkStock[id] ?? 0, state.equipment.chalkCondition > 0 ? 1 : 0) },
+    } };
+  }
+  state = initializeCareerDepth(state);
+  state = { ...state, realism: realismOf(state) };
+  state = { ...state, tournaments: state.tournaments.map(t => ({ ...t, televisedRounds: t.televisedRounds ?? tournamentCatalog.find(event => event.id === t.id)?.televisedRounds ?? [] })) };
   const currentDateValue = getTournamentDateValue(state.currentDate);
   const invalidMatchIds = new Set(
     state.matches
@@ -9285,7 +9459,7 @@ export function repairGameState(state: GameState): GameState {
           rankingBaseline: state.tournamentProgress.rankingBaseline ?? {},
         }
       : createEmptyTournamentProgress(),
-    liveMatch: keepLiveMatch ? state.liveMatch : null,
+    liveMatch: keepLiveMatch ? normalizeLiveMatchState(state.liveMatch) : null,
     history: {
       ...state.history,
       matchLog: repairedMatchLog,
@@ -9634,7 +9808,7 @@ function updateCompetitionTablesFromCpuDraw(
   });
 
   return keys.reduce<CompetitionTablesState>((nextTables, key) => {
-    let rows = nextTables[key];
+    let rows = [...nextTables[key]];
     const storedBaseline = rankingBaseline[key];
     const baselineRankings = new Map(
       storedBaseline
@@ -10184,6 +10358,8 @@ function getNextUpcomingTournament(state: GameState) {
 }
 
 export function continueToNextTournamentState(previousState: GameState) {
+  previousState = initializeCareerDepth(previousState);
+  if (pendingStory(previousState) || previousState.seasonReview?.pending) return advanceWeekState(previousState);
   const initialTarget = getNextUpcomingTournament(previousState);
   if (!initialTarget) {
     return finalizeState(
@@ -10214,17 +10390,11 @@ export function continueToNextTournamentState(previousState: GameState) {
     )
       break;
 
-    const daysToTarget = daysUntil(target.startDate, nextState.currentDate);
-    if (daysToTarget > 0 && daysToTarget < 7) {
-      nextState = {
-        ...nextState,
-        currentDate: target.startDate,
-      };
-      break;
-    }
-
+    const before = nextState;
     nextState = advanceWeekState(nextState);
     iterations += 1;
+    if (nextState.currentDate === before.currentDate || pendingStory(nextState) || nextState.seasonReview?.pending) return nextState;
+    if (depthOf(nextState).commitments.some(c => c.status === 'scheduled' && c.startDate === nextState.currentDate)) return nextState;
 
     if (nextState.liveMatch?.status === "In Progress") break;
     if (
@@ -10253,6 +10423,7 @@ function rollCompetitionTablesForward(
   tables: CompetitionTablesState,
   playerName: string,
   worldPlayers: WorldPlayerRecord[] = [],
+  rolling = false,
 ): CompetitionTablesState {
   const worldPlayersByName = new Map(
     worldPlayers.map((record) => [record.playerName, record]),
@@ -10260,7 +10431,7 @@ function rollCompetitionTablesForward(
 
   return {
     world: tables.world.map((row, index) => ({
-      ...applyWorldRankingDecay(row, worldPlayersByName.get(row.playerName)),
+      ...(rolling ? row : applyWorldRankingDecay(row, worldPlayersByName.get(row.playerName))),
       ranking: index + 1,
       movement: 0,
       highlighted: row.playerName === playerName,
@@ -13312,7 +13483,7 @@ function finalizeState(
   lastAction: string,
   snapshotLabel?: string,
 ) {
-  const nextState = recalculateState(state, lastAction);
+  const nextState = recalculateState(reconcileRealism(reconcileCareerDepth(processRankingCalendar(state))), lastAction);
   return snapshotLabel
     ? withHistorySnapshot(nextState, snapshotLabel)
     : nextState;
@@ -13322,7 +13493,8 @@ export function getTournamentEntryRound(
   state: GameState,
   tournament: Tournament,
 ): TournamentRound {
-  const rankingRows = getCompetitionRowsForTournament(state, tournament);
+  const rawRows = getCompetitionRowsForTournament(state, tournament);
+  const rankingRows = countsForWorldRanking(tournament) || tournament.type === 'Invitational' ? seedingRows(state, tournament, rawRows) : rawRows;
   const playerRank =
     rankingRows.find((row) => row.playerName === state.player.fullName)
       ?.ranking ??
@@ -13553,6 +13725,9 @@ function selectTournamentOpponent(
 }
 
 function createMatchSetup(state: GameState, tournament: Tournament) {
+  state = { ...state, attributes: effectiveCareerAttributes(state, state.attributes) };
+  const touch = conditionAdjustment(venueConditions(tournament), state.attributes.technical['Cue Ball Control'] ?? 50, state.attributes.technical['Safety Play'] ?? 50, familiarisedFor(state, tournament));
+  state = { ...state, attributes: { ...state.attributes, technical: { ...state.attributes.technical, 'Cue Ball Control': clamp((state.attributes.technical['Cue Ball Control'] ?? 50) + touch, 1, 99), 'Safety Play': clamp((state.attributes.technical['Safety Play'] ?? 50) + touch, 1, 99) } } };
   const currentRound =
     state.tournamentProgress.tournamentId === tournament.id &&
     state.tournamentProgress.currentRound
@@ -13641,6 +13816,7 @@ function createMatchSetup(state: GameState, tournament: Tournament) {
       equipmentBonus,
     }) +
     coachMatchBonus +
+    depthOf(state).temporarySharpness +
     (preparationEffects?.sharpnessDelta ?? 0) * preparationDecay +
     travelModifier -
     (state.trainingCondition.injuryWeeks > 0 ? 6 : 0) -
@@ -14184,7 +14360,7 @@ function createLiveMatchState(
     opponentFatigue,
     clamp(Math.round((100 - setup.opponent.ranking) / 14), 0, 8),
   );
-  const opponentApproach = getLiveMatchOpponentApproach({
+  const opponentApproach = learnedCounter(state, setup.opponent.playerName) ?? getLiveMatchOpponentApproach({
     playerFrames: 0,
     opponentFrames: 0,
     opponentConfidence,
@@ -14209,6 +14385,10 @@ function createLiveMatchState(
   return {
     tournamentId: tournament.id,
     round: setup.currentRound,
+    sessions: sessionPlan(setup.roundPlan.bestOf, tournament),
+    venue: venueConditions(tournament),
+    conditionEffect: conditionAdjustment(venueConditions(tournament), playerVisitProfile.cueBallControl, playerVisitProfile.safetyPlay, familiarisedFor(state, tournament)),
+    sessionId: `${state.season}:${tournament.id}:${setup.currentRound}:${setup.opponent.playerName}:${state.history.matchLog.length}`,
     bestOf: setup.roundPlan.bestOf,
     framesNeeded,
     playerName: state.player.fullName,
@@ -14938,6 +15118,7 @@ export function advanceLiveVisit(
   mode: LiveMatchResolutionMode = "manual",
   granularity: "visit" | "shot" = "visit",
 ): LiveMatchState {
+  if (liveMatch.status === 'Completed' || pendingMatchBreak(liveMatch)) return liveMatch;
   const actorIsPlayer = liveMatch.playerAtTable === liveMatch.playerName;
   const actor: LiveVisitActor = actorIsPlayer ? "Player" : "Opponent";
   const resolvedDecision =
@@ -14952,9 +15133,11 @@ export function advanceLiveVisit(
   const tacticalEdge = actorIsPlayer
     ? liveMatch.tacticalEdge
     : -liveMatch.tacticalEdge;
-  const activeProfile = actorIsPlayer
+  const rawProfile = actorIsPlayer
     ? liveMatch.playerVisitProfile
     : liveMatch.opponentVisitProfile;
+  const conditionEffect = actorIsPlayer ? liveMatch.conditionEffect ?? 0 : liveMatch.venue ? conditionAdjustment(liveMatch.venue, rawProfile.cueBallControl, rawProfile.safetyPlay, false) : 0;
+  const activeProfile = { ...rawProfile, cueBallControl: clamp(rawProfile.cueBallControl + conditionEffect, 1, 99), safetyPlay: clamp(rawProfile.safetyPlay + (liveMatch.tacticalPlan === 'Safety' ? conditionEffect * 0.5 : conditionEffect), 1, 99) };
   const defendingProfile = actorIsPlayer
     ? liveMatch.opponentVisitProfile
     : liveMatch.playerVisitProfile;
@@ -15528,7 +15711,7 @@ function resolveCareerSimulationLiveMatch(
   state: GameState,
   tournament: Tournament,
 ): LiveMatchState {
-  const liveMatch = createLiveMatchState(state, tournament);
+  let liveMatch = createLiveMatchState(state, tournament);
   const frameWinChance = convertMatchWinProbabilityToFrameWinProbability(
     liveMatch.plannedMatchWinChance,
     liveMatch.bestOf,
@@ -15580,6 +15763,10 @@ function resolveCareerSimulationLiveMatch(
         ? liveMatch.playerName
         : liveMatch.opponentName,
     });
+    // Quick simulation delegates interval decisions to the conservative rest
+    // option, records them once, and preserves the same break/recovery rules.
+    liveMatch = { ...liveMatch, playerFrames, opponentFrames, status: playerFrames >= liveMatch.framesNeeded || opponentFrames >= liveMatch.framesNeeded ? 'Completed' : 'In Progress' };
+    if (pendingMatchBreak(liveMatch)) liveMatch = resolveSessionBreak(liveMatch, 'recover');
   }
 
   const pressureValue = clamp(
@@ -15631,10 +15818,13 @@ function resolveCareerSimulationLiveMatch(
   };
 }
 
-function finalizeLiveMatch(
+export function finalizeLiveMatch(
   state: GameState,
   liveMatch: LiveMatchState,
 ): GameState {
+  const sourceMatchId = liveMatch.sessionId ?? `${state.season}:${liveMatch.tournamentId}:${liveMatch.round}:${liveMatch.opponentName}`;
+  if (state.matches.some(m => m.sourceMatchId === sourceMatchId)) return state;
+  if (liveMatch.status !== 'Completed') return state;
   const tournament = state.tournaments.find(
     (item) => item.id === liveMatch.tournamentId,
   );
@@ -15673,7 +15863,12 @@ function finalizeLiveMatch(
     liveMatch.round,
     !won && isFinalRound,
   );
-  const rankingPointsGained = !awardsRankingPoints
+  const protectedOpeningLoss = countsForWorldRanking(tournament) && !won && state.tournamentProgress.completedRounds.length === 0 && (
+    getTournamentEntryRound(state, tournament) !== tournamentRounds[0] ||
+    (['ukMajor', 'worldChampionshipMain'].includes(resolveTournamentFormat(tournament).id) && (seedingRows(state, tournament, state.competitionTables.world).find(r => r.playerName === state.player.fullName)?.ranking ?? 999) <= 16) ||
+    /shoot.?out/i.test(tournament.name)
+  );
+  const rankingPointsGained = !awardsRankingPoints || protectedOpeningLoss
     ? 0
     : isQSchoolTournament
       ? liveMatch.playerFrames
@@ -15703,12 +15898,13 @@ function finalizeLiveMatch(
     : opponentPlacementKnown
       ? opponentPlacement.prizeMoney
       : 0;
-  const confidenceChange = won ? (liveMatch.round === "Final" ? 8 : 5) : -3;
+  const confidenceChange = matchConfidenceChange(state.player.confidence, won, liveMatch.plannedMatchWinChance, isFinalRound, (depthOf(state).mediaExpectationsUntil ?? '') > state.currentDate);
+  const sessionRecovery = Math.min(20, (liveMatch.sessions?.completedBreaks ?? []).reduce((n, b) => n + (b.kind === 'overnight' ? 10 : b.kind === 'session' ? 5 : 2) + (b.choice === 'recover' ? 2 : 0), 0));
   const fatigueChange = clamp(
     Math.round(liveMatch.frameHistory.length * 1.5) + (won ? 2 : 1),
     4,
     16,
-  );
+  ) - sessionRecovery;
   const playerWonTournament = won && isFinalRound;
   const opponentWonTournament = !won && isFinalRound;
   const awardsCareerTitle = tournamentAwardsCareerTitle(tournament);
@@ -15721,6 +15917,8 @@ function finalizeLiveMatch(
   const tournamentClass = getTournamentCircuitClass(tournament);
   const equipmentProfile = getEquipmentPerformanceProfile(state.equipment);
   const latestMatch: Match = {
+    sourceMatchId,
+    season: state.season,
     id: `match-${Date.now()}-${tournament.id}-${liveMatch.round.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${state.history.matchLog.length + 1}`,
     tournamentId: tournament.id,
     playedOn: state.currentDate,
@@ -15728,6 +15926,8 @@ function finalizeLiveMatch(
     bestOf: liveMatch.bestOf,
     playerName: state.player.fullName,
     opponentName: liveMatch.opponentName,
+    opponentId: uniqueOpponentId(state, liveMatch.opponentName),
+    playerTactic: liveMatch.tacticalPlan,
     playerRanking:
       state.player.amateurRanking ?? state.player.worldRanking ?? 0,
     opponentRanking: liveMatch.opponentRanking,
@@ -16106,6 +16306,7 @@ function finalizeLiveMatch(
       competitionTables,
       worldPlayers,
       careerSystems,
+      rollingRankings: playerEventComplete ? recordRankingEvent(state, tournament, completedEventDraw, getTournamentPlacementAwards).rollingRankings : state.rollingRankings,
       tournaments: state.tournaments.map((item) =>
         item.id === tournament.id
           ? {
@@ -16369,6 +16570,7 @@ function recalculateState(
   state: GameState,
   lastAction = state.lastAction,
 ): GameState {
+  state = rebuildRollingRankings(initializeRollingRankings(state), state.currentDate, false);
   const coachContracts = normalizeCoachContracts(
     state.coachContracts,
     state.coaches,
@@ -16387,7 +16589,7 @@ function recalculateState(
     state.finance.baseCashFlow +
     sponsorWeeklyIncome -
     coachCost -
-    facilityWeeklyRental;
+    facilityWeeklyRental - trainingBaseCost(state) - overseasWeeklyCost(state);
   let competitionTables = COMPETITION_TABLE_KEYS.reduce<CompetitionTablesState>(
     (tables, key) => ({
       ...tables,
@@ -16422,6 +16624,7 @@ function recalculateState(
     competitionTables,
     state.player,
   );
+  competitionTables = rebuildRollingRankings({ ...state, competitionTables }, state.currentDate, false).competitionTables;
   const careerSystems = syncCareerSystems({
     competitionTables,
     player: state.player,
@@ -16817,7 +17020,7 @@ function loadStoredState(): GameState {
   if (!saved) return createStarterState();
 
   try {
-    const parsed = JSON.parse(saved) as Partial<GameState> & {
+    const parsed = JSON.parse(decodeCareerSave(saved)) as Partial<GameState> & {
       tournamentProgress?: TournamentProgressState;
     };
     const fallbackState = createStarterState();
@@ -16834,6 +17037,9 @@ function loadStoredState(): GameState {
     const hydratedState: GameState = {
       ...fallbackState,
       ...parsed,
+      rollingRankings: parsed.rollingRankings,
+      careerDepth: parsed.careerDepth,
+      realism: parsed.realism,
       worldSeed: parsed.worldSeed ?? fallbackState.worldSeed,
       player: parsedPlayer,
       attributes: parsed.attributes
@@ -17151,7 +17357,7 @@ export function hireCoachState(
       ],
       player: {
         ...previousState.player,
-        confidence: clamp(previousState.player.confidence + 2, 0, 100),
+confidence: previousState.player.confidence,
         morale: clamp(previousState.player.morale + 2, 0, 100),
       },
       inbox: [
@@ -17215,7 +17421,7 @@ export function buyCueState(previousState: GameState, cueId: string) {
         equipment: { ...previousState.equipment, currentCueId: cueId },
         player: {
           ...previousState.player,
-          confidence: clamp(previousState.player.confidence + 1, 0, 100),
+          confidence: previousState.player.confidence,
         },
       },
       "Equipped an owned cue.",
@@ -17249,7 +17455,7 @@ export function buyCueState(previousState: GameState, cueId: string) {
       player: {
         ...previousState.player,
         cash: previousState.player.cash - cue.price,
-        confidence: clamp(previousState.player.confidence + 1, 0, 100),
+        confidence: previousState.player.confidence,
       },
       inbox: [
         createInboxMessage(
@@ -17273,6 +17479,12 @@ export function buyChalkState(previousState: GameState, chalkId: string) {
   const chalk = chalkCatalog.find((item) => item.id === chalkId);
   if (!chalk) return previousState;
   const stock = previousState.equipment.chalkStock[chalkId] ?? 0;
+  const previousChalkId = previousState.equipment.currentChalkId;
+  const savedConditions = { ...previousState.equipment.chalkConditions,
+    ...(previousChalkId ? { [previousChalkId]: previousState.equipment.chalkCondition } : {}),
+  };
+  const storedCondition = savedConditions[chalkId] ?? 100;
+  const availableUnits = stock - Number(storedCondition <= 0);
   if (
     previousState.equipment.currentChalkId === chalkId &&
     stock > 0 &&
@@ -17283,22 +17495,23 @@ export function buyChalkState(previousState: GameState, chalkId: string) {
       `${chalk.name} is already equipped with ${stock} unit${stock === 1 ? "" : "s"} remaining.`,
     );
   }
-  if (previousState.equipment.chalkOwned.includes(chalkId) && stock > 0) {
+  if (previousState.equipment.chalkOwned.includes(chalkId) && availableUnits > 0) {
     return finalizeState(
       {
         ...previousState,
         equipment: {
           ...previousState.equipment,
           currentChalkId: chalkId,
-          chalkCondition: 100,
+          chalkCondition: storedCondition > 0 ? storedCondition : 100,
+          chalkConditions: { ...savedConditions, [chalkId]: storedCondition > 0 ? storedCondition : 100 },
           chalkStock: {
             ...previousState.equipment.chalkStock,
-            [chalkId]: Math.max(0, stock - 1),
+            [chalkId]: availableUnits,
           },
         },
         player: {
           ...previousState.player,
-          confidence: clamp(previousState.player.confidence + 1, 0, 100),
+          confidence: previousState.player.confidence,
         },
       },
       `Opened and equipped a stocked unit of ${chalk.name}.`,
@@ -17322,12 +17535,13 @@ export function buyChalkState(previousState: GameState, chalkId: string) {
           ? previousState.equipment.chalkOwned
           : [...previousState.equipment.chalkOwned, chalkId],
         chalkCondition: 100,
+        chalkConditions: { ...savedConditions, [chalkId]: 100 },
         chalkStock: { ...previousState.equipment.chalkStock, [chalkId]: 5 },
       },
       player: {
         ...previousState.player,
         cash: previousState.player.cash - chalk.cost,
-        confidence: clamp(previousState.player.confidence + 1, 0, 100),
+        confidence: previousState.player.confidence,
       },
       inbox: [
         createInboxMessage(
@@ -17395,7 +17609,7 @@ export function buyTipState(previousState: GameState, tipId: string) {
       player: {
         ...previousState.player,
         cash: previousState.player.cash - tip.cost,
-        confidence: clamp(previousState.player.confidence + 1, 0, 100),
+        confidence: previousState.player.confidence,
       },
       inbox: [
         createInboxMessage(
@@ -17428,11 +17642,11 @@ export function applyTrainingPlanState(
     );
   }
 
-  const normalizedTrainingPlan = normalizeTrainingPlan(
+  const normalizedTrainingPlan = protectRealismSessions(previousState, protectCommitmentSessions(previousState, protectPartnerSessions(previousState, normalizeTrainingPlan(
     nextWeek ?? previousState.trainingPlan,
-    previousState.currentDate,
+    plusDays(depthOf(previousState).nextSettlementDate, -7),
     getEnteredCompetitions(previousState),
-  );
+  ))));
   const trainingEffects = applyCoachTrainingBonus(
     calculateTrainingEffects(normalizedTrainingPlan),
     previousState.coachContracts,
@@ -17446,8 +17660,11 @@ export function applyTrainingPlanState(
   const facilityMultiplier = getFacilityTrainingMultiplier(
     previousState.equipment,
   );
-  const adaptedGain = (gain: number) =>
-    gain * adaptationMultiplier * facilityMultiplier;
+  const developmentState = previousState;
+  const activeDevelopmentKind = depthOf(previousState).project?.status === 'active' ? depthOf(previousState).project?.kind : undefined;
+  previousState = progressDevelopment(previousState, normalizedTrainingPlan);
+  const adaptedGain = (gain: number, skill: string) =>
+    gain * adaptationMultiplier * Math.min(1.15, facilityMultiplier * baseTrainingMultiplier(developmentState)) * developmentTrainingBonus(developmentState, normalizedTrainingPlan, skill);
   const recoveryCapacity =
     trainingEffects.recoverySessions * 5 + trainingEffects.restSessions * 4;
   const nextStrain = clamp(
@@ -17487,13 +17704,21 @@ export function applyTrainingPlanState(
       })
     : previousState.health.activeIssue;
   const nextAttributes = deepCloneAttributes(previousState.attributes);
+  const completedCells = normalizedTrainingPlan.filter(d => !d.careerCommitmentId).flatMap(d => [d.morning, d.afternoon, d.evening]);
+  for (const [kind, skill, title] of [
+    ['safety', 'Safety Play', 'Safety Exchanges'], ['cue-action', 'Consistency', 'Line-Up Drill'], ['pressure', 'Composure', 'Mental Training'], ['stamina', 'Recovery Rate', 'Fitness'],
+  ]) {
+    if (activeDevelopmentKind !== kind || previousState.health.activeIssue) continue;
+    const sessions = completedCells.filter(c => c.title === title).length;
+    if (sessions > 0) improveAttribute(nextAttributes, skill, getScaledTrainingGain(previousState, skill, adaptedGain(sessions / 6, skill)));
+  }
   improveAttribute(
     nextAttributes,
     "Long Potting",
     getScaledTrainingGain(
       previousState,
       "Long Potting",
-      adaptedGain(trainingEffects.technicalGain),
+      adaptedGain(trainingEffects.technicalGain, 'Long Potting'),
     ),
   );
   improveAttribute(
@@ -17502,7 +17727,7 @@ export function applyTrainingPlanState(
     getScaledTrainingGain(
       previousState,
       "Cue Ball Control",
-      adaptedGain(trainingEffects.cueControlGain),
+      adaptedGain(trainingEffects.cueControlGain, 'Cue Ball Control'),
     ),
   );
   improveAttribute(
@@ -17511,7 +17736,7 @@ export function applyTrainingPlanState(
     getScaledTrainingGain(
       previousState,
       "Break Building",
-      adaptedGain(trainingEffects.breakBuildingGain),
+      adaptedGain(trainingEffects.breakBuildingGain, 'Break Building'),
     ),
   );
   improveAttribute(
@@ -17520,7 +17745,7 @@ export function applyTrainingPlanState(
     getScaledTrainingGain(
       previousState,
       "Focus",
-      adaptedGain(trainingEffects.focusGain),
+      adaptedGain(trainingEffects.focusGain, 'Focus'),
     ),
   );
   improveAttribute(
@@ -17529,7 +17754,7 @@ export function applyTrainingPlanState(
     getScaledTrainingGain(
       previousState,
       "Stamina",
-      adaptedGain(trainingEffects.staminaGain),
+      adaptedGain(trainingEffects.staminaGain, 'Stamina'),
     ),
   );
   const currentCareerRank =
@@ -17586,11 +17811,7 @@ export function applyTrainingPlanState(
     0,
     100,
   );
-  const nextPlayerConfidence = clamp(
-    previousState.player.confidence + trainingEffects.confidenceDelta,
-    0,
-    100,
-  );
+  const nextPlayerConfidence = supportedConfidence(previousState.player.confidence, trainingEffects.confidenceDelta);
   const nextPlayerMorale = clamp(
     previousState.player.morale +
       trainingEffects.moraleDelta -
@@ -17621,6 +17842,7 @@ export function applyTrainingPlanState(
       ...previousState,
       attributes: nextAttributes,
       trainingPlan: normalizedTrainingPlan,
+      careerDepth: recordProjectOutcome(previousState, nextAttributes),
       trainingAppliedWeek: previousState.week,
       trainingCondition: {
         ...previousState.trainingCondition,
@@ -18282,7 +18504,7 @@ function getUniqueSaveSlotName(baseName: string, excludedId?: string) {
 
 function persistCareerSlot(
   state: GameState,
-  options: { id?: string; name?: string } = {},
+  options: { id?: string; name?: string; serialized?: string } = {},
 ) {
   const id = options.id ?? createSaveSlotId();
   const existing = readSaveSlotIndex().find((slot) => slot.id === id);
@@ -18297,9 +18519,9 @@ function persistCareerSlot(
     date: state.currentDate,
     updatedAt: new Date().toISOString(),
   };
-  window.localStorage.setItem(
+  writeCareerStorage(
     `${SAVE_SLOT_PREFIX}${id}`,
-    JSON.stringify({ ...state, schemaVersion: SAVE_SCHEMA_VERSION }),
+    options.serialized ?? encodeCareerSave({ ...state, schemaVersion: SAVE_SCHEMA_VERSION }),
   );
   writeSaveSlotIndex([
     summary,
@@ -18334,12 +18556,25 @@ export function useGameState() {
 
   useEffect(() => {
     if (typeof window === "undefined" || careerSessionMode !== "active") return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
-    if (activeSaveSlotId) persistCareerSlot(gameState, { id: activeSaveSlotId });
+    const serialized = encodeCareerSave(gameState);
+    writeCareerStorage(STORAGE_KEY, serialized);
+    if (activeSaveSlotId) persistCareerSlot(gameState, { id: activeSaveSlotId, serialized });
   }, [activeSaveSlotId, careerSessionMode, gameState]);
 
   const actions = useMemo(
     () => ({
+      actOnRealism(action: RealismAction) {
+        setGameState(previous => {
+          const next = realismAction(previous, action);
+          return finalizeState(next, next.lastAction);
+        });
+      },
+      actOnCareer(action: CareerDepthAction) {
+        setGameState(previous => {
+          const next = careerDepthAction(previous, action);
+          return finalizeState(next, next.lastAction);
+        });
+      },
       beginNewCareer() {
         setCareerSessionMode("creating");
       },
@@ -18366,7 +18601,7 @@ export function useGameState() {
       startDemoCareer() {
         const demoState = createStarterState();
         const slot = persistCareerSlot(demoState, { name: "Demo Career" });
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(demoState));
+        window.localStorage.setItem(STORAGE_KEY, encodeCareerSave(demoState));
         writeActiveSaveSlotId(slot.id);
         setActiveSaveSlotId(slot.id);
         setGameState(demoState);
@@ -18381,7 +18616,7 @@ export function useGameState() {
         const normalizedName =
           name.trim() || `${gameState.player.fullName} · ${gameState.season}`;
         const summary = persistCareerSlot(gameState, { name: normalizedName });
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
+        window.localStorage.setItem(STORAGE_KEY, encodeCareerSave(gameState));
         writeActiveSaveSlotId(summary.id);
         setActiveSaveSlotId(summary.id);
         return summary;
@@ -18429,7 +18664,7 @@ export function useGameState() {
             !parsed.currentDate
           )
             return false;
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+          window.localStorage.setItem(STORAGE_KEY, encodeCareerSave(parsed));
           const importedState = loadStoredState();
           const slot = persistCareerSlot(importedState, {
             name: `${importedState.player.fullName} · Imported`,
@@ -18494,11 +18729,21 @@ export function useGameState() {
       },
       resetCareer(config?: NewCareerConfig) {
         const newCareer = createNewCareerState(config);
-        const slot = persistCareerSlot(newCareer, {
-          name: newCareer.player.fullName,
-        });
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(newCareer));
-        writeActiveSaveSlotId(slot.id);
+        const slot: SaveSlotSummary = {
+          id: createSaveSlotId(),
+          name: getUniqueSaveSlotName(newCareer.player.fullName),
+          playerName: newCareer.player.fullName,
+          season: newCareer.season,
+          date: newCareer.currentDate,
+          updatedAt: new Date().toISOString(),
+        };
+        const serialized = encodeCareerSave(newCareer);
+        writeCareerStorageBatch([
+          [`${SAVE_SLOT_PREFIX}${slot.id}`, serialized],
+          [SAVE_SLOT_INDEX_KEY, JSON.stringify([slot, ...readSaveSlotIndex()])],
+          [STORAGE_KEY, serialized],
+          [ACTIVE_SAVE_SLOT_KEY, slot.id],
+        ]);
         setActiveSaveSlotId(slot.id);
         setGameState(newCareer);
         setCareerSessionMode("active");
@@ -18603,6 +18848,7 @@ export function useGameState() {
             previousState.player.reputation,
             tone,
           );
+          outcome.nextWeeklyCost = Math.min(contract.weeklyCost, Math.round(outcome.nextWeeklyCost * (1 + coachNegotiationAdjustment(previousState, coachId))));
           if (!outcome.success) {
             return finalizeState(
               {
@@ -18643,7 +18889,7 @@ export function useGameState() {
               ),
               player: {
                 ...previousState.player,
-                confidence: clamp(previousState.player.confidence + 1, 0, 100),
+                confidence: previousState.player.confidence,
               },
               inbox: [
                 createInboxMessage(
@@ -18684,11 +18930,7 @@ export function useGameState() {
                 },
                 player: {
                   ...previousState.player,
-                  confidence: clamp(
-                    previousState.player.confidence + 1,
-                    0,
-                    100,
-                  ),
+                  confidence: previousState.player.confidence,
                 },
               },
               "Equipped an owned case.",
@@ -18715,7 +18957,7 @@ export function useGameState() {
               player: {
                 ...previousState.player,
                 cash: previousState.player.cash - equipmentCase.price,
-                confidence: clamp(previousState.player.confidence + 1, 0, 100),
+                confidence: previousState.player.confidence,
               },
               inbox: [
                 createInboxMessage(
@@ -18750,11 +18992,7 @@ export function useGameState() {
                 },
                 player: {
                   ...previousState.player,
-                  confidence: clamp(
-                    previousState.player.confidence + 1,
-                    0,
-                    100,
-                  ),
+                  confidence: previousState.player.confidence,
                 },
               },
               "Switched your active training facility membership.",
@@ -18782,7 +19020,7 @@ export function useGameState() {
               },
               player: {
                 ...previousState.player,
-                confidence: clamp(previousState.player.confidence + 1, 0, 100),
+                confidence: previousState.player.confidence,
               },
               inbox: [
                 createInboxMessage(
@@ -19035,7 +19273,8 @@ export function useGameState() {
 
           while (
             nextState.liveMatch &&
-            nextState.liveMatch.status === "In Progress"
+            nextState.liveMatch.status === "In Progress" &&
+            !pendingMatchBreak(nextState.liveMatch)
           ) {
             const progressedLiveMatch: LiveMatchState = playOutLiveFrame(
               nextState.liveMatch,
@@ -19120,12 +19359,8 @@ export function useGameState() {
               getTacticalMatchupEdge(
                 prompt.recommendedPlan,
                 previousState.liveMatch.opponentApproach,
-              ) + 2,
-            playerConfidence: clamp(
-              previousState.liveMatch.playerConfidence + 2,
-              25,
-              99,
-            ),
+              ),
+            playerConfidence: previousState.liveMatch.playerConfidence,
             lastTacticalNote: `${prompt.title}: ${prompt.note}`,
             feed: (
               [
@@ -19286,6 +19521,7 @@ export function useGameState() {
           }
 
           const liveMatch = previousState.liveMatch;
+          if (pendingMatchBreak(liveMatch) || liveMatch.status === 'Completed') return previousState;
           const remainingPoints = getRemainingTablePoints(liveMatch);
           const concededLiveMatch: LiveMatchState = {
             ...liveMatch,
@@ -19436,9 +19672,11 @@ export function useGameState() {
             ) ?? negotiationOptionCatalog[0];
           const toneModifier =
             tone === "Conservative" ? 8 : tone === "Ambitious" ? -10 : 0;
+          const introduction = depthOf(previousState).commercialIntroduction;
+          const introductionApplies = introduction?.offerId === sponsorId && !introduction.used && introduction.expiresDate >= previousState.currentDate;
           const success =
             Math.random() * 100 <
-            clamp(selectedOption.probability + toneModifier, 10, 90);
+            clamp(selectedOption.probability + toneModifier + (introductionApplies ? 5 : 0), 10, 90);
 
           const updatedOffers = previousState.sponsorOffers.map((item) => {
             if (item.id !== sponsorId) return item;
@@ -19494,13 +19732,10 @@ export function useGameState() {
             {
               ...previousState,
               sponsorOffers: updatedOffers,
+              careerDepth: { ...depthOf(previousState), commercialIntroduction: introductionApplies ? { ...introduction!, used: true } : introduction },
               player: {
                 ...previousState.player,
-                confidence: clamp(
-                  previousState.player.confidence + (success ? 1 : -1),
-                  0,
-                  100,
-                ),
+                confidence: supportedConfidence(previousState.player.confidence, success ? 1 : -1),
                 morale: clamp(
                   previousState.player.morale + (success ? 2 : -1),
                   0,
@@ -19605,7 +19840,7 @@ export function useGameState() {
               player: {
                 ...previousState.player,
                 cash: previousState.player.cash - totalCost,
-                confidence: clamp(previousState.player.confidence + 1, 0, 100),
+                confidence: previousState.player.confidence,
               },
               inbox: [
                 createInboxMessage(
@@ -19710,7 +19945,7 @@ export function useGameState() {
               player: {
                 ...previousState.player,
                 cash: previousState.player.cash - maintenanceAction.cost,
-                confidence: clamp(previousState.player.confidence + 2, 0, 100),
+                confidence: previousState.player.confidence,
               },
               inbox: [
                 createInboxMessage(
@@ -19749,7 +19984,7 @@ export function useGameState() {
               attributes: nextAttributes,
               player: {
                 ...previousState.player,
-                confidence: clamp(previousState.player.confidence + 6, 0, 100),
+                confidence: supportedConfidence(previousState.player.confidence, 6),
                 morale: clamp(previousState.player.morale + 4, 0, 100),
                 fatigue: clamp(previousState.player.fatigue - 10, 0, 100),
               },

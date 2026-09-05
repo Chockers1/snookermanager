@@ -12,6 +12,8 @@ import {
   SkipForward,
 } from 'lucide-react'
 import { useGame } from '../context/useGame'
+import { pendingMatchBreak, sessionAssessment } from '../game/realism/sessions'
+import { CareerEditor } from '../components/career/CareerDepthPanels'
 
 type LiveMatchViewState = NonNullable<ReturnType<typeof useGame>['gameState']['liveMatch']>
 type LiveTacticalPlan = LiveMatchViewState['tacticalPlan']
@@ -106,7 +108,7 @@ function StatComparison({ label, player, opponent, suffix = '' }: { label: strin
 }
 
 export function LiveMatchPage() {
-  const { gameState, simulateLiveShot, simulateLiveFrame, simulateLiveMatch, applyLiveCoachCue, concedeLiveFrame, updateLiveMatchTactics } = useGame()
+  const { gameState, actOnRealism, simulateLiveShot, simulateLiveFrame, simulateLiveMatch, applyLiveCoachCue, concedeLiveFrame, updateLiveMatchTactics } = useGame()
   const navigate = useNavigate()
   const [autoPlaying, setAutoPlaying] = useState(false)
   const [concedeConfirmationOpen, setConcedeConfirmationOpen] = useState(false)
@@ -122,14 +124,14 @@ export function LiveMatchPage() {
   }, [liveMatch?.status, navigate])
 
   useEffect(() => {
-    if (!autoPlaying || !liveMatch || liveMatch.status !== 'In Progress' || concedeConfirmationOpen) return
+    if (!autoPlaying || !liveMatch || liveMatch.status !== 'In Progress' || pendingMatchBreak(liveMatch) || concedeConfirmationOpen) return
     const timer = window.setTimeout(() => simulateLiveShot(), 700)
     return () => window.clearTimeout(timer)
   }, [autoPlaying, concedeConfirmationOpen, liveMatch, simulateLiveShot])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (!liveMatch || event.altKey || event.ctrlKey || event.metaKey) return
+      if (!liveMatch || pendingMatchBreak(liveMatch) || event.altKey || event.ctrlKey || event.metaKey) return
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLButtonElement) return
       if (event.key === ' ') {
         event.preventDefault()
@@ -175,9 +177,18 @@ export function LiveMatchPage() {
   const opponentSafetySuccess = percent(liveMatch.opponentStats.safetiesWon, liveMatch.opponentStats.safetyAttempts)
   const latestEvent = liveMatch.feed[0]?.text ?? 'The frame is ready to begin.'
   const chronologicalFrameLog = [...liveMatch.feed].reverse()
+  const sessionBreak = pendingMatchBreak(liveMatch)
 
   return (
     <div className="min-h-screen overflow-auto bg-[#050b12] p-2.5 text-white sm:p-3 xl:flex xl:h-screen xl:min-h-0 xl:flex-col xl:overflow-hidden" data-testid="live-match-score-centre">
+      {sessionBreak && <CareerEditor required title={sessionBreak.kind === 'overnight' ? 'Overnight session break' : sessionBreak.kind === 'session' ? 'Session break' : 'Mid-session interval'} onClose={() => setAutoPlaying(false)}>
+        <div className="space-y-4 overflow-y-auto border-t border-border p-4 text-sm">
+          <p className="font-semibold">{liveMatch.playerName} {liveMatch.playerFrames}–{liveMatch.opponentFrames} {liveMatch.opponentName} · {sessionBreak.afterFrame} frames played</p>
+          <p className="text-gray-400">{liveMatch.coachPrompt.note}</p><ul className="list-inside list-disc text-gray-300">{sessionAssessment(liveMatch).map(line => <li key={line}>{line}</li>)}</ul><p>Fatigue {Math.round(liveMatch.playerFatigue)}% · confidence {Math.round(liveMatch.playerConfidence)}% · highest break {liveMatch.playerHighestBreak}</p>
+          <p className="text-gray-400">Both players recover during the break. Choose your focus, then adjust tactics before resuming. No training or weekly finances are settled during a match break.</p>
+          <div className="grid gap-3 sm:grid-cols-3">{([{ choice: 'recover', title: 'Rest and hydrate', text: 'An extra 2 fatigue recovery' }, { choice: 'reset', title: 'Mental reset', text: 'Up to +2 confidence below 90; pressure −3' }, { choice: 'review', title: 'Review tactics', text: 'Use your coach’s assessment; no artificial skill boost' }] as const).map(item => <button key={item.choice} className="btn-secondary min-h-16 flex-col gap-1 text-xs" onClick={() => { setAutoPlaying(false); actOnRealism({ type: 'break', choice: item.choice }) }}><b>{item.title}</b><span className="font-normal text-gray-400">{item.text}</span></button>)}</div>
+        </div>
+      </CareerEditor>}
       <header className="mx-auto flex w-full max-w-[1580px] shrink-0 items-center gap-3 rounded-xl border border-border bg-surface/85 px-3 py-2">
         <button type="button" aria-label="Return to Tournament Hub" onClick={() => navigate('/tournaments/hub')} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-border bg-surface-light text-gray-300 hover:border-green-500/50 hover:text-white"><Menu className="h-5 w-5" /></button>
         <div className="min-w-0 flex-1"><h1 className="truncate text-sm font-bold sm:text-base">{tournament?.name ?? 'Live Match'} · {liveMatch.round}</h1><p className="mt-0.5 flex items-center gap-1.5 truncate text-[10px] text-gray-400"><CalendarDays className="h-3 w-3" /> Best of {liveMatch.bestOf} · {tournament?.location ?? liveMatch.table} · {formatClock(liveMatch.timeElapsedMinutes)}</p></div>

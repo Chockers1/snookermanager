@@ -1,4 +1,7 @@
 import { useNavigate } from "react-router-dom";
+import { tournamentCommitmentConflict } from "../game/careerDepth/commitments";
+import { CareerDecisionNotice, RivalryContext } from "../components/career/CareerDepthPanels";
+import { VenueScoutingPanel } from '../components/career/RealismPanels';
 import {
   Crown,
   MapPin,
@@ -21,7 +24,7 @@ import {
   buildTournamentDrawData,
   buildTournamentHubData,
 } from "../utils/liveRouteData";
-import { formatMoney } from "../utils/formatters";
+import { formatMoney, formatPercent } from "../utils/formatters";
 
 function average(values: number[]) {
   if (values.length === 0) return 0;
@@ -87,6 +90,7 @@ export function TournamentHubPage() {
       ? "A career-defining stage with history, pressure and prestige"
       : "A season-defining tournament with elite rewards and pressure";
   const tournamentEntered = activeTournament?.status === "Entered";
+  const entryConflict = activeTournament && !tournamentEntered ? tournamentCommitmentConflict(gameState, activeTournament) : null;
   const playability = activeTournament
     ? getTournamentPlayability(gameState, activeTournament)
     : null;
@@ -144,7 +148,9 @@ export function TournamentHubPage() {
   const nextMatchStageLabel = tournamentEntered
     ? (activeRound ?? "Awaiting Draw")
     : "Awaiting Draw";
-  const primaryActionLabel = !equipmentReady
+  const primaryActionLabel = entryConflict
+    ? "Manage Calendar Clash"
+    : !equipmentReady
     ? "Open Equipment"
     : !tournamentEntered
       ? "Enter Tournament"
@@ -179,6 +185,10 @@ export function TournamentHubPage() {
 
   function handlePlayLiveMatch() {
     if (!activeTournament) return;
+    if (entryConflict) {
+      navigate("/calendar?commitments=1");
+      return;
+    }
     if (!equipmentReady) {
       navigate("/equipment/cues");
       return;
@@ -204,6 +214,9 @@ export function TournamentHubPage() {
 
   return (
     <div className="relative flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+      <CareerDecisionNotice />
+      <RivalryContext opponent={nextOpponent?.playerName ?? ''} />
+      <VenueScoutingPanel tournament={activeTournament} opponent={nextOpponent?.playerName} />
       {isMajorEvent ? (
         <div
           aria-hidden="true"
@@ -330,7 +343,7 @@ export function TournamentHubPage() {
                         gameState.player.amateurRanking ??
                         gameState.player.worldRanking ??
                         "-"}{" "}
-                      · {gameState.player.confidence}% confidence
+                      · {formatPercent(gameState.player.confidence)} confidence
                     </p>
                   </div>
                 </div>
@@ -351,6 +364,7 @@ export function TournamentHubPage() {
                 </div>
               </div>
               <div className="grid gap-2">
+                {entryConflict && <p role="status" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-300">Entry blocked: {entryConflict}</p>}
                 <button
                   type="button"
                   className={`${
@@ -464,7 +478,7 @@ export function TournamentHubPage() {
                   Confidence
                 </span>
                 <b className="text-sm text-white">
-                  {gameState.player.confidence}%
+                  {formatPercent(gameState.player.confidence)}
                 </b>
               </div>
               <div className="rounded-lg bg-surface-light/50 p-2">
@@ -555,9 +569,9 @@ export function TournamentHubPage() {
                 </b>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-gray-400">Ranking value</span>
+                <span className="text-gray-400">Ranking credit</span>
                 <b className="text-white">
-                  {activeTournament?.rankingValue ?? 0} pts
+                  {activeTournament?.rankingType === 'World Ranking' || activeTournament?.rankingType === 'One-Year' ? 'Finishing prize earnings' : `${activeTournament?.rankingValue ?? 0} pts`}
                 </b>
               </div>
               <div className="flex justify-between gap-3">

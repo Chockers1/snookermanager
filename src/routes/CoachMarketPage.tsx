@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CoachRelationshipsPanel } from "../components/career/CareerDepthPanels";
 import { Check, Search, SlidersHorizontal, Users, X } from "lucide-react";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
@@ -195,6 +196,7 @@ export function CoachMarketPage() {
 
   return (
     <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+      <CoachRelationshipsPanel />
       <section className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-surface/85 px-4 py-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">

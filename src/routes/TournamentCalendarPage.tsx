@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react'
+import { SeasonPlanningPanel } from '../components/career/CareerDepthPanels'
+import { QualificationRacesPanel, TravelLocationPanel } from '../components/career/RealismPanels'
+import { tournamentCommitmentConflict } from '../game/careerDepth/commitments'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, MapPin, Search, Trophy } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
@@ -93,7 +96,8 @@ export function TournamentCalendarPage() {
   const selectedCashRequirement = selectedTournament ? getTournamentEntryCashRequirement(gameState, selectedTournament) : 0
   const eventExpired = selectedTournament ? new Date(`${selectedTournament.endDate ?? selectedTournament.startDate}T00:00:00`) < currentDate : false
   const existingEntry = gameState.tournaments.find((event) => event.status === 'Entered' && event.id !== selectedTournament?.id)
-  const entryBlocker = !selectedAccess?.allowed
+  const entryConflict = selectedTournament ? tournamentCommitmentConflict(gameState, selectedTournament) : null
+  const entryBlocker = entryConflict ?? (!selectedAccess?.allowed
     ? selectedAccess?.reason
     : eventExpired
       ? 'This event has already finished.'
@@ -101,7 +105,7 @@ export function TournamentCalendarPage() {
         ? `Finish or withdraw from ${existingEntry.name} first.`
         : gameState.player.cash < selectedCashRequirement
           ? 'Not enough cash for the entry fee.'
-          : null
+          : null)
 
   return (
     <div className="space-y-6">
@@ -118,6 +122,9 @@ export function TournamentCalendarPage() {
         </div>
       </div>
 
+      <SeasonPlanningPanel />
+      <QualificationRacesPanel />
+      <TravelLocationPanel />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="col-span-12 space-y-4 xl:col-span-7">
           <div className="card">

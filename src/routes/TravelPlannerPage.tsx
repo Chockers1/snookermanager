@@ -10,7 +10,9 @@ import { useNavigate } from "react-router-dom";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
 import { hotelOptionCatalog, travelOptionCatalog } from "../data/catalogs";
-import { getNextEligibleTournament } from "../hooks/useGameState";
+import { getNextEligibleTournament, getTravelPackageCost } from "../hooks/useGameState";
+import { travelOptionsFor, journeyQuote } from '../game/realism/travel';
+import { TravelLocationPanel } from '../components/career/RealismPanels';
 import type { HotelOption, TravelOption } from "../types/game";
 import { formatMoney } from "../utils/formatters";
 
@@ -43,7 +45,6 @@ function formatArrivalTime(
   if (!eventStartDate) return catalogArrivalTime;
   const arrivalDate = new Date(`${eventStartDate}T12:00:00`);
   if (Number.isNaN(arrivalDate.getTime())) return catalogArrivalTime;
-  arrivalDate.setDate(arrivalDate.getDate() - 1);
   const dateLabel = new Intl.DateTimeFormat("en-GB", {
     weekday: "short",
     day: "numeric",
@@ -54,12 +55,14 @@ function formatArrivalTime(
 }
 
 function CompactSelectors({
+  options,
   selectedTravel,
   selectedHotel,
   onTravelChange,
   onHotelChange,
   className = "",
 }: {
+  options: TravelOption[];
   selectedTravel: TravelOption;
   selectedHotel: HotelOption;
   onTravelChange: (id: string) => void;
@@ -76,7 +79,7 @@ function CompactSelectors({
           value={selectedTravel.id}
           onChange={(event) => onTravelChange(event.target.value)}
         >
-          {travelOptionCatalog.map((option) => (
+          {options.map((option) => (
             <option key={option.id} value={option.id}>
               {option.name} · {formatMoney(option.cost)} · {option.fatigueLabel}{" "}
               fatigue
@@ -122,6 +125,7 @@ function TravelPlannerContent() {
   const navigate = useNavigate();
   const { gameState, bookTravel } = useGame();
   const activeEvent = getNextEligibleTournament(gameState);
+  const travelOptions = travelOptionsFor(gameState, activeEvent ?? undefined);
   const existingBooking = activeEvent
     ? gameState.travel.bookings[activeEvent.id]
     : undefined;
@@ -136,15 +140,15 @@ function TravelPlannerContent() {
       hotelOptionCatalog[0].id,
   );
   const selectedTravel =
-    travelOptionCatalog.find((option) => option.id === selectedTravelId) ??
-    travelOptionCatalog[0];
+    travelOptions.find((option) => option.id === selectedTravelId) ??
+    travelOptions[0];
   const selectedHotel =
     hotelOptionCatalog.find((option) => option.id === selectedHotelId) ??
     hotelOptionCatalog[0];
 
-  const fixedCosts = 55;
-  const totalTripCost = selectedTravel.cost + selectedHotel.cost + fixedCosts;
-  const cashRemaining = gameState.player.cash - totalTripCost;
+  const totalTripCost = getTravelPackageCost(gameState, selectedTravelId, selectedHotelId, activeEvent?.id);
+  const fixedCosts = totalTripCost - selectedTravel.cost - selectedHotel.cost;
+  const cashRemaining = gameState.player.cash - totalTripCost + (existingBooking?.totalCost ?? 0);
   const readinessScore = Math.max(
     0,
     Math.min(
@@ -159,12 +163,15 @@ function TravelPlannerContent() {
       ),
     ),
   );
+  const savedJourney = activeEvent ? gameState.realism?.journeys[`${activeEvent.id}:${activeEvent.startDate}`] : undefined;
+  const journeyLocked = Boolean(savedJourney && (savedJourney.applied || savedJourney.departure <= gameState.currentDate));
+  const arrivalTooLate = Boolean(activeEvent && journeyQuote(gameState, activeEvent, selectedTravelId).arrival > activeEvent.startDate);
   const canConfirm = Boolean(
-    activeEvent?.status === "Entered" && cashRemaining >= 0,
+    activeEvent?.status === "Entered" && cashRemaining >= 0 && !journeyLocked && !arrivalTooLate,
   );
 
   function autoPlan() {
-    const autoTravel = travelOptionCatalog
+    const autoTravel = travelOptions
       .slice()
       .sort(
         (left, right) =>
@@ -209,6 +216,7 @@ function TravelPlannerContent() {
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
         <CompactSelectors
+          options={travelOptions}
           className="md:hidden"
           selectedTravel={selectedTravel}
           selectedHotel={selectedHotel}
@@ -239,7 +247,7 @@ function TravelPlannerContent() {
             </span>
           </div>
           <div className="flex justify-between gap-3">
-            <span className="text-gray-400">Transfers + incidentals</span>
+            <span className="text-gray-400">Extra hotel nights, transfers & discounts</span>
             <span className="text-white">{formatMoney(fixedCosts)}</span>
           </div>
           <div className="flex justify-between gap-3 border-t border-border/70 pt-2 font-semibold">
@@ -264,10 +272,10 @@ function TravelPlannerContent() {
           ))}
         </div>
 
+        {arrivalTooLate && <p role="status" className="text-xs text-amber-300">This journey cannot arrive before the tournament starts. Return to the Hub to withdraw and choose a later event.</p>}
         {existingBooking ? (
           <p className="rounded border border-green-600/20 bg-green-600/10 px-2.5 py-2 text-[10px] text-green-300">
-            Booked package: {formatMoney(existingBooking.totalCost)}. Confirm
-            again to update it.
+            Booked package: {formatMoney(existingBooking.totalCost)}. {journeyLocked ? 'Journey started; this package is locked. Continue to preparation or match preview.' : 'Confirm again to update it.'}
           </p>
         ) : null}
 
@@ -284,7 +292,7 @@ function TravelPlannerContent() {
           </button>
           <button
             type="button"
-            aria-label="Match Preview"
+            aria-label={existingBooking?.preparation ? "Match Preview" : "Preparation"}
             className="btn-secondary min-h-10 justify-center px-2 text-[10px] sm:text-xs"
             onClick={() =>
               navigate(
@@ -325,7 +333,7 @@ function TravelPlannerContent() {
   return (
     <div
       data-testid="travel-planner-viewport"
-      className="grid h-full min-h-0 min-w-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 overflow-hidden sm:gap-3"
+      className="grid h-full min-h-0 min-w-0 grid-rows-[auto_auto_auto_minmax(0,1fr)] gap-2 overflow-hidden sm:gap-3"
     >
       <header className="flex min-w-0 items-end justify-between gap-3">
         <div className="min-w-0">
@@ -357,6 +365,7 @@ function TravelPlannerContent() {
           </button>
         </div>
       </header>
+      <TravelLocationPanel tournament={activeEvent ?? undefined} travelId={selectedTravelId} />
 
       <div className="grid shrink-0 grid-cols-3 gap-1.5 sm:gap-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div className="card hidden min-w-0 px-3 py-2 lg:block">
@@ -391,7 +400,7 @@ function TravelPlannerContent() {
             </span>
           </div>
           <div className="grid min-h-0 flex-1 grid-rows-5 gap-1.5 p-2">
-            {travelOptionCatalog.map((option) => {
+            {travelOptions.map((option) => {
               const Icon = iconMap[option.icon];
               const selected = option.id === selectedTravel.id;
               return (
@@ -411,7 +420,7 @@ function TravelPlannerContent() {
                     </span>
                     <span className="block truncate text-[9px] text-gray-500">
                       {formatArrivalTime(
-                        activeEvent?.startDate,
+                        activeEvent ? journeyQuote(gameState, activeEvent, option.id).arrival : undefined,
                         option.arrivalTime,
                       )}{" "}
                       · {option.comfort}/5 comfort
@@ -482,6 +491,7 @@ function TravelPlannerContent() {
             </p>
           </div>
           <CompactSelectors
+            options={travelOptions}
             className="mt-4"
             selectedTravel={selectedTravel}
             selectedHotel={selectedHotel}

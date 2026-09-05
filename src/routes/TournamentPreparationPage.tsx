@@ -77,14 +77,14 @@ export function TournamentPreparationPage() {
     existingPlan?.supportIds ?? [],
   );
 
+  const baseConfidence = existingPlan?.confidenceBaseline ?? clamp(gameState.player.confidence - (existingPlan?.effects.confidenceDelta ?? 0));
   const effects = useMemo(
-    () => calculatePreparationEffects(allocations, supportIds),
-    [allocations, supportIds],
+    () => calculatePreparationEffects(allocations, supportIds, baseConfidence),
+    [allocations, supportIds, baseConfidence],
   );
   const oldEffects = existingPlan?.effects;
   const availableCash = gameState.player.cash + (oldEffects?.cost ?? 0);
   const canConfirm = Boolean(booking && tournament?.status === "Entered" && effects.cost <= availableCash);
-  const baseConfidence = clamp(gameState.player.confidence - (oldEffects?.confidenceDelta ?? 0));
   const baseFatigue = clamp(gameState.player.fatigue - (oldEffects?.fatigueDelta ?? 0));
   const baseStrain = clamp(gameState.trainingCondition.strain - (oldEffects?.strainDelta ?? 0));
   const preparedConfidence = clamp(baseConfidence + effects.confidenceDelta);

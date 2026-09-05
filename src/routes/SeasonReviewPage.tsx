@@ -1,4 +1,6 @@
 import { useNavigate } from "react-router-dom";
+import { CareerSeasonSummary } from "../components/career/CareerDepthPanels";
+import { WorldDigestPanel } from '../components/career/RealismPanels';
 import {
   Bar,
   BarChart,
@@ -26,7 +28,7 @@ import {
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
 import { buildSeasonReviewData } from "../utils/liveRouteData";
-import { formatMoney } from "../utils/formatters";
+import { formatMoney, formatPercent } from "../utils/formatters";
 
 function metricColor(label: string) {
   if (label === "Financial Result" || label === "Ranking Movement")
@@ -88,6 +90,7 @@ export function SeasonReviewPage() {
 
     return (
       <div className="space-y-4 pb-24">
+        <CareerSeasonSummary />
         <header className="flex flex-col gap-3 rounded-xl border border-border bg-surface/85 p-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">Season complete</p>
@@ -255,7 +258,7 @@ export function SeasonReviewPage() {
     },
     {
       label: "Confidence",
-      value: `${gameState.player.confidence}%`,
+      value: formatPercent(gameState.player.confidence),
       sub: "Mental edge",
     },
     {
@@ -285,6 +288,8 @@ export function SeasonReviewPage() {
 
   return (
     <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+      <CareerSeasonSummary />
+      <WorldDigestPanel />
       <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
