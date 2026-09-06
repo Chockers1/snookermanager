@@ -32,6 +32,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
   const {
     gameState,
     continueToNextTournament,
+    finishSeason,
     enterTournament,
     skipTournament,
   } = useGame();
@@ -46,7 +47,8 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
   const currentRanking =
     playerRankingRow?.ranking ?? player.worldRanking ?? player.amateurRanking;
   const rankingMovement = playerRankingRow?.movement ?? 0;
-  const nextEvent = getNextEligibleTournament(gameState);
+  const reviewPending = Boolean(gameState.seasonReview?.pending);
+  const nextEvent = reviewPending ? undefined : getNextEligibleTournament(gameState);
   const enteredEvent = nextEvent?.status === "Entered" ? nextEvent : undefined;
   const entryConflict = nextEvent && !enteredEvent ? tournamentCommitmentConflict(gameState, nextEvent) : null;
   const tournamentPlayability = enteredEvent
@@ -105,7 +107,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
               : "Open Tournament Hub"
       : nextEvent
         ? entryConflict ? "Manage Calendar Clash" : "Enter Tournament"
-        : "View Tournament Calendar";
+        : reviewPending ? "Open Season Review" : "Finish Season";
 
   function handlePrimaryEventAction() {
     setEventMenuOpen(false);
@@ -136,7 +138,8 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
       return;
     }
 
-    navigate("/calendar");
+    finishSeason();
+    navigate("/season-review");
   }
 
   function handleSecondaryEventAction() {
@@ -273,15 +276,15 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
         </span>
         <div className="min-w-0 flex-1">
           <p
-            title={nextEvent?.name ?? "No eligible event"}
+            title={nextEvent?.name ?? (reviewPending ? "Season review ready" : "Season run-in")}
             className="truncate text-[11px] font-medium text-white"
           >
-            {nextEvent?.name ?? "No eligible event"}
+            {nextEvent?.name ?? (reviewPending ? "Season review ready" : "Season run-in")}
           </p>
           <p className="truncate text-[9px] text-gray-500">
             {isDashboard
-              ? nextEvent ? `${eventStageLabel} · ${nextEvent.format} · ${eventStatusLabel}` : "Check the calendar or advance a week"
-              : (nextEvent?.format ?? "No event scheduled")}
+              ? nextEvent ? `${eventStageLabel} · ${nextEvent.format} · ${eventStatusLabel}` : "Finish the season to review and start next year"
+              : (nextEvent?.format ?? "Review and continue into next season")}
           </p>
         </div>
       </button>
@@ -359,7 +362,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
             </button>
             {eventMenuOpen ? (
               <div className="absolute right-0 top-12 z-50 w-56 max-w-[calc(100vw-6rem)] space-y-2 rounded-lg border border-border bg-sidebar p-3 shadow-2xl">
-                <p className="break-words text-xs font-semibold text-white">{nextEvent?.name ?? "No eligible event"}</p>
+                <p className="break-words text-xs font-semibold text-white">{nextEvent?.name ?? (reviewPending ? "Season review ready" : "Season run-in")}</p>
                 <p className="text-[10px] text-gray-400">{eventStatusLabel}</p>
                 <button type="button" onClick={handlePrimaryEventAction} className="btn-primary min-h-11 w-full text-xs">{primaryEventActionLabel}</button>
                 <button type="button" onClick={handleSecondaryEventAction} className="btn-secondary min-h-11 w-full text-xs">{enteredEvent || hasLiveMatchInProgress ? "Tournament Hub" : nextEvent ? "Skip This Event" : "View Calendar"}</button>

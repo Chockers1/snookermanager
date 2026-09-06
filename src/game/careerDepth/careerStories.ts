@@ -85,7 +85,7 @@ export function reconcileStories(state: GameState): GameState {
     const before = getRivalry(next, match.opponentName);
     next = recordEncounter(next, match);
     const after = getRivalry(next, match.opponentName);
-    if (!before?.rivalry && after?.rivalry) next = careerMessage(next, 'rivalry:' + after.opponentId, 'A rivalry is taking shape', match.opponentName + ': repeated close meetings now carry extra history. Review the head-to-head and vary familiar tactics.', '/match/result');
+    if (!before?.rivalry && after?.rivalry) next = careerMessage(next, 'rivalry:' + after.opponentId, 'A rivalry is taking shape', match.opponentName + ': repeated close meetings now carry extra history. Review the head-to-head and vary familiar tactics.', '/career/rivalries');
   }
   d = depthOf(next);
   if (fresh.length) {

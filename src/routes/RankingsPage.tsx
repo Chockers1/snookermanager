@@ -268,6 +268,7 @@ export function RankingsPage() {
     if (row.playerName === gameState.player.fullName) {
       return {
         ...row,
+        age: gameState.player.age,
         overall: playerOverall,
         potential: playerPotential,
         recentResults: gameState.player.form.slice(-10),
@@ -278,6 +279,7 @@ export function RankingsPage() {
     const estimated = getEstimatedRatings(row.playerName, row.ranking, ratingCircuit, archive?.age)
     return {
       ...row,
+      age: archive?.age,
       overall: archive?.overallRating ?? estimated.overall,
       potential: Math.max(
         archive?.overallRating ?? estimated.overall,
@@ -291,6 +293,7 @@ export function RankingsPage() {
   const nextTarget = activeRowsWithRatings.find((row) => row.ranking === Math.max(1, (playerRow?.ranking ?? 2) - 1))
   const moneyRanking = activeTab === 'world' || activeTab === 'oneYear'
   const earningsSummary = rankingEarningsSummary(gameState, gameState.player.fullName)
+  const pendingEarnings = earningsSummary.pending.filter(e => activeTab !== 'oneYear' || e.season === gameState.season)
   const rankingSources = moneyRanking ? earningsSummary.recent.filter(e => activeTab !== 'oneYear' || e.season === gameState.season).map(e => ({ label: `${gameState.rollingRankings?.events[e.eventKey]?.name ?? e.eventKey} · ${e.earnedOn}`, points: e.amount, prizeMoney: e.amount })) : buildTournamentRankingSources(
     gameState.history.tournamentHistory,
     gameState.tournaments,
@@ -347,8 +350,6 @@ export function RankingsPage() {
 
   return (
     <div className={lists.length ? "flex flex-col gap-3" : "flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5"}>
-      <QualificationRacesPanel />
-      <TourDevelopmentPanel />
       {lists.length > 0 && <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface px-4 py-2 text-xs">
         <label>Pathway standings <select aria-label="Pathway standings" value={selectedList} onChange={e => setPathwayList(e.target.value)} className="ml-2 rounded border border-border bg-background px-2 py-1">{lists.map(list => <option key={list}>{list}</option>)}</select></label>
         <span className="text-gray-400">Recorded results only{pathwayRows.length === 0 ? ' — no completed events yet' : ''}.</span>
@@ -381,6 +382,12 @@ export function RankingsPage() {
         </div>
       </div>
 
+      {moneyRanking && !finalRankingTab && pendingEarnings.length > 0 && <section aria-label="Pending ranking credit" className="shrink-0 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
+        <h2 className="font-semibold text-amber-300">Results recorded · ranking credit pending</h2>
+        <p className="mt-1 text-gray-300">Rankings update on the event’s scheduled finish date, even if you finish your matches earlier. Prize money is paid separately.</p>
+        <ul className="mt-1 max-h-24 space-y-1 overflow-y-auto">{pendingEarnings.map(e => <li key={e.id} className="text-gray-300">{gameState.rollingRankings?.events[e.eventKey]?.name ?? e.eventKey}: <strong className="text-white">+{formatMoney(e.amount)}</strong> counts from <strong className="text-white">{e.earnedOn}</strong>.</li>)}</ul>
+        <p className="mt-1 text-gray-400">Your eventual position also depends on other players’ results and expiring earnings. Exhibitions award no world-ranking credit.</p>
+      </section>}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
         <div className="grid min-h-0 gap-3 xl:col-span-8 xl:grid-rows-[minmax(0,1fr)_84px] xl:gap-2">
           <div className="card min-h-0 flex h-full flex-col overflow-hidden">
@@ -393,6 +400,7 @@ export function RankingsPage() {
                     <th className="px-2 py-2 text-center font-medium">Move</th>
                     <th className="px-3 py-2 text-left font-medium">Player</th>
                     <th className="px-2 py-2 text-left font-medium">Nation</th>
+                    <th className="px-2 py-2 text-center font-medium">Age</th>
                     <th className="px-2 py-2 text-center font-medium">OVR</th>
                     <th className="px-2 py-2 text-center font-medium">POT</th>
                     <th className="px-3 py-2 text-right font-medium">{moneyRanking ? 'Ranking earnings' : 'Points'}</th>
@@ -403,13 +411,14 @@ export function RankingsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {activeRowsWithRatings.length === 0 && <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">Complete events in this circuit to start its standings.</td></tr>}
+                  {activeRowsWithRatings.length === 0 && <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-400">Complete events in this circuit to start its standings.</td></tr>}
                   {activeRowsWithRatings.map((row) => (
                     <tr key={row.id} className={`border-b border-border/40 ${row.highlighted ? 'bg-green-600/12' : 'hover:bg-surface-light/40'}`}>
                       <td className="px-3 py-2 font-bold text-white">{row.ranking}</td>
                       <td className="px-2 py-2 text-center"><Movement value={row.movement} /></td>
                       <td className={`px-3 py-2 font-medium ${row.highlighted ? 'text-green-400' : 'text-white'}`}>{row.playerName}</td>
                       <td className="px-2 py-2 text-gray-400">{row.nation}</td>
+                      <td className="px-2 py-2 text-center tabular-nums text-gray-300">{row.age ?? "—"}</td>
                       <td className="px-2 py-2 text-center font-semibold text-white">{row.overall}</td>
                       <td className="px-2 py-2 text-center font-semibold text-green-400">{row.potential}</td>
                       <td className="px-3 py-2 text-right text-white">{moneyRanking ? formatMoney(row.points) : row.points}</td>
@@ -522,6 +531,8 @@ export function RankingsPage() {
           </div>
         </div>
       </div>
+      <QualificationRacesPanel />
+      <TourDevelopmentPanel />
     </div>
   )
 }

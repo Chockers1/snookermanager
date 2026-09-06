@@ -36,6 +36,7 @@ const iconMap: Record<string, typeof LayoutDashboard> = {
   "Tournament Hub": Target,
   "Match Centre": Swords,
   Rankings: Medal,
+  Rivalries: Swords,
   Sponsorship: Handshake,
   Mental: Brain,
   Health: HeartPulse,

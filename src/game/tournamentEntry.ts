@@ -1,3 +1,4 @@
+import { createTournamentBriefing } from './tournamentCareerHistory';
 import type { GameState } from '../hooks/useGameState';
 import type { Tournament } from '../types/game';
 import { rankingCutoffDate, rankingEventKey } from './rollingRankings';
@@ -31,5 +32,5 @@ export function reconcileEntryReminders(state: GameState, eligible: (event: Tour
   // One digest per calendar day, with persistent keys independent of inbox trimming.
   let next: GameState = { ...state, careerDepth: { ...d, entryReminders: [...previous, ...notices.map(n => n.key)].slice(-500) } };
   next = careerMessage(next, `entry-reminders:${state.currentDate}:${notices.map(n => n.key).join('|')}`, 'Tournament entry reminders', notices.map(({t,days}) => `${t.name}: ${days === 0 ? 'last day' : days + ' days left'}, closes ${entryDeadline(t)}; ranking cutoff ${rankingCutoffDate(t)}.`).join(' '), '/calendar');
-  return next;
+  return { ...next, inbox: next.inbox.map(message => message.id === next.inbox[0]?.id ? { ...message, tournamentBriefings: notices.map(({t})=>createTournamentBriefing(state,t)) } : message) };
 }

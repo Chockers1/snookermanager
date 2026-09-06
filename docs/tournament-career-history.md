@@ -1,0 +1,13 @@
+# Tournament career history
+
+Career Stats & Legacy now includes Tournament Career History, with a tour filter, a tournament selector and every retained edition in date order. Each edition shows finish, wins/draws/losses, prize money, highest break and centuries. View run expands the recorded rounds, opponents and scores. Events with no saved appearances have an explicit empty state. A tournament query parameter supports direct links from inbox messages.
+
+Tournament identity uses stable event IDs. Changed IDs can be reconciled only by an exact normalized event name and event class, never a substring; World Championship Qualifying remains separate from World Championship. Completed match records take precedence over older inferred aggregate statistics, including group-stage draws. Older draws or match logs can supply missing individual results; otherwise missing opponents are labelled Not recorded.
+
+Invitations, entry confirmations, travel/preparation messages and deadline reminders attach a snapshot of prior tournament history. This includes the immediately previous season, the last played edition when the player missed that season, and the best prior run. Snapshots exclude the upcoming edition and future seasons. Archived emails retain their original edition and results across rollover. New-season briefings use the same result lookup.
+
+The previous 240-entry cap no longer deletes player event histories. Every edition and personal round result is retained. Beyond 240 recent entries, full-field CPU draws can be dropped only when personal round results are already stored. Older saves lacking personal round results retain their draws for recovery. Save repair applies current calendar date validation only to the current season, protecting past editions of reused tournament IDs.
+
+On load, missing prior-season editions can be recovered from completed tour-ledger draws that explicitly mark the human player. Recovery keeps recorded opponents and frame scores, and uses exact recorded prize earnings when available. It never reruns matches or awards money, ranking earnings or aggregate career statistics. Unknown breaks, centuries or financial details remain labelled as missing. Existing personal archive entries take precedence. Records absent from both the personal archive and retained tour ledger cannot be reconstructed without an older save.
+
+Validation covers all-season selection, ID changes, qualifier separation, group draws, long archives, legacy details, reminders, frozen mail, save repair and actual season rollover. Browser tests exercise the inbox-to-history link, tour/event filters, older round expansion, reload and desktop/mobile layout.

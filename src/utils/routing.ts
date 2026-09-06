@@ -8,6 +8,7 @@ export const appRoutes: AppRoute[] = [
     label: "Career Progression",
     section: "Career",
   },
+  { path: "/career/rivalries", label: "Rivalries", section: "Career" },
   { path: "/career/stats", label: "Legacy Stats", section: "Career" },
   { path: "/player/attributes", label: "Attributes", section: "Player" },
   { path: "/training", label: "Training Planner", section: "Training" },
@@ -71,6 +72,7 @@ export const sidebarGroups = [
     items: [
       { label: "Attributes", path: "/player/attributes" },
       { label: "Career Progression", path: "/career/progression" },
+      { label: "Rivalries", path: "/career/rivalries" },
       { label: "Legacy Stats", path: "/career/stats" },
     ],
   },

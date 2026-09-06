@@ -1,3 +1,15 @@
+import { announceSeasonTourChanges, createSeasonTourChanges, type SeasonTourChanges } from '../game/seasonTourChanges';
+import { enrichTournamentMessages, retainTournamentArchive, recoverTournamentArchive } from '../game/tournamentCareerHistory';
+import { initialAttributeHistory, recordAttributeHistory, recoverAttributeHistory, type AttributeHistory } from '../game/attributeHistory';
+import { reconcileSponsorMarket, seasonalSponsorBlocker } from '../game/sponsorMarket';
+import { createSeasonStartReport, preserveSeasonStartEmails } from '../game/seasonStartReport';
+import { createSeasonEndReport, preserveSeasonEmails } from '../game/seasonEndReport';
+import { ensureSeasonClock, seasonPosition, seasonWeekLabel, rolloverSeasonClock, type SeasonClock } from '../game/seasonClock';
+import { playerDecline, ageAttributeLoss, type DeclineProfile } from '../game/playerAgeing';
+import { reconcileCareerBudget } from '../game/careerBudget';
+import { repairCpuHistoricalRecords, ensureWorldPopulation, cpuSeasonEvidence, annualCpuDevelopment, uniqueRankingRows } from '../game/worldIntegrity';
+import { recordedSeasonWinners } from '../game/seasonReview';
+import { eventFinancialReport, financialSummary } from '../game/eventFinancialReport';
 import { reconcileAchievements } from '../game/careerAchievements';
 import { entryClosed, entryDeadline } from '../game/tournamentEntry';
 import { applyTourSkills, developmentEdge, evolveTourSkills } from '../game/tourDevelopment';
@@ -190,6 +202,7 @@ export {
 
 type FinanceState = {
   cash: number;
+  budgetWarningPeriod?: string;
   baseCashFlow: number;
   cashFlow: number;
   budgetTargets: Record<string, number>;
@@ -601,6 +614,8 @@ export type LiveMatchState = {
 };
 
 type CareerSnapshot = {
+  seasonNumber?: number;
+  seasonWeek?: number;
   label: string;
   season: string;
   week: number;
@@ -647,6 +662,11 @@ type CareerMatchLogEntry = {
 };
 
 type TournamentHistoryEntry = {
+  recoveredFromLedger?: { prizeKnown: boolean };
+  entryPaid?: number;
+  preparationPaid?: number;
+  venuePracticePaid?: number;
+  sponsorBonusesPaid?: number;
   id: string;
   season: string;
   tournamentId: string;
@@ -726,6 +746,8 @@ type SeasonWorldHeadline = {
 
 type SeasonReviewTransition = {
   pending: boolean;
+  popupDismissed?: boolean;
+  finalRankings?: { ranking: number; playerName: string; points: number }[];
   completedSeason: CareerSeasonRecord;
   nextSeason: string;
   financialChange: number;
@@ -815,6 +837,9 @@ type WorldPlayerSeasonRecord = {
 };
 
 type WorldPlayerRecord = {
+  declineProfile?: DeclineProfile;
+  centuries?: number;
+  breakRecordsMatches?: number;
   skillDevelopment?: import("../game/tourDevelopment").TourDevelopment;
   id: string;
   playerName: string;
@@ -916,6 +941,8 @@ type CareerSystemsState = {
 };
 
 export type GameState = {
+  seasonClock?: SeasonClock;
+  worldPopulationSeason?: string;
   realism?: import('../game/realism/types').RealismState;
   rollingRankings?: RollingRankingsState;
   careerDepth?: CareerDepthState;
@@ -937,6 +964,7 @@ export type GameState = {
   worldPlayers: WorldPlayerRecord[];
   careerSystems: CareerSystemsState;
   sponsors: SponsorDeal[];
+  sponsorMarket?: import("../game/sponsorMarket").SponsorMarketState;
   sponsorOffers: SponsorOfferState[];
   inbox: InboxMessage[];
   travel: TravelState;
@@ -945,15 +973,18 @@ export type GameState = {
   liveMatch: LiveMatchState | null;
   history: CareerHistoryState;
   seasonReview: SeasonReviewTransition | null;
+  tourChangesReport?: SeasonTourChanges;
+  tourChangesAnnouncedSeason?: string;
   coachContracts: CoachContract[];
   trainingPlan: TrainingPlannerDay[];
   trainingAppliedWeek: number | null;
   trainingCondition: TrainingConditionState;
+  attributeHistory?: AttributeHistory;
   health: HealthState;
   lastAction: string;
 };
 
-export const SAVE_SCHEMA_VERSION = 12;
+export const SAVE_SCHEMA_VERSION = 13;
 const STORAGE_KEY = ACTIVE_SAVE_KEY;
 const TOURNAMENT_ROUNDS: TournamentRound[] = [
   "Last 16",
@@ -1146,7 +1177,6 @@ const FEEDER_NATIONS = [
   "POL",
   "AUS",
 ];
-const TOURNAMENT_HISTORY_LIMIT = 240;
 const SEASON_RECORD_LIMIT = 12;
 const COMPETITION_TABLE_KEYS: CompetitionTableKey[] = [
   "world",
@@ -1959,7 +1989,7 @@ function getSyntheticLiveMatchRound(bestOf: number): TournamentRound {
   return "Final";
 }
 
-function simulateCareerFrameOutcome(
+export function simulateCareerFrameOutcome(
   playerFrameWinChance: number,
   playerStrength: number,
   opponentStrength: number,
@@ -1995,7 +2025,9 @@ function simulateCareerFrameOutcome(
     45,
     147,
   );
-  const losingCap = Math.max(0, winningPoints - 5);
+  // These generated scores contain no simulated foul/free-ball awards.
+  // Both players therefore share the same 147-point table budget.
+  const losingCap = Math.max(0, Math.min(winningPoints - 5, 147 - winningPoints));
   const losingPoints = clamp(
     Math.round(Math.random() * Math.min(losingCap, 18 + losingStrength * 0.42)),
     0,
@@ -3222,10 +3254,6 @@ function getBracketMatchWinner(
     : { ...match.bottom, score: undefined };
 }
 
-function createFallbackBracketEntrant(seed: number): BracketPlayer {
-  return createBracketPlayer(`Qualifier ${seed}`, 160 + seed, "INT");
-}
-
 function buildTournamentDrawField(
   state: GameState,
   tournament: Tournament,
@@ -3257,12 +3285,13 @@ function buildTournamentDrawField(
   );
   const qualified = recordedMajorQualifiers(state, tournament);
   const pathwayEvent = ['Junior', 'Regional Youth', 'National Youth', 'Amateur', 'Q Tour', 'Q School', 'Senior'].includes(tournament.type);
-  const pathwayCandidates = pathwayEvent ? [...rankingRows, ...Object.values(state.competitionTables).flat()] : rankingRows;
+  const rosterRows = state.worldPlayers.filter(p => !p.retired).map((p, i) => ({ id:p.id, playerName:p.playerName, nation:p.nation, ranking:rankingRows.length+i+1, points:0, movement:0, prizeMoney:0 }));
+  const pathwayCandidates = pathwayEvent ? [...rankingRows, ...rosterRows] : rankingRows;
   const playerRecords = new Map(state.worldPlayers.map(p => [p.playerName, p]));
   const pathwayCheckState = { ...state, securedCards: tournament.type === 'Q School' ? securedPathwayCards(state, tournament.startDate) : undefined };
   const eligibleOpponent = (row: RankingRow) => {
     const record = playerRecords.get(row.playerName);
-    if (!record) return !pathwayEvent;
+    if (!record || isTemporaryQualifierName(record.playerName)) return false;
     return !pathwayEntryReason(tournament, { name: record.playerName, nation: record.nation, age: record.age, hasTourCard: record.hasTourCard, retired: record.retired }, pathwayCheckState);
   };
   const opponentEntries = pathwayCandidates
@@ -3283,12 +3312,31 @@ function buildTournamentDrawField(
   // Main-tour fields can include amateur top-ups. Use real persisted identities,
   // so every simulated entrant can receive an auditable finishing award.
   if (countsForWorldRanking(tournament) && opponentEntries.length < fieldSize) {
-    const topUps = [...state.competitionTables.qSchool, ...state.competitionTables.amateur];
+    const topUps = [...state.competitionTables.qSchool, ...state.competitionTables.amateur, ...rosterRows];
     for (const row of topUps) {
       if (opponentEntries.length >= fieldSize) break;
       if (row.playerName === state.player.fullName || opponentEntries.some(p => p.name === row.playerName) || playerRecords.get(row.playerName)?.retired) continue;
       if (qualified !== null && !qualified.includes(row.playerName)) continue;
       opponentEntries.push(createBracketPlayer(row.playerName, opponentEntries.length + 1 + (resolveTournamentFormat(tournament).seedOffset ?? 0), row.nation));
+    }
+  }
+  // A withdrawn direct seed leaves a vacancy, filled by the highest-seeded losing qualifier.
+  if (qualified !== null && opponentEntries.length + Number(includePlayer) < fieldSize) {
+    const qualifier = Object.values(state.rollingRankings?.events ?? {}).filter(e => e.season === state.season && e.completedOn <= tournament.startDate && e.name.startsWith(tournament.name) && /qualif/i.test(e.name)).sort((a,b)=>b.completedOn.localeCompare(a.completedOn))[0];
+    const reserves = (qualifier?.bracket.at(-1)?.matches ?? []).flatMap(m => typeof m.top.score === 'number' && typeof m.bottom.score === 'number' ? [m.top.score < m.bottom.score ? m.top : m.bottom] : []).sort((a,b)=>a.rank-b.rank);
+    for (const entrant of reserves) {
+      if (opponentEntries.length + Number(includePlayer) >= fieldSize) break;
+      if (entrant.name === state.player.fullName || opponentEntries.some(p=>p.name===entrant.name) || !playerRecords.has(entrant.name) || playerRecords.get(entrant.name)?.retired) continue;
+      opponentEntries.push({...entrant,score:undefined,rank:opponentEntries.length+1});
+    }
+  }
+  // Early senior previews precede the qualifying results. Complete provisional
+  // invitation places with eligible registered seniors; cutoff rebuilds use earned places.
+  if (tournament.type === 'Senior' && selectedPathwayNames?.length && opponentEntries.length + Number(includePlayer) < fieldSize) {
+    for (const row of pathwayCandidates.filter(eligibleOpponent).sort((a,b)=>a.ranking-b.ranking)) {
+      if (opponentEntries.length + Number(includePlayer) >= fieldSize) break;
+      if (row.playerName === state.player.fullName || opponentEntries.some(p=>p.name===row.playerName)) continue;
+      opponentEntries.push(createBracketPlayer(row.playerName,opponentEntries.length+1,row.nation));
     }
   }
   let field = [...(includePlayer ? [playerEntry] : []), ...opponentEntries]
@@ -3301,11 +3349,11 @@ function buildTournamentDrawField(
     );
   }
 
-  while (field.length < fieldSize) {
-    field.push(createFallbackBracketEntrant(field.length + 1));
+  if (field.length < fieldSize) {
+    throw new Error(`Insufficient eligible registered entrants for ${tournament.name}: ${field.length}/${fieldSize}`);
   }
 
-  return field.map((p, i) => ({ ...p, developmentEdge: developmentEdge(playerRecords.get(p.name)?.skillDevelopment), seed: i + 1 + (resolveTournamentFormat(tournament).seedOffset ?? 0) }));
+  return field.map((p, i) => ({ ...p, developmentEdge: developmentEdge(playerRecords.get(p.name)?.skillDevelopment) + ((playerRecords.get(p.name)?.overallRating ?? 65) - 75) * 2, seed: i + 1 + (resolveTournamentFormat(tournament).seedOffset ?? 0) }));
 }
 
 export function buildTournamentDraw(
@@ -3415,7 +3463,7 @@ function simulateBracketScore(
 ) {
   const bestOf = getTournamentRoundPlan(tournament, round).bestOf;
   const framesNeeded = Math.ceil(bestOf / 2);
-  const topWinChance = clamp(50 + (bottomRank - topRank) * 1.2 + developmentDifference, 18, 82);
+  const topWinChance = clamp(50 + clamp((bottomRank - topRank) * 0.15, -12, 12) + developmentDifference, 18, 82);
   const topWon = random() * 100 < topWinChance;
   const loserFrames = clamp(
     Math.round(
@@ -3587,7 +3635,7 @@ function completeRemainingTournamentDraw(
 /** Complete the world calendar in date order, independently of human entry.
  * This function never advances training, cash settlement or the player's match. */
 export function processRankingCalendar(input: GameState): GameState {
-  let state = scheduleRankingExpiries(initializeRollingRankings(input));
+  let state = ensureSeasonClock(ensureWorldPopulation(scheduleRankingExpiries(initializeRollingRankings(input))));
   state = { ...state, tournaments: state.tournaments.map(t => isChampionshipLeague(t) && t.status !== 'Completed' ? { ...t, format: 'Groups: up to 4 frames, draws allowed · final best of 5', prizeMoney: 328000, winnerPrize: 33000, runnerUpPrize: 23000 } : t) };
   const through = state.currentDate;
   const ledger = state.rollingRankings!;
@@ -3656,7 +3704,7 @@ function rerankCompetitionRows(
   playerName: string,
   baselineRankings?: ReadonlyMap<string, number>,
 ) {
-  const sorted = [...rows].sort((left, right) => {
+  const sorted = uniqueRankingRows(rows).sort((left, right) => {
     if (right.points !== left.points) return right.points - left.points;
     if (right.prizeMoney !== left.prizeMoney)
       return right.prizeMoney - left.prizeMoney;
@@ -4334,7 +4382,7 @@ function normalizeWorldPlayerRecord(
         : clamp(Math.round(15 + Math.max(0, 96 - worldRank) * 0.7), 5, 95),
     overallRating:
       typeof record.overallRating === "number"
-        ? clamp(Math.round(record.overallRating), 35, 99)
+        ? clamp(record.overallRating, 35, 99)
         : inferWorldPlayerOverallRating(record, tables),
     ratingProgress:
       typeof record.ratingProgress === "number" ? record.ratingProgress : 0,
@@ -4688,10 +4736,9 @@ function formatSeasonLabel(startYear: number) {
 }
 
 function getSeasonStartYearForDate(dateString: string) {
-  const date = new Date(`${dateString}T00:00:00`);
-  const year = date.getUTCFullYear();
+  const year = Number(dateString.slice(0, 4));
 
-  return date.getUTCMonth() >= 6 ? year : year - 1;
+  return dateString.slice(5) >= "06-30" ? year : year - 1;
 }
 
 function getSeasonLabelForDate(dateString: string) {
@@ -4713,11 +4760,11 @@ function getSeasonLabelForTournaments(tournaments: Tournament[]) {
 }
 
 function getNextSeasonStartDate(tournaments: Tournament[]) {
-  return `${getTournamentSeasonStartYear(tournaments) + 1}-07-01`;
+  return `${getTournamentSeasonStartYear(tournaments) + 1}-06-30`;
 }
 
 function addYears(dateString: string, years: number) {
-  const date = new Date(`${dateString}T00:00:00`);
+  const date = new Date(`${dateString}T12:00:00Z`);
   date.setUTCFullYear(date.getUTCFullYear() + years);
   return date.toISOString().slice(0, 10);
 }
@@ -4937,7 +4984,7 @@ function upsertTournamentHistoryEntry(
   entry: TournamentHistoryEntry,
 ) {
   const withoutExisting = entries.filter((item) => item.id !== entry.id);
-  return [entry, ...withoutExisting].slice(0, TOURNAMENT_HISTORY_LIMIT);
+  return retainTournamentArchive([entry, ...withoutExisting]);
 }
 
 function finalizeTournamentHistoryForSeason(
@@ -5517,6 +5564,9 @@ function createSeasonRecord(
 }
 
 function applySeasonRollover(state: GameState) {
+  state = enrichTournamentMessages(state);
+  state = preserveSeasonStartEmails(state, getTournamentEntryAccess);
+  state = ensureSeasonClock(state);
   const archivedTournamentHistory = finalizeTournamentHistoryForSeason(
     state.history.tournamentHistory,
     state.tournaments,
@@ -5544,10 +5594,7 @@ function applySeasonRollover(state: GameState) {
     state.careerSystems.pro.worldRank ??
     state.player.worldRanking ??
     999;
-  const currentWorldRank = Math.max(
-    rawCurrentWorldRank,
-    getHistoryPerformanceRankFloor(archivedState.history),
-  );
+  const currentWorldRank = rawCurrentWorldRank;
   const currentHasTourCard =
     state.careerSystems.pro.hasTourCard || currentWorldRank <= 64;
   const qTourPromotionEligible = state.history.tournamentHistory.some(e => e.season === state.season && e.eventType === 'Q Tour' && /tour card/i.test(e.reward ?? ''));
@@ -5723,7 +5770,8 @@ function applySeasonRollover(state: GameState) {
   };
   const attributesForNextSeason = applySeasonalAgeRegression(
     state.attributes,
-    state.player.age + 1,
+    state.player.age,
+    playerDecline({id:"human",declineProfile:state.player.declineProfile},state.worldSeed),
   );
   const playerForNextSeason: Player = {
     ...state.player,
@@ -5749,6 +5797,7 @@ function applySeasonRollover(state: GameState) {
     careerSystemsSeed.pro.currentTier,
     state.player,
     seasonRecord,
+    state,
   );
   const nextWorldPlayers = evolveWorldPlayersForNextSeason(
     archivedWorldPlayers,
@@ -5758,6 +5807,7 @@ function applySeasonRollover(state: GameState) {
     careerSystemsSeed.pro,
     nextSeasonStartYear,
     pathwayCardAwards(archivedState),
+    state.worldSeed,
   );
   const livingCompetitionTables = rebuildLivingCompetitionTables(
     rolledCompetitionTables,
@@ -5855,64 +5905,14 @@ function applySeasonRollover(state: GameState) {
     .filter((record) => !previousWorldPlayers.has(record.playerName))
     .map((record) => `${record.playerName} · age ${record.age}`)
     .slice(0, 6);
-  const worldNumberOneRow = rebuiltCompetitionTables.world[0] ?? null;
-  const worldNumberOneRecord = worldNumberOneRow
-    ? nextWorldPlayers.find(
-        (record) => record.playerName === worldNumberOneRow.playerName,
-      )
-    : null;
-  const worldNumberOne = worldNumberOneRow
-    ? {
-        playerName: worldNumberOneRow.playerName,
-        nation: worldNumberOneRow.nation,
-        titles: worldNumberOneRow.titles,
-        wins: worldNumberOneRow.wins,
-        losses: worldNumberOneRow.losses,
-      }
-    : null;
-  const headlineCandidates = state.competitionTables.oneYear
-    .filter((row) => row.playerName !== state.player.fullName)
-    .slice()
-    .sort(
-      (left, right) =>
-        right.titles - left.titles ||
-        right.wins - left.wins ||
-        left.ranking - right.ranking,
-    );
-  const majorEvents = state.tournaments
-    .filter(
-      (event) =>
-        event.type === "Major" ||
-        /world championship|uk major|uk championship|masters|tour championship|champion of champions/i.test(
-          event.name,
-        ),
-    )
-    .filter(
-      (event, index, events) =>
-        events.findIndex((candidate) => candidate.name === event.name) ===
-        index,
-    )
-    .slice(0, 6);
-  const majorWinners = majorEvents.map((event, index) => {
-    const playerEntry = archivedTournamentHistory.find(
-      (entry) =>
-        entry.tournamentId === event.id &&
-        entry.season === state.season &&
-        entry.result === "Winner",
-    );
-    const fallbackWinner =
-      headlineCandidates[
-        (index + Math.abs(state.worldSeed)) %
-          Math.max(1, headlineCandidates.length)
-      ]?.playerName ??
-      worldNumberOneRecord?.playerName ??
-      state.player.fullName;
-    return {
-      tournamentName: event.name,
-      winner: playerEntry ? state.player.fullName : fallbackWinner,
-      playerWon: Boolean(playerEntry),
-    };
-  });
+  // Preserve the closing standings before next-season tables are rebuilt.
+  const finalRankings = state.competitionTables.world.map(row => ({ ranking: row.ranking, playerName: row.playerName, points: row.points }));
+  const worldNumberOneRow = state.competitionTables.world[0];
+  const worldNumberOne = worldNumberOneRow ? {
+    playerName: worldNumberOneRow.playerName, nation: worldNumberOneRow.nation,
+    titles: worldNumberOneRow.titles, wins: worldNumberOneRow.wins, losses: worldNumberOneRow.losses,
+  } : null;
+  const majorWinners = recordedSeasonWinners(archivedState);
   const seasonSnapshots = archivedState.history.snapshots.filter(
     (snapshot) => snapshot.season === state.season,
   );
@@ -5961,7 +5961,22 @@ function applySeasonRollover(state: GameState) {
                 : "Keep developing and target the next promotion threshold.",
             };
 
-  return {
+  const seasonReview: SeasonReviewTransition = {
+      pending: true,
+      completedSeason: seasonRecord,
+      nextSeason: nextSeasonLabel,
+      financialChange,
+      careerDecision,
+      worldNumberOne,
+      majorWinners,
+      finalRankings,
+      promotedPlayers,
+      cardLosses,
+      retirements,
+      newcomers,
+    };
+
+  const rolledState: GameState = {
     ...archivedState,
     player: verifiedPlayer,
     attributes: attributesForNextSeason,
@@ -5970,6 +5985,7 @@ function applySeasonRollover(state: GameState) {
       seasonStartAttributes: deepCloneAttributes(attributesForNextSeason),
     },
     season: nextSeasonLabel,
+    seasonClock: rolloverSeasonClock(state,nextSeasonLabel),
     tournaments: nextSeasonSchedule,
     rankings: rebuiltCompetitionTables[primaryKey].map((row) => ({ ...row })),
     competitionTables: rebuiltCompetitionTables,
@@ -5984,25 +6000,14 @@ function applySeasonRollover(state: GameState) {
         seasonRecord,
       ),
     },
-    seasonReview: {
-      pending: true,
-      completedSeason: seasonRecord,
-      nextSeason: nextSeasonLabel,
-      financialChange,
-      careerDecision,
-      worldNumberOne,
-      majorWinners,
-      promotedPlayers,
-      cardLosses,
-      retirements,
-      newcomers,
-    },
+    seasonReview,
     inbox: [
       createInboxMessage(
         {
           sender: "Career Manager",
           subject: `${state.season} end of season report ready`,
-          preview: `${state.season} finished with ${seasonRecord.matchesPlayed} matches, ${seasonRecord.titles} titles and £${seasonRecord.prizeMoney.toLocaleString("en-GB")} prize money. Review your career decision and the major world results before starting ${nextSeasonLabel}.`,
+          seasonReport: createSeasonEndReport(seasonReview, archivedState),
+          preview: `${seasonRecord.wins} wins from ${seasonRecord.matchesPlayed} matches · ${seasonRecord.titles} titles · £${seasonRecord.prizeMoney.toLocaleString("en-GB")} prize money. ${seasonRecord.closingRankingLabel} #${seasonRecord.closingRanking}. ${careerDecision.title}.`,
           priority: "High",
           actionLabel: "Open Season Review",
           actionRoute: "/season-review",
@@ -6012,9 +6017,30 @@ function applySeasonRollover(state: GameState) {
       ...state.inbox,
     ].slice(0, 18),
   };
+  const populatedState = ensureWorldPopulation(rolledState);
+  return { ...populatedState, tourChangesReport: createSeasonTourChanges(populatedState, archivedState) };
+}
+
+/** Finish free weeks through the existing settlement clock; never skip an entry or decision. */
+export function finishSeasonState(previousState: GameState): GameState {
+  let state = initializeCareerDepth(previousState);
+  if (state.seasonReview?.pending) return { ...state, seasonReview: { ...state.seasonReview, popupDismissed: false } };
+  // More than enough for every daily boundary in a July-to-June season.
+  for (let step = 0; step < 400; step++) {
+    if (state.liveMatch?.status === 'In Progress') return { ...state, lastAction: 'Resume your live match before finishing the season.' };
+    if (pendingStory(state)) return { ...state, lastAction: 'Season advance paused: choose a response to the career decision in your inbox, then continue.' };
+    const event = getNextEligibleTournament(state);
+    if (event) return { ...state, lastAction: 'Season advance paused: ' + event.name + ' is available. Play or skip it in the calendar before finishing the season.' };
+    const before = state;
+    state = advanceWeekState(state);
+    if (state.seasonReview?.pending) return state;
+    if (state.currentDate === before.currentDate) return state;
+  }
+  return { ...state, lastAction: 'Season advance paused. Review your calendar before continuing.' };
 }
 
 export function startNextSeasonState(previousState: GameState): GameState {
+  previousState = preserveSeasonEmails(previousState);
   if (!previousState.seasonReview?.pending) {
     return finalizeState(
       previousState,
@@ -6045,10 +6071,11 @@ export function startNextSeasonState(previousState: GameState): GameState {
           {
             sender: "Career Manager",
             subject: `${unlockedState.season} season started`,
-            preview: `The new July-to-June calendar is active. ${firstTournament ? `${firstTournament.name} is your first eligible event.` : "No eligible event is currently available."}`,
+            seasonStartReport: createSeasonStartReport(unlockedState, getTournamentEntryAccess),
+            preview: `${unlockedState.player.careerStage} · £${unlockedState.player.cash.toLocaleString("en-GB")} available. ${firstTournament ? `Next: ${firstTournament.name}.` : "No eligible event is currently available."} Your season briefing includes entry dates and last season’s tournament finishes.`,
             priority: "High",
-            actionLabel: "Open Dashboard",
-            actionRoute: "/",
+            actionLabel: "Plan Season",
+            actionRoute: "/calendar",
           },
           "Today",
         ),
@@ -6080,6 +6107,12 @@ export function advanceWeekState(previousState: GameState): GameState {
   if (entered && previousState.travel.bookings[entered.id] && !previousState.travel.bookings[entered.id].preparation) return { ...previousState, lastAction: 'Choose and confirm your tournament preparation before advancing.' };
   const boundary = nextCareerBoundary(previousState);
   if (entered && !previousState.travel.bookings[entered.id] && boundary >= journeyQuote(previousState, entered, '').departure) return { ...previousState, lastAction: 'Book travel before advancing through the departure window.' };
+  const seasonBoundary = getNextSeasonStartDate(previousState.tournaments);
+  if (seasonBoundary <= boundary && seasonBoundary < depthOf(previousState).nextSettlementDate) {
+    // Close on July 1 without settling the following full week early or missing opening events.
+    const closingState = finalizeState({ ...previousState, currentDate: seasonBoundary > previousState.currentDate ? seasonBoundary : previousState.currentDate }, 'Season complete.');
+    return finalizeState(applySeasonRollover(closingState), 'Season complete. Review your results and start the new season.');
+  }
   if (boundary < depthOf(previousState).nextSettlementDate) return finalizeState({ ...previousState, currentDate: boundary }, 'Reached a career calendar commitment. Review your calendar before continuing.');
   return advanceWholeWeekState(previousState);
 }
@@ -6380,7 +6413,7 @@ function advanceWholeWeekState(previousState: GameState): GameState {
   const weeklyReportMessage = createInboxMessage(
     {
       sender: "Career Manager",
-      subject: `Week ${nextState.week} report`,
+      subject: `${seasonWeekLabel(protectedState)} report`,
       preview: `Cash ${cashFlow >= 0 ? "+" : "-"}£${Math.abs(cashFlow).toLocaleString("en-GB")} · confidence ${formatTrainingMetricChange(confidenceDelta)} · fatigue ${formatTrainingMetricChange(fatigueDelta)} · ${weeklyImprovements.length} attribute${weeklyImprovements.length === 1 ? "" : "s"} improved.`,
       priority:
         nextState.player.fatigue >= 75 ||
@@ -6450,7 +6483,7 @@ function advanceWholeWeekState(previousState: GameState): GameState {
         {
           label: "Strain / burnout",
           value: `${nextState.trainingCondition.strain}% / ${nextState.trainingCondition.burnout}%`,
-          detail: "Current training health",
+          detail: nextState.trainingCondition.strain === 0 && nextState.trainingCondition.burnout === 0 ? "Recovered — no accumulated strain or burnout" : "Current training health",
           tone:
             nextState.trainingCondition.strain >= 70 ||
             nextState.trainingCondition.burnout >= 70
@@ -6500,8 +6533,8 @@ function advanceWholeWeekState(previousState: GameState): GameState {
           ...nextState.inbox,
         ].slice(0, 18),
       },
-      `Advanced to week ${nextState.week}.`,
-      `Week ${nextState.week}`,
+      `Advanced to ${seasonWeekLabel(nextState)}.`,
+      seasonWeekLabel(nextState),
     );
   }
 
@@ -6650,6 +6683,7 @@ export function enterTournamentState(
             ) ??
               createTournamentHistoryEntry(tournament, previousState.season)),
             status: "Entered",
+            entryPaid: cashRequirement,
             result: "Entered",
           }),
         ),
@@ -7012,33 +7046,12 @@ function applyCoachTrainingBonus(
   );
 }
 
-function buildSponsorOffers(
-  existingOffers: SponsorOfferState[] = [],
-): SponsorOfferState[] {
-  const existingOffersById = new Map(
-    existingOffers.map((offer) => [offer.id, offer]),
-  );
-
-  return sponsorOfferCatalog.map((offer) => {
-    const existingOffer = existingOffersById.get(offer.id);
-
-    if (!existingOffer) {
-      return {
-        ...offer,
-        status: "Available",
-        negotiationCount: 0,
-        notes: [],
-      };
-    }
-
-    return {
-      ...offer,
-      ...existingOffer,
-      status: existingOffer.status ?? "Available",
-      negotiationCount: existingOffer.negotiationCount ?? 0,
-      notes: existingOffer.notes ?? [],
-    };
-  });
+function buildSponsorOffers(existingOffers: SponsorOfferState[] = []): SponsorOfferState[] {
+  return existingOffers.map(offer => ({ ...offer,
+    status: offer.status ?? 'Available',
+    negotiationCount: offer.negotiationCount ?? 0,
+    notes: offer.notes ?? [],
+  }));
 }
 
 function roundToNearestFifty(value: number) {
@@ -7123,6 +7136,7 @@ function buildTournamentInvitationContent(
   return {
     sender: "Tournament Office",
     subject: `Invitation: ${tournament.name}`,
+    tournamentReference: { id: tournament.id, startDate: tournament.startDate },
     preview: `${contextLead} The prize fund is £${prizeFund.toLocaleString("en-GB")}, with £${winnerPrize.toLocaleString("en-GB")} for the champion${tournament.rankingValue > 0 ? ` and ${tournament.rankingValue.toLocaleString("en-GB")} ranking points at stake` : " in this non-ranking event"}. Enter or skip the event, then book travel if entering.`,
     priority: "High",
     actionLabel: "Review Event",
@@ -7270,7 +7284,7 @@ function normalizeInboxMessages(
       const tournament = tournaments.find(
         (event) => event.name === tournamentName,
       );
-      if (tournament) {
+      if (tournament && (!message.tournamentBriefings?.length || message.tournamentBriefings[0].startDate === tournament.startDate) && (!message.tournamentReference || message.tournamentReference.startDate === tournament.startDate)) {
         return {
           ...normalizedMessage,
           ...buildTournamentInvitationContent(
@@ -7726,6 +7740,7 @@ export function confirmTournamentPreparationState(
         ...previousState.finance,
         ledger,
       },
+      history: { ...previousState.history, tournamentHistory: previousState.history.tournamentHistory.map(h=>h.tournamentId===tournament.id && h.startDate===tournament.startDate ? {...h,preparationPaid:effects.cost}:h) },
       travel: {
         ...previousState.travel,
         bookings: {
@@ -7944,7 +7959,7 @@ function refreshSponsorOffers(state: GameState) {
   const loadModifier = state.sponsors.length >= sponsorCapacity ? 0.96 : 1;
   const normalizedOffers = buildSponsorOffers(state.sponsorOffers);
   return normalizedOffers.map((offer) => {
-    if (offer.status !== "Available") return offer;
+    if (offer.status !== "Available" || offer.seasonal) return offer;
 
     const baseOffer =
       sponsorOfferCatalog.find((item) => item.id === offer.id) ?? offer;
@@ -8069,6 +8084,8 @@ function createCareerSnapshot(state: GameState, label: string): CareerSnapshot {
   return {
     label,
     season: state.season,
+    seasonNumber: seasonPosition(state).season,
+    seasonWeek: seasonPosition(state).week,
     week: state.week,
     date: state.currentDate,
     ranking: rankingDisplay.ranking,
@@ -8143,36 +8160,12 @@ function adjustAttribute(
   group[label] = clamp(group[label] + delta, 1, 100);
 }
 
-function getSeasonalAgeRegressionProfile(age: number) {
-  if (age < 35) {
-    return { physical: 0, technical: 0, mental: 0 };
-  }
-  if (age <= 39) {
-    return { physical: age % 2 === 0 ? -1 : 0, technical: 0, mental: 0 };
-  }
-  if (age <= 44) {
-    return { physical: -1, technical: age % 3 === 0 ? -1 : 0, mental: 0 };
-  }
-  if (age <= 49) {
-    return { physical: -2, technical: age % 2 === 0 ? -1 : 0, mental: 0 };
-  }
-  if (age <= 54) {
-    return { physical: -2, technical: -1, mental: age % 2 === 0 ? -1 : 0 };
-  }
-  if (age <= 59) {
-    return { physical: -3, technical: -1, mental: -1 };
-  }
-  if (age <= 64) {
-    return { physical: -3, technical: -2, mental: -1 };
-  }
-  return { physical: -4, technical: -2, mental: -1 };
-}
-
 function applySeasonalAgeRegression(
   attributes: PlayerAttributes,
   age: number,
+  decline: DeclineProfile,
 ): PlayerAttributes {
-  const profile = getSeasonalAgeRegressionProfile(age);
+  const profile = ageAttributeLoss(age,decline);
   const nextAttributes = deepCloneAttributes(attributes);
   const physicalLabels = [
     "Stamina",
@@ -8192,20 +8185,16 @@ function applySeasonalAgeRegression(
 
   physicalLabels.forEach((label, index) => {
     const easedDelta =
-      index >= 3 && profile.physical < -1
-        ? profile.physical + 1
-        : profile.physical;
+      index >= 3 ? profile.physical * .65 : profile.physical;
     adjustAttribute(nextAttributes.physical, label, easedDelta);
   });
   technicalLabels.forEach((label, index) => {
     const easedDelta =
-      index >= 3 && profile.technical < -1
-        ? profile.technical + 1
-        : profile.technical;
+      index >= 3 ? profile.technical * .55 : profile.technical;
     adjustAttribute(nextAttributes.technical, label, easedDelta);
   });
   mentalLabels.forEach((label, index) => {
-    const easedDelta = index >= 2 && profile.mental < 0 ? 0 : profile.mental;
+    const easedDelta = index >= 2 ? profile.mental * .4 : profile.mental;
     adjustAttribute(nextAttributes.mental, label, easedDelta);
   });
 
@@ -8406,7 +8395,8 @@ function getWorldRankForAccess(
     state.player.worldRanking ??
     999;
 
-  return Math.max(rawWorldRank, getHistoryPerformanceRankFloor(state.history));
+  // Entry and seeding follow the earned ranking, including at the start of a new season.
+  return rawWorldRank;
 }
 
 function isWorldChampionshipQualifierTournament(tournament: Tournament) {
@@ -9116,7 +9106,10 @@ function repairLegacyWorldEntry(state: GameState): GameState {
 }
 
 export function repairGameState(state: GameState): GameState {
-  state = repairLegacyWorldEntry(initializeRollingRankings(state));
+  state = recoverTournamentArchive(state);
+  state = preserveSeasonEmails(state);
+  state = ensureSeasonClock(state);
+  state = ensureWorldPopulation(repairCpuHistoricalRecords(repairLegacyWorldEntry(initializeRollingRankings(state))));
   state = { ...state, tournaments: state.tournaments.map(t => isChampionshipLeague(t) && t.status !== 'Completed' ? { ...t, format: 'Groups: up to 4 frames, draws allowed · final best of 5', prizeMoney: 328000, winnerPrize: 33000, runnerUpPrize: 23000 } : t) };
   state = { ...state, tournaments: state.tournaments.map(t => {
     if (t.status === 'Completed') return t;
@@ -9143,6 +9136,7 @@ export function repairGameState(state: GameState): GameState {
   const invalidMatchIds = new Set(
     state.matches
       .filter((match) => {
+        if (match.season && match.season !== state.season) return false;
         const tournament = state.tournaments.find(
           (event) => event.id === match.tournamentId,
         );
@@ -9168,7 +9162,7 @@ export function repairGameState(state: GameState): GameState {
       currentDateValue;
     const invalidEntry =
       tournament.status === "Entered" &&
-      (!getTournamentEntryAccess(state, tournament).allowed || eventEnded);
+      ((!getTournamentEntryAccess(state, tournament).allowed && state.tournamentProgress.tournamentId !== tournament.id) || eventEnded);
     const invalidHistory = invalidTournamentIds.has(tournament.id);
     if (!invalidEntry && !invalidHistory) return tournament;
     return {
@@ -9180,8 +9174,7 @@ export function repairGameState(state: GameState): GameState {
     (tournament) => tournament.id === state.tournamentProgress.tournamentId,
   );
   const keepProgress = Boolean(
-    activeProgressTournament?.status === "Entered" &&
-    getTournamentEntryAccess(state, activeProgressTournament).allowed,
+    activeProgressTournament?.status === "Entered",
   );
   const keepLiveMatch =
     Boolean(
@@ -9198,6 +9191,7 @@ export function repairGameState(state: GameState): GameState {
     (match) => !invalidMatchIds.has(match.id),
   );
   const repairedMatchLog = state.history.matchLog.filter((entry) => {
+    if (entry.season !== state.season) return true;
     const tournament = repairedTournaments.find(
       (event) => event.id === entry.tournamentId,
     );
@@ -9258,7 +9252,7 @@ export function repairGameState(state: GameState): GameState {
     ),
   );
 
-  const repairedLegacy = state.history.legacy ?? careerLegacyOf({ ...state, matches: repairedMatches, history: { ...state.history, matchLog: repairedMatchLog, tournamentHistory: state.history.tournamentHistory.filter(entry => !invalidTournamentIds.has(entry.tournamentId)) } });
+  const repairedLegacy = state.history.legacy ?? careerLegacyOf({ ...state, matches: repairedMatches, history: { ...state.history, matchLog: repairedMatchLog, tournamentHistory: state.history.tournamentHistory.filter(entry => (entry.season !== state.season || !invalidTournamentIds.has(entry.tournamentId))) } });
   return evolveTourSkills(reconcileAchievements({
     ...state,
     schemaVersion: SAVE_SCHEMA_VERSION,
@@ -9290,7 +9284,7 @@ export function repairGameState(state: GameState): GameState {
             (event) => event.id === tournamentId,
           );
           return Boolean(
-            tournament && getTournamentEntryAccess(state, tournament).allowed,
+            tournament && (tournament.status === "Entered" || getTournamentEntryAccess(state, tournament).allowed),
           );
         }),
       ),
@@ -9307,7 +9301,7 @@ export function repairGameState(state: GameState): GameState {
       legacy: repairedLegacy,
       matchLog: repairedMatchLog,
       tournamentHistory: state.history.tournamentHistory.filter(
-        (entry) => !invalidTournamentIds.has(entry.tournamentId),
+        (entry) => (entry.season !== state.season || !invalidTournamentIds.has(entry.tournamentId)),
       ),
     },
     lastAction:
@@ -9753,11 +9747,7 @@ function updateWorldPlayersFromCompletedDraw(
       return sum + ((entry.result === "W" ? 1 : 0) - expected) * 0.42;
     }, 0);
     const developmentDrift =
-      record.age <= 24
-        ? 0.08 * playerResults.length
-        : record.age >= 42
-          ? -0.05 * playerResults.length
-          : 0;
+      record.age <= 24 ? 0.04 * playerResults.length : 0;
     const nextProgress =
       (record.ratingProgress ?? 0) + performanceProgress + developmentDrift;
     const wholeChange =
@@ -9771,7 +9761,7 @@ function updateWorldPlayersFromCompletedDraw(
     return {
       ...record,
       overallRating: clamp(
-        currentOverall + wholeChange,
+        currentOverall + (record.age >= playerDecline(record).startAge ? Math.min(0, wholeChange) : wholeChange),
         35,
         Math.max(currentOverall, potential),
       ),
@@ -10327,7 +10317,8 @@ function getRecentSeasonStat(
 }
 
 function getMainTourAgeDecline(record: WorldPlayerRecord) {
-  const age = record.age;
+  const profile = playerDecline(record);
+  const age = 35 + record.age - profile.startAge;
   if (age <= 34) return 0;
 
   const rawDecline =
@@ -10347,7 +10338,7 @@ function getMainTourAgeDecline(record: WorldPlayerRecord) {
         ? 0.92
         : 1;
 
-  return rawDecline * activeLegendRelief;
+  return rawDecline * activeLegendRelief * profile.rate;
 }
 
 function getMainTourYouthUpside(record: WorldPlayerRecord) {
@@ -11779,6 +11770,7 @@ export function evolveWorldPlayersForNextSeason(
   playerProState: ProCareerSystemState,
   nextSeasonStartYear: number,
   earnedCards?: Map<string, 'Q School' | 'Q Tour' | 'Federation Route'>,
+  worldSeed = 0,
 ) {
   const agedPlayers = players.map((record) => {
     const isHumanPlayer = record.playerName === nextPlayer.fullName;
@@ -12022,7 +12014,7 @@ export function evolveWorldPlayersForNextSeason(
         ) -
         getWorldPlayerPromotionScore(left.record, promotionTables, left.source),
     )
-    .slice(0, openSlots)
+    .slice(0, earnedCards ? undefined : openSlots)
     .map((entry) =>
       awardWorldPlayerTourCard(entry.record, entry.source, nextSeasonStartYear),
     );
@@ -12060,7 +12052,7 @@ export function evolveWorldPlayersForNextSeason(
     )
     .slice(0, remainingOpenSlots)
     .map((record) =>
-      awardWorldPlayerTourCard(record, "Federation Route", nextSeasonStartYear),
+      ({ ...awardWorldPlayerTourCard(record, "Top Up", nextSeasonStartYear), yearsRemaining:1, expiresAfterSeason:formatSeasonLabel(nextSeasonStartYear) }),
     );
   for (const record of fallbackPromotions) {
     promotedNames.add(record.playerName);
@@ -12077,7 +12069,7 @@ export function evolveWorldPlayersForNextSeason(
       : record,
   );
 
-  return nextSeasonPlayers;
+  return nextSeasonPlayers.map(record => ({...record,declineProfile:record.playerName===nextPlayer.fullName ? playerDecline({id:"human",declineProfile:nextPlayer.declineProfile},worldSeed) : playerDecline(record,worldSeed)}));
 }
 
 function rebuildLivingCompetitionTables(
@@ -12319,7 +12311,9 @@ function archiveWorldPlayersForSeason(
   playerStatus: string,
   player?: Player,
   playerSeasonRecord?: CareerSeasonRecord,
+  evidenceState?: GameState,
 ) {
+  const evidence = evidenceState ? cpuSeasonEvidence(evidenceState, getTournamentPlacementAwards) : undefined;
   const currentNames = new Set([
     ...players.map((entry) => entry.playerName),
     ...getAllCompetitionPlayerNames(tables),
@@ -12539,6 +12533,10 @@ function archiveWorldPlayersForSeason(
                           ? "Q Tour"
                           : "Development",
     };
+    const actual = evidence?.get(entryName);
+    if (!isHumanPlayer && evidence) {
+      Object.assign(seasonRecord, { matches:actual?.matches ?? 0, wins:actual?.wins ?? 0, losses:actual?.losses ?? 0, draws:actual?.draws ?? 0, titles:actual?.titles ?? 0, prizeMoney:actual?.prize ?? 0, proWins:actual?.proWins ?? 0, proLosses:actual?.proLosses ?? 0, mainTourEvents:actual?.proEvents ?? 0 });
+    }
     const seasonRows = [
       seasonRecord,
       ...existing.seasons.filter((entry) => entry.season !== season),
@@ -12574,19 +12572,7 @@ function archiveWorldPlayersForSeason(
     const performanceGrowth = seasonWins >= 5 ? 2 : seasonWins <= 1 ? -1 : 0;
     const currentOverall =
       existing.overallRating ?? inferWorldPlayerOverallRating(existing, tables);
-    const ageDevelopment =
-      existing.age <= 23
-        ? 2
-        : existing.age <= 28
-          ? 1
-          : existing.age >= 45
-            ? -2
-            : existing.age >= 39
-              ? -1
-              : 0;
-    const seasonalRatingChange = isHumanPlayer
-      ? 0
-      : clamp(performanceGrowth + ageDevelopment, -3, 3);
+    const seasonalRatingChange = isHumanPlayer ? 0 : annualCpuDevelopment(existing.age, currentOverall, getWorldPlayerDevelopmentPotential(existing), existing.playerName, playerDecline(existing));
 
     return {
       ...existing,
@@ -12604,9 +12590,12 @@ function archiveWorldPlayersForSeason(
       titles: existing.titles + seasonRecord.titles,
       majorTitles:
         existing.majorTitles +
-        (entryName === playerName ? (playerSeasonRecord?.majorTitles ?? 0) : 0),
-      qTourWins: existing.qTourWins + qTourTitles,
-      seniorTitles: existing.seniorTitles + seniorTitles,
+        (entryName === playerName ? (playerSeasonRecord?.majorTitles ?? 0) : actual?.majors ?? 0),
+      highestBreak: Math.max(existing.highestBreak, actual?.highestBreak ?? 0),
+      centuries: (existing.centuries ?? 0) + (actual?.centuries ?? 0),
+      breakRecordsMatches: (existing.breakRecordsMatches ?? 0) + (actual?.breakMatches ?? 0),
+      qTourWins: existing.qTourWins + (evidence ? actual?.qTourTitles ?? 0 : qTourTitles),
+      seniorTitles: existing.seniorTitles + (evidence ? actual?.seniorTitles ?? 0 : seniorTitles),
       highestWorldRank:
         existing.highestWorldRank == null
           ? (worldRow?.ranking ?? null)
@@ -12893,114 +12882,6 @@ function getRecentProfessionalHistoryProfile(history?: CareerHistoryState) {
   };
 }
 
-function getHistoryPerformanceRankFloor(history?: CareerHistoryState) {
-  const recentProProfile = getRecentProfessionalHistoryProfile(history);
-  const recentMatchCount =
-    recentProProfile.twoYearProWins + recentProProfile.twoYearProLosses;
-  const historyEntries = history?.tournamentHistory ?? [];
-  const rankingTitles = historyEntries.filter(
-    (entry) =>
-      entry.result === "Winner" && isProfessionalEventType(entry.eventType),
-  ).length;
-  const majorTitles = historyEntries.filter(
-    (entry) => entry.result === "Winner" && isMajorCareerEvent(entry),
-  ).length;
-  const worldTitles = historyEntries.filter(
-    (entry) =>
-      entry.result === "Winner" &&
-      isWorldChampionshipMainDrawName(entry.tournamentName),
-  ).length;
-  const professionalFinals = historyEntries.filter((entry) =>
-    isProfessionalFinalLevelRun(entry),
-  ).length;
-  const hasTitleProof = rankingTitles > 0 || majorTitles > 0 || worldTitles > 0;
-
-  if (recentMatchCount < 8) {
-    return 1;
-  }
-
-  if (
-    recentProProfile.latestSeasonProWins < 2 &&
-    recentProProfile.twoYearWinRate < 0.18
-  ) {
-    return 97;
-  }
-
-  if (
-    recentProProfile.latestSeasonProWins < 4 &&
-    (recentProProfile.twoYearWinRate < 0.2 ||
-      recentProProfile.latestSeasonMainTourEvents < 6)
-  ) {
-    return 65;
-  }
-
-  if (
-    recentProProfile.latestSeasonProWins < 8 &&
-    recentProProfile.latestSeasonMajorFinals === 0 &&
-    recentProProfile.twoYearWinRate < 0.35
-  ) {
-    return recentProProfile.latestSeasonMainTourEvents >= 8 &&
-      recentProProfile.twoYearWinRate >= 0.2
-      ? 33
-      : 65;
-  }
-
-  if (
-    !hasTitleProof &&
-    recentMatchCount >= 20 &&
-    recentProProfile.latestSeasonMajorFinals === 0 &&
-    recentProProfile.twoYearWinRate < 0.25
-  ) {
-    return recentProProfile.latestSeasonMainTourEvents >= 8 &&
-      recentProProfile.twoYearWinRate >= 0.2
-      ? 33
-      : 65;
-  }
-
-  if (
-    !hasTitleProof &&
-    recentMatchCount >= 20 &&
-    recentProProfile.latestSeasonMajorFinals === 0 &&
-    recentProProfile.twoYearWinRate < 0.35
-  ) {
-    return 33;
-  }
-
-  if (
-    !hasTitleProof &&
-    recentMatchCount >= 20 &&
-    recentProProfile.twoYearWinRate < 0.45
-  ) {
-    return 17;
-  }
-
-  if (!hasTitleProof && recentMatchCount >= 8) {
-    return professionalFinals >= 3 &&
-      recentProProfile.latestSeasonMajorFinals > 0 &&
-      recentProProfile.twoYearWinRate >= 0.45
-      ? 9
-      : 17;
-  }
-
-  if (
-    recentProProfile.latestSeasonProWins < 8 &&
-    recentProProfile.latestSeasonMajorFinals === 0 &&
-    recentProProfile.twoYearWinRate < 0.45
-  ) {
-    return 17;
-  }
-
-  if (
-    recentProProfile.latestSeasonProWins < 10 &&
-    recentProProfile.latestSeasonMajorFinals === 0 &&
-    recentProProfile.twoYearWinRate < 0.5
-  ) {
-    return 5;
-  }
-
-  return 1;
-}
-
 function getTournamentFinishTier(result: string) {
   if (/winner/i.test(result)) return 5;
   if (/quarter/i.test(result)) return 2;
@@ -13044,10 +12925,7 @@ function getCareerStageFromSystems(
   careerSystems: CareerSystemsState,
   history?: CareerHistoryState,
 ) {
-  const worldRank = Math.max(
-    careerSystems.pro.worldRank ?? 999,
-    getHistoryPerformanceRankFloor(history),
-  );
+  const worldRank = careerSystems.pro.worldRank ?? 999;
   const majorHistory =
     history?.tournamentHistory.filter((entry) => isMajorCareerEvent(entry)) ??
     [];
@@ -13336,7 +13214,7 @@ function finalizeState(
   snapshotLabel?: string,
 ) {
   state = { ...state, history: { ...state.history, legacy: careerLegacyOf(state) } };
-  const recalculated = recalculateState(reconcileRealism(reconcileCareerDepth(processRankingCalendar(state))), lastAction);
+  const recalculated = reconcileCareerBudget(recalculateState(reconcileRealism(reconcileCareerDepth(processRankingCalendar(state))), lastAction));
   const nextState = { ...recalculated, player: { ...recalculated.player, legacyScore: careerLegacyRating(careerLegacyOf(recalculated)).score } };
   return snapshotLabel
     ? withHistorySnapshot(nextState, snapshotLabel)
@@ -14709,77 +14587,20 @@ export function simulateSyntheticLiveVisitMatch(
   });
 }
 
-function resolveCompletedLiveFrame(
+export function resolveCompletedLiveFrame(
   liveMatch: LiveMatchState,
   mode: "Played" | "Simmed",
+  concededBy?: "Player" | "Opponent",
 ): LiveMatchState {
-  liveMatch = attemptGoldenBall(liveMatch);
+  if (!concededBy) liveMatch = attemptGoldenBall(liveMatch);
   let nextPlayerPoints = liveMatch.playerPoints;
   let nextOpponentPoints = liveMatch.opponentPoints;
   let playerWinsFrame = nextPlayerPoints > nextOpponentPoints;
 
-  if (mode === "Simmed") {
-    const plannedFrameWinChance =
-      liveMatch.plannedWinChance ??
-      convertMatchWinProbabilityToFrameWinProbability(
-        liveMatch.plannedMatchWinChance,
-        liveMatch.bestOf,
-      );
-    const matchExpectationEdge = liveMatch.plannedMatchWinChance - 50;
-    const formatExpectationEdge =
-      matchExpectationEdge *
-      (liveMatch.bestOf >= 25
-        ? 0.22
-        : liveMatch.bestOf >= 19
-          ? 0.1
-          : liveMatch.bestOf <= 7
-            ? -0.08
-            : 0);
-    const pointEdge = clamp(
-      (nextPlayerPoints - nextOpponentPoints) * 0.08,
-      -8,
-      8,
-    );
-    const confidenceEdge = clamp(
-      (liveMatch.playerConfidence - liveMatch.opponentConfidence) * 0.05,
-      -4,
-      4,
-    );
-    const clutchEdge = clamp(
-      (liveMatch.playerClutch - liveMatch.opponentClutch) * 0.05,
-      -4,
-      4,
-    );
-    const fatigueEdge = clamp(
-      (liveMatch.opponentFatigue - liveMatch.playerFatigue) * 0.04,
-      -4,
-      4,
-    );
-    const pressureClamp =
-      liveMatch.pressureValue >= 78
-        ? 0.75
-        : liveMatch.pressureValue >= 58
-          ? 0.9
-          : 1;
-    const simulatedFrameWinChance = clamp(
-      plannedFrameWinChance +
-        formatExpectationEdge +
-        pointEdge * pressureClamp +
-        confidenceEdge +
-        clutchEdge +
-        fatigueEdge,
-      4,
-      96,
-    );
-    playerWinsFrame = Math.random() * 100 < simulatedFrameWinChance;
-
-    if (playerWinsFrame && nextPlayerPoints <= nextOpponentPoints) {
-      nextPlayerPoints =
-        nextOpponentPoints + clamp(5 + Math.round(Math.random() * 18), 5, 23);
-    } else if (!playerWinsFrame && nextOpponentPoints <= nextPlayerPoints) {
-      nextOpponentPoints =
-        nextPlayerPoints + clamp(5 + Math.round(Math.random() * 18), 5, 23);
-    }
+  // The visits have already decided the score. Simulating must not reroll
+  // the winner or manufacture points after the table has been cleared.
+  if (concededBy) {
+    playerWinsFrame = concededBy === 'Opponent';
   } else if (nextPlayerPoints === nextOpponentPoints) {
     const respottedBlackWinChance = clamp(
       50 +
@@ -16295,6 +16116,7 @@ export function finalizeLiveMatch(
                 getTournamentHistoryId(state.season, tournament.id),
             ) ?? createTournamentHistoryEntry(tournament, state.season)),
             status: nextRound ? "In Progress" : "Completed",
+            sponsorBonusesPaid: (state.history.tournamentHistory.find(h=>h.tournamentId===tournament.id && h.startDate===tournament.startDate)?.sponsorBonusesPaid ?? state.matches.filter(m=>m.tournamentId===tournament.id && (m.season??state.season)===state.season).reduce((n,m)=>n+(m.sponsorBonusEarned??0),0)) + sponsorBonusTotal,
             result: playerWonTournament ? "Winner" : groupMatch ? (nextRound ? `Group play continues · ${nextRound}` : `Eliminated in ${liveMatch.round}`) : won
               ? tourCardClinched && nextRound
                 ? `Advanced to ${nextRound} · Tour card secured`
@@ -16382,13 +16204,7 @@ export function finalizeLiveMatch(
     nextState.player.amateurRanking;
   const rankingMovement =
     previousRank && currentRank ? previousRank - currentRank : 0;
-  const travelCost = state.travel.bookings[tournament.id]?.totalCost ?? 0;
-  const preparationCost =
-    state.travel.bookings[tournament.id]?.preparation?.effects.cost ?? 0;
-  const entryCost = getTournamentEntryCashRequirement(state, tournament);
-  const eventIncome = prizeMoneyEarned + sponsorBonusTotal;
-  const eventCosts = entryCost + travelCost + preparationCost;
-  const eventNet = eventIncome - eventCosts;
+  const eventFinance = eventFinancialReport(completedMatchState, tournament);
   const nextTournament = getNextEligibleTournament(completedMatchState);
   const finish = playerWonTournament ? "Winner" : groupMatch ? `Eliminated in ${liveMatch.round}` : `Lost in ${liveMatch.round}`;
   const rankingSummary = currentRank
@@ -16412,6 +16228,7 @@ export function finalizeLiveMatch(
           {
             sender: "Tournament Office",
             subject: `Post-event report: ${tournament.name}`,
+            eventFinance,
             preview: `${finish} after a ${latestMatch.playerFrames}-${latestMatch.opponentFrames} result. Review the performance, ranking and financial outcome below.`,
             priority: won ? "High" : "Medium",
             actionLabel: "View Completed Draw",
@@ -16452,28 +16269,7 @@ export function finalizeLiveMatch(
                 value: `${latestMatch.highestBreak}`,
                 tone: latestMatch.highestBreak >= 50 ? "positive" : "neutral",
               },
-              {
-                label: "Prize money",
-                value: `£${prizeMoneyEarned.toLocaleString("en-GB")}`,
-                tone: prizeMoneyEarned > 0 ? "positive" : "neutral",
-              },
-              {
-                label: "Sponsor bonus",
-                value: `£${sponsorBonusTotal.toLocaleString("en-GB")}`,
-                tone: sponsorBonusTotal > 0 ? "positive" : "neutral",
-              },
-              {
-                label: "Event costs",
-                value: `-£${eventCosts.toLocaleString("en-GB")}`,
-                detail: `Entry £${entryCost.toLocaleString("en-GB")} · travel £${travelCost.toLocaleString("en-GB")} · preparation £${preparationCost.toLocaleString("en-GB")}`,
-                tone: eventCosts > 0 ? "negative" : "neutral",
-              },
-              {
-                label: "Net finances",
-                value: `${eventNet >= 0 ? "+" : "-"}£${Math.abs(eventNet).toLocaleString("en-GB")}`,
-                detail: `£${eventIncome.toLocaleString("en-GB")} total income`,
-                tone: eventNet >= 0 ? "positive" : "negative",
-              },
+              ...financialSummary(eventFinance),
             ],
           },
           "Today",
@@ -16489,6 +16285,7 @@ function recalculateState(
   state: GameState,
   lastAction = state.lastAction,
 ): GameState {
+  state = enrichTournamentMessages(recordAttributeHistory(state));
   state = rebuildRollingRankings(initializeRollingRankings(state), state.currentDate, false);
   const coachContracts = normalizeCoachContracts(
     state.coachContracts,
@@ -16612,7 +16409,7 @@ function recalculateState(
     notificationCount: unreadCount,
   };
 
-  return {
+  return announceSeasonTourChanges(reconcileSponsorMarket({
     ...state,
     inbox: normalizedInbox,
     season: getSeasonLabelForTournaments(state.tournaments),
@@ -16632,7 +16429,7 @@ function recalculateState(
       (sponsor) => sponsor.weeksRemaining > 0,
     ).map(sponsor => ({ ...sponsor, performance: sponsorPerformance(sponsor, sponsorRanking({ player, rankings: activeRankings }).rank, player.rankingLabel) })),
     lastAction,
-  };
+  }));
 }
 
 export function createStarterState(): GameState {
@@ -16685,7 +16482,7 @@ export function createStarterState(): GameState {
     worldPlayers: buildWorldPlayersFromTables(competitionTables, starterPlayer),
     careerSystems,
     sponsors: starterSponsors.map((sponsor) => ({ ...sponsor })),
-    sponsorOffers: buildSponsorOffers(),
+    sponsorOffers: [],
     inbox: normalizeInboxMessages(
       starterInboxMessages.map((message) => ({ ...message })),
     ),
@@ -16711,6 +16508,7 @@ export function createStarterState(): GameState {
     lastAction: "Career loaded from the starter save.",
   };
 
+  baseState.attributeHistory = initialAttributeHistory(baseState);
   baseState.trainingPlan = buildAutoTrainingPlanFromState(baseState);
 
   return withHistorySnapshot(
@@ -16896,7 +16694,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
     worldPlayers: buildWorldPlayersFromTables(competitionTables, player),
     careerSystems,
     sponsors: [],
-    sponsorOffers: buildSponsorOffers(),
+    sponsorOffers: [],
     inbox: buildNewCareerInboxMessages(
       careerConfig.fullName,
       selectedBackground.name,
@@ -16924,6 +16722,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
     lastAction: `Created a new ${selectedBackground.name} career for ${careerConfig.fullName}.`,
   };
 
+  baseState.attributeHistory = initialAttributeHistory(baseState);
   baseState.trainingPlan = buildAutoTrainingPlanFromState(baseState);
 
   return withHistorySnapshot(
@@ -16957,6 +16756,7 @@ function loadStoredState(): GameState {
       ...fallbackState,
       ...parsed,
       rollingRankings: parsed.rollingRankings,
+      sponsorMarket: parsed.sponsorMarket,
       careerDepth: parsed.careerDepth,
       realism: parsed.realism,
       worldSeed: parsed.worldSeed ?? fallbackState.worldSeed,
@@ -17105,6 +16905,8 @@ function loadStoredState(): GameState {
           }
         : fallbackState.history,
       seasonReview: parsed.seasonReview ?? null,
+      tourChangesReport: parsed.tourChangesReport,
+      tourChangesAnnouncedSeason: parsed.tourChangesAnnouncedSeason,
       trainingPlan: Array.isArray(parsed.trainingPlan)
         ? normalizeTrainingPlan(
             parsed.trainingPlan as TrainingPlannerDay[],
@@ -17116,6 +16918,7 @@ function loadStoredState(): GameState {
             }),
           )
         : fallbackState.trainingPlan,
+      attributeHistory: parsed.attributeHistory,
       trainingAppliedWeek: parsed.trainingAppliedWeek ?? null,
       trainingCondition: {
         ...fallbackState.trainingCondition,
@@ -17788,6 +17591,8 @@ export function applyTrainingPlanState(
               ranking: currentCareerRank,
               form: currentForm,
               lastReport: {
+                seasonNumber: seasonPosition(previousState).season,
+                seasonWeek: seasonPosition(previousState).week,
                 startDate: previousReportSnapshot.date,
                 endDate: previousState.currentDate,
                 changes: attributeChanges,
@@ -17819,7 +17624,7 @@ export function applyTrainingPlanState(
               createInboxMessage(
                 {
                   sender: "Head Coach",
-                  subject: `Fortnightly training report: ${improvements.length} improved`,
+                  subject: `Fortnightly training report: ${seasonWeekLabel(previousState)} · ${improvements.length} improved`,
                   preview: `${improvementSummary}. Review your development, form, ranking and workload below.`,
                   priority:
                     overloadInjury || declines.length > improvements.length
@@ -17946,6 +17751,8 @@ export function acceptSponsorState(
 ) {
   const offer = findSponsorOfferFromState(previousState, sponsorId);
   if (!offer) return previousState;
+  const marketBlocker = seasonalSponsorBlocker(previousState, offer);
+  if (marketBlocker) return finalizeState(previousState, marketBlocker);
   if (offer.status === "Rejected") {
     return finalizeState(
       previousState,
@@ -17955,6 +17762,7 @@ export function acceptSponsorState(
   if (previousState.sponsors.some((sponsor) => sponsor.name === offer.name)) {
     return finalizeState(previousState, `${offer.name} is already active.`);
   }
+  if (offer.status === "Accepted") return finalizeState(previousState, `${offer.name} has already been signed. Wait for a new approach or review your existing contract renewal.`);
   if (previousState.player.reputation < offer.minimumReputation) {
     return finalizeState(
       previousState,
@@ -17997,6 +17805,7 @@ export function acceptSponsorState(
   }
 
   const acceptedSponsor: SponsorDeal = {
+    signedSeason: previousState.season,
     id: offer.id,
     name: offer.name,
     category: offer.category,
@@ -18575,6 +18384,15 @@ export function useGameState() {
           2,
         );
       },
+      recoverAttributeHistory(serializedState: string) {
+        try {
+          recoverAttributeHistory(gameState, serializedState);
+          setGameState(previous => recoverAttributeHistory(previous, serializedState));
+          return { success: true, message: 'Earlier attribute history recovered. Your career progress is unchanged.' };
+        } catch (error) {
+          return { success: false, message: error instanceof Error ? error.message : 'Could not read attribute history.' };
+        }
+      },
       importCareer(serializedState: string) {
         if (typeof window === "undefined") return false;
         try {
@@ -18677,6 +18495,12 @@ export function useGameState() {
         setGameState((previousState) =>
           continueToNextTournamentState(previousState),
         );
+      },
+      finishSeason() {
+        setGameState(previousState => finishSeasonState(previousState));
+      },
+      dismissSeasonReview() {
+        setGameState(state => state.seasonReview ? { ...state, seasonReview: { ...state.seasonReview, popupDismissed: true } } : state);
       },
       startNextSeason() {
         setGameState((previousState) => startNextSeasonState(previousState));
@@ -19443,13 +19267,8 @@ export function useGameState() {
 
           const liveMatch = previousState.liveMatch;
           if (pendingMatchBreak(liveMatch) || liveMatch.status === 'Completed') return previousState;
-          const remainingPoints = getRemainingTablePoints(liveMatch);
           const concededLiveMatch: LiveMatchState = {
             ...liveMatch,
-            opponentPoints: Math.max(
-              liveMatch.opponentPoints,
-              liveMatch.playerPoints + remainingPoints + 1,
-            ),
             currentBreak: 0,
             playerAtTable: liveMatch.opponentName,
             tableState: { redsRemaining: 0, coloursRemaining: [] },
@@ -19473,6 +19292,7 @@ export function useGameState() {
           const progressedLiveMatch = resolveCompletedLiveFrame(
             concededLiveMatch,
             "Played",
+            "Player",
           );
 
           return progressedLiveMatch.status === "Completed"
@@ -19574,6 +19394,8 @@ export function useGameState() {
         setGameState((previousState) => {
           const offer = findSponsorOfferFromState(previousState, sponsorId);
           if (!offer) return previousState;
+          const marketBlocker = seasonalSponsorBlocker(previousState, offer);
+          if (marketBlocker) return finalizeState(previousState, marketBlocker);
           if (offer.status !== "Available") {
             return finalizeState(
               previousState,
@@ -19622,16 +19444,16 @@ export function useGameState() {
               monthlyValue = Math.round(item.monthlyValue * 1.1);
             }
             if (selectedOption.label === "Reduce Obligations") {
-              monthlyValue = Math.max(200, item.monthlyValue - 150);
+              monthlyValue = Math.max(item.seasonal ? 50 : 200, item.monthlyValue - 150);
               behaviour = `${item.behaviour} · Reduced appearance load`;
             }
             if (selectedOption.label === "Add Title Bonus") {
-              monthlyValue = Math.max(200, item.monthlyValue - 250);
+              monthlyValue = Math.max(item.seasonal ? 50 : 200, item.monthlyValue - 250);
               bonusClause = `${item.bonusClause} · Ranking title +£5,000`;
             }
             if (selectedOption.label === "Shorten Contract Length") {
-              monthlyValue = Math.max(200, item.monthlyValue - 200);
-              contractLength = "18 months";
+              monthlyValue = Math.max(item.seasonal ? 50 : 200, item.monthlyValue - 200);
+              contractLength = item.seasonal ? Math.max(3, Math.min(18, Number.parseInt(item.contractLength, 10) - 3)) + " months" : "18 months";
             }
 
             return {

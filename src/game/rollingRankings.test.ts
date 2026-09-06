@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createStarterState, processRankingCalendar, repairGameState } from '../hooks/useGameState';
 import type { BracketRound, Tournament } from '../types/game';
-import { initializeRollingRankings, recordRankingEvent, rebuildRollingRankings, rankingEventKey, lockTournamentSeedings, seedingRows, scheduleRankingExpiries } from './rollingRankings';
+import { rankingEarningsSummary, initializeRollingRankings, recordRankingEvent, rebuildRollingRankings, rankingEventKey, lockTournamentSeedings, seedingRows, scheduleRankingExpiries } from './rollingRankings';
 
 function fixture() {
   const state = createStarterState();
@@ -133,4 +133,17 @@ describe('rolling ranking earnings', () => {
     expect(done.rollingRankings!.seedings[rankingEventKey(future)].world[a]).toBe(1);
     expect(done.competitionTables.world.find(r => r.playerName === a)?.points).toBe(10000);
   });
+});
+
+it('shows recorded credit as pending until publication without crediting it twice',()=>{
+ const {state,tournament,bracket,a}=fixture();
+ const recorded=recordRankingEvent(state,tournament,bracket,award);
+ const before=rebuildRollingRankings({...recorded,currentDate:'2026-09-09'},'2026-09-09');
+ expect(rankingEarningsSummary(before,a).pending).toHaveLength(1);
+ expect(before.competitionTables.world.find(r=>r.playerName===a)?.points).toBe(0);
+ const published=rebuildRollingRankings({...before,currentDate:'2026-09-10'},'2026-09-10');
+ expect(rankingEarningsSummary(published,a).pending).toHaveLength(0);
+ expect(published.competitionTables.world.find(r=>r.playerName===a)?.points).toBe(10000);
+ expect(rebuildRollingRankings(published,'2026-09-10').competitionTables.world).toEqual(published.competitionTables.world);
+ expect(published.player.cash).toBe(state.player.cash);
 });

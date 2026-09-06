@@ -1,6 +1,6 @@
 export type ProjectKind = 'long-pot' | 'safety' | 'cue-action' | 'stamina' | 'pressure';
 export type Strategy = 'ranking' | 'majors' | 'development' | 'survival';
-export type CommitmentKind = 'exhibition' | 'camp' | 'appearance' | 'recovery';
+export type CommitmentKind = 'exhibition' | 'camp' | 'appearance' | 'recovery' | 'club-work';
 export type StoryKind = 'deciders' | 'breakthrough' | 'early-exits' | 'television';
 export type StoryChoice = 'programme' | 'support' | 'continue' | 'exhibition' | 'sponsor' | 'protect' | 'technique' | 'coach' | 'media' | 'coach-prep';
 export type CareerStory = {

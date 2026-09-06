@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { attributeComparison, attributePeriods, type AttributePeriod } from '../game/attributeHistory'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Activity, ChevronRight, HeartPulse, Shield, Sparkles, Star } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
@@ -27,7 +28,9 @@ function conditionLabel(value: number, inverted = false) {
   return 'Fragile'
 }
 
-function formatDelta(value: number) {
+function formatDelta(value: number | null) {
+  if (value === null) return '—'
+  value = Math.round(value * 10) / 10
   return value > 0 ? `+${value}` : value < 0 ? `${value}` : '–'
 }
 
@@ -40,8 +43,13 @@ function attributeGroupsFrom(attributes: PlayerAttributes): Array<[AttributeGrou
 }
 
 export function PlayerAttributesPage() {
-  const { gameState } = useGame()
+  const { gameState, recoverAttributeHistory } = useGame()
   const navigate = useNavigate()
+  const [period, setPeriod] = useState<AttributePeriod>('start')
+  const [recoveryMessage, setRecoveryMessage] = useState('')
+  const recoveryInput = useRef<HTMLInputElement>(null)
+  const comparison = attributeComparison(gameState, period)
+  const periodLabel = attributePeriods.find(option => option.value === period)!.label
   const [view, setView] = useState<'grouped' | 'flat'>('grouped')
   const currentCoach = gameState.coaches.find((coach) => coach.id === gameState.currentCoachId)
   const allAttributes = Object.entries({
@@ -63,34 +71,28 @@ export function PlayerAttributesPage() {
     overallRating,
   })
   const matchFitness = Math.max(0, 100 - gameState.player.fatigue)
-  const seasonStartAttributes = gameState.trainingCondition.seasonStartAttributes ?? gameState.attributes
-  const seasonStartOverall = calculateOverallRating({
-    attributes: seasonStartAttributes,
-    personalityTraits: gameState.player.personalityTraits,
-    playingStyle: gameState.player.playingStyle,
-  })
-  const overallDelta = overallRating - seasonStartOverall
-  const seasonDeltas = attributeGroupsFrom(gameState.attributes).flatMap(([group, attributes]) =>
-    Object.entries(attributes).map(([label, value]) => ({
-      group,
-      label,
-      delta: value - (seasonStartAttributes[group][label] ?? value),
-    })),
+  const baseline = comparison.baseline
+  const baselineOverall = baseline?.overall
+  const overallDelta = baselineOverall === undefined ? null : overallRating - baselineOverall
+  const deltas = attributeGroupsFrom(gameState.attributes).flatMap(([group, attributes]) =>
+    Object.entries(attributes).map(([label, value]) => value - (baseline?.attributes[group][label] ?? value)),
   )
-  const improvedCount = seasonDeltas.filter((item) => item.delta > 0).length
-  const totalGained = seasonDeltas.reduce((sum, item) => sum + Math.max(0, item.delta), 0)
+  const improvedCount = deltas.filter(delta => delta > 0).length
+  const totalGained = Math.round(deltas.reduce((sum, delta) => sum + Math.max(0, delta), 0) * 10) / 10
+  const totalLost = Math.round(deltas.reduce((sum, delta) => sum + Math.max(0, -delta), 0) * 10) / 10
   const topStrengths = allAttributes.slice().sort((left, right) => right[1] - left[1]).slice(0, 5)
   const topWeaknesses = allAttributes.slice().sort((left, right) => left[1] - right[1]).slice(0, 5)
   const attributeGroups = attributeGroupsFrom(gameState.attributes)
 
   function renderAttributeRow(group: AttributeGroup, label: string, value: number) {
-    const delta = value - (seasonStartAttributes[group][label] ?? value)
+    const previous = baseline?.attributes[group][label]
+    const delta = previous === undefined ? null : value - previous
     return (
-      <div key={label} className="flex items-center gap-2">
+      <div key={label} data-testid={`attribute-${label}`} className="flex items-center gap-2">
         <span className="w-32 shrink-0 truncate text-[11px] text-gray-300">{label}</span>
         <div className="min-w-0 flex-1"><ProgressBar value={value} tone={ratingTone(value)} compact /></div>
         <span className="w-7 shrink-0 text-right text-xs font-medium text-white">{value}</span>
-        <span className={`w-8 shrink-0 text-right text-[10px] font-semibold tabular-nums ${delta > 0 ? 'text-green-400' : delta < 0 ? 'text-red-400' : 'text-gray-600'}`}>
+        <span className={`w-8 shrink-0 text-right text-[10px] font-semibold tabular-nums ${delta !== null && delta > 0 ? 'text-green-400' : delta !== null && delta < 0 ? 'text-red-400' : 'text-gray-600'}`}>
           {formatDelta(delta)}
         </span>
       </div>
@@ -105,7 +107,7 @@ export function PlayerAttributesPage() {
           <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <h1 className="truncate text-2xl font-bold text-white">Player Attributes - {gameState.player.fullName}</h1>
             <span className="border-l border-border pl-4 text-xs font-medium text-green-400/80">
-              {gameState.season} development · +{totalGained} gained · {improvedCount} improved
+              {periodLabel} · +{totalGained} gained{totalLost > 0 ? ` · −${totalLost} lost` : ''} · {improvedCount} improved
             </span>
           </div>
           <p className="mt-1 text-sm text-gray-400">{gameState.player.careerStage} - Age {gameState.player.age} - {gameState.player.handedness} - {gameState.player.playingStyle}</p>
@@ -117,9 +119,27 @@ export function PlayerAttributesPage() {
         </div>
       </div>
 
+      <div className="card card-body space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div role="group" aria-label="Attribute comparison period" className="flex flex-wrap gap-2">
+            {attributePeriods.map(option => <button key={option.value} type="button" aria-pressed={period === option.value} className={period === option.value ? 'btn-primary text-xs' : 'btn-secondary text-xs'} onClick={() => setPeriod(option.value)}>{option.label}</button>)}
+          </div>
+          <button type="button" className="btn-secondary text-xs" onClick={() => recoveryInput.current?.click()}>Recover from older save</button>
+          <input ref={recoveryInput} type="file" aria-label="Older career save" className="hidden" accept=".json,.txt" onChange={async event => {
+            const file = event.target.files?.[0]
+            event.target.value = ''
+            if (!file) return
+            try { setRecoveryMessage(recoverAttributeHistory(await file.text()).message) }
+            catch { setRecoveryMessage('Could not read this file. Choose an exported save from this career.') }
+          }} />
+        </div>
+        <p className="text-xs leading-relaxed text-gray-400" data-testid="attribute-coverage">{comparison.note}</p>
+        {recoveryMessage && <p role="status" className="text-xs text-gray-300">{recoveryMessage}</p>}
+      </div>
+
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
         {[
-          { label: 'Overall Rating', value: overallRating, sub: `Started ${seasonStartOverall} · ${formatDelta(overallDelta)}`, icon: Star, tone: 'green', delta: overallDelta },
+          { label: 'Overall Rating', value: overallRating, sub: baselineOverall === undefined ? 'Historical overall not recorded' : `Baseline ${baselineOverall} · ${formatDelta(overallDelta)}`, icon: Star, tone: 'green', delta: overallDelta },
           { label: 'Potential', value: potential, sub: '/ 100', icon: Sparkles, tone: 'blue' },
           { label: 'Morale', value: gameState.player.morale, sub: conditionLabel(gameState.player.morale), icon: Activity, tone: 'green' },
           { label: 'Match Fitness', value: matchFitness, sub: `${matchFitness}% ready`, icon: HeartPulse, tone: 'green' },
@@ -145,7 +165,7 @@ export function PlayerAttributesPage() {
             <div key={group} className="card">
               <div className="card-header">
                 <h3 className="text-sm font-semibold text-white">{groupLabels[group]}</h3>
-                <span className="text-[9px] font-medium uppercase tracking-wide text-gray-500">Season Δ</span>
+                <span className="text-[9px] font-medium uppercase tracking-wide text-gray-500">{periodLabel} Δ</span>
               </div>
               <div className="card-body space-y-2.5">
                 {Object.entries(attributes).map(([label, value]) => renderAttributeRow(group, label, value))}
@@ -155,7 +175,7 @@ export function PlayerAttributesPage() {
         </div>
       ) : (
         <div className="card">
-          <div className="card-header"><h3 className="text-sm font-semibold text-white">All Attributes</h3><span className="text-[10px] text-gray-400">Strongest to weakest</span></div>
+          <div className="card-header"><h3 className="text-sm font-semibold text-white">All Attributes</h3><span className="text-[10px] text-gray-400">{periodLabel} Δ · Strongest to weakest</span></div>
           <div className="card-body grid gap-y-2.5 sm:grid-cols-3 sm:gap-x-6">
             {allAttributes.slice().sort((left, right) => right[1] - left[1]).map(([label, value]) => {
               const group = attributeGroups.find(([, attributes]) => label in attributes)?.[0] ?? 'technical'

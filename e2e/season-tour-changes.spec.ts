@@ -1,0 +1,24 @@
+import {expect,test} from '@playwright/test';
+import {seasonTourChangesFixture} from '../test-support/seasonTourChangesFixture';
+import {ACTIVE_SAVE_KEY,encodeCareerSave} from '../src/game/saveStorage';
+import {readCareerSave} from './read-career-save';
+for(const width of [1280,390])test('separate season tour changes message at '+width+'px',async({page})=>{
+  const {after}=seasonTourChangesFixture();after.inbox=[{id:'existing-season-briefing',sender:'Career Manager',subject:'Existing season briefing',preview:'Your own season plan is separate.',date:after.currentDate,priority:'High',read:true}];
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.setViewportSize({width,height:width===1280?720:844});
+  await page.addInitScript(({key,value})=>{if(!sessionStorage.getItem('tour-news-fixture')){localStorage.setItem(key,value);sessionStorage.setItem('tour-news-fixture','1')}},{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(after)});
+  const open=async()=>{await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await page.evaluate(()=>{history.pushState({},'','/inbox');dispatchEvent(new PopStateEvent('popstate'))})};
+  await open();
+  const report=page.getByRole('region',{name:'Season tour changes'});
+  await expect(report).toContainText('Retiring Champion');await expect(report).toContainText('Senior Arrival');await expect(report).toContainText('Q School Graduate');await expect(report).toContainText('Q Tour Graduate');await expect(report).toContainText('New Q School Contender');
+  await expect(report).not.toContainText('Still Professional');await expect(report).not.toContainText('Already Retired');
+  const youth=page.getByRole('region',{name:'New youth players'});await youth.locator('summary').click();await expect(youth.getByText('Youth Arrival 4',{exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  const actions=page.getByTestId('inbox-message-actions');await expect(actions.getByRole('button',{name:'View Rankings',exact:true})).toBeVisible();
+  const box=await actions.boundingBox();expect(box!.y+box!.height).toBeLessThanOrEqual(width===1280?720:844);
+  await expect(page.getByLabel('Inbox messages')).toBeVisible();
+  await expect(page.getByLabel('Select inbox message')).toHaveCount(0);
+  await page.getByLabel('Inbox messages').getByRole('button',{name:/Existing season briefing/}).click();await expect(page.getByRole('heading',{name:'Existing season briefing',exact:true})).toBeVisible();
+  const saved=await readCareerSave(page);expect(saved.inbox.filter(m=>m.tourChangesReport)).toHaveLength(1);expect(saved.tourChangesAnnouncedSeason).toBe(after.season);
+  await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();await page.evaluate(()=>{history.pushState({},'','/inbox');dispatchEvent(new PopStateEvent('popstate'))});
+  await expect(report).toContainText('Retiring Champion');expect((await readCareerSave(page)).inbox.filter(m=>m.tourChangesReport)).toHaveLength(1);expect(errors).toEqual([]);
+});

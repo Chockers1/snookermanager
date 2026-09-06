@@ -1,3 +1,5 @@
+import { seasonWeekLabel } from "../../game/seasonClock";
+import { SeasonReviewPopup } from '../game/SeasonReviewPopup';
 import { useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
@@ -25,6 +27,7 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="flex h-screen min-w-0 overflow-hidden bg-background text-white">
+      <SeasonReviewPopup />
       <a
         href="#main-content"
         className="fixed left-3 top-3 z-[70] -translate-y-20 rounded bg-green-600 px-3 py-2 text-sm font-semibold text-white transition focus:translate-y-0"
@@ -80,16 +83,10 @@ export function AppShell({ children }: AppShellProps) {
           <p className="min-w-0 flex-1 truncate text-[10px] text-gray-400">
             {gameState.lastAction}
           </p>
-          <div className="hidden shrink-0 items-center gap-3 text-[10px] sm:flex">
-            <span className="hidden whitespace-nowrap text-gray-500 md:inline">
-              Season {gameState.season}
-            </span>
-            <span className="hidden whitespace-nowrap text-gray-500 md:inline">
-              Wk {gameState.week}
-            </span>
-            <span className="whitespace-nowrap text-gray-400">
-              {gameState.currentDate}
-            </span>
+          <div className="flex shrink-0 items-center gap-3 text-[10px]">
+            <span data-testid="season-week" className="whitespace-nowrap text-gray-300">{seasonWeekLabel(gameState)}</span>
+            <span className="hidden whitespace-nowrap text-gray-500 lg:inline">{gameState.season}</span>
+            <span className="hidden whitespace-nowrap text-gray-400 md:inline">{gameState.currentDate}</span>
           </div>
         </div>
       </div>

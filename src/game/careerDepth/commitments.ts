@@ -5,6 +5,7 @@ import { bounded, careerMessage, depthOf, overlaps, plusDays, peakPreparationWin
 import { buildTrainingCell, calculateDayLoad } from '../../utils/trainingPlan';
 
 export const COMMITMENTS: Record<CommitmentKind, { name: string; days: number; cost: number; income: number; fatigue: number; sharpness: number }> = {
+  'club-work': { name: 'Paid club work', days: 1, cost: 0, income: 120, fatigue: 5, sharpness: 0 },
   exhibition: { name: 'Paid exhibition', days: 1, cost: 0, income: 300, fatigue: 6, sharpness: 0 },
   camp: { name: 'Practice camp', days: 3, cost: 250, income: 0, fatigue: 4, sharpness: 3 },
   appearance: { name: 'Sponsor appearance', days: 1, cost: 0, income: 150, fatigue: 3, sharpness: 0 },
@@ -25,7 +26,7 @@ export function commitmentQuote(state: GameState, kind: CommitmentKind, startDat
   const scale = state.player.worldRanking ? 1 + Math.min(3, state.player.reputation / 30) : 0.5;
   return { id: `${kind}:${startDate}`, kind, startDate, endDate: plusDays(startDate, item.days - 1),
     sponsorId: kind === 'appearance' ? [...state.sponsors].sort((a, b) => (a.compliance ?? 100) - (b.compliance ?? 100))[0]?.id : undefined,
-    cost: Math.round(item.cost * scale), income: Math.round(item.income * scale),
+    cost: Math.round(item.cost * scale), income: kind === 'club-work' ? item.income : Math.round(item.income * scale),
     fatigue: item.fatigue, sharpness: item.sharpness, status: 'scheduled' };
 }
 export function commitmentConflict(state: GameState, start: string, end: string) {
@@ -45,9 +46,10 @@ export function scheduleCommitment(state: GameState, kind: CommitmentKind, start
   if (conflict) return { ...state, lastAction: conflict };
   if (d.commitments.some(c => c.id === quote.id)) return { ...state, lastAction: 'That opportunity has already been booked or declined.' };
   if (kind === 'appearance' && !state.sponsors.length && !storyId) return { ...state, lastAction: 'A sponsor contract or media invitation is required.' };
+  if (kind === 'club-work' && d.commitments.some(c => c.kind === kind && c.status !== 'cancelled' && Math.abs(Date.parse(c.startDate)-Date.parse(start)) < 7*86400000)) return {...state,lastAction:'Local clubs offer one paid shift per seven days.'};
   if (kind === 'appearance' && !storyId && d.commitments.some(c => c.kind === 'appearance' && c.status !== 'cancelled' && Math.abs(Date.parse(c.startDate) - Date.parse(start)) < 28 * 86400000)) return { ...state, lastAction: 'Your commercial schedule allows one paid sponsor appearance every four weeks.' };
   if (kind === 'exhibition' && !storyId) return { ...state, lastAction: 'Paid exhibitions require a breakthrough invitation.' };
-  if (state.player.cash < quote.cost || (d.schedule?.enabled && state.player.cash - quote.cost < d.schedule.reserve)) return { ...state, lastAction: 'Not enough unreserved cash for this commitment.' };
+  if (quote.cost > 0 && (state.player.cash < quote.cost || (d.schedule?.enabled && state.player.cash - quote.cost < d.schedule.reserve))) return { ...state, lastAction: 'Not enough unreserved cash for this commitment.' };
   return { ...state, player: { ...state.player, cash: state.player.cash - quote.cost },
     careerDepth: { ...d, commitments: [...d.commitments, { ...quote, sourceStoryId: storyId }] },
     finance: { ...state.finance, ledger: [{ id: `commitment-cost:${quote.id}`, date: state.currentDate, description: COMMITMENTS[kind].name, amount: quote.cost, type: 'Expense', category: 'Training' }, ...state.finance.ledger] },

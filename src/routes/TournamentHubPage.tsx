@@ -53,9 +53,11 @@ export function TournamentHubPage() {
     gameState,
     simulateMatch,
     enterTournament,
+    withdrawTournament,
     skipTournament,
     continueToNextTournament,
     continueWeek,
+    finishSeason,
   } = useGame();
   const navigate = useNavigate();
   const hubData = buildTournamentHubData(gameState);
@@ -71,7 +73,7 @@ export function TournamentHubPage() {
     (tip) => tip.id === gameState.equipment.currentTipId,
   );
   const equipmentReady = Boolean(currentCue && currentChalk && currentTip);
-  const activeTournament = getNextEligibleTournament(gameState);
+  const activeTournament = gameState.seasonReview?.pending ? undefined : getNextEligibleTournament(gameState);
   const tournamentName = activeTournament?.name.toLowerCase() ?? "";
   const isQualifier = /qualif|q school/.test(tournamentName);
   const isWorldChampionship =
@@ -232,13 +234,14 @@ export function TournamentHubPage() {
         <section className="rounded-xl border border-border bg-surface p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-green-400">Tournament Hub</p>
           <h1 className="mt-3 text-2xl font-bold text-white">No eligible tournament</h1>
-          <p className="mt-3 max-w-2xl text-sm text-gray-400">There is no tournament available for you to enter right now. Check the calendar, or advance a week to continue your career.</p>
+          <p className="mt-3 max-w-2xl text-sm text-gray-400">Your remaining season is clear. Finish Season advances the remaining weeks, including training, living costs and tour results, then opens your season review. It pauses if an event or career decision needs attention.</p>
           {nextRestricted && <div className="mt-5 rounded-lg border border-border bg-surface-light p-4">
             <p className="font-semibold text-white">{nextRestricted.name}</p>
             <p className="mt-1 text-sm text-gray-400">{getTournamentEntryAccess(gameState, nextRestricted).reason}</p>
           </div>}
           <div className="mt-6 flex flex-wrap gap-3">
-            <button type="button" className="btn-primary" onClick={() => navigate('/calendar')}>View Tournament Calendar</button>
+            <button type="button" className="btn-primary" onClick={() => { finishSeason(); navigate('/season-review'); }}>{gameState.seasonReview?.pending ? 'Open Season Review' : 'Finish Season'}</button>
+            <button type="button" className="btn-secondary" onClick={() => navigate('/calendar')}>View Tournament Calendar</button>
             <button type="button" className="btn-secondary" onClick={continueWeek}>Advance One Week</button>
           </div>
         </section>
@@ -446,8 +449,9 @@ export function TournamentHubPage() {
                     </button>
                   )}
                 </div>
+                {tournamentEntered && completedRounds.length === 0 && !(gameState.liveMatch?.tournamentId === activeTournament.id && gameState.liveMatch.status === "In Progress") && <button type="button" className="btn-secondary min-h-8 text-xs" onClick={() => withdrawTournament(activeTournament.id)}>Withdraw Entry</button>}
                 {tournamentEntered && !playability?.canPlay ? (
-                  <p className="line-clamp-2 text-center text-[9px] leading-tight text-amber-300">
+                  <p className="text-center text-[10px] leading-tight text-amber-300">
                     {playability?.reason}
                   </p>
                 ) : null}

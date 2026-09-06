@@ -26,6 +26,7 @@ const CareerProgressionPage = lazy(() =>
     default: module.CareerProgressionPage,
   })),
 );
+const RivalriesPage = lazy(() => import('./routes/RivalriesPage').then(module => ({ default: module.RivalriesPage })));
 const LegacyStatsPage = lazy(() =>
   import("./routes/LegacyStatsPage").then((module) => ({
     default: module.LegacyStatsPage,
@@ -214,6 +215,7 @@ export function AppRoutes() {
             path="/career/progression"
             element={<CareerProgressionPage />}
           />
+          <Route path="/career/rivalries" element={<RivalriesPage />} />
           <Route path="/career/stats" element={<LegacyStatsPage />} />
           <Route path="/player/attributes" element={<PlayerAttributesPage />} />
           <Route path="/training" element={<TrainingPlannerPage />} />

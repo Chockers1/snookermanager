@@ -139,7 +139,7 @@ export function realismAction(state: GameState, action: RealismAction): GameStat
     if (state.trainingAppliedWeek === state.week && date < depthOf(state).nextSettlementDate) return fail('This training week is already settled. Book familiarisation before applying that week.');
     if (!affordable(35)) return fail('Not enough unreserved cash for the £35 practice table session.');
     const next = spend(state, 35, `familiarise:${key}`, `${event.name} familiarisation table`);
-    return { ...next, realism: { ...r, familiarised: [...r.familiarised, key], activities: [...r.activities, { id: `familiarise:${key}`, date, kind: 'familiarise', label: `Venue familiarisation: ${event.name}` }] }, lastAction: `£35 table session reserved for ${date}, evening. Replaces normal evening training; halves the small unfamiliar-condition penalty.` };
+    return { ...next, history:{...next.history,tournamentHistory:next.history.tournamentHistory.map(h=>h.tournamentId===event.id && h.startDate===event.startDate?{...h,venuePracticePaid:(h.venuePracticePaid??0)+35}:h)}, realism: { ...r, familiarised: [...r.familiarised, key], activities: [...r.activities, { id: `familiarise:${key}`, date, kind: 'familiarise', label: `Venue familiarisation: ${event.name}` }] }, lastAction: `£35 table session reserved for ${date}, evening. Replaces normal evening training; halves the small unfamiliar-condition penalty.` };
   }
   const match = watchableMatch(state, action.opponentId);
   const date = state.currentDate;

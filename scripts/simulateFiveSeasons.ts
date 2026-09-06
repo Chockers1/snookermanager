@@ -1,3 +1,4 @@
+import { recordWorldAudit } from './worldAuditRecorder'
 import fs from 'node:fs'
 import { careerDepthAction } from '../src/game/careerDepth'
 import { depthOf, pendingStory } from '../src/game/careerDepth/shared'
@@ -8083,6 +8084,7 @@ function main() {
         seasonIssues.add(`${archivedSeason}: player record is missing from worldPlayers after rollover.`)
       }
 
+      if (process.argv.includes('--world-audit')) recordWorldAudit(path.join(reportsDir, reportBaseName + '-world'), openingState, eventResolvedState, advancedState)
       seasons.push(seasonReport)
       finalizeWorldAccessDebugSeason(worldAccessDebugStore, reportBaseName, seasonReport)
       if (managedYouthScenario && managedSupportProfile === 'best') {

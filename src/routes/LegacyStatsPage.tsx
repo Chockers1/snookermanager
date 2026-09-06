@@ -1,3 +1,6 @@
+import { tournamentRoundHistory } from '../game/tournamentCareerHistory';
+import { TournamentCareerHistory } from '../components/career/TournamentCareerHistory';
+import { seasonWeekLabel, snapshotWeekLabel } from "../game/seasonClock";
 import { AchievementGoalsPanel } from '../components/career/SeasonExpansionPanels'
 import { careerLegacyOf, careerLegacyRating } from '../game/careerLegacy'
 import { LegacyRecords } from '../components/career/LegacyRecords'
@@ -50,11 +53,11 @@ export function LegacyStatsPage() {
     totalPrizeMoney,
   }
   const legacyBreakdown = rating.breakdown
-  const rankingTrend = trendSnapshots.map((snapshot) => ({ label: `W${snapshot.week}`, value: snapshot.ranking || currentRanking }))
-  const prizeTrend = trendSnapshots.map((snapshot) => ({ label: `W${snapshot.week}`, value: snapshot.totalPrizeMoney }))
-  const confidenceTrend = trendSnapshots.map((snapshot) => ({ label: `W${snapshot.week}`, value: snapshot.confidence }))
+  const rankingTrend = trendSnapshots.map((snapshot) => ({ label: snapshotWeekLabel(snapshot, gameState), value: snapshot.ranking || currentRanking }))
+  const prizeTrend = trendSnapshots.map((snapshot) => ({ label: snapshotWeekLabel(snapshot, gameState), value: snapshot.totalPrizeMoney }))
+  const confidenceTrend = trendSnapshots.map((snapshot) => ({ label: snapshotWeekLabel(snapshot, gameState), value: snapshot.confidence }))
   const prizeByEvent = tournamentArchive.slice(0, 8).map((event) => ({ event: event.tournamentName.replace(/ Championship| Masters| Open/g, ''), prize: event.prizeMoney }))
-  const finalsData: LegacyFinalRow[] = tournamentArchive
+  const finalsData: Array<LegacyFinalRow & { prizeKnown: boolean; impactKnown: boolean }> = tournamentArchive
     .filter((event) => event.status === 'Completed' && event.matchesPlayed > 0)
     .slice(0, 7)
     .map((event) => ({
@@ -62,11 +65,13 @@ export function LegacyStatsPage() {
       year: event.startDate.slice(0, 4) || gameState.season,
       event: event.tournamentName,
       category: event.eventType ?? 'Career Event',
-      opponent: event.rounds.at(-1)?.split(':')[0] ?? 'Archive result',
+      opponent: tournamentRoundHistory(gameState,event).at(-1)?.opponent ?? 'Not recorded',
       result: event.result,
-      score: event.rounds.at(-1)?.split(': ')[1] ?? '-',
+      score: tournamentRoundHistory(gameState,event).at(-1)?.score || '-',
       prize: event.prizeMoney,
       impact: event.rankingPoints,
+      prizeKnown: event.recoveredFromLedger?.prizeKnown ?? true,
+      impactKnown: !event.recoveredFromLedger,
     }))
 
   return (
@@ -95,6 +100,7 @@ export function LegacyStatsPage() {
 
       <AchievementGoalsPanel />
       <LegacyRecords stats={career} />
+      <TournamentCareerHistory />
 
       <div className="grid gap-4 xl:grid-cols-12">
         <div className="min-w-0 space-y-4 xl:col-span-3">
@@ -123,7 +129,7 @@ export function LegacyStatsPage() {
                 ['Century Breaks', summary.centuryBreaks],
                 ['147s recorded', summary.maximumBreaks],
                 ['Sponsors', gameState.sponsors.length],
-                ['Week', gameState.week],
+                ['Season / week', seasonWeekLabel(gameState)],
               ].map(([label, value]) => <div key={label} className="flex justify-between rounded bg-surface-light/50 px-3 py-2"><span className="text-gray-400">{label}</span><span className="text-white">{value}</span></div>)}
             </div>
           </div>
@@ -147,7 +153,7 @@ export function LegacyStatsPage() {
               <table className="w-full text-xs">
                 <thead><tr className="border-b border-border text-gray-500"><th className="px-4 py-2 text-left">Year</th><th className="px-4 py-2 text-left">Event</th><th className="px-4 py-2 text-left">Opponent</th><th className="px-4 py-2 text-left">Result</th><th className="px-4 py-2 text-left">Score</th><th className="px-4 py-2 text-right">Prize</th><th className="px-4 py-2 text-right">Ranking Credit</th></tr></thead>
                 <tbody>
-                  {finalsData.length > 0 ? finalsData.map((final) => <tr key={final.id} className="border-b border-border/50 hover:bg-surface-light/50"><td className="px-4 py-2 text-gray-400">{final.year}</td><td className="px-4 py-2 text-white">{final.event}</td><td className="px-4 py-2 text-white">{final.opponent}</td><td className={final.result === 'Winner' || final.result === 'Won' ? 'px-4 py-2 text-green-400' : 'px-4 py-2 text-red-400'}>{final.result}</td><td className="px-4 py-2 text-white">{final.score}</td><td className="px-4 py-2 text-right text-green-400">{formatMoney(final.prize)}</td><td className={final.impact >= 0 ? 'px-4 py-2 text-right font-medium text-green-400' : 'px-4 py-2 text-right font-medium text-red-400'}>{final.impact >= 0 ? '+' : ''}{final.impact}</td></tr>) : <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No completed tournament finals are archived yet.</td></tr>}
+                  {finalsData.length > 0 ? finalsData.map((final) => <tr key={final.id} className="border-b border-border/50 hover:bg-surface-light/50"><td className="px-4 py-2 text-gray-400">{final.year}</td><td className="px-4 py-2 text-white">{final.event}</td><td className="px-4 py-2 text-white">{final.opponent}</td><td className={final.result === 'Winner' || final.result === 'Won' ? 'px-4 py-2 text-green-400' : 'px-4 py-2 text-red-400'}>{final.result}</td><td className="px-4 py-2 text-white">{final.score}</td><td className="px-4 py-2 text-right text-green-400">{final.prizeKnown ? formatMoney(final.prize) : '—'}</td><td className={final.impact >= 0 ? 'px-4 py-2 text-right font-medium text-green-400' : 'px-4 py-2 text-right font-medium text-red-400'}>{final.impactKnown ? (final.impact >= 0 ? '+' : '') + final.impact : '—'}</td></tr>) : <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No completed tournament finals are archived yet.</td></tr>}
                 </tbody>
               </table>
             </div>

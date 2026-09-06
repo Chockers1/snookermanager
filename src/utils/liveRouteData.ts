@@ -1,3 +1,4 @@
+import { seasonPosition, snapshotWeekLabel } from "../game/seasonClock";
 import { getBestOfForRound } from '../data/tournamentFormats';
 import { protectCommitmentSessions } from '../game/careerDepth/commitments';
 import { travelOptionsFor } from '../game/realism/travel';
@@ -437,7 +438,7 @@ function getTrendLabels(state: GameState, count: number) {
   const snapshots = state.history.snapshots.slice(-count);
   if (snapshots.length > 0) {
     return snapshots.map((snapshot) => ({
-      label: `W${snapshot.week}`,
+      label: snapshotWeekLabel(snapshot, state),
       ranking:
         snapshot.ranking ||
         (state.player.amateurRanking ?? state.player.worldRanking ?? 0),
@@ -449,7 +450,7 @@ function getTrendLabels(state: GameState, count: number) {
   }
 
   return Array.from({ length: count }, (_, index) => ({
-    label: `W${Math.max(1, state.week - (count - index - 1))}`,
+    label: `S${seasonPosition(state).season} W${Math.max(1, seasonPosition(state).week - (count - index - 1))}`,
     ranking: state.player.amateurRanking ?? state.player.worldRanking ?? 0,
     confidence: clamp(
       state.player.confidence - (count - index - 1) * 2,

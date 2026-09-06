@@ -1,5 +1,7 @@
+import { seasonTitle, snapshotWeekLabel } from "../game/seasonClock";
+import { SeasonRankings } from '../components/game/SeasonReviewPopup';
 import { useNavigate } from "react-router-dom";
-import { CareerSeasonSummary } from "../components/career/CareerDepthPanels";
+import { CareerDecisionNotice, CareerSeasonSummary } from "../components/career/CareerDepthPanels";
 import { WorldDigestPanel } from '../components/career/RealismPanels';
 import {
   Bar,
@@ -49,7 +51,7 @@ function getMetricIcon(label: string) {
 }
 
 export function SeasonReviewPage() {
-  const { gameState, continueWeek, startNextSeason } = useGame();
+  const { gameState, finishSeason, startNextSeason } = useGame();
   const navigate = useNavigate();
   const transition = gameState.seasonReview;
 
@@ -94,10 +96,10 @@ export function SeasonReviewPage() {
         <header className="flex flex-col gap-3 rounded-xl border border-border bg-surface/85 p-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">Season complete</p>
-            <h1 className="mt-1 text-2xl font-bold text-white">{record.season} End of Season Report</h1>
+            <h1 className="mt-1 text-2xl font-bold text-white">{seasonTitle(gameState,record.season)} End of Season Report</h1>
             <p className="mt-1 text-sm text-gray-400">Review your career decision and the major changes across the snooker world.</p>
           </div>
-          <span className="w-fit rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300">Review required</span>
+          <div className="flex flex-wrap items-center gap-2"><span className="w-fit rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300">Review required</span><button type="button" className="btn-secondary text-xs" onClick={finishSeason}>Open Review Popup</button></div>
         </header>
 
         <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
@@ -124,6 +126,7 @@ export function SeasonReviewPage() {
           <div className="card p-5 text-center"><Crown className="mx-auto h-8 w-8 text-amber-400" /><p className="mt-2 metric-label">World Number One</p><p className="mt-2 text-xl font-bold text-white">{worldNumberOne?.playerName ?? 'Not recorded'}</p>{worldNumberOne ? <><p className="text-xs text-gray-400">{worldNumberOne.nation}</p><p className="mt-3 text-xs text-green-400">{worldNumberOne.titles} titles · {worldNumberOne.wins}-{worldNumberOne.losses}</p></> : null}</div>
         </section>
 
+        <SeasonRankings review={transition} playerName={gameState.player.fullName} />
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{worldLists.map((group) => { const Icon = group.icon; return <div key={group.title} className="card p-4"><h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Icon className={`h-4 w-4 ${group.tone}`} />{group.title}</h3><ul className="mt-3 space-y-2 text-xs text-gray-300">{group.items.length ? group.items.map((item) => <li key={item} className="rounded bg-surface-light/50 px-3 py-2">{item}</li>) : <li className="text-gray-500">{group.empty}</li>}</ul></div> })}</section>
 
         <div className="fixed inset-x-0 bottom-8 z-20 border-t border-green-500/30 bg-sidebar/95 p-3 shadow-2xl backdrop-blur lg:left-52"><div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-white">Ready for {transition.nextSeason}?</p><p className="text-xs text-gray-400">Starting unlocks the new calendar and sends your first eligible event invitation.</p></div><button type="button" className="btn-primary min-h-11 justify-center px-5 text-sm" onClick={() => { startNextSeason(); navigate('/') }}>Start New Season <ChevronRight className="h-4 w-4" /></button></div></div>
@@ -189,7 +192,7 @@ export function SeasonReviewPage() {
       ];
   const seasonHistory = historySnapshots.slice(-8);
   const rankingMovementData = seasonHistory.map((snapshot) => ({
-    label: `W${snapshot.week}`,
+    label: snapshotWeekLabel(snapshot, gameState),
     value: snapshot.ranking || (playerRank?.ranking ?? 0),
   }));
   const prizeMoneyByEvent = currentSeasonEvents.length
@@ -297,7 +300,7 @@ export function SeasonReviewPage() {
               End of Season Review
             </h1>
             <p className="mt-1 truncate text-xs text-gray-400">
-              Season {gameState.season} review for {gameState.player.fullName}.
+              {seasonTitle(gameState)} review for {gameState.player.fullName}.
             </p>
           </div>
           <div className="card flex shrink-0 items-center gap-3 px-4 py-2.5">
@@ -612,6 +615,8 @@ export function SeasonReviewPage() {
         </section>
       </div>
 
+      <CareerDecisionNotice />
+      <p role="status" className="shrink-0 text-xs text-amber-300">{gameState.lastAction}</p>
       <div className="flex shrink-0 flex-wrap justify-center gap-2 rounded-lg border border-border bg-surface-light/40 px-3 py-2.5">
         <button
           type="button"
@@ -627,12 +632,13 @@ export function SeasonReviewPage() {
         >
           Set Next Season Plan
         </button>
+        <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => navigate("/calendar")}>View Calendar</button>
         <button
           type="button"
           className="btn-primary px-3 py-2 text-xs"
-          onClick={continueWeek}
+          onClick={finishSeason}
         >
-          <Trophy className="h-3.5 w-3.5" /> Continue to Offseason{" "}
+          <Trophy className="h-3.5 w-3.5" /> Finish Season{" "}
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
       </div>

@@ -1,3 +1,4 @@
+import { careerBudget, nextClubWorkDate } from '../game/careerBudget';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -55,7 +56,9 @@ const incomeColors = ["#22c55e", "#16a34a", "#3b82f6", "#38bdf8"];
 const expenseColors = ["#ef4444", "#f97316", "#fbbf24", "#64748b"];
 
 export function FinancePage() {
-  const { gameState, updateBudgetTargets } = useGame();
+  const { gameState, updateBudgetTargets, actOnCareer } = useGame();
+  const budget = careerBudget(gameState);
+  const workDate = nextClubWorkDate(gameState);
   const navigate = useNavigate();
   const {
     incomeBreakdown,
@@ -288,6 +291,10 @@ export function FinancePage() {
         </div>
       </div>
 
+      <div className={"card flex flex-wrap items-center justify-between gap-3 p-3 " + (budget.warning ? "border-amber-500/50" : "")}>
+        <div className="min-w-0 text-sm"><p className="font-semibold text-white">{budget.warning ? 'Cash needs attention' : 'Career cash outlook'}</p><p className="text-gray-400">Four-week projection {formatMoney(budget.projected)}{budget.runway !== null ? ' · ' + budget.runway + ' weeks of funds at current spending' : ''}. Club work pays £120 for one reserved day, once per week.</p></div>
+        <button className="btn-secondary shrink-0 px-3 py-2" disabled={!workDate} onClick={() => workDate && actOnCareer({type:'commitment',kind:'club-work',startDate:workDate})}>{workDate ? 'Book club work · '+workDate : 'No free work date in next 28 days'}</button>
+      </div>
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <div className="card min-h-0 p-3">
           <div className="flex items-center gap-2">

@@ -60,6 +60,7 @@ export function TrainingReportPage() {
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase text-gray-500">Training</p>
           <h1 className="mt-1 text-2xl font-bold text-white">Fortnightly Training Report</h1>
+          {latestReport?.seasonNumber !== undefined && <p className="mt-1 text-xs text-green-400">Season {latestReport.seasonNumber} · Week {latestReport.seasonWeek}</p>}
           <p className="mt-1 max-w-3xl text-sm text-gray-400">Two-week feedback for {gameState.player.fullName}: actual attribute movement, fatigue, and next-focus guidance{latestReport ? ` from ${latestReport.startDate} to ${latestReport.endDate}` : ''}.</p>
         </div>
         <button type="button" onClick={() => navigate('/training')} className="btn-primary shrink-0 text-xs">View Next Week Plan</button>

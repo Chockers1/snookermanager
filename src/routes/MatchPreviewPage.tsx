@@ -156,8 +156,10 @@ export function MatchPreviewPage() {
     <div className="flex min-h-0 flex-col gap-3 [&>*]:shrink-0 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-y-auto xl:p-1.5">
       <RivalryContext opponent={opponentName} />
       {activeTournament && nextOpponent && <ObjectivesPanel opponentRank={nextOpponent.ranking} bestOf={getBestOfForRound(activeTournament, activeRound ?? '', 7)} objectives={activeLiveMatch?.objectives} />}
-      <CoachAdvicePanel opponent={opponentName} tournament={activeTournament} onUsePlan={setPlan} />
-      <VenueScoutingPanel tournament={activeTournament} opponent={opponentName} />
+      <div className="grid min-w-0 items-start gap-2 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] [&>section>button]:py-1.5 [&>section>button]:text-[11px] [&>section>button]:leading-5">
+        <CoachAdvicePanel compact opponent={opponentName} tournament={activeTournament} onUsePlan={setPlan} />
+        <VenueScoutingPanel tournament={activeTournament} opponent={opponentName} />
+      </div>
       <div className="flex shrink-0 flex-col gap-2 rounded-lg border border-border bg-surface/85 px-3 py-2 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[11px] font-medium text-gray-500">

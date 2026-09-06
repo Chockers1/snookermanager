@@ -1,3 +1,4 @@
+import { withCpuBreakRecords, uniqueRankingRows } from './worldIntegrity';
 import { isChampionshipLeague, championshipEarnings } from './championshipLeague';
 import type { GameState, CompetitionTableRow } from '../hooks/useGameState';
 import type { BracketRound, Tournament, RankingRow } from '../types/game';
@@ -98,6 +99,7 @@ export function recordRankingEvent(state: GameState, tournament: Tournament, bra
   const ledger = state.rollingRankings!;
   const key = rankingEventKey(tournament);
   if (ledger.events[key] || ledger.legacyEventKeys.includes(key)) return state;
+  bracket = withCpuBreakRecords(bracket, key, state.worldPlayers, state.player.fullName);
   const entrants = new Map<string, { rank: number; firstRound: string; wins: number; lastRound: string; champion: boolean }>();
   for (const round of bracket) for (const match of round.matches) {
     for (const p of [match.top, match.bottom]) if (p.name !== 'TBD' && !/^Qualifier \d+$/.test(p.name) && !entrants.has(p.name)) entrants.set(p.name, { rank: p.rank, firstRound: round.label, wins: 0, lastRound: round.label, champion: false });
@@ -152,7 +154,7 @@ export function rebuildRollingRankings(state: GameState, date: string, revision 
     }
     return 0;
   };
-  const rank = (rows: CompetitionTableRow[], totals: Map<string, number>, key: 'world' | 'oneYear', movements: Record<string, number>) => [...rows].map(r => ({ ...r, points: totals.get(r.playerName) ?? 0 })).sort((a, b) => b.points - a.points || countback(a.playerName, b.playerName, key) || (previous?.[key][a.playerName] ?? a.ranking) - (previous?.[key][b.playerName] ?? b.ranking) || a.playerName.localeCompare(b.playerName)).map((r, i) => ({ ...r, ranking: i + 1, movement: revision ? (previous?.[key][r.playerName] ?? r.ranking) - i - 1 : movements[r.playerName] ?? 0 }));
+  const rank = (rows: CompetitionTableRow[], totals: Map<string, number>, key: 'world' | 'oneYear', movements: Record<string, number>) => uniqueRankingRows(rows).map(r => ({ ...r, points: totals.get(r.playerName) ?? 0 })).sort((a, b) => b.points - a.points || countback(a.playerName, b.playerName, key) || (previous?.[key][a.playerName] ?? a.ranking) - (previous?.[key][b.playerName] ?? b.ranking) || a.playerName.localeCompare(b.playerName)).map((r, i) => ({ ...r, ranking: i + 1, movement: revision ? (previous?.[key][r.playerName] ?? r.ranking) - i - 1 : movements[r.playerName] ?? 0 }));
   const tables = { ...state.competitionTables, world: rank(state.competitionTables.world, world, 'world', ledger.movementWorld), oneYear: rank(state.competitionTables.oneYear, season, 'oneYear', ledger.movementOneYear) };
   const next = { ...state, competitionTables: tables };
   const revisions = revision ? [...ledger.revisions.filter(r => r.date !== date), snapshot(next, date)] : ledger.revisions;
@@ -215,5 +217,6 @@ export function rankingEarningsSummary(state: GameState, playerName: string) {
   const ledger = state.rollingRankings;
   const next30 = plusDays(state.currentDate, 30);
   const active = (ledger?.earnings ?? []).filter(e => e.playerName === playerName && e.earnedOn <= state.currentDate && e.expiresOn > state.currentDate);
-  return { expiring: active.filter(e => e.expiresOn <= next30).reduce((s, e) => s + e.amount, 0), estimated: active.filter(e => e.estimated).reduce((s, e) => s + e.amount, 0), recent: active.filter(e => !e.estimated).sort((a, b) => b.earnedOn.localeCompare(a.earnedOn)).slice(0, 5) };
+  const pending = (ledger?.earnings ?? []).filter(e => e.playerName === playerName && !e.estimated && e.amount > 0 && e.earnedOn > state.currentDate && Boolean(ledger?.events[e.eventKey])).sort((a,b) => a.earnedOn.localeCompare(b.earnedOn));
+  return { pending, expiring: active.filter(e => e.expiresOn <= next30).reduce((s, e) => s + e.amount, 0), estimated: active.filter(e => e.estimated).reduce((s, e) => s + e.amount, 0), recent: active.filter(e => !e.estimated).sort((a, b) => b.earnedOn.localeCompare(a.earnedOn)).slice(0, 5) };
 }

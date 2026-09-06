@@ -1,3 +1,4 @@
+import { seasonWeekLabel } from "../game/seasonClock";
 import { CoachAdvicePanel } from "../components/career/MatchInsightPanels";
 import { useState } from "react";
 import { DevelopmentPanel } from "../components/career/CareerDepthPanels";
@@ -189,7 +190,7 @@ function TrainingPlannerContent() {
           </p>
           <h1 className="text-lg font-bold text-white">Build This Week</h1>
           <p className="text-[9px] text-gray-400">
-            Week {gameState.week} · {weekStart}–{weekEnd} · choose, check, apply
+            {seasonWeekLabel(gameState)} · {weekStart}–{weekEnd} · choose, check, apply
           </p>
         </div>
         <div className="flex gap-2">

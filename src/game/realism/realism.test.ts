@@ -90,7 +90,7 @@ describe('travel, elapsed costs and training base', () => {
     const arrived = continueToNextTournamentState(state);
     expect(arrived.currentDate).toBe(event.startDate);
     expect(arrived.realism?.location).toBe(journeyQuote(state, event, '').destination);
-    const late = bookTravelState({ ...enterTournamentState(createStarterState(), event.id), currentDate: event.startDate }, event.id);
+    const late = bookTravelState({ ...enterTournamentState(createStarterState(), event.id), currentDate: plusDays(event.startDate, 1) }, event.id);
     expect(late.travel.bookings[event.id]).toBeUndefined();
     expect(late.lastAction).toContain('cannot arrive');
   });

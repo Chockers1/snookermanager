@@ -1,3 +1,5 @@
+import { seasonalSponsorBlocker, sponsorMarketProfile } from '../game/sponsorMarket'
+import type { SponsorOfferCard } from '../types/game'
 import { SponsorPerformancePanel } from '../components/game/SponsorPerformancePanel'
 import { sponsorExpectations, sponsorRanking } from '../game/sponsorPerformance'
 import { useMemo, useState } from 'react'
@@ -14,7 +16,8 @@ function riskClass(risk: 'Low Risk' | 'Medium Risk' | 'Risky Terms') {
   return 'bg-green-600/20 text-green-400'
 }
 
-function getOfferStatus(offer: { minimumReputation: number }, reputation: number, slotsFull: boolean) {
+function getOfferStatus(offer: SponsorOfferCard, reputation: number, slotsFull: boolean, blocker: string | null) {
+  if (blocker) return { canAccept: false, label: "Requirements changed", detail: blocker }
   const missingReputation = Math.max(0, offer.minimumReputation - reputation)
   if (slotsFull) return { canAccept: false, label: 'Slots Full', detail: 'Improve ranking or reputation to open more sponsor room.' }
   if (missingReputation > 0) return { canAccept: false, label: `${missingReputation} rep short`, detail: `Need ${missingReputation} more reputation before this deal can be signed.` }
@@ -35,12 +38,12 @@ export function SponsorshipOffersPage() {
   const commercial = sponsorRanking(gameState)
   const sponsorSlotsFull = gameState.sponsors.length >= sponsorCapacity
   const filteredOffers = availableOffers.filter((offer) => {
-    if (filter === 'Ready') return getOfferStatus(offer, gameState.player.reputation, sponsorSlotsFull).canAccept
+    if (filter === 'Ready') return getOfferStatus(offer, gameState.player.reputation, sponsorSlotsFull, seasonalSponsorBlocker(gameState, offer)).canAccept
     if (filter === 'Low Risk') return offer.risk === 'Low Risk'
     return true
   })
   const selectedOffer = filteredOffers.find((offer) => offer.id === selectedOfferId) ?? filteredOffers[0] ?? null
-  const selectedOfferStatus = selectedOffer ? getOfferStatus(selectedOffer, gameState.player.reputation, sponsorSlotsFull) : null
+  const selectedOfferStatus = selectedOffer ? getOfferStatus(selectedOffer, gameState.player.reputation, sponsorSlotsFull, seasonalSponsorBlocker(gameState, selectedOffer)) : null
 
   function cycleFilter() {
     setFilter((current) => current === 'All' ? 'Ready' : current === 'Ready' ? 'Low Risk' : 'All')
@@ -50,11 +53,11 @@ export function SponsorshipOffersPage() {
   return (
     <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
       <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Support</p>
             <h1 className="mt-1 text-2xl font-bold leading-tight text-white">Sponsorship</h1>
-            <p className="mt-1 truncate text-xs text-gray-400">Manage endorsements and commercial partnerships.</p>
+            <p className="mt-1 text-xs text-gray-400">{gameState.season} sponsor market · {sponsorMarketProfile(gameState).label}</p><p className="mt-1 text-[10px] text-gray-500">Fresh approaches each season and as your profile grows. Signed contracts retain their agreed terms.</p>
           </div>
           <div className="flex shrink-0 gap-2">
             <button type="button" className={compareOffers ? 'btn-primary px-3 py-2 text-xs' : 'btn-secondary px-3 py-2 text-xs'} onClick={() => setCompareOffers((current) => !current)}>{compareOffers ? 'Close Comparison' : 'Compare Offers'}</button>
@@ -118,7 +121,7 @@ export function SponsorshipOffersPage() {
           <div className="card-body flex h-full min-h-0 flex-col gap-2 overflow-auto px-3 py-3 scrollbar-thin">
             {filteredOffers.length === 0 && <p className="p-4 text-sm text-gray-400">No offers match this filter. Your active contracts and reviews remain available here.</p>}
             {filteredOffers.map((offer) => {
-              const status = getOfferStatus(offer, gameState.player.reputation, sponsorSlotsFull)
+              const status = getOfferStatus(offer, gameState.player.reputation, sponsorSlotsFull, seasonalSponsorBlocker(gameState, offer))
 
               return (
                 <button
@@ -127,21 +130,21 @@ export function SponsorshipOffersPage() {
                   onClick={() => setSelectedOfferId(offer.id)}
                   className={`w-full rounded-lg px-3 py-2.5 text-left transition-colors ${selectedOffer?.id === offer.id ? 'bg-green-600/10 ring-1 ring-green-600/30' : 'bg-surface-light/50 hover:bg-surface-light'}`}
                 >
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface">
                         <Handshake className="h-[18px] w-[18px] text-green-400" />
                       </div>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="truncate text-sm font-semibold text-white">{offer.name}</h4>
+                          <h4 className="truncate text-sm font-semibold text-white">{offer.name}</h4>{offer.seasonal && <span className="text-[9px] text-green-300">New {offer.seasonal.season}</span>}
                           <span className="rounded bg-green-600/20 px-1.5 py-0.5 text-[10px] text-green-400">{offer.category}</span>
                           <span className={status.canAccept ? 'rounded bg-sky-600/20 px-1.5 py-0.5 text-[10px] text-sky-400' : 'rounded bg-amber-600/20 px-1.5 py-0.5 text-[10px] text-amber-400'}>{status.label}</span>
                         </div>
                         <p className="mt-0.5 truncate text-xs text-gray-400">{offer.contractLength} - {offer.behaviour}</p>
                       </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-4">
+                    <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-start sm:gap-4">
                       <div className="text-right">
                         <p className="text-sm font-bold text-green-400">{formatMoney(offer.monthlyValue)}/mo</p>
                         <p className="text-[10px] text-gray-500">Offer Value</p>
@@ -167,7 +170,7 @@ export function SponsorshipOffersPage() {
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-surface text-gray-500"><tr><th className="px-3 py-2 text-left">Sponsor</th><th className="px-3 py-2 text-right">Monthly</th><th className="px-3 py-2 text-right">Brand Fit</th><th className="px-3 py-2 text-right">Minimum Rep</th><th className="px-3 py-2 text-right">Risk</th><th className="px-3 py-2 text-right">Status</th></tr></thead>
               <tbody>{filteredOffers.map((offer) => {
-                const status = getOfferStatus(offer, gameState.player.reputation, sponsorSlotsFull)
+                const status = getOfferStatus(offer, gameState.player.reputation, sponsorSlotsFull, seasonalSponsorBlocker(gameState, offer))
                 return <tr key={offer.id} className="border-t border-border/60"><td className="px-3 py-2 font-medium text-white">{offer.name}</td><td className="px-3 py-2 text-right text-green-400">{formatMoney(offer.monthlyValue)}</td><td className="px-3 py-2 text-right text-white">{offer.brandFit}%</td><td className="px-3 py-2 text-right text-white">{offer.minimumReputation}</td><td className="px-3 py-2 text-right text-gray-300">{offer.risk}</td><td className={status.canAccept ? 'px-3 py-2 text-right text-green-400' : 'px-3 py-2 text-right text-amber-400'}>{status.label}</td></tr>
               })}</tbody>
             </table>
@@ -196,7 +199,7 @@ export function SponsorshipOffersPage() {
             <div className="card min-h-0 flex h-full flex-col overflow-hidden xl:col-span-4">
               <div className="card-body flex h-full min-h-0 flex-col justify-between px-3 py-3">
                 <div>
-                  <h3 className="mb-3 text-xs font-semibold text-white">Brand Notes</h3>
+                  <h3 className="mb-3 text-xs font-semibold text-white">Brand Notes</h3>{selectedOffer.seasonal && <p className="mb-2 text-[10px] text-gray-400">{selectedOffer.note}</p>}
                   <div className="space-y-2 text-xs text-gray-400">
                     <div className="flex justify-between gap-3"><span>Bonus Clause</span><span className="text-right text-white">{selectedOffer.bonusClause}</span></div>
                     <div className="flex justify-between gap-3"><span>Behaviour</span><span className="text-right text-white">{selectedOffer.behaviour}</span></div>

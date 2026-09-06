@@ -1,3 +1,4 @@
+import { seasonPosition, seasonWeekLabel, snapshotWeekLabel } from "../game/seasonClock";
 import { CareerDecisionNotice } from '../components/career/CareerDepthPanels';
 import { DashboardCareerSummary, DashboardFinanceSummary } from '../components/game/DashboardSummaryCards';
 import {
@@ -62,11 +63,11 @@ export function DashboardPage() {
   const rankingTrend = gameState.history.snapshots
     .slice(-10)
     .map((snapshot) => ({
-      label: `W${snapshot.week}`,
+      label: snapshotWeekLabel(snapshot, gameState),
       rank: snapshot.ranking || currentRanking || 0,
     }));
   const fallbackRankingTrend = Array.from({ length: 8 }, (_, index) => ({
-    label: `W${Math.max(1, gameState.week - (7 - index))}`,
+    label: `S${seasonPosition(gameState).season} W${Math.max(1, seasonPosition(gameState).week - (7 - index))}`,
     rank: Math.max(1, (currentRanking ?? 40) + (7 - index)),
   }));
   const activeRankingTrend =
@@ -205,7 +206,7 @@ export function DashboardPage() {
                 <span className="truncate">Training Week Overview</span>
               </h3>
               <span className="text-[9px] text-gray-400">
-                Week {gameState.week}
+                {seasonWeekLabel(gameState)}
               </span>
             </div>
             <div className="card-body flex min-h-0 flex-1 flex-col gap-2.5">

@@ -1,3 +1,4 @@
+import { playerDecline, ensurePlayerDeclines } from './playerAgeing';
 import type { GameState } from '../hooks/useGameState';
 import { bounded } from './careerDepth/shared';
 export type TourSkills = { longPotting: number; breakBuilding: number; safetyPlay: number; composure: number; stamina: number };
@@ -8,10 +9,12 @@ const hash = (text: string) => [...text].reduce((n,c) => (n * 31 + c.charCodeAt(
 const monthNumber = (date: string) => Number(date.slice(0,4))*12 + Number(date.slice(5,7))-1;
 const monthLabel = (n: number) => `${Math.floor(n/12)}-${String(n%12+1).padStart(2,'0')}`;
 export function evolveTourSkills(state: GameState): GameState {
+  state = ensurePlayerDeclines(state);
   const month = state.currentDate.slice(0,7);
   let changed = false;
   const worldPlayers = state.worldPlayers.map(p => {
     if (p.retired || p.playerName === state.player.fullName) return p;
+    const declineProfile = playerDecline(p,state.worldSeed);
     const old = p.skillDevelopment;
     if (old && monthNumber(old.reviewedMonth) >= monthNumber(month)) return p;
     changed = true;
@@ -24,7 +27,7 @@ export function evolveTourSkills(state: GameState): GameState {
       const growth = p.age<=25 ? .16*support*headroom : p.age<=34 ? .05*support : .015;
       const note: string[] = [];
       for (const skill of skills) {
-        const decline = p.age>=40 ? (skill==='stamina'?.18:skill==='longPotting'?.09:0) : p.age>=35 && skill==='stamina'?.07:0;
+        const decline = p.age>=declineProfile.startAge ? (skill==='stamina'?.18:skill==='longPotting'?.09:0)*declineProfile.rate : 0;
         const practice = skill===focus ? .10*support : 0;
         const delta = (p.injuryWeeks ? 0 : growth+practice)-decline;
         const before = next.offsets[skill];

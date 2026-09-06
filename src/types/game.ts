@@ -1,4 +1,5 @@
 export type Player = {
+  declineProfile?: import("../game/playerAgeing").DeclineProfile;
   id: string;
   firstName: string;
   lastName: string;
@@ -286,6 +287,12 @@ export type TrainingSlot = {
 };
 
 export type InboxMessage = {
+  tourChangesReport?: import("../game/seasonTourChanges").SeasonTourChanges;
+  tournamentReference?: { id: string; startDate: string };
+  tournamentBriefings?: import("../game/tournamentCareerHistory").TournamentBriefing[];
+  seasonStartReport?: import("../game/seasonStartReport").SeasonStartReport;
+  seasonReport?: import("../game/seasonEndReport").SeasonEndReport;
+  eventFinance?: import("../game/eventFinancialReport").EventFinancialReport;
   id: string;
   sender: string;
   subject: string;
@@ -304,6 +311,7 @@ export type InboxMessage = {
 };
 
 export type SponsorDeal = {
+  signedSeason?: string;
   performance?: import("../game/sponsorPerformance").SponsorPerformance;
   id: string;
   name: string;
@@ -374,6 +382,8 @@ export type TrainingConditionState = {
     ranking?: number | null;
     form?: number;
     lastReport?: {
+      seasonNumber?: number;
+      seasonWeek?: number;
       startDate: string;
       endDate: string;
       changes: Array<{
@@ -996,6 +1006,7 @@ export type DeadlineItem = {
 };
 
 export type SponsorOfferCard = {
+  seasonal?: import("../game/sponsorMarket").SeasonalSponsorTerms;
   id: string;
   name: string;
   category: string;

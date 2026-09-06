@@ -1,3 +1,4 @@
+import { seasonalSponsorBlocker } from '../game/sponsorMarket';
 import { sponsorExpectations, sponsorRanking } from "../game/sponsorPerformance";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -35,9 +36,9 @@ export function SponsorshipContractPage() {
   const selectedSponsorSlot = searchParams.get("slot") ?? undefined;
   const selectedOffer = useMemo(
     () =>
-      gameState.sponsorOffers.find((offer) => offer.id === selectedOfferId) ??
-      gameState.sponsorOffers.find((offer) => offer.status === "Available") ??
-      gameState.sponsorOffers[0],
+      selectedOfferId
+        ? gameState.sponsorOffers.find((offer) => offer.id === selectedOfferId)
+        : gameState.sponsorOffers.find((offer) => offer.status === "Available") ?? gameState.sponsorOffers[0],
     [gameState.sponsorOffers, selectedOfferId],
   );
   const contractData = selectedOffer
@@ -77,6 +78,7 @@ export function SponsorshipContractPage() {
     );
   }
 
+  const marketBlocker = seasonalSponsorBlocker(gameState, selectedOffer);
   const commercial = sponsorRanking(gameState);
   const expectations = sponsorExpectations(selectedOffer.risk === "Risky Terms" ? "High" : selectedOffer.risk === "Medium Risk" ? "Medium" : "Low", commercial.rank, commercial.label);
   const obligationProfile = getSponsorObligationProfile({
@@ -331,6 +333,8 @@ export function SponsorshipContractPage() {
               Negotiation Tone
             </h3>
             <div className="grid gap-2">
+            {marketBlocker && <p role="status" className="text-xs text-amber-300">{marketBlocker}</p>}
+            {selectedOffer.seasonal && <p className="text-xs text-gray-400">{selectedOffer.note}</p>}
               {(["Conservative", "Balanced", "Ambitious"] as const).map(
                 (tone) => (
                   <button
@@ -376,6 +380,7 @@ export function SponsorshipContractPage() {
             <button
               type="button"
               className="btn-primary justify-center text-xs"
+              disabled={Boolean(marketBlocker)}
               onClick={() => acceptSponsor(selectedOffer.id, selectedSponsorSlot)}
             >
               <Star className="h-3.5 w-3.5" /> Accept Contract
@@ -383,6 +388,7 @@ export function SponsorshipContractPage() {
             <button
               type="button"
               className="btn-secondary justify-center text-xs"
+              disabled={Boolean(marketBlocker)}
               onClick={() =>
                 negotiateSponsor(
                   selectedOffer.id,

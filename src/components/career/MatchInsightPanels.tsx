@@ -8,17 +8,16 @@ import { depthOf } from '../../game/careerDepth/shared';
 export function ObjectivesPanel({ opponentRank, bestOf, objectives }: { opponentRank: number; bestOf: number; objectives?: PersonalMatchObjective[] }) {
   const { gameState } = useGame();
   const goals = objectives ?? matchObjectives(gameState, opponentRank, bestOf);
-  return <section aria-label="Personal match objectives" className="shrink-0 rounded-lg border border-green-500/25 bg-green-500/5 px-3 py-2">
-    <p className="text-xs font-semibold text-green-400">Personal match objectives</p>
-    <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-white">{goals.map(g => <span key={g.id}>{g.label}</span>)}</div>
-    <p className="mt-1 text-[10px] text-gray-400">Locked when play starts · complete all for +1 confidence, even in defeat. No penalty for missing a target.</p>
-  </section>;
+  return <details aria-label="Personal match objectives" className="min-w-0 shrink-0 rounded-lg border border-green-500/25 bg-green-500/5 text-[11px]">
+    <summary className="cursor-pointer px-3 py-1.5 leading-5"><span className="font-semibold text-green-400">Personal match objectives</span><span className="ml-3 text-white">{goals.map(g => g.label).join(' · ')}</span><span className="ml-3 text-green-400">+1 confidence</span></summary>
+    <p className="border-t border-green-500/20 px-3 py-2 text-[11px] text-gray-400">Locked when play starts · complete all for +1 confidence, even in defeat. No penalty for missing a target.</p>
+  </details>;
 }
-export function CoachAdvicePanel({ opponent = '', tournament, onUsePlan }: { opponent?: string; tournament?: Tournament; onUsePlan?: (plan: 'Attack' | 'Balanced' | 'Safety') => void }) {
+export function CoachAdvicePanel({ opponent = '', tournament, onUsePlan, compact = false }: { opponent?: string; tournament?: Tournament; compact?: boolean; onUsePlan?: (plan: 'Attack' | 'Balanced' | 'Safety') => void }) {
   const { gameState } = useGame();
   const advice = coachingAdvice(gameState, opponent, tournament ?? getNextEligibleTournament(gameState));
   return <details className="shrink-0 rounded-lg border border-border bg-surface text-xs">
-    <summary className="cursor-pointer px-3 py-2 font-semibold text-white">{advice.coach} · Tactical & scheduling advice</summary>
+    <summary className={"cursor-pointer px-3 font-semibold text-white " + (compact ? "py-1.5 text-[11px] leading-5" : "py-2")}>{advice.coach} · {compact ? "Tactics & schedule" : "Tactical & scheduling advice"}</summary>
     <div className="space-y-3 border-t border-border p-3 text-gray-300">
       {opponent && <div><p className="font-semibold text-green-400">Suggested approach: {advice.tactic}</p><p className="mt-1">{advice.tactical}</p><p className="mt-1 text-[10px] text-gray-500">{advice.evidence}</p>{onUsePlan && <button type="button" className="btn-secondary mt-2 text-xs" onClick={() => onUsePlan(advice.tactic)}>Use coach’s approach</button>}</div>}
       <p>{advice.schedule}</p>

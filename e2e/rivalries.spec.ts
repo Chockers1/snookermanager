@@ -1,0 +1,22 @@
+import { expect,test } from '@playwright/test';
+import { rivalriesFixture } from '../test-support/rivalriesFixture';
+import {ACTIVE_SAVE_KEY,encodeCareerSave} from '../src/game/saveStorage';
+for(const width of [1280,390])test('rivalries navigation and records at '+width,async({page})=>{
+ const {state,rival,newcomer}=rivalriesFixture();
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.setViewportSize({width,height:844});
+ await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
+ await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+ if(width<1280) await page.getByRole('button',{name:/Open navigation/}).click();
+ await page.getByRole('link',{name:'Rivalries',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Rivalries',exact:true})).toBeVisible();
+ const card=page.getByRole('article',{name:rival.playerName+' head-to-head'});
+ await expect(card).toContainText('Established rivalry');await expect(card).toContainText('H2H 2–1');
+ await card.locator('summary').click();await expect(card).toContainText('Lost 3–4');
+ await page.getByLabel('Rivalry filter').selectOption('Established rivalries');
+ await expect(page.getByRole('article',{name:newcomer.playerName+' head-to-head'})).toHaveCount(0);
+ await page.getByLabel('Rivalry filter').selectOption('All opponents');
+ await page.getByLabel('Search opponents').fill(newcomer.playerName);
+ await expect(page.getByRole('article')).toHaveCount(1);await expect(page.getByRole('article')).toContainText('First meeting');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);expect(errors).toEqual([]);
+});

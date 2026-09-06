@@ -1,6 +1,7 @@
 import type { Tournament } from '../types/game'
 
 type TournamentScheduleState = {
+  tournamentProgress?: { tournamentId: string | null }
   currentDate: string
   tournaments: Tournament[]
   travel: { bookings: Record<string, { preparation?: unknown } | undefined> }
@@ -19,7 +20,7 @@ export function selectNextEligibleTournament<TState extends TournamentScheduleSt
   const currentDateValue = getTournamentDateValue(state.currentDate)
   const activeEntry = state.tournaments.find((tournament) => tournament.status === 'Entered'
     && getTournamentDateValue(tournament.endDate ?? tournament.startDate) >= currentDateValue
-    && getEntryAccess(state, tournament).allowed)
+    && (state.tournamentProgress?.tournamentId === tournament.id || getEntryAccess(state, tournament).allowed))
   if (activeEntry) return activeEntry
 
   return [...state.tournaments]

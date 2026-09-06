@@ -1,3 +1,12 @@
+import { SeasonTourChangesReport } from '../components/game/SeasonTourChangesReport';
+import { TournamentHistoryBriefing } from '../components/game/TournamentHistoryBriefing';
+import { seasonStartReportForMessage } from '../game/seasonStartReport';
+import { SeasonStartReport } from '../components/game/SeasonStartReport';
+import { getTournamentEntryAccess } from '../hooks/useGameState';
+import { seasonReportForMessage } from '../game/seasonEndReport';
+import { SeasonEndReport } from '../components/game/SeasonEndReport';
+import { financialReportForMessage } from '../game/eventFinancialReport';
+import { PostEventReport } from '../components/game/PostEventReport';
 import { useMemo, useState } from "react";
 import { StoryDecisionPanel } from "../components/career/CareerDepthPanels";
 import { WorldDigestPanel } from '../components/career/RealismPanels';
@@ -114,10 +123,16 @@ export function InboxPage() {
     filteredInbox[0] ??
     null;
   const selectedSummary = getMessageSummary(selectedMessage);
+  const eventFinance = financialReportForMessage(gameState, selectedMessage);
+  const seasonReport = seasonReportForMessage(gameState, selectedMessage);
+  const seasonStartReport = seasonStartReportForMessage(gameState, selectedMessage, getTournamentEntryAccess);
+  const tourChangesReport = selectedMessage?.tourChangesReport;
+  const wideReport = Boolean(seasonStartReport);
+  const compactReport = Boolean(eventFinance || seasonReport || wideReport);
   const selectedText = selectedMessage
     ? `${selectedMessage.subject} ${selectedMessage.preview}`.toLowerCase()
     : "";
-  const relatedTournament = gameState.tournaments.find((tournament) =>
+  const relatedTournament = seasonReport || wideReport || tourChangesReport ? undefined : eventFinance ? gameState.tournaments.find(t=>t.id===eventFinance.tournamentId && t.startDate===eventFinance.startDate) : selectedMessage?.tournamentReference ? gameState.tournaments.find(t=>t.id===selectedMessage.tournamentReference!.id && t.startDate===selectedMessage.tournamentReference!.startDate) : gameState.tournaments.slice().sort((a,b)=>b.name.length-a.name.length).find((tournament) =>
     selectedText.includes(tournament.name.toLowerCase()),
   );
   const relatedTravel = relatedTournament
@@ -223,8 +238,8 @@ export function InboxPage() {
         </div>
       </div>
 
-      <section className="card grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(9rem,0.8fr)_minmax(11rem,1.2fr)] overflow-hidden md:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.5fr)] md:grid-rows-1">
-        <div className="flex min-h-0 flex-col overflow-hidden border-b border-border md:border-b-0 md:border-r">
+      <section className={"card grid min-h-0 min-w-0 flex-1 overflow-hidden md:grid-rows-1 " + (wideReport ? "md:grid-cols-1 " : "md:grid-cols-[minmax(240px,0.7fr)_minmax(0,1.5fr)] ") + (compactReport ? "grid-rows-1" : "grid-rows-[minmax(9rem,0.8fr)_minmax(11rem,1.2fr)]")}>
+        <div className={(wideReport ? "hidden" : compactReport ? "hidden md:flex" : "flex") + " min-h-0 flex-col overflow-hidden border-b border-border md:border-b-0 md:border-r"}>
           <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
             <p className="text-xs font-semibold text-white">Messages</p>
             <span className="text-[10px] text-gray-500">
@@ -277,7 +292,8 @@ export function InboxPage() {
           </div>
         </div>
 
-        <article className="flex min-h-0 min-w-0 flex-col overflow-hidden p-4 sm:p-5">
+        <article className={"flex min-h-0 min-w-0 flex-col overflow-hidden " + (compactReport ? "p-3" : "p-4 sm:p-5")}>
+          {compactReport && <label className={"mb-2 shrink-0 text-[10px] text-gray-400 " + (wideReport ? "" : "md:hidden")}>Message<select aria-label="Select inbox message" className="mt-1 w-full min-w-0 rounded border border-border bg-surface p-1.5 text-xs text-white" value={selectedMessage?.id} onChange={e=>{const message=filteredInbox.find(m=>m.id===e.target.value);if(message)openMessage(message)}}>{filteredInbox.map(m=><option key={m.id} value={m.id}>{m.subject}</option>)}</select></label>}
           {selectedMessage ? (
             <>
               <div data-testid="inbox-message-body" className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
@@ -292,16 +308,16 @@ export function InboxPage() {
                   {selectedMessage.priority} priority
                 </span>
               </div>
-              <h2 className="mt-2 text-xl font-semibold text-white sm:text-2xl">
+              <h2 className={compactReport ? "mt-1 text-base font-semibold leading-5 text-white" : "mt-2 text-xl font-semibold text-white sm:text-2xl"}>
                 {selectedMessage.subject}
               </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-5 text-gray-300">
+              {!compactReport && <p className="mt-3 max-w-3xl text-sm leading-5 text-gray-300">
                 {gameState.realism?.digest.some(d => d.id === selectedMessage.id) ? 'Results and milestones from your simulated tour.' : selectedMessage.preview}
-              </p>
+              </p>}
               <StoryDecisionPanel messageId={selectedMessage.id} />
               <WorldDigestPanel messageId={selectedMessage.id} />
 
-              {selectedSummary.length ? (
+              {tourChangesReport ? <SeasonTourChangesReport report={tourChangesReport} /> : seasonStartReport ? <SeasonStartReport report={seasonStartReport} live={seasonStartReport.season === gameState.season} /> : seasonReport ? <SeasonEndReport report={seasonReport} /> : eventFinance ? <PostEventReport finance={eventFinance} summary={selectedSummary} /> : selectedSummary.length ? (
                 <div className="mt-3 max-w-3xl shrink-0 rounded-lg border border-border bg-background/30">
                   <div className="border-b border-border px-4 py-2">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
@@ -335,7 +351,9 @@ export function InboxPage() {
                 </div>
               ) : null}
 
-              {relatedTournament ? (
+              {!compactReport && selectedMessage.tournamentBriefings?.length ? <TournamentHistoryBriefing briefings={selectedMessage.tournamentBriefings} /> : null}
+
+              {relatedTournament && !compactReport ? (
                 <div className="mt-3 shrink-0 rounded-lg border border-border-light bg-background/40 p-3">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -372,8 +390,8 @@ export function InboxPage() {
               ) : null}
               </div>
 
-              <div data-testid="inbox-message-actions" className="mt-3 flex shrink-0 flex-wrap gap-2 border-t border-border bg-surface pt-3">
-                {relatedTournament?.status === "Available" ? (
+              <div data-testid="inbox-message-actions" className={(compactReport ? "mt-2 gap-1.5 pt-2 [&>button]:min-h-8 [&>button]:px-2 [&>button]:py-1 [&>button]:text-[11px]" : "mt-3 gap-2 pt-3") + " flex shrink-0 flex-wrap border-t border-border bg-surface"}>
+                {tourChangesReport ? <><button type="button" className="btn-primary" onClick={() => runMessageAction("/rankings")}>View Rankings</button><button type="button" className="btn-secondary" onClick={() => runMessageAction("/calendar")}>Tournament Calendar</button></> : seasonStartReport ? <><button type="button" className="btn-primary" onClick={() => runMessageAction("/calendar")}>Plan Season</button><button type="button" className="btn-secondary" onClick={() => runMessageAction("/tournaments/hub")}>Tournament Hub</button></> : !isCompletedEventReport && relatedTournament?.status === "Available" ? (
                   <button
                     type="button"
                     className="btn-primary min-h-10 text-xs"
@@ -420,7 +438,7 @@ export function InboxPage() {
                     View Calendar
                   </button>
                 ) : null}
-                {relatedTournament?.status === "Entered" ? (
+                {!isCompletedEventReport && relatedTournament?.status === "Entered" ? (
                   <button
                     type="button"
                     className="btn-secondary min-h-10 text-xs text-red-300"
