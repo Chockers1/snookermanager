@@ -139,6 +139,7 @@ export type TableSetup = {
 };
 
 export type Tournament = {
+  entryDeadline?: string;
   sessionFrames?: Record<number, number[]>;
   overnightAfterSessions?: number[];
   venueConditions?: import('../game/realism/types').VenueConditions;
@@ -205,6 +206,8 @@ export type Tournament = {
   televisedRounds?: string[];
   unlockRequirement?: string;
   progressionImpact?: string;
+  /** Accepted before cutoff rules were introduced; applies only to this saved event. */
+  legacyEntryHonoured?: boolean;
   seasonOpenAccessLock?: "worldMainDraw" | "worldQualifying" | null;
   reward?: string;
   format: string;
@@ -219,6 +222,9 @@ export type Tournament = {
 };
 
 export type Match = {
+  televised?: boolean;
+  objectives?: import("../game/matchInsights").PersonalMatchObjective[];
+  debrief?: import("../game/matchInsights").MatchDebrief;
   sourceMatchId?: string;
   season?: string;
   opponentId?: string;
@@ -234,11 +240,12 @@ export type Match = {
   opponentRanking: number;
   playerFrames: number;
   opponentFrames: number;
-  result: "Won" | "Lost" | "In Progress";
+  result: "Won" | "Lost" | "Drawn" | "In Progress";
   highestBreak: number;
   opponentHighestBreak: number;
   fifties: number;
   centuries: number;
+  maximumBreaks?: number;
   potSuccess: number;
   longPotSuccess: number;
   safetySuccess: number;
@@ -297,6 +304,7 @@ export type InboxMessage = {
 };
 
 export type SponsorDeal = {
+  performance?: import("../game/sponsorPerformance").SponsorPerformance;
   id: string;
   name: string;
   category: string;
@@ -525,6 +533,7 @@ export type TrainingCell = {
 };
 
 export type TrainingPlannerDay = {
+  planningBlockKind?: "training" | "rest";
   careerCommitmentId?: string;
   day: string;
   dateLabel: string;
@@ -819,6 +828,8 @@ export type TournamentStageProgress = {
 };
 
 export type BracketPlayer = {
+  developmentEdge?: number;
+  seed?: number;
   name: string;
   rank: number;
   nation: string;
@@ -832,9 +843,19 @@ export type BracketMatchup = {
   bottom: BracketPlayer;
   placeholder?: boolean;
   upset?: boolean;
+  group?: string;
+  matchday?: number;
+  topBreaks?: number[];
+  bottomBreaks?: number[];
 };
 
 export type BracketRound = {
+  groupRule?: 'ranking' | 'winsFrames' | 'amateur' | 'league';
+  groupAdvance?: number;
+  groupTieOrder?: Record<string, string[]>;
+  groupTieMatches?: { group: string; top: string; bottom: string; topFrames: number; bottomFrames: number }[];
+  bestOf?: number;
+  reservePlayers?: BracketPlayer[];
   label: string;
   matches: BracketMatchup[];
 };

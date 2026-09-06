@@ -1,6 +1,8 @@
+import { SponsorPerformancePanel } from '../components/game/SponsorPerformancePanel'
+import { sponsorExpectations, sponsorRanking } from '../game/sponsorPerformance'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BadgeCheck, Check, ChevronRight, Handshake } from 'lucide-react'
+import { Check, ChevronRight, Handshake } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { useGame } from '../context/useGame'
 import { buildSponsorshipOffersData } from '../utils/liveRouteData'
@@ -30,6 +32,7 @@ export function SponsorshipOffersPage() {
   const activeSelectedSlot = currentSlots.some((slot) => slot.slot === selectedSlot && slot.status === 'Vacant')
     ? selectedSlot
     : currentSlots.find((slot) => slot.status === 'Vacant')?.slot ?? ''
+  const commercial = sponsorRanking(gameState)
   const sponsorSlotsFull = gameState.sponsors.length >= sponsorCapacity
   const filteredOffers = availableOffers.filter((offer) => {
     if (filter === 'Ready') return getOfferStatus(offer, gameState.player.reputation, sponsorSlotsFull).canAccept
@@ -43,29 +46,6 @@ export function SponsorshipOffersPage() {
     setFilter((current) => current === 'All' ? 'Ready' : current === 'Ready' ? 'Low Risk' : 'All')
   }
 
-  if (availableOffers.length === 0) {
-    return (
-      <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
-        <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Support</p>
-          <h1 className="mt-1 text-2xl font-bold leading-tight text-white">Sponsorship Offers</h1>
-          <p className="mt-1 text-xs text-gray-400">All current sponsor offers have been accepted or cleared.</p>
-        </div>
-
-        <div className="card card-body flex min-h-0 flex-1 items-center justify-center px-8 text-center">
-          <div>
-            <BadgeCheck className="mx-auto h-12 w-12 text-green-400" />
-            <p className="mt-4 text-2xl font-semibold text-white">No open sponsor offers</p>
-            <p className="mt-3 text-sm text-gray-400">Review active deals or continue the career until new offers arrive.</p>
-            <div className="mt-6 flex justify-center gap-3">
-              <Link to="/" className="btn-primary">Back To Dashboard</Link>
-              <Link to="/inbox" className="btn-secondary">Open Inbox</Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
@@ -101,6 +81,7 @@ export function SponsorshipOffersPage() {
           <div className="card-header px-3 py-2"><h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Handshake className="h-4 w-4 text-green-400" /> Active Sponsors</h3></div>
           <div className="card-body flex h-full min-h-0 flex-col gap-2 overflow-auto px-3 py-3 scrollbar-thin">
             {currentSlots.map((slot) => (
+              <div key={slot.slot} className="rounded-lg bg-surface-light/50 p-2">
               <button
                 key={slot.slot}
                 type="button"
@@ -116,6 +97,8 @@ export function SponsorshipOffersPage() {
                 <div className="flex justify-between text-xs text-gray-400"><span>{slot.slot}</span><span className="text-green-400">{slot.monthlyIncome ?? '--'}</span></div>
                 <p className="mt-1 text-[10px] text-gray-500">{slot.status}{slot.timeLeft ? ` - ${slot.timeLeft}` : ''}{slot.status === 'Vacant' && activeSelectedSlot !== slot.slot ? ' · Click to fill' : ''}</p>
               </button>
+              {gameState.sponsors.filter(s => s.slot === slot.slot).map(sponsor => <SponsorPerformancePanel key={sponsor.id} sponsor={sponsor} rank={commercial.rank} rankingLabel={commercial.label} />)}
+              </div>
             ))}
             <div className="mt-auto border-t border-border pt-2.5">
               <div className="flex justify-between text-xs"><span className="text-gray-400">Total Sponsored Income</span><span className="font-bold text-green-400">{formatMoney(activeRevenue)}/mo</span></div>
@@ -133,6 +116,7 @@ export function SponsorshipOffersPage() {
         <div className="card min-h-0 flex h-full flex-col overflow-hidden xl:col-span-9">
           <div className="card-header px-3 py-2"><h3 className="text-sm font-semibold text-white">Available Offers</h3><span className="text-[10px] text-gray-500">{filteredOffers.length} shown</span></div>
           <div className="card-body flex h-full min-h-0 flex-col gap-2 overflow-auto px-3 py-3 scrollbar-thin">
+            {filteredOffers.length === 0 && <p className="p-4 text-sm text-gray-400">No offers match this filter. Your active contracts and reviews remain available here.</p>}
             {filteredOffers.map((offer) => {
               const status = getOfferStatus(offer, gameState.player.reputation, sponsorSlotsFull)
 
@@ -199,6 +183,7 @@ export function SponsorshipOffersPage() {
                   <div><span className="text-gray-500">Min Rep</span><p className="text-white">{selectedOffer.minimumReputation}</p></div>
                   <div><span className="text-gray-500">Brand Fit</span><p className="text-white">{selectedOffer.brandFit}%</p></div>
                 </div>
+                <p className="text-[11px] text-gray-400">Starts at 75/100 satisfaction · Target: {sponsorExpectations(selectedOffer.risk === "Risky Terms" ? "High" : selectedOffer.risk === "Medium Risk" ? "Medium" : "Low", commercial.rank, commercial.label).expectedWinRate}% match wins. Poor results bring warnings before cancellation.</p>
                 <p className="text-[11px] text-gray-400">{activeSelectedSlot ? `Signing into ${activeSelectedSlot}. ` : ''}{selectedOfferStatus?.detail}</p>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" className="btn-primary px-3 py-2 text-xs" disabled={!selectedOfferStatus?.canAccept || !activeSelectedSlot} onClick={() => acceptSponsor(selectedOffer.id, activeSelectedSlot)}><Handshake className="h-3.5 w-3.5" /> Fill {activeSelectedSlot || 'Sponsor Slot'}</button>

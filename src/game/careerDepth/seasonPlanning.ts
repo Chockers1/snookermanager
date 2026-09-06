@@ -1,3 +1,4 @@
+import { tournamentCommitmentConflict } from './commitments';
 import { bookTravelState, enterTournamentState, getTournamentEntryAccess, getTravelPackageCost, type GameState } from '../../hooks/useGameState';
 import { depthOf, overlaps, plusDays, pendingStory } from './shared';
 import type { Strategy } from './types';
@@ -26,6 +27,9 @@ export function recommendSeason(state: GameState) {
       else if (d.strategy === 'ranking' && event.rankingValue <= 0) { include = false; reason = 'Does not advance the ranking strategy.'; }
       else if (d.strategy === 'survival' && entry + travel > Math.max(0, state.player.cash - recurringCost(state) * 4) / 4) { include = false; reason = 'Guaranteed costs are too high for the survival budget.'; }
       if (include && d.commitments.some(c => c.status === 'scheduled' && overlaps(plusDays(event.startDate, -1), event.endDate ?? event.startDate, c.startDate, c.endDate))) { include = false; reason = 'Conflicts with an existing commitment.'; }
+      const protectedConflict = tournamentCommitmentConflict(state,event);
+      if (include && protectedConflict) { include=false; reason=protectedConflict; }
+      if (include && d.board?.priorities.includes(event.id)) reason='Your priority event. '+reason;
       if (include) lastEnd = event.endDate ?? event.startDate;
       return { event, entry, travel, total: entry + travel, include, reason: include && d.strategy === 'majors' ? 'Selected peak event.' : reason, inApprovalWindow: event.startDate < plusDays(state.currentDate, 42) };
     });
@@ -37,6 +41,8 @@ export function approveSchedule(state: GameState, eventIds: string[], cap: numbe
   const selected = eventIds.map(id => options.find(r => r.event.id === id));
   if (!selected.length || selected.some(r => !r || !r.inApprovalWindow || !getTournamentEntryAccess(state, r.event).allowed)) return { ...state, lastAction: 'Choose eligible events within the next six weeks.' };
   const rows = selected.filter(r => r !== undefined);
+  const protectedConflict = rows.map(r=>tournamentCommitmentConflict(state,r.event)).find(Boolean);
+  if (protectedConflict) return { ...state,lastAction:protectedConflict };
   if (d.strategy === 'majors' && rows.some(r => d.targets.includes(r.event.id) && (
     d.commitments.some(c => c.status === 'scheduled' && overlaps(c.startDate, c.endDate, plusDays(r.event.startDate, -3), plusDays(r.event.startDate, -1))) ||
     rows.some(other => other.event.id !== r.event.id && overlaps(other.event.startDate, other.event.endDate ?? other.event.startDate, plusDays(r.event.startDate, -3), plusDays(r.event.startDate, -1)))

@@ -1,3 +1,4 @@
+import { CoachAdvicePanel } from "../components/career/MatchInsightPanels";
 import { useState } from "react";
 import { DevelopmentPanel } from "../components/career/CareerDepthPanels";
 import { TrainingBasePanel } from '../components/career/RealismPanels';
@@ -179,6 +180,7 @@ function TrainingPlannerContent() {
       data-testid="training-planner"
     >
       <DevelopmentPanel />
+      <CoachAdvicePanel />
       <TrainingBasePanel />
       <header className="flex shrink-0 flex-col gap-2 rounded-xl border border-border bg-surface/85 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -241,7 +243,7 @@ function TrainingPlannerContent() {
 
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto xl:overflow-hidden">
         <div className="grid min-h-full gap-2 xl:h-full xl:grid-cols-[minmax(0,1fr)_350px]">
-          <div className="flex min-h-0 flex-col gap-2">
+          <div className="flex min-h-0 min-w-0 flex-col gap-2">
             <section className="card flex min-h-[390px] flex-1 flex-col overflow-hidden xl:min-h-0">
               <div className="card-header shrink-0 py-2">
                 <div>
@@ -259,16 +261,16 @@ function TrainingPlannerContent() {
                 </span>
               </div>
               <div className="scrollbar-thin hidden min-h-0 flex-1 overflow-auto p-2 md:block">
-                <div className="grid min-w-[980px] grid-cols-[72px_repeat(7,minmax(118px,1fr))] gap-1.5">
+                <div className="grid h-full min-h-[204px] w-full grid-cols-[64px_repeat(7,minmax(0,1fr))] grid-rows-[auto_repeat(3,minmax(0,1fr))] gap-1.5">
                   <div className="flex items-end px-1 pb-1 text-[8px] uppercase text-gray-600">
                     Session
                   </div>
                   {plannerWeek.map((day) => (
                     <div
                       key={`head-${day.day}`}
-                      className="rounded-md border border-border bg-surface-light/35 px-2 py-1.5"
+                      className="min-w-0 rounded-md border border-border bg-surface-light/35 px-1.5 py-1.5"
                     >
-                      <div className="flex justify-between gap-1">
+                      <div className="flex flex-wrap justify-between gap-1">
                         <b className="text-[10px]">{day.day}</b>
                         <span
                           className={`rounded px-1 text-[7px] ${day.load >= 70 ? "bg-red-500/10 text-red-400" : day.load >= 50 ? "bg-amber-500/10 text-amber-400" : "bg-green-500/10 text-green-400"}`}
@@ -285,6 +287,7 @@ function TrainingPlannerContent() {
                       >
                         {day.dateLabel}
                       </p>
+                      {day.planningBlockKind && <p className="text-[8px] text-sky-300">{day.competitionName}</p>}
                     </div>
                   ))}
                   {sessionRows.flatMap((row) => [
@@ -305,12 +308,12 @@ function TrainingPlannerContent() {
                       return (
                         <label
                           key={`${day.day}-${row.key}`}
-                          className="min-w-0 rounded-md border border-border bg-surface-light/25 p-1.5"
+                          className="flex min-w-0 flex-col justify-center rounded-md border border-border bg-surface-light/25 p-1 2xl:p-1.5"
                         >
                           <select
                             aria-label={`${day.day} ${row.label}`}
-                            disabled={Boolean(day.careerCommitmentId)}
-                            title={day.careerCommitmentId ? session.subtitle : session.subtitle.startsWith('Practice partner:') ? session.subtitle : undefined}
+                            disabled={Boolean(day.careerCommitmentId || day.planningBlockKind)}
+                            title={day.planningBlockKind ? "Reserved on the season planning board" : day.careerCommitmentId ? session.subtitle : session.subtitle.startsWith('Practice partner:') ? session.subtitle : undefined}
                             value={getTrainingSessionOptionId(session)}
                             onChange={(event) =>
                               changeSession(
@@ -319,7 +322,7 @@ function TrainingPlannerContent() {
                                 event.target.value,
                               )
                             }
-                            className="h-8 w-full rounded border border-border bg-surface px-1.5 text-[9px] font-medium text-white"
+                            className="h-6 w-full shrink-0 rounded border border-border bg-surface px-1 text-[9px] font-medium text-white 2xl:h-8 2xl:px-1.5"
                           >
                             <option value="" disabled>
                               Select session
@@ -330,7 +333,7 @@ function TrainingPlannerContent() {
                               </option>
                             ))}
                           </select>
-                          <span className="mt-1 flex justify-between gap-1">
+                          <span className="mt-0.5 flex justify-between gap-1 text-[7px] leading-tight 2xl:mt-1">
                             <span
                               className={`truncate rounded border px-1 text-[7px] ${categoryStyles[session.category]}`}
                             >
@@ -363,6 +366,7 @@ function TrainingPlannerContent() {
                         {day.loadLabel}
                       </span>
                     </div>
+                    {day.planningBlockKind && <p className="mb-2 text-xs text-sky-300">{day.competitionName}</p>}
                     <div className="grid gap-2 sm:grid-cols-3">
                       {sessionRows.map((row) => {
                         const session = day[row.key];
@@ -373,8 +377,8 @@ function TrainingPlannerContent() {
                             </span>
                               <select
                               aria-label={`${day.day} ${row.label}`}
-                              disabled={Boolean(day.careerCommitmentId)}
-                              title={day.careerCommitmentId ? session.subtitle : undefined}
+                              disabled={Boolean(day.careerCommitmentId || day.planningBlockKind)}
+                              title={day.planningBlockKind ? "Reserved on the season planning board" : day.careerCommitmentId ? session.subtitle : undefined}
                               value={getTrainingSessionOptionId(session)}
                               onChange={(event) =>
                                 changeSession(
@@ -415,7 +419,7 @@ function TrainingPlannerContent() {
           </div>
 
           <aside className="scrollbar-thin flex min-h-0 flex-col gap-2 overflow-y-auto">
-            <section className="card shrink-0 border-green-500/25 p-3">
+            <section className="card flex shrink-0 flex-col xl:grow border-green-500/25 p-3">
               <div className="flex justify-between gap-3">
                 <div>
                   <p className="text-[8px] uppercase tracking-wider text-green-400">
@@ -439,14 +443,14 @@ function TrainingPlannerContent() {
                 {selectedPreset?.description ??
                   "You have manually adjusted one or more sessions."}
               </p>
-              <div className="mt-2 flex justify-between border-t border-border pt-2 text-[9px]">
+              <div className="mt-2 flex justify-between border-t border-border pt-2 text-[9px] xl:mt-auto">
                 <span className="text-gray-400">Fatigue risk</span>
                 <b className={riskTone(summary.fatigueRisk)}>
                   {summary.fatigueRisk}%
                 </b>
               </div>
             </section>
-            <section className="card shrink-0 overflow-hidden">
+            <section className="card flex shrink-0 flex-col xl:grow overflow-hidden">
               <div className="card-header py-2">
                 <div>
                   <h2 className="text-xs font-semibold">
@@ -458,7 +462,7 @@ function TrainingPlannerContent() {
                 </div>
                 <span className="text-[8px] text-green-400">Estimated</span>
               </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2 p-3">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2 p-3 xl:flex-1 xl:content-center">
                 {summary.expectedGains.map((gain) => {
                   const adjusted = Math.max(
                     0,
@@ -487,7 +491,7 @@ function TrainingPlannerContent() {
                 })}
               </div>
             </section>
-            <section className="card shrink-0 p-3">
+            <section className="card flex shrink-0 flex-col xl:grow p-3">
               <div className="mb-2 flex justify-between">
                 <h2 className="text-xs font-semibold">Weekly Balance</h2>
                 <button
@@ -499,7 +503,7 @@ function TrainingPlannerContent() {
                   Full report
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2 xl:flex-1 xl:content-center">
                 {summary.balance.map((item) => (
                   <div key={item.label}>
                     <div className="mb-1 flex justify-between text-[8px]">
@@ -511,7 +515,7 @@ function TrainingPlannerContent() {
                 ))}
               </div>
             </section>
-            <section className="card shrink-0 p-3">
+            <section className="card flex shrink-0 flex-col xl:grow p-3">
               <div className="flex justify-between">
                 <h2 className="text-xs font-semibold">
                   Competition Protection

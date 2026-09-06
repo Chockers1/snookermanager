@@ -1,3 +1,8 @@
+import { EntryTimelinePanel } from '../components/career/SeasonExpansionPanels';
+import { pathwayRuleSummary } from '../game/pathwayRules'
+import { resolveTournamentFormat, tournamentFormatSummary } from '../data/tournamentFormats';
+import { GroupFixtures } from '../components/tournaments/GroupFixtures';
+import { isGroupDraw } from '../game/championshipLeague';
 import { useNavigate } from "react-router-dom";
 import { tournamentCommitmentConflict } from "../game/careerDepth/commitments";
 import { CareerDecisionNotice, RivalryContext } from "../components/career/CareerDepthPanels";
@@ -19,6 +24,7 @@ import { chalkCatalog, cueCatalog, tipCatalog } from "../data/catalogs";
 import {
   getNextEligibleTournament,
   getTournamentPlayability,
+  getTournamentEntryAccess,
 } from "../hooks/useGameState";
 import {
   buildTournamentDrawData,
@@ -49,10 +55,12 @@ export function TournamentHubPage() {
     enterTournament,
     skipTournament,
     continueToNextTournament,
+    continueWeek,
   } = useGame();
   const navigate = useNavigate();
   const hubData = buildTournamentHubData(gameState);
   const drawData = buildTournamentDrawData(gameState);
+  const groupCompetition = isGroupDraw(drawData.bracket);
   const currentCue = cueCatalog.find(
     (cue) => cue.id === gameState.equipment.currentCueId,
   );
@@ -109,8 +117,8 @@ export function TournamentHubPage() {
     .find((round) => round.label === activeRound)
     ?.matches.find(
       (match) =>
-        match.top.name === gameState.player.fullName ||
-        match.bottom.name === gameState.player.fullName,
+        (!groupCompetition || match.top.score === undefined) && (match.top.name === gameState.player.fullName ||
+        match.bottom.name === gameState.player.fullName),
     );
   const bracketOpponent = activeBracketMatch
     ? activeBracketMatch.top.name === gameState.player.fullName
@@ -212,9 +220,36 @@ export function TournamentHubPage() {
     navigate("/match/preview");
   }
 
+  if (!activeTournament) {
+    const nextRestricted = gameState.tournaments.filter(t =>
+      (t.endDate ?? t.startDate) >= gameState.currentDate && t.status !== 'Completed' && t.status !== 'Skipped' &&
+      (t.type === 'Major' || t.type === 'Ranking' || t.type === 'Professional Tour') &&
+      !getTournamentEntryAccess(gameState, t).allowed
+    ).sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
+    return (
+      <div className="space-y-4">
+        <CareerDecisionNotice />
+        <section className="rounded-xl border border-border bg-surface p-6 sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-widest text-green-400">Tournament Hub</p>
+          <h1 className="mt-3 text-2xl font-bold text-white">No eligible tournament</h1>
+          <p className="mt-3 max-w-2xl text-sm text-gray-400">There is no tournament available for you to enter right now. Check the calendar, or advance a week to continue your career.</p>
+          {nextRestricted && <div className="mt-5 rounded-lg border border-border bg-surface-light p-4">
+            <p className="font-semibold text-white">{nextRestricted.name}</p>
+            <p className="mt-1 text-sm text-gray-400">{getTournamentEntryAccess(gameState, nextRestricted).reason}</p>
+          </div>}
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button type="button" className="btn-primary" onClick={() => navigate('/calendar')}>View Tournament Calendar</button>
+            <button type="button" className="btn-secondary" onClick={continueWeek}>Advance One Week</button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="relative flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
       <CareerDecisionNotice />
+      {activeTournament.legacyEntryHonoured && <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">Your previously accepted entry has been restored after a save rules update. This exception applies to this event only; future World Championship entries use the ranking cutoff and qualifying results.</p>}
       <RivalryContext opponent={nextOpponent?.playerName ?? ''} />
       <VenueScoutingPanel tournament={activeTournament} opponent={nextOpponent?.playerName} />
       {isMajorEvent ? (
@@ -267,7 +302,7 @@ export function TournamentHubPage() {
             </h1>
             <p className="truncate text-xs text-gray-400">
               {activeTournament?.location ?? "Location TBD"} ·{" "}
-              {activeTournament?.format ?? "Format pending"}
+              {activeTournament ? tournamentFormatSummary(activeTournament) : "Format pending"}
             </p>
           </div>
           {isMajorEvent ? (
@@ -431,10 +466,10 @@ export function TournamentHubPage() {
                   ) : (
                     <Trophy className="h-3.5 w-3.5 text-green-400" />
                   )}{" "}
-                  {isMajorEvent ? "Championship Draw" : "Tournament Bracket"}
+                  {groupCompetition ? "Groups and Fixtures" : isMajorEvent ? "Championship Draw" : "Tournament Bracket"}
                 </h2>
                 <p className="mt-0.5 text-[10px] text-gray-500">
-                  {isMajorEvent
+                  {groupCompetition ? "Group standings update after every match" : isMajorEvent
                     ? "Elite field · your route to the title is highlighted"
                     : "Live draw · your route is highlighted"}
                 </p>
@@ -444,16 +479,16 @@ export function TournamentHubPage() {
                 className="btn-secondary min-h-10 justify-center px-3 text-xs"
                 onClick={() => navigate("/tournaments/draw")}
               >
-                <Maximize2 className="h-3.5 w-3.5" /> Open Full Draw
+                <Maximize2 className="h-3.5 w-3.5" /> {groupCompetition ? "All Groups & Fixtures" : "Open Full Draw"}
               </button>
             </div>
             <div className="min-h-0 flex-1 p-2.5">
-              <TournamentBracket
+              <>{groupCompetition ? <GroupFixtures key={activeRound} rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={activeRound} /> : <TournamentBracket
                 rounds={drawData.bracket}
                 playerName={gameState.player.fullName}
                 currentRound={activeRound}
                 dense
-              />
+              />}</>
             </div>
           </section>
         </div>
@@ -506,7 +541,7 @@ export function TournamentHubPage() {
                 Tournament Progress
               </h2>
               <span className="text-[11px] text-amber-400">
-                {completedRounds.length} / {stageLabels.length} rounds
+                {groupCompetition ? stageLabels.filter(s => s.status === "completed").length : completedRounds.length} / {stageLabels.length} {groupCompetition ? "stages" : "rounds"}
               </span>
             </div>
             <div
@@ -531,7 +566,7 @@ export function TournamentHubPage() {
               ))}
             </div>
             <div className="mt-2 flex justify-between gap-1 text-[9px] text-gray-500">
-              {stageLabels.map((stage) => (
+              {(stageLabels.length > 8 ? stageLabels.filter(stage => stage.status === "current") : stageLabels).map((stage) => (
                 <span
                   key={stage.label}
                   className={
@@ -558,6 +593,16 @@ export function TournamentHubPage() {
               </h2>
             </div>
             <div className="scrollbar-thin min-h-0 flex-1 space-y-3 overflow-auto p-3 text-xs">
+              {activeTournament && <EntryTimelinePanel event={activeTournament} />}
+              {activeTournament && <details className="rounded border border-border p-2" open={stageLabels.length <= 8}>
+                <summary className="cursor-pointer font-semibold text-white">Round rules and format</summary>
+                <dl className="mt-2 space-y-1">{resolveTournamentFormat(activeTournament).roundStructure.map(round => <div key={round} className="flex justify-between gap-2"><dt className="text-gray-400">{round}</dt><dd className="text-white">{resolveTournamentFormat(activeTournament).roundBestOf?.[round] === 4 ? 'Up to 4 · draws' : 'Best of ' + resolveTournamentFormat(activeTournament).roundBestOf?.[round]}</dd></div>)}</dl>
+                <p className="mt-2 text-gray-400">{resolveTournamentFormat(activeTournament).seedingModel}</p>
+                {resolveTournamentFormat(activeTournament).qualifiers && <p className="mt-2 text-amber-200">{resolveTournamentFormat(activeTournament).qualifiers} qualification places; play stops at the deciding qualifying round.</p>}
+                {resolveTournamentFormat(activeTournament).specialRules?.map(rule => <p key={rule} className="mt-2 text-amber-200">{rule === 'shootOut' ? '10-minute frame; 15-second shot clock, then 10 seconds after five minutes. Fouls give ball in hand. Level scores use a blue-ball shoot-out.' : rule === 'blackBallDecider' ? 'A black-ball shoot-out replaces the deciding frame.' : rule === 'handicap' ? 'Club handicap: the lower seed receives two points per ranking-place gap, capped at 28, at the start of every frame.' : 'After a 147, a golden ball worth 20 points makes a 167 possible.'}</p>)}
+                {pathwayRuleSummary(activeTournament).map(rule => <p key={rule} className="mt-2 text-gray-300">{rule}</p>)}
+                {resolveTournamentFormat(activeTournament).sourceStatus && <p className="mt-2 text-[10px] text-gray-500">{resolveTournamentFormat(activeTournament).sourceStatus}</p>}
+              </details>}
               <div className="flex justify-between gap-3">
                 <span className="text-gray-400">Winner prize</span>
                 <b className="text-green-400">

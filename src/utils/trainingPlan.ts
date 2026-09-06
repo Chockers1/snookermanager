@@ -231,7 +231,7 @@ export function getTrainingSessionOptionId(cell: TrainingCell) {
   return matchedOption?.id ?? "recovery";
 }
 
-function calculateDayLoad(
+export function calculateDayLoad(
   day: Pick<TrainingPlannerDay, "morning" | "afternoon" | "evening">,
 ) {
   const sessionLoad = [day.morning, day.afternoon, day.evening]

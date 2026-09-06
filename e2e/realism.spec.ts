@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createStarterState, getNextEligibleTournament, enterTournamentState, bookTravelState, confirmTournamentPreparationState, startLiveMatchState, type GameState } from '../src/hooks/useGameState';
+import { createStarterState, getNextEligibleTournament, enterTournamentState, bookTravelState, getTravelPackageEstimate, confirmTournamentPreparationState, startLiveMatchState, type GameState } from '../src/hooks/useGameState';
 import { getDefaultPreparationAllocations } from '../src/game/tournamentPreparation';
 import { realismOf, reconcileRealism } from '../src/game/realism';
 import { sessionPlan } from '../src/game/realism/sessions';
@@ -122,4 +122,28 @@ test('recorded tour digest appears in Inbox without duplicating after reload', a
   await page.reload();
   await page.getByRole('button', { name: /Continue Career/ }).click();
   expect((await readCareerSave(page)).realism!.digest).toEqual(before);
+});
+
+
+test('hotel choices show nightly rates and a range, then charge the initial stay', async ({ page }) => {
+  let state = seed();
+  const event = getNextEligibleTournament(state)!;
+  state = enterTournamentState(state, event.id);
+  await open(page, '/travel', state);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.getByText('Trip estimate · early exit to final')).toBeVisible();
+  await expect(page.getByText('Pay on booking')).toBeVisible();
+  await expect(page.getByRole('button', { name: /night.*stay/ }).first()).toBeVisible();
+  await page.screenshot({ path: 'test-results/hotel-stay-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const travel = page.getByLabel('Travel option').filter({ visible: true });
+  const hotel = page.getByLabel('Hotel option').filter({ visible: true });
+  await expect(hotel).toBeVisible();
+  await expect(hotel.locator('option').first()).toContainText('/night');
+  const expected = getTravelPackageEstimate(state, await travel.inputValue(), await hotel.inputValue(), event.id);
+  await page.getByRole('button', { name: 'Confirm Travel', exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/hotel-stay-mobile.png', fullPage: true });
+  await page.getByRole('button', { name: 'Confirm Travel', exact: true }).click();
+  await expect.poll(async () => (await readCareerSave(page)).travel.bookings[event.id]?.totalCost).toBe(expected.minCost);
+  expect((await readCareerSave(page)).player.cash).toBeCloseTo(state.player.cash - expected.minCost, 2);
 });

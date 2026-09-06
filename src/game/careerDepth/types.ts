@@ -19,6 +19,8 @@ export type DevelopmentProject = {
   matchEvidence?: { matches: number; pottingTotal: number; safetyTotal: number; highestBreak: number; longMatches: number; longMatchWins: number };
 };
 export type OpponentRelationship = {
+  draws?: number; closeMatches?: number; finals?: number; intensity?: number;
+  meetings?: { id: string; date: string; event: string; round: string; score: string; result: string }[];
   opponentId: string; name: string; wins: number; losses: number; deciders: number;
   rivalry: boolean; recent: ('W' | 'L')[];
   tactics: Record<string, number>;
@@ -36,6 +38,10 @@ export type ApprovedSchedule = {
   quotes: Record<string, number>; recurringCost: number;
 };
 export type CareerDepthState = {
+  board?: import("../seasonBoard").SeasonBoard;
+  achievements?: import("../careerAchievements").Achievement[];
+  entryReminders?: string[];
+  objectiveRecord?: { achieved: number; total: number; matches: number };
   version: 1; seenMatchIds: string[]; seenEventIds: string[];
   milestones: string[]; lastStoryDate?: string; stories: CareerStory[];
   relationships: Record<string, OpponentRelationship>;
@@ -51,6 +57,9 @@ export type CareerDepthState = {
   temporarySharpness: number; sharpnessExpires?: string;
 };
 export type CareerDepthAction =
+  | { type: 'priority-event'; id: string }
+  | { type: 'season-block'; start: string; kind: 'training' | 'rest'; focus: ProjectKind }
+  | { type: 'remove-season-block'; id: string }
   | { type: 'project'; kind: ProjectKind }
   | { type: 'cancel-project' }
   | { type: 'partner'; id: string | null }

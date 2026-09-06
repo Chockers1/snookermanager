@@ -1,3 +1,5 @@
+import { TourDevelopmentPanel } from '../components/career/SeasonExpansionPanels'
+import { pathwayStandings, qTourQualification } from '../game/pathwayRules'
 import { useState } from 'react'
 import { QualificationRacesPanel } from '../components/career/RealismPanels'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -241,7 +243,12 @@ export function RankingsPage() {
   const defaultTab = finalRankingTab ?? currentPathTab
   const [activeTab, setActiveTab] = useState<RankingTabKey>(defaultTab)
   const activeConfig = rankingTabs.find((tab) => tab.key === activeTab) ?? rankingTabs[0]
-  const activeRows = gameState.competitionTables[activeConfig.key]
+  const [pathwayList, setPathwayList] = useState('Europe')
+  const lists = activeTab === 'qTour' ? ['Europe', 'Asia Pacific', 'Middle East', 'Americas'] : activeTab === 'qSchool' ? ['Q School UK', 'Q School Asia'] : activeTab === 'senior' ? ['Two-year seniors', 'Race to the Crucible'] : []
+  const selectedList = lists.includes(pathwayList) ? pathwayList : lists[0]
+  const pathwayRows = lists.length ? pathwayStandings(gameState, activeTab === 'senior' ? 'Senior' : selectedList as Parameters<typeof pathwayStandings>[1], gameState.currentDate, selectedList === 'Two-year seniors') : []
+  const activeRows = lists.length ? pathwayRows.map((r, i) => ({ ...(gameState.competitionTables[activeConfig.key].find(p => p.playerName === r.name) ?? { id: r.name, playerName: r.name, nation: gameState.worldPlayers.find(p => p.playerName === r.name)?.nation ?? 'INT', movement: 0, prizeMoney: 0, wins: 0, losses: 0 }), ranking: i + 1, points: r.points, eventsPlayed: r.events, titles: r.titles })) : gameState.competitionTables[activeConfig.key]
+  const qTourPlaces = activeTab === 'qTour' ? qTourQualification(gameState, gameState.currentDate) : null
   const playerOverall = calculateOverallRating({
     attributes: gameState.attributes,
     personalityTraits: gameState.player.personalityTraits,
@@ -279,7 +286,7 @@ export function RankingsPage() {
       recentResults: archive?.recentResults,
     }
   })
-  const playerRow = activeRowsWithRatings.find((row) => row.playerName === gameState.player.fullName) ?? activeRowsWithRatings[0]
+  const playerRow = activeRowsWithRatings.find((row) => row.playerName === gameState.player.fullName)
   const nextTournament = getNextEligibleTournament(gameState)
   const nextTarget = activeRowsWithRatings.find((row) => row.ranking === Math.max(1, (playerRow?.ranking ?? 2) - 1))
   const moneyRanking = activeTab === 'world' || activeTab === 'oneYear'
@@ -339,8 +346,14 @@ export function RankingsPage() {
   const movementLabel = playerMovement > 0 ? `+${playerMovement}` : `${playerMovement}`
 
   return (
-    <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+    <div className={lists.length ? "flex flex-col gap-3" : "flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5"}>
       <QualificationRacesPanel />
+      <TourDevelopmentPanel />
+      {lists.length > 0 && <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface px-4 py-2 text-xs">
+        <label>Pathway standings <select aria-label="Pathway standings" value={selectedList} onChange={e => setPathwayList(e.target.value)} className="ml-2 rounded border border-border bg-background px-2 py-1">{lists.map(list => <option key={list}>{list}</option>)}</select></label>
+        <span className="text-gray-400">Recorded results only{pathwayRows.length === 0 ? ' — no completed events yet' : ''}.</span>
+        {qTourPlaces?.automatic && <span className="text-emerald-300">Provisional Europe card: {qTourPlaces.automatic}</span>}
+      </div>}
       <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -390,6 +403,7 @@ export function RankingsPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {activeRowsWithRatings.length === 0 && <tr><td colSpan={11} className="px-4 py-8 text-center text-gray-400">Complete events in this circuit to start its standings.</td></tr>}
                   {activeRowsWithRatings.map((row) => (
                     <tr key={row.id} className={`border-b border-border/40 ${row.highlighted ? 'bg-green-600/12' : 'hover:bg-surface-light/40'}`}>
                       <td className="px-3 py-2 font-bold text-white">{row.ranking}</td>
@@ -439,7 +453,7 @@ export function RankingsPage() {
           </div>
         </div>
 
-        <div className="grid min-h-0 gap-3 xl:col-span-4 xl:grid-rows-[0.23fr_0.22fr_0.14fr_0.16fr_0.17fr_0.08fr] xl:gap-2">
+        <div className={lists.length ? "grid gap-3 xl:col-span-4" : "grid min-h-0 gap-3 xl:col-span-4 xl:grid-rows-[0.23fr_0.22fr_0.14fr_0.16fr_0.17fr_0.08fr] xl:gap-2"}>
           <div className="card min-h-0 overflow-hidden bg-gradient-to-b from-surface-light/80 to-surface/80 px-4 py-3 text-center">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{finalRankingTab ? 'Current Ranking After Final' : `Your ${activeConfig.label}`}</p>
             <p className="mt-1 text-5xl font-bold text-white">#{playerRow?.ranking ?? '-'}</p>
@@ -469,8 +483,8 @@ export function RankingsPage() {
 
           <div className="card min-h-0 px-3 py-2.5 text-center">
             <h3 className="text-xs font-semibold text-white">Next Target</h3>
-            <p className="mt-1 text-3xl font-bold text-white">#{nextTarget?.ranking ?? Math.max(1, (playerRow?.ranking ?? 2) - 1)}</p>
-            <p className="mt-1 text-xs text-green-400">Needs {moneyRanking ? formatMoney(Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)) : `${Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)} pts`}</p>
+            <p className="mt-1 text-3xl font-bold text-white">{playerRow ? '#' + (nextTarget?.ranking ?? Math.max(1, playerRow.ranking - 1)) : 'Unranked'}</p>
+            <p className="mt-1 text-xs text-green-400">{!playerRow ? 'Complete a circuit event' : <>Needs {moneyRanking ? formatMoney(Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)) : `${Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)} pts`}</>}</p>
             <p className="mt-1 truncate text-[10px] text-gray-500">{nextTournament?.name ?? 'Next event'} can shift this race.</p>
           </div>
 

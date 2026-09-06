@@ -133,7 +133,7 @@ export function RivalryContext({ opponent }: { opponent: string }) {
   const { gameState } = useGame();
   const relationship = getRivalry(gameState, opponent);
   if (!relationship || !relationship.rivalry) return null;
-  return <p className="shrink-0 rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">Competitive rivalry · {opponent} · H2H {relationship.wins}–{relationship.losses} · {relationship.deciders} deciding frames · Recent {relationship.recent.join(' ')}. Familiar opponents can adapt their tactics.</p>;
+  return <details className="shrink-0 rounded border border-amber-500/30 bg-amber-500/5 text-xs text-amber-300"><summary className="cursor-pointer px-3 py-2">{gameState.careerDepth?.partnerId === relationship.opponentId ? 'Friendly rivalry' : 'Competitive rivalry'} · {opponent} · H2H {relationship.wins}–{relationship.losses}{relationship.draws ? ' · ' + relationship.draws + ' draws' : ''} · Intensity {relationship.intensity ?? 40}/100</summary><div className="space-y-2 border-t border-amber-500/20 p-3"><p>{relationship.closeMatches ?? relationship.deciders} close matches · {relationship.deciders} deciding frames · {relationship.finals ?? 0} finals · Recent {relationship.recent.join(' ')}</p><p>Familiar rivals can counter your repeated tactics. Winning a rematch after your last defeat earns a small confidence boost.</p>{relationship.meetings?.map(m => <p key={m.id} className="text-gray-400">{m.date} · {m.event} · {m.round} · {m.result} {m.score}</p>)}</div></details>;
 }
 
 export function CareerSeasonSummary() {
@@ -141,6 +141,7 @@ export function CareerSeasonSummary() {
   const d = depthOf(gameState);
   return <CareerDisclosure title="Career story and development history" summary={<>Career history · {d.projectHistory.filter(p => p.status === 'completed').length} projects completed · {Object.values(d.relationships).filter(r => r.rivalry).length} rivalries</>}>
     <div className={body}>
+      {d.objectiveRecord && <p className="text-green-400">Personal objectives: {d.objectiveRecord.achieved}/{d.objectiveRecord.total} achieved across {d.objectiveRecord.matches} matches.</p>}
       {[...d.stories].reverse().map(s => <details key={s.id} className="rounded border border-border p-3"><summary className="cursor-pointer font-semibold text-white">{s.createdDate} · {s.title} · {s.status}</summary><p className="mt-2 text-gray-400">{s.evidence}</p>{s.updates.map((update, i) => <p key={i} className="mt-2 border-l-2 border-green-600 pl-2 text-gray-300">{update}</p>)}</details>)}
       {d.projectHistory.map(p => <div key={p.id}><p className="text-white">{PROJECTS[p.kind].name} · {p.status} · {p.completedWeeks} training weeks</p>{p.closingAttributes && <p className="text-gray-400">{Object.entries(p.baseline).map(([skill, before]) => `${skill}: ${before} → ${p.closingAttributes![skill]}`).join(' · ')}</p>}</div>)}
       {Object.entries(d.coachRelationships).map(([id, relation]) => <p key={id}>{gameState.coaches.find(c => c.id === id)?.name ?? 'Former coach'} · {coachRelationshipLabel(relation.trust)} · {relation.note}</p>)}

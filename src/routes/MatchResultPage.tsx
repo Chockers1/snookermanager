@@ -1,3 +1,6 @@
+import { MatchReviewPanel } from "../components/career/MatchInsightPanels";
+import { GroupFixtures } from '../components/tournaments/GroupFixtures';
+import { isGroupDraw } from '../game/championshipLeague';
 import { useNavigate } from "react-router-dom";
 import { RivalryContext, CareerDecisionNotice } from "../components/career/CareerDepthPanels";
 import {
@@ -57,8 +60,9 @@ export function MatchResultPage() {
   const playerFrames = latestMatch?.playerFrames ?? 0;
   const opponentFrames = latestMatch?.opponentFrames ?? 0;
   const playerWon = latestMatch?.result === "Won";
+  const drawn = latestMatch?.result === "Drawn";
+  const groupCompetition = isGroupDraw(gameState.tournamentProgress.draw) && gameState.tournamentProgress.tournamentId === latestMatch?.tournamentId;
   const tournamentContinues = Boolean(
-    playerWon &&
     latestMatch &&
     gameState.tournamentProgress.tournamentId === latestMatch.tournamentId &&
     gameState.tournamentProgress.currentRound,
@@ -221,8 +225,8 @@ export function MatchResultPage() {
           <h1 className="mt-1 text-2xl font-bold text-white">Match Review</h1>
           <p className="mt-1 text-xs text-gray-400">
             {tournamentContinues
-              ? "Round complete · your tournament continues"
-              : `Event complete · ${playerWon ? "tournament won" : `eliminated in the ${latestMatch.round}`}`}
+              ? "Match complete · your tournament continues"
+              : `Event complete · ${playerWon && latestMatch.round === "Final" ? "tournament won" : `eliminated in the ${latestMatch.round}`}`}
           </p>
         </div>
         <button
@@ -234,8 +238,9 @@ export function MatchResultPage() {
         </button>
       </div>
 
+      {groupCompetition && <div className="card max-h-[34rem] overflow-y-auto p-3"><GroupFixtures key={latestMatch.id} rounds={gameState.tournamentProgress.draw} playerName={playerName} currentRound={latestMatch.round} /></div>}
       <section
-        className={`grid overflow-hidden rounded-xl border bg-surface md:grid-cols-[1fr_190px_1fr] ${playerWon ? "border-green-600/30" : "border-red-600/30"}`}
+        className={`grid overflow-hidden rounded-xl border bg-surface md:grid-cols-[1fr_190px_1fr] ${drawn ? "border-amber-500/30" : playerWon ? "border-green-600/30" : "border-red-600/30"}`}
       >
         <div className="flex items-center gap-3 px-4 py-4 sm:px-6">
           <div
@@ -254,9 +259,9 @@ export function MatchResultPage() {
                 "-"}
             </p>
             <p
-              className={`mt-1 text-[10px] font-semibold uppercase ${playerWon ? "text-green-400" : "text-red-400"}`}
+              className={`mt-1 text-[10px] font-semibold uppercase ${drawn ? "text-amber-300" : playerWon ? "text-green-400" : "text-red-400"}`}
             >
-              {playerWon ? "Match won" : "Match lost"}
+              {drawn ? "Match drawn · 1 point" : playerWon ? "Match won" : "Match lost"}
             </p>
           </div>
         </div>
@@ -298,6 +303,8 @@ export function MatchResultPage() {
         </div>
       </section>
 
+      <MatchReviewPanel match={latestMatch} />
+
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(330px,.9fr)]">
         <section className="card overflow-hidden">
           <div className="card-header">
@@ -312,7 +319,7 @@ export function MatchResultPage() {
             <span
               className={`rounded-full px-2.5 py-1 text-[10px] ${playerWon ? "bg-green-500/10 text-green-300" : "bg-red-500/10 text-red-300"}`}
             >
-              {playerWon ? "Winning performance" : "Defeat reviewed"}
+              {drawn ? "Draw reviewed" : playerWon ? "Winning performance" : "Defeat reviewed"}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4 xl:grid-cols-7">
@@ -476,12 +483,12 @@ export function MatchResultPage() {
             Coach’s next step
           </p>
           <h3 className="mt-2 text-sm font-semibold text-white">
-            {gameState.player.fatigue >= 65
+            {latestMatch.debrief?.training.title ?? (gameState.player.fatigue >= 65
               ? "Recover, then rebuild"
-              : "Build on the evidence"}
+              : "Build on the evidence")}
           </h3>
           <p className="mt-1 text-[11px] leading-relaxed text-gray-400">
-            {improvementAdvice[0] ??
+            {latestMatch.debrief?.training.sessions ?? improvementAdvice[0] ??
               coachFeedback[0]?.items[0] ??
               "Keep the next training block balanced and protect match readiness."}
           </p>

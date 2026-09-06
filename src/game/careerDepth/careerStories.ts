@@ -1,7 +1,7 @@
 import type { GameState } from '../../hooks/useGameState';
 import type { CareerStory, StoryChoice, StoryKind } from './types';
 import { careerMessage, dayNumber, depthOf, plusDays } from './shared';
-import { recordEncounter } from './relationships';
+import { recordEncounter, getRivalry } from './relationships';
 import { startProject } from './developmentProjects';
 import { commitmentQuote, scheduleCommitment } from './commitments';
 import { supportedConfidence } from '../confidenceSystem';
@@ -81,7 +81,12 @@ export function reconcileStories(state: GameState): GameState {
   let next = state;
   let d = depthOf(next);
   const fresh = state.matches.filter(m => m.result !== 'In Progress' && !d.seenMatchIds.includes(m.id)).reverse();
-  for (const match of fresh) next = recordEncounter(next, match);
+  for (const match of fresh) {
+    const before = getRivalry(next, match.opponentName);
+    next = recordEncounter(next, match);
+    const after = getRivalry(next, match.opponentName);
+    if (!before?.rivalry && after?.rivalry) next = careerMessage(next, 'rivalry:' + after.opponentId, 'A rivalry is taking shape', match.opponentName + ': repeated close meetings now carry extra history. Review the head-to-head and vary familiar tactics.', '/match/result');
+  }
   d = depthOf(next);
   if (fresh.length) {
     next = { ...next, careerDepth: { ...d, seenMatchIds: [...d.seenMatchIds, ...fresh.map(m => m.id)],

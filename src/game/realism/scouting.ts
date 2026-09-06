@@ -1,3 +1,4 @@
+import { developmentEdge } from '../tourDevelopment';
 import type { GameState } from '../../hooks/useGameState';
 export function scoutingReport(state: GameState, name: string) {
   const opponent = state.worldPlayers.find(p => p.playerName === name);
@@ -7,7 +8,7 @@ export function scoutingReport(state: GameState, name: string) {
   const practice = id ? state.careerDepth?.practiceHistory?.[id]?.sessions ?? 0 : 0;
   const samples = matches.length + watched + Math.min(4, practice);
   const uncertainty = Math.max(2, 12 - samples * 2);
-  const ability = opponent?.overallRating;
+  const ability = opponent?.overallRating === undefined ? undefined : opponent.overallRating + developmentEdge(opponent.skillDevelopment);
   // Round the estimate itself so its midpoint cannot expose an exact hidden rating.
   const estimate = Math.round((ability ?? 65) / 5) * 5;
   const observations = id ? state.careerDepth?.relationships[id] : undefined;
@@ -33,12 +34,12 @@ export function watchableMatch(state: GameState, opponentId: string) {
 
 /** Results shown to the player come from completed matches, never invented form. */
 export function recordedOpponentResults(state: GameState, name: string) {
-  const results: { id: string; date: string; opponent: string; result: 'W' | 'L'; score: string }[] = [];
+  const results: { id: string; date: string; opponent: string; result: 'W' | 'L' | 'D'; score: string }[] = [];
   for (const event of Object.values(state.rollingRankings?.events ?? {}).filter(e => e.applied && e.completedOn <= state.currentDate).sort((a, b) => b.completedOn.localeCompare(a.completedOn))) {
     for (const round of [...event.bracket].reverse()) for (const match of round.matches) {
       if (![match.top.name, match.bottom.name].includes(name) || typeof match.top.score !== 'number' || typeof match.bottom.score !== 'number') continue;
       const [own, other] = match.top.name === name ? [match.top, match.bottom] : [match.bottom, match.top];
-      results.push({ id: `${event.key}:${match.id}`, date: event.completedOn, opponent: other.name, result: own.score! > other.score! ? 'W' : 'L', score: `${own.score}–${other.score}` });
+      results.push({ id: `${event.key}:${match.id}`, date: event.completedOn, opponent: other.name, result: own.score === other.score ? 'D' : own.score! > other.score! ? 'W' : 'L', score: `${own.score}–${other.score}` });
     }
   }
   return results.slice(0, 4);

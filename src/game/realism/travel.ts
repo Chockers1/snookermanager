@@ -7,6 +7,18 @@ import type { Journey } from './types';
 // Approximate route planning, not airline fares or a live timetable. Offsets are
 // deliberately standard-time estimates; the UI labels them as such.
 export const LOCATIONS: Record<string, { lat: number; lon: number; zone: number; region: string }> = {
+  Auckland: { lat: -36.85, lon: 174.76, zone: 12, region: 'New Zealand' },
+  Perth: { lat: -31.95, lon: 115.86, zone: 8, region: 'Australia' },
+  Albury: { lat: -36.08, lon: 146.92, zone: 10, region: 'Australia' },
+  Brisbane: { lat: -27.47, lon: 153.03, zone: 10, region: 'Australia' },
+  Toronto: { lat: 43.65, lon: -79.38, zone: -5, region: 'Canada' },
+  SanJose: { lat: 37.34, lon: -121.89, zone: -8, region: 'USA' },
+  RiodeJaneiro: { lat: -22.91, lon: -43.17, zone: -3, region: 'Brazil' },
+  Dubai: { lat: 25.20, lon: 55.27, zone: 4, region: 'UAE' },
+  Vienna: { lat: 48.21, lon: 16.37, zone: 1, region: 'Austria' },
+  Sofia: { lat: 42.70, lon: 23.32, zone: 2, region: 'Bulgaria' },
+  Oberhausen: { lat: 51.50, lon: 6.86, zone: 1, region: 'Germany' },
+  Lochristi: { lat: 51.10, lon: 3.83, zone: 1, region: 'Belgium' },
   Britain: { lat: 52.5, lon: -1.5, zone: 0, region: 'Britain' },
   Belfast: { lat: 54.6, lon: -5.9, zone: 0, region: 'Ireland' },
   Dublin: { lat: 53.3, lon: -6.3, zone: 0, region: 'Ireland' },

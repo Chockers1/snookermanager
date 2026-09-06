@@ -1,3 +1,4 @@
+import { isChampionshipLeague, championshipEarnings } from './championshipLeague';
 import type { GameState, CompetitionTableRow } from '../hooks/useGameState';
 import type { BracketRound, Tournament, RankingRow } from '../types/game';
 import { resolveTournamentFormat } from '../data/tournamentFormats';
@@ -33,12 +34,19 @@ export function countsForWorldRanking(t: Tournament) {
 export function isMajorQualifying(t: Tournament) {
   return ['ukMajorQualifying', 'worldChampionshipQualifying'].includes(resolveTournamentFormat(t).id);
 }
+export function isAttachedQualifying(t: Tournament) {
+  return ['ukMajorQualifying', 'worldChampionshipQualifying', 'proQualifier', 'internationalQualifier', 'worldOpenQualifier'].includes(resolveTournamentFormat(t).id);
+}
+export function attachedMainDirectSeeds(t: Tournament) {
+  const id = resolveTournamentFormat(t).id;
+  return ['ukMajor', 'worldChampionshipMain'].includes(id) ? 16 : id === 'homeNationsMain' ? 32 : 0;
+}
 export function qualifiedNames(bracket: BracketRound[]) {
   return (bracket.at(-1)?.matches ?? []).flatMap(m => typeof m.top.score === 'number' && typeof m.bottom.score === 'number' ? [m.top.score > m.bottom.score ? m.top.name : m.bottom.name] : []);
 }
 export function recordedMajorQualifiers(state: Pick<GameState, 'rollingRankings'> & Partial<Pick<GameState, 'season'>>, t: Tournament): string[] | null {
   const id = resolveTournamentFormat(t).id;
-  const pattern = id === 'ukMajor' ? /uk (championship|major).*qualif/i : id === 'worldChampionshipMain' ? /world championship.*qualif/i : null;
+  const pattern = id === 'ukMajor' ? /uk (championship|major).*qualif/i : id === 'worldChampionshipMain' ? /world championship.*qualif/i : id === 'internationalChampionship' ? /international championship.*qualif/i : id === 'worldOpen' ? /world open.*qualif/i : id === 'homeNationsMain' ? new RegExp(t.name + '.*qualif', 'i') : null;
   if (!pattern) return null;
   const event = Object.values(state.rollingRankings?.events ?? {}).filter(e => (!state.season || e.season === state.season) && e.completedOn <= t.startDate && pattern.test(e.name)).sort((a, b) => b.completedOn.localeCompare(a.completedOn))[0];
   return event ? qualifiedNames(event.bracket) : null;
@@ -99,17 +107,17 @@ export function recordRankingEvent(state: GameState, tournament: Tournament, bra
       const entry = entrants.get(p.name);
       if (!entry) continue;
       entry.lastRound = round.label;
-      if (p.name === winner) { entry.wins++; entry.champion = /^final$/i.test(round.label); }
+      if (p.name === winner && match.top.score !== match.bottom.score) { entry.wins++; entry.champion = /^final$/i.test(round.label); }
     }
   }
   const completedOn = tournament.endDate ?? tournament.startDate;
   const additions: RankingEarning[] = [];
-  const qualified = isMajorQualifying(tournament) ? new Set(qualifiedNames(bracket)) : new Set<string>();
+  const qualified = isAttachedQualifying(tournament) ? new Set(qualifiedNames(bracket)) : new Set<string>();
   if (countsForWorldRanking(tournament)) for (const [playerName, entry] of entrants) {
     const protectedMajorSeed = ['ukMajor', 'worldChampionshipMain'].includes(resolveTournamentFormat(tournament).id) && entry.rank <= 16;
     const seededLoss = entry.wins === 0 && (entry.firstRound !== bracket[0]?.label || protectedMajorSeed);
     const shootOutLoss = entry.wins === 0 && /shoot.?out/i.test(tournament.name);
-    const amount = seededLoss || shootOutLoss || qualified.has(playerName) ? 0 : award(tournament, entry.lastRound, entry.champion).prizeMoney;
+    const amount = isChampionshipLeague(tournament) ? championshipEarnings(bracket, playerName) : seededLoss || shootOutLoss || qualified.has(playerName) ? 0 : award(tournament, entry.lastRound, entry.champion).prizeMoney;
     additions.push({ id: `${key}:${playerName}`, eventKey: key, playerName, amount, earnedOn: completedOn, expiresOn: tournament.rankingExpiryDate ?? shiftYears(completedOn, 2), season: state.season, fixedExpiry: Boolean(tournament.rankingExpiryDate) });
   }
   return { ...state, rollingRankings: { ...ledger, earnings: [...ledger.earnings, ...additions], events: { ...ledger.events, [key]: { key, tournamentId: tournament.id, name: tournament.name, season: state.season, completedOn, ranking: countsForWorldRanking(tournament), bracket, applied: false } } } };

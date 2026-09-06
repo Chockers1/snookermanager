@@ -30,7 +30,7 @@ export function partnerAvailable(state: GameState) {
 }
 export function developmentTrainingBonus(state: GameState, plan: TrainingPlannerDay[], skill?: string) {
   const p = depthOf(state).project;
-  if (state.health.activeIssue || state.trainingCondition.injuryWeeks > 0 || plan.some(d => d.competitionName)) return 1;
+  if (state.health.activeIssue || state.trainingCondition.injuryWeeks > 0 || plan.some(d => d.competitionName && d.planningBlockKind !== 'training')) return 1;
   const cells = plan.flatMap(d => [d.morning, d.afternoon, d.evening]);
   const project = p?.status === 'active' && (!skill || PROJECTS[p.kind].skills.includes(skill)) && cells.filter(c => PROJECTS[p.kind].sessions.includes(c.title)).length >= 3;
   const partner = partnerAvailable(state) && (!skill || skill === (depthOf(state).partnerFocus ?? 'Long Potting')) && cells.some(c => c.subtitle.startsWith('Practice partner:'));
@@ -55,7 +55,7 @@ export function progressDevelopment(state: GameState, plan: TrainingPlannerDay[]
   const key = `${state.season}:${state.week}`;
   const p = d.project;
   const cells = plan.flatMap(day => [day.morning, day.afternoon, day.evening]);
-  const protectedWeek = Boolean(state.health.activeIssue || state.trainingCondition.injuryWeeks > 0 || plan.some(day => day.competitionName));
+  const protectedWeek = Boolean(state.health.activeIssue || state.trainingCondition.injuryWeeks > 0 || plan.some(day => day.competitionName && day.planningBlockKind !== 'training'));
   const relevant = p ? cells.filter(c => PROJECTS[p.kind].sessions.includes(c.title)).length : 0;
   const earned = !protectedWeek && relevant >= 3;
   let project = p;

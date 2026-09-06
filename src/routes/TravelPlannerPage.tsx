@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
 import { hotelOptionCatalog, travelOptionCatalog } from "../data/catalogs";
-import { getNextEligibleTournament, getTravelPackageCost } from "../hooks/useGameState";
+import { getNextEligibleTournament, getTravelPackageEstimate } from "../hooks/useGameState";
 import { travelOptionsFor, journeyQuote } from '../game/realism/travel';
 import { TravelLocationPanel } from '../components/career/RealismPanels';
 import type { HotelOption, TravelOption } from "../types/game";
@@ -60,6 +60,7 @@ function CompactSelectors({
   selectedHotel,
   onTravelChange,
   onHotelChange,
+  hotelNights,
   className = "",
 }: {
   options: TravelOption[];
@@ -67,6 +68,7 @@ function CompactSelectors({
   selectedHotel: HotelOption;
   onTravelChange: (id: string) => void;
   onHotelChange: (id: string) => void;
+  hotelNights: { min: number; max: number; rateMultiplier: number };
   className?: string;
 }) {
   return (
@@ -97,8 +99,7 @@ function CompactSelectors({
         >
           {hotelOptionCatalog.map((option) => (
             <option key={option.id} value={option.id}>
-              {option.name} · {formatMoney(option.cost)} ·{" "}
-              {option.preparationLabel} prep
+              {option.name} · {formatMoney(option.cost * hotelNights.rateMultiplier)}/night · {formatMoney(option.cost * hotelNights.rateMultiplier * hotelNights.min)}–{formatMoney(option.cost * hotelNights.rateMultiplier * hotelNights.max)} stay · {option.preparationLabel} prep
             </option>
           ))}
         </select>
@@ -146,8 +147,9 @@ function TravelPlannerContent() {
     hotelOptionCatalog.find((option) => option.id === selectedHotelId) ??
     hotelOptionCatalog[0];
 
-  const totalTripCost = getTravelPackageCost(gameState, selectedTravelId, selectedHotelId, activeEvent?.id);
-  const fixedCosts = totalTripCost - selectedTravel.cost - selectedHotel.cost;
+  const estimate = getTravelPackageEstimate(gameState, selectedTravelId, selectedHotelId, activeEvent?.id);
+  const totalTripCost = estimate.totalCost;
+  const hotelNights = { min: estimate.minNights, max: estimate.maxNights, rateMultiplier: estimate.nightlyRate / selectedHotel.cost };
   const cashRemaining = gameState.player.cash - totalTripCost + (existingBooking?.totalCost ?? 0);
   const readinessScore = Math.max(
     0,
@@ -214,7 +216,7 @@ function TravelPlannerContent() {
           {activeEvent?.startDate ?? gameState.currentDate}
         </p>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 sm:p-4">
         <CompactSelectors
           options={travelOptions}
           className="md:hidden"
@@ -222,6 +224,7 @@ function TravelPlannerContent() {
           selectedHotel={selectedHotel}
           onTravelChange={setSelectedTravelId}
           onHotelChange={setSelectedHotelId}
+          hotelNights={hotelNights}
         />
 
         <div className="hidden grid-cols-2 gap-2 sm:grid">
@@ -241,19 +244,24 @@ function TravelPlannerContent() {
 
         <div className="space-y-1.5 border-t border-border pt-3 text-xs">
           <div className="flex justify-between gap-3">
-            <span className="text-gray-400">Travel + hotel</span>
-            <span className="text-white">
-              {formatMoney(selectedTravel.cost + selectedHotel.cost)}
-            </span>
+            <span className="text-gray-400">Travel, transfers & fees</span>
+            <span className="text-white">{formatMoney(estimate.fixedCost)}</span>
           </div>
           <div className="flex justify-between gap-3">
-            <span className="text-gray-400">Extra hotel nights, transfers & discounts</span>
-            <span className="text-white">{formatMoney(fixedCosts)}</span>
+            <span className="text-gray-400">Hotel · {formatMoney(estimate.nightlyRate)}/night</span>
+            <span className="text-white">{estimate.minNights}–{estimate.maxNights} nights</span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-gray-400">Trip estimate · early exit to final</span>
+            <span className="text-white">{formatMoney(estimate.minCost)}–{formatMoney(estimate.maxCost)}</span>
           </div>
           <div className="flex justify-between gap-3 border-t border-border/70 pt-2 font-semibold">
-            <span className="text-white">Total</span>
+            <span className="text-white">{journeyLocked ? 'Paid so far' : 'Pay on booking'}</span>
             <span className="text-amber-400">{formatMoney(totalTripCost)}</span>
           </div>
+          <p className="text-[10px] leading-relaxed text-gray-400">{journeyLocked && savedJourney?.hotelNightlyRate === undefined
+            ? 'This existing booking already covers the full event.'
+            : 'Includes arrival and preparation nights. Later rounds add hotel nights automatically; rounds on the same day add no extra charge. Round dates are estimated across the event dates.'}</p>
         </div>
 
         <div className="grid grid-cols-4 gap-1.5 text-center">
@@ -471,8 +479,9 @@ function TravelPlannerContent() {
                   </span>
                   <span className="text-right">
                     <span className="block text-xs font-semibold text-white">
-                      {formatMoney(option.cost)}
+                      {formatMoney(option.cost * hotelNights.rateMultiplier)}/night
                     </span>
+                    <span className="block text-[9px] text-gray-400">{formatMoney(option.cost * hotelNights.rateMultiplier * hotelNights.min)}–{formatMoney(option.cost * hotelNights.rateMultiplier * hotelNights.max)} stay</span>
                     <span className="text-[9px] text-green-400">
                       {option.preparationLabel} prep
                     </span>
@@ -497,6 +506,7 @@ function TravelPlannerContent() {
             selectedHotel={selectedHotel}
             onTravelChange={setSelectedTravelId}
             onHotelChange={setSelectedHotelId}
+          hotelNights={hotelNights}
           />
           <div className="mt-4 space-y-3 border-t border-border pt-4">
             <div>

@@ -1,3 +1,4 @@
+import { getBestOfForRound } from '../data/tournamentFormats';
 import { protectCommitmentSessions } from '../game/careerDepth/commitments';
 import { travelOptionsFor } from '../game/realism/travel';
 import { scoutingReport, recordedOpponentResults } from '../game/realism/scouting';
@@ -374,7 +375,7 @@ function findPlayerDrawMatch(
     : draw;
   for (const round of rounds) {
     const match = round.matches.find(
-      (item) => item.top.name === playerName || item.bottom.name === playerName,
+      (item) => (!item.group || item.top.score === undefined) && (item.top.name === playerName || item.bottom.name === playerName),
     );
     if (match) return match;
   }
@@ -539,11 +540,12 @@ function formatSignedPercent(value: number) {
 function getResultMarginLabel(
   playerFrames: number,
   opponentFrames: number,
-  result: "Won" | "Lost" | "In Progress",
+  result: "Won" | "Lost" | "Drawn" | "In Progress",
 ) {
   const frameMargin = Math.abs(playerFrames - opponentFrames);
 
   if (result === "In Progress") return "In progress";
+  if (result === "Drawn") return "Draw · one group point";
   if (frameMargin <= 1)
     return result === "Won" ? "Narrow win" : "Narrow defeat";
   if (frameMargin >= 4)
@@ -1000,7 +1002,7 @@ export function buildMatchPreviewData(state: GameState) {
     id: match.id,
     date: match.playedOn ?? state.currentDate,
     opponent: match.opponentName,
-    result: match.result === "Won" ? "W" : "L",
+    result: match.result === "Drawn" ? "D" : match.result === "Won" ? "W" : "L",
     score: `${match.playerFrames}-${match.opponentFrames}`,
   }));
   const recentOpponentResults = recordedOpponentResults(state, nextOpponent?.playerName ?? '');
@@ -1175,12 +1177,7 @@ export function buildMatchPreviewData(state: GameState) {
     currentCueState,
     currentChalk,
     currentTip,
-    bestOf:
-      activeRound === "Final"
-        ? "Best of 11"
-        : activeRound === "Semi Final"
-          ? "Best of 9"
-          : "Best of 7",
+    bestOf: activeTournament ? (getBestOfForRound(activeTournament, activeRound ?? "", 7) === 4 ? "Up to 4 frames" : `Best of ${getBestOfForRound(activeTournament, activeRound ?? "", 7)}`) : "Awaiting draw",
     totalMeetings,
     wins,
     losses,
@@ -2646,7 +2643,7 @@ export function buildTournamentDrawData(
     ? state.tournamentProgress.currentRound
     : null;
   const bracket =
-    draw.length > 0
+    !activeTournament ? [] : draw.length > 0
       ? draw
       : [
           {
@@ -2676,7 +2673,7 @@ export function buildTournamentDrawData(
   const bracketOpponents = bracket
     .flatMap((round) => round.matches)
     .flatMap((match) => [match.top, match.bottom])
-    .filter((entry) => entry.name !== player && entry.name !== "TBD");
+    .filter((entry, index, entries) => entry.name !== player && entry.name !== "TBD" && entries.findIndex(p => p.name === entry.name) === index);
   const outlookPool =
     bracketOpponents.length > 0
       ? bracketOpponents
@@ -2686,7 +2683,7 @@ export function buildTournamentDrawData(
               state.rankings.find((row) => row.playerName === entry.name) ??
               createFallbackRankingRow(entry.name, entry.rank, entry.nation),
           )
-      : opponents.slice(0, 4);
+      : activeTournament ? opponents.slice(0, 4) : [];
   const opponentOutlook = outlookPool.map((row) => ({
     id: row.id,
     name: row.playerName,
@@ -2712,7 +2709,7 @@ export function buildTournamentDrawData(
   const progress = progressLabels.map((label) => ({
     label,
     status:
-      eventCompleted || completedRounds.some((round) => round.round === label)
+      eventCompleted || (activeRound !== label && completedRounds.some((round) => round.round === label))
         ? ("completed" as const)
         : activeRound === label
           ? ("current" as const)

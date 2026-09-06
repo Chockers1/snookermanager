@@ -1,3 +1,4 @@
+import { careerLegacyOf, careerLegacyRating } from '../game/careerLegacy'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDays, Check, ChevronRight, Circle, Lock, Route, Trophy } from 'lucide-react'
@@ -23,6 +24,7 @@ type StageMetricSnapshot = {
   confidence: number
   cash: number
   legacyScore: number
+  worldTitles: number
   technicalAverage: number
   mentalAverage: number
   breakBuilding: number
@@ -90,7 +92,7 @@ function getStageFromState(metrics: StageMetricSnapshot) {
   if (metrics.worldRanking != null && metrics.worldRanking <= 32) stage = 9
   if (metrics.worldRanking != null && metrics.worldRanking <= 16) stage = 10
   if (metrics.majorCommitted || (metrics.legacyScore >= 50 && metrics.reputation >= 80)) stage = Math.max(stage, 11)
-  if (metrics.legacyScore >= 70) stage = Math.max(stage, 12)
+  if (metrics.worldTitles > 0) stage = Math.max(stage, 12)
   if (metrics.age >= 35 && (metrics.proCommitted || metrics.reputation >= 65)) stage = Math.max(stage, 13)
   if (metrics.reputation >= 70 && (metrics.age >= 40 || metrics.seniorCommitted)) stage = Math.max(stage, 14)
   return stage
@@ -149,7 +151,8 @@ export function CareerProgressionPage() {
     reputation: gameState.player.reputation,
     confidence: gameState.player.confidence,
     cash: gameState.player.cash,
-    legacyScore: gameState.player.legacyScore,
+    legacyScore: careerLegacyRating(careerLegacyOf(gameState)).score,
+    worldTitles: careerLegacyRating(careerLegacyOf(gameState)).worldTitles,
     technicalAverage: calculateTechnicalAverage(gameState.attributes.technical),
     mentalAverage: calculateAverage(Object.values(gameState.attributes.mental)),
     breakBuilding: gameState.attributes.technical['Break Building'] ?? 0,

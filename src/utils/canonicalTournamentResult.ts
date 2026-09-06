@@ -110,7 +110,7 @@ export function buildCanonicalTournamentResult(
     && /skipped|high-cost event not entered|entered|travel booked|season ended before completion|completed/i.test(resultLabel)
   const playedRoundResults = options.playedRounds
     ?.map((round) => {
-      const match = round.match(/^(.+?):\s+(Won|Lost)\b/i)
+      const match = round.match(/^(.+?):\s+(Won|Lost|Drawn)\b/i)
       return match?.[1] && match[2] ? { round: match[1].trim(), result: match[2] } : null
     })
     .filter((round): round is { round: string, result: string } => round != null) ?? []

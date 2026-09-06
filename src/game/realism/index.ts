@@ -1,9 +1,11 @@
+import { residenceRegion } from '../pathwayRules';
 import type { GameState } from '../../hooks/useGameState';
 import type { TrainingPlannerDay } from '../../types/game';
 import type { RealismAction, RealismState } from './types';
 import { bounded, careerMessage, dayNumber, depthOf, plusDays } from '../careerDepth/shared';
 import { LOCATIONS, arrivalFatigue, routeBetween } from './travel';
 import { TRAINING_BASES } from './base';
+import { hotelRoundDate } from './accommodation';
 import { updateWorldDigest } from './digest';
 import { resolveSessionBreak } from './sessions';
 import { watchableMatch } from './scouting';
@@ -26,6 +28,30 @@ export function reconcileRealism(state: GameState): GameState {
       const fatigue = arrivalFatigue(journey, next.currentDate);
       const applied = Math.min(fatigue, 100 - next.player.fatigue);
       next = { ...next, realism: { ...next.realism, location: journey.destination, journeys: { ...next.realism.journeys, [key]: { ...journey, applied: true, fatigueRemaining: applied, acclimatisedThrough: next.currentDate } } }, player: { ...next.player, fatigue: bounded(next.player.fatigue + applied) } };
+    }
+  }
+  // Reserve additional hotel nights only when the player reaches a later round.
+  // A saved paid-through date makes repeated finalization and reloads idempotent.
+  const progress = next.tournamentProgress;
+  const event = next.tournaments.find(t => t.id === progress.tournamentId && t.status === 'Entered');
+  if (event && progress.currentRound) {
+    const key = `${event.id}:${event.startDate}`;
+    const journey = next.realism.journeys[key];
+    const booking = next.travel.bookings[event.id];
+    if (journey?.hotelNightlyRate !== undefined && journey.hotelThrough && booking) {
+      const roundDate = hotelRoundDate(event, progress.currentRound);
+      const calendarDate = next.currentDate > (event.endDate ?? event.startDate) ? event.endDate ?? event.startDate : next.currentDate;
+      const through = roundDate > calendarDate ? roundDate : calendarDate;
+      const nights = Math.max(0, dayNumber(through) - dayNumber(journey.hotelThrough));
+      if (nights > 0) {
+        const cost = Math.round(nights * journey.hotelNightlyRate * 100) / 100;
+        const totalCost = Math.round((booking.totalCost + cost) * 100) / 100;
+        next = { ...spend(next, cost, `hotel:${key}:${through}`, `${event.name}: ${nights} extra hotel night(s) for ${progress.currentRound} at £${journey.hotelNightlyRate}/night`),
+          realism: { ...next.realism, journeys: { ...next.realism.journeys, [key]: { ...journey, hotelThrough: through } } },
+          travel: { ...next.travel, bookings: { ...next.travel.bookings, [event.id]: { ...booking, totalCost } } },
+          history: { ...next.history, tournamentHistory: next.history.tournamentHistory.map(h => h.startDate === event.startDate && h.tournamentId === event.id ? { ...h, bookedTravelCost: totalCost } : h) },
+        };
+      }
     }
   }
   // Charge only elapsed nights. This cursor survives reloads and partial weeks.
@@ -92,7 +118,7 @@ export function realismAction(state: GameState, action: RealismAction): GameStat
     if (!affordable(cost + base.weekly * 4)) return fail('Keep four weeks of base fees and your approved reserve after joining or relocation costs.');
     const next = spend(state, cost, `base:${state.currentDate}`, `${base.name}${moving ? ' relocation and joining' : ' joining'}`);
     const journeyKey = `relocation:${state.currentDate}`;
-    return { ...next, realism: { ...r, base: action.base, home: action.location, relocationDate: state.currentDate,
+    return { ...next, realism: { ...r, base: action.base, home: action.location, relocationDate: moving ? state.currentDate : r.relocationDate, regionalResidenceSince: moving && residenceRegion(r.home) !== residenceRegion(action.location) ? state.currentDate : r.regionalResidenceSince ?? r.relocationDate,
       journeys: moving ? { ...r.journeys, [journeyKey]: { eventKey: journeyKey, origin: r.location, destination: action.location, distanceKm: route.distanceKm, zoneHours: route.zoneHours, mode: route.flight ? 'Flight' : 'Ground', departure: state.currentDate, arrival: plusDays(state.currentDate, route.flight ? 2 : 1), acclimatisationDays: 0, fatigue: route.flight ? 12 : 4, cost, applied: false } } : r.journeys }, lastAction: `${base.name}: £${cost} paid; £${base.weekly}/week recurring. ${moving ? 'Relocation travel is reserved in the timetable.' : 'Permanent attributes are unchanged.'}` };
   }
   if (action.type === 'return-home') {

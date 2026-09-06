@@ -1,3 +1,5 @@
+> Superseded by [the round-by-round gameplay audit](tournament-rules-audit.md). The original report below checked profile definitions, not actual frame counts or draw progression.
+
 # Tournament Format Audit
 
 Generated: 2026-09-03T09:06:32.484Z

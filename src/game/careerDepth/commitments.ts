@@ -2,7 +2,7 @@ import type { GameState } from '../../hooks/useGameState';
 import type { TrainingPlannerDay, Tournament } from '../../types/game';
 import type { CareerCommitment, CommitmentKind } from './types';
 import { bounded, careerMessage, depthOf, overlaps, plusDays, peakPreparationWindows } from './shared';
-import { buildTrainingCell } from '../../utils/trainingPlan';
+import { buildTrainingCell, calculateDayLoad } from '../../utils/trainingPlan';
 
 export const COMMITMENTS: Record<CommitmentKind, { name: string; days: number; cost: number; income: number; fatigue: number; sharpness: number }> = {
   exhibition: { name: 'Paid exhibition', days: 1, cost: 0, income: 300, fatigue: 6, sharpness: 0 },
@@ -12,7 +12,10 @@ export const COMMITMENTS: Record<CommitmentKind, { name: string; days: number; c
 };
 export function tournamentCommitmentConflict(state: GameState, tournament: Tournament): string | null {
   const conflict = depthOf(state).commitments.find(c => c.status === 'scheduled' && overlaps(plusDays(tournament.startDate, -1), tournament.endDate ?? tournament.startDate, c.startDate, c.endDate));
-  if (!conflict) return null;
+  if (!conflict) {
+    const block = depthOf(state).board?.blocks.find(b => overlaps(plusDays(tournament.startDate,-1),tournament.endDate ?? tournament.startDate,b.start,b.end));
+    return block ? 'Conflicts with a protected '+block.kind+' week ('+block.start+'–'+block.end+'). Remove the block in the season planning board to enter.' : null;
+  }
   const dates = conflict.startDate === conflict.endDate ? conflict.startDate : `${conflict.startDate}–${conflict.endDate}`;
   return `${COMMITMENTS[conflict.kind].name} (${dates}) overlaps this tournament or its travel day. Manage your commitments in Calendar, or skip this event.`;
 }
@@ -30,6 +33,7 @@ export function commitmentConflict(state: GameState, start: string, end: string)
   if (state.trainingAppliedWeek === state.week && start < depthOf(state).nextSettlementDate) return 'This training week has already been applied. Choose the next training week.';
   if (state.tournaments.some(t => t.status === 'Entered' && overlaps(start, end, plusDays(t.startDate, -1), t.endDate ?? t.startDate))) return 'Conflicts with an entered tournament or protected travel.';
   if (peakPreparationWindows(state).some(w => overlaps(start, end, w.startDate, w.endDate))) return 'Conflicts with the three-day preparation block protected by your approved major-event plan.';
+  if (depthOf(state).board?.blocks.some(b=>overlaps(start,end,b.start,b.end))) return 'Conflicts with a protected season planning block.';
   if (depthOf(state).commitments.some(c => c.status === 'scheduled' && overlaps(start, end, c.startDate, c.endDate))) return 'Conflicts with another commitment.';
   return null;
 }
@@ -56,6 +60,13 @@ export function protectCommitmentSessions(state: GameState, plan: TrainingPlanne
     const peak = peakPreparationWindows(state).find(w => date >= w.startDate && date <= w.endDate);
     if (peak && !day.competitionName) return { ...day, morning: buildTrainingCell('match-prep'), afternoon: buildTrainingCell('review'), evening: buildTrainingCell('rest'), competitionName: `Protected preparation: ${peak.name}` };
     const commitment = depthOf(state).commitments.find(c => c.status !== 'cancelled' && overlaps(date, date, c.startDate, c.endDate));
+    const block = depthOf(state).board?.blocks.find(b=>date>=b.start && date<=b.end);
+    if (!commitment && block && !day.competitionName) {
+      const focus = { 'long-pot':'long-pot-routine','safety':'safety-exchanges','pressure':'mental-training','stamina':'fitness','cue-action':'line-up-drill' }[block.focus];
+      const sessions = { morning:buildTrainingCell(block.kind==='rest'?'rest':focus),afternoon:buildTrainingCell(block.kind==='rest'?'rest':'video-review'),evening:buildTrainingCell('rest') };
+      const load=calculateDayLoad(sessions);
+      return { ...day,...sessions,planningBlockKind:block.kind,load,loadLabel:load>=80?'High':load>=55?'Medium':'Low',competitionName:'Planned '+block.kind+' week' };
+    }
     if (!commitment || day.competitionName) return day;
     // Commitments replace all three sessions: never free extra training on top of them.
     const cell = { ...buildTrainingCell('rest'), subtitle: COMMITMENTS[commitment.kind].name };

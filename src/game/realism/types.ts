@@ -5,6 +5,8 @@ export type Journey = {
   mode: 'Ground' | 'Flight'; departure: string; arrival: string; acclimatisationDays: number;
   fatigue: number; cost: number; applied: boolean;
   fatigueRemaining?: number; acclimatisedThrough?: string; hotelThrough?: string;
+  // Missing rates identify legacy bookings prepaid through the full event.
+  hotelNightlyRate?: number; hotelInitialNights?: number; hotelMaximumNights?: number;
 };
 export type VenueConditions = { speed: number; cushions: number; humidity: number; description: string };
 export type MatchSessions = {
@@ -13,7 +15,7 @@ export type MatchSessions = {
 };
 export type RealismState = {
   version: 1; initializedOn: string; home: string; location: string;
-  base: BaseKind; basePaidThrough: string; relocationDate?: string;
+  base: BaseKind; basePaidThrough: string; relocationDate?: string; regionalResidenceSince?: string;
   journeys: Record<string, Journey>;
   familiarised: string[];
   activities: { id: string; date: string; kind: 'scout' | 'familiarise'; label: string }[];

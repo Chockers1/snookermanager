@@ -1,12 +1,15 @@
+import { resolveTournamentFormat } from '../../data/tournamentFormats';
 import type { GameState } from '../../hooks/useGameState';
 import type { Tournament } from '../../types/game';
 import type { BreakChoice, MatchSessions } from './types';
 type Live = NonNullable<GameState['liveMatch']>;
 export function sessionPlan(bestOf: number, tournament?: Tournament): MatchSessions {
-  const configured = tournament?.sessionFrames?.[bestOf];
+  const id = tournament ? resolveTournamentFormat(tournament).id : undefined;
+  const publishedNineteen = bestOf === 19 && id && !['worldChampionshipMain', 'worldChampionshipQualifying', 'shanghaiMasters'].includes(id) ? [8, 11] : undefined;
+  const configured = tournament?.sessionFrames?.[bestOf] ?? publishedNineteen;
   const defaults: Record<number, number[]> = { 17: [8, 9], 19: [9, 10], 21: [10, 11], 25: [8, 8, 9], 33: [8, 8, 8, 9], 35: [8, 9, 8, 10] };
   const frames = configured?.length && configured.every(n => Number.isInteger(n) && n > 0) && configured.reduce((n, x) => n + x, 0) === bestOf ? configured : defaults[bestOf] ?? [bestOf];
-  return { frames, overnightAfter: tournament?.overnightAfterSessions ?? (frames.length >= 3 ? [2] : []), completedBreaks: [] };
+  return { frames, overnightAfter: tournament?.overnightAfterSessions ?? (bestOf === 33 ? [1, 3] : frames.length >= 3 ? [2] : []), completedBreaks: [] };
 }
 export function pendingMatchBreak(live: Live) {
   if (!live.sessions || live.status === 'Completed' || live.playerPoints > 0 || live.opponentPoints > 0 || live.currentBreak > 0) return null;
@@ -16,7 +19,7 @@ export function pendingMatchBreak(live: Live) {
   for (let i = 0; i < live.sessions.frames.length; i++) {
     const end = start + live.sessions.frames[i];
     if (played === end && i < live.sessions.frames.length - 1) return { afterFrame: played, kind: live.sessions.overnightAfter.includes(i + 1) ? 'overnight' as const : 'session' as const, nextSession: i + 2 };
-    if (played === start + 4 && played < end && end - start >= 7) return { afterFrame: played, kind: 'interval' as const, nextSession: i + 1 };
+    if (played < end && ((played === start + 4 && (end - start >= 9 || live.sessions.frames.length > 1)) || (end - start === 13 && played === start + 8))) return { afterFrame: played, kind: 'interval' as const, nextSession: i + 1 };
     start = end;
   }
   return null;

@@ -1,3 +1,4 @@
+import { sponsorExpectations, sponsorRanking } from "../game/sponsorPerformance";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Info, Scale, Star } from "lucide-react";
@@ -76,6 +77,8 @@ export function SponsorshipContractPage() {
     );
   }
 
+  const commercial = sponsorRanking(gameState);
+  const expectations = sponsorExpectations(selectedOffer.risk === "Risky Terms" ? "High" : selectedOffer.risk === "Medium Risk" ? "Medium" : "Low", commercial.rank, commercial.label);
   const obligationProfile = getSponsorObligationProfile({
     category: selectedOffer.category,
     brandFit: selectedOffer.brandFit,
@@ -369,6 +372,7 @@ export function SponsorshipContractPage() {
             </ul>
           </div>
           <div className="grid gap-2">
+            <p className="rounded-lg border border-border bg-surface-light p-3 text-xs text-gray-400">Performance terms: starts at 75/100 satisfaction. Aim for {expectations.expectedWinRate}% match wins{expectations.rankingTarget !== null ? ` and top ${expectations.rankingTarget} in ${expectations.rankingLabel}` : ""}. Below 40 brings a warning and at least six more competitive matches to recover. Only a score below 25 after that period can end the deal. Wins rebuild confidence; weeks without matches do not lower satisfaction.</p>
             <button
               type="button"
               className="btn-primary justify-center text-xs"

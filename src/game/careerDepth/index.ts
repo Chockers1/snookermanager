@@ -1,3 +1,8 @@
+import { getTournamentEntryAccess } from '../../hooks/useGameState';
+import { entryReminderDates, reconcileEntryReminders } from '../tournamentEntry';
+import { setPriority, reserveSeasonBlock, removeSeasonBlock } from '../seasonBoard';
+import { reconcileAchievements } from '../careerAchievements';
+import { evolveTourSkills } from '../tourDevelopment';
 import type { GameState } from '../../hooks/useGameState';
 import { realismBoundary } from '../realism';
 import type { CareerDepthAction } from './types';
@@ -16,7 +21,8 @@ export function initializeCareerDepth(state: GameState): GameState {
   return next;
 }
 export function reconcileCareerDepth(state: GameState): GameState {
-  let next = reconcileStories(settleCommitments(initializeCareerDepth(state)));
+  let next = evolveTourSkills(reconcileAchievements(reconcileStories(settleCommitments(initializeCareerDepth(state)))));
+  next = reconcileEntryReminders(next, t => getTournamentEntryAccess(next,t).allowed);
   const d = depthOf(next);
   const partner = next.worldPlayers.find(p => p.id === d.partnerId);
   if (d.partnerId && (!partner || partner.retired)) {
@@ -31,6 +37,9 @@ export function careerDepthAction(state: GameState, action: CareerDepthAction): 
   state = initializeCareerDepth(state);
   const d = depthOf(state);
   switch (action.type) {
+    case 'priority-event': return setPriority(state,action.id);
+    case 'season-block': return reserveSeasonBlock(state,action);
+    case 'remove-season-block': return removeSeasonBlock(state,action.id);
     case 'project': return startProject(state, action.kind);
     case 'cancel-project': return { ...state, careerDepth: { ...d, project: null,
       projectHistory: d.project?.status === 'active' ? [...d.projectHistory, { ...d.project, status: 'cancelled', note: 'Cancelled without a permanent attribute penalty.' }] : d.projectHistory }, lastAction: 'Project cancelled; temporary cue-action penalty removed.' };
@@ -56,7 +65,7 @@ export function careerDepthAction(state: GameState, action: CareerDepthAction): 
 }
 export function nextCareerBoundary(state: GameState) {
   const d = depthOf(state);
-  const dates = [d.nextSettlementDate];
+  const dates = [d.nextSettlementDate, ...entryReminderDates(state, t=>getTournamentEntryAccess(state,t).allowed)];
   const realismDate = realismBoundary(state);
   if (realismDate) dates.push(realismDate);
   for (const c of d.commitments.filter(c => c.status === 'scheduled')) dates.push(c.startDate, plusDays(c.endDate, 1));

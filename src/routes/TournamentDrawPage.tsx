@@ -1,3 +1,5 @@
+import { GroupFixtures } from '../components/tournaments/GroupFixtures';
+import { isGroupDraw } from '../game/championshipLeague';
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Download, Route, Trophy } from "lucide-react";
@@ -38,12 +40,21 @@ export function TournamentDrawPage() {
   const [compactView, setCompactView] = useState(false);
   const tournamentId = searchParams.get("tournament");
   const drawData = buildTournamentDrawData(gameState, tournamentId);
+  const groupCompetition = isGroupDraw(drawData.bracket);
   const visibleBracket = compactView
     ? drawData.bracket.map((round) => ({
         ...round,
         matches: round.matches.slice(0, 2),
       }))
     : drawData.bracket;
+
+  if (!drawData.tournamentId) return (
+    <section className="rounded-xl border border-border bg-surface p-6">
+      <h1 className="text-2xl font-bold text-white">No tournament draw</h1>
+      <p className="mt-3 text-sm text-gray-400">Choose an event from the calendar to view its draw.</p>
+      <button type="button" className="btn-primary mt-5" onClick={() => navigate('/calendar')}>View Tournament Calendar</button>
+    </section>
+  );
 
   return (
     <div className="space-y-5 pb-10">
@@ -152,7 +163,7 @@ export function TournamentDrawPage() {
             <div className="card-header">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
                 <Trophy className="h-3.5 w-3.5 text-green-400" />{" "}
-                {drawData.eventCompleted ? "Completed Bracket" : "Bracket"}
+                {groupCompetition ? "Groups and Fixtures" : drawData.eventCompleted ? "Completed Bracket" : "Bracket"}
               </h3>
               <span
                 className={
@@ -165,12 +176,12 @@ export function TournamentDrawPage() {
               </span>
             </div>
             <div className="card-body min-h-[32rem] overflow-hidden">
-              <TournamentBracket
+              <>{groupCompetition ? <GroupFixtures rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={drawData.currentPosition.currentRound} /> : <TournamentBracket
                 rounds={visibleBracket}
                 playerName={gameState.player.fullName}
                 currentRound={drawData.currentPosition.currentRound}
                 dense={compactView}
-              />
+              />}</>
             </div>
           </div>
 

@@ -8,13 +8,21 @@ export function recordEncounter(state: GameState, match: Match): GameState {
   const depth = depthOf(state);
   const old = depth.relationships[id] ?? { opponentId: id, name: match.opponentName,
     wins: 0, losses: 0, deciders: 0, rivalry: false, recent: [], tactics: {} };
+  if (old.meetings?.some(m => m.id === match.id)) return state;
   const won = match.result === 'Won';
-  const deciders = old.deciders + Number(match.playerFrames + match.opponentFrames === match.bestOf);
+  const deciders = old.deciders + Number(match.bestOf > 1 && match.bestOf % 2 === 1 && match.playerFrames + match.opponentFrames === match.bestOf);
+  const closeMatches = (old.closeMatches ?? old.deciders) + Number(match.bestOf > 1 && Math.abs(match.playerFrames - match.opponentFrames) <= 1);
+  const finals = (old.finals ?? 0) + Number(match.round === 'Final');
+  const meetings = old.wins + old.losses + (old.draws ?? 0) + 1;
+  const intensity = Math.min(100, meetings * 6 + closeMatches * 10 + finals * 8);
+  const objectiveRecord = depth.objectiveRecord ?? { achieved: 0, total: 0, matches: 0 };
   const tactic = match.playerTactic;
-  return { ...state, careerDepth: { ...depth, relationships: { ...depth.relationships,
-    [id]: { ...old, wins: old.wins + Number(won), losses: old.losses + Number(!won), deciders,
-      rivalry: old.wins + old.losses + 1 >= 3 && deciders >= 2,
-      recent: [...old.recent, won ? 'W' as const : 'L' as const].slice(-10),
+  return { ...state, careerDepth: { ...depth, objectiveRecord: { achieved: objectiveRecord.achieved + (match.objectives ?? []).filter(o => o.achieved).length, total: objectiveRecord.total + (match.objectives ?? []).length, matches: objectiveRecord.matches + Number(Boolean(match.objectives?.length)) }, relationships: { ...depth.relationships,
+    [id]: { ...old, draws: (old.draws ?? 0) + Number(match.result === 'Drawn'), closeMatches, finals, intensity,
+      meetings: [...(old.meetings ?? []), { id: match.id, date: match.playedOn ?? state.currentDate, event: state.tournaments.find(t => t.id === match.tournamentId)?.name ?? 'Recorded event', round: match.round, score: match.playerFrames + '–' + match.opponentFrames, result: match.result }].slice(-8),
+      wins: old.wins + Number(won), losses: old.losses + Number(match.result === 'Lost'), deciders,
+      rivalry: old.rivalry || (meetings >= 3 && (deciders >= 2 || closeMatches >= 3 || finals >= 2)),
+      recent: match.result === 'Drawn' ? old.recent : [...old.recent, won ? 'W' as const : 'L' as const].slice(-10),
       tactics: tactic ? { ...old.tactics, [tactic]: (old.tactics[tactic] ?? 0) + 1 } : old.tactics },
   } } };
 }

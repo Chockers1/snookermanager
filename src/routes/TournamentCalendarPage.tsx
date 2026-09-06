@@ -1,9 +1,12 @@
-import { useMemo, useState } from 'react'
+import { SeasonBoardPanel, EntryTimelinePanel } from '../components/career/SeasonExpansionPanels'
+import { CoachAdvicePanel } from "../components/career/MatchInsightPanels";
+import { MonthCalendar, CalendarEventDialog } from '../components/tournaments/MonthCalendar'
+import { useState } from 'react'
 import { SeasonPlanningPanel } from '../components/career/CareerDepthPanels'
 import { QualificationRacesPanel, TravelLocationPanel } from '../components/career/RealismPanels'
 import { tournamentCommitmentConflict } from '../game/careerDepth/commitments'
 import { useNavigate } from 'react-router-dom'
-import { CalendarDays, ChevronLeft, ChevronRight, MapPin, Search, Trophy } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, List, MapPin, Search, Trophy } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { useGame } from '../context/useGame'
 import { getNextEligibleTournament, getTournamentEntryAccess, getTournamentEntryCashRequirement } from '../hooks/useGameState'
@@ -24,7 +27,22 @@ const tierColorClasses = {
   blue: 'bg-blue-500',
 }
 
-function getTournamentLevel(stageId: number): Exclude<CalendarLevelFilter, 'All Tours'> {
+function calendarAccent(type: string): keyof typeof tierColorClasses {
+  if (type === 'Major') return 'gold'
+  if (type === 'Ranking' || type === 'Professional Tour') return 'green'
+  if (type === 'Invitational') return 'violet'
+  if (type === 'Senior' || type === 'Exhibition') return 'blue'
+  return 'orange'
+}
+
+function getTournamentLevel(event: { stageId: number; type: string }): Exclude<CalendarLevelFilter, 'All Tours'> {
+  if (['Junior', 'Regional Youth', 'National Youth'].includes(event.type)) return 'Junior Pathway'
+  if (event.type === 'Amateur') return 'Amateur Circuit'
+  if (event.type === 'Q Tour') return 'Q Tour'
+  if (event.type === 'Q School') return 'Q School'
+  if (['Senior', 'Exhibition'].includes(event.type)) return 'Legacy'
+  if (['Professional Tour', 'Ranking', 'Major', 'Invitational'].includes(event.type)) return 'Main Tour'
+  const stageId = event.stageId
   if (stageId <= 3) return 'Junior Pathway'
   if (stageId === 4) return 'Amateur Circuit'
   if (stageId === 5) return 'Q Tour'
@@ -34,7 +52,7 @@ function getTournamentLevel(stageId: number): Exclude<CalendarLevelFilter, 'All 
 }
 
 function formatEventDates(startDay: number, endDay?: number, startMonth = 0, endMonth = startMonth) {
-  if (!endDay || endDay === startDay) return `${startDay} ${monthShortLabels[startMonth]}`
+  if (!endDay || (endDay === startDay && startMonth === endMonth)) return `${startDay} ${monthShortLabels[startMonth]}`
   if (startMonth === endMonth) return `${startDay}-${endDay} ${monthShortLabels[startMonth]}`
   return `${startDay} ${monthShortLabels[startMonth]}-${endDay} ${monthShortLabels[endMonth]}`
 }
@@ -65,27 +83,17 @@ export function TournamentCalendarPage() {
   const calendarData = buildCalendarData(gameState)
   const liveTournamentsById = new Map(gameState.tournaments.map((event) => [event.id, event]))
   const equipmentReady = Boolean(gameState.equipment.currentCueId && gameState.equipment.currentChalkId && gameState.equipment.currentTipId)
-  const monthOptions = useMemo(() => {
-    const uniqueMonths = new Map<string, { label: string; month: number; year: number }>()
-    calendarData.events
-      .slice()
-      .sort((left, right) => (left.startYear - right.startYear) || (left.startMonth - right.startMonth) || (left.startDay - right.startDay))
-      .forEach((event) => {
-        const key = `${event.startYear}-${event.startMonth}`
-        if (!uniqueMonths.has(key)) uniqueMonths.set(key, { label: `${monthLongLabels[event.startMonth]} ${event.startYear}`, month: event.startMonth, year: event.startYear })
-      })
-    return Array.from(uniqueMonths.values())
-  }, [calendarData.events])
-  const currentDate = new Date(`${gameState.currentDate}T00:00:00`)
-  const defaultMonthIndex = Math.max(0, monthOptions.findIndex((option) => option.month === currentDate.getMonth() && option.year === currentDate.getFullYear()))
-  const [monthIndex, setMonthIndex] = useState(defaultMonthIndex)
+  const currentDate = new Date(gameState.currentDate + 'T00:00:00')
+  const todayMonth = currentDate.getFullYear() * 12 + currentDate.getMonth()
+  const [monthIndex, setMonthIndex] = useState(todayMonth)
+  const [view, setView] = useState<'list' | 'month' | 'board'>('list')
+  const [circuitFilter, setCircuitFilter] = useState('All circuits')
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [levelFilter, setLevelFilter] = useState<CalendarLevelFilter>('All Tours')
   const [selectedTournamentId, setSelectedTournamentId] = useState(getNextEligibleTournament(gameState)?.id ?? gameState.tournaments[0]?.id ?? '')
-  const activeMonth = monthOptions[monthIndex] ?? monthOptions[0]
-  const visibleEvents = useMemo(
-    () => calendarData.events.filter((event) => eventOverlapsMonth(event, activeMonth.month, activeMonth.year) && (levelFilter === 'All Tours' || getTournamentLevel(event.stageId) === levelFilter)),
-    [activeMonth.month, activeMonth.year, calendarData.events, levelFilter],
-  )
+  const activeMonth = { year: Math.floor(monthIndex / 12), month: ((monthIndex % 12) + 12) % 12, label: monthLongLabels[((monthIndex % 12) + 12) % 12] + ' ' + Math.floor(monthIndex / 12) }
+  const circuits = [...new Set(calendarData.events.filter(event => levelFilter === 'All Tours' || getTournamentLevel(event) === levelFilter).map(event => event.tourCircuit))].sort()
+  const visibleEvents = calendarData.events.filter((event) => eventOverlapsMonth(event, activeMonth.month, activeMonth.year) && (levelFilter === 'All Tours' || getTournamentLevel(event) === levelFilter) && (circuitFilter === 'All circuits' || event.tourCircuit === circuitFilter))
   const selectedTournament = gameState.tournaments.find((event) => event.id === selectedTournamentId && visibleEvents.some((calendarEvent) => calendarEvent.id === event.id))
     ?? gameState.tournaments.find((event) => event.id === visibleEvents[0]?.id)
     ?? null
@@ -107,75 +115,7 @@ export function TournamentCalendarPage() {
           ? 'Not enough cash for the entry fee.'
           : null)
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-white">Tournament Calendar</h1>
-          <p className="mt-1 text-sm text-gray-400">Season pathway schedule - {activeMonth.label}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button type="button" className="btn-secondary text-xs" onClick={() => setMonthIndex(defaultMonthIndex)}><CalendarDays className="h-3.5 w-3.5" /> Today</button>
-          <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => setMonthIndex((value) => Math.max(0, value - 1))} aria-label="Previous month"><ChevronLeft className="h-3.5 w-3.5" /></button>
-          <span className="min-w-36 text-center text-sm font-medium text-white">{activeMonth.label}</span>
-          <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => setMonthIndex((value) => Math.min(monthOptions.length - 1, value + 1))} aria-label="Next month"><ChevronRight className="h-3.5 w-3.5" /></button>
-        </div>
-      </div>
-
-      <SeasonPlanningPanel />
-      <QualificationRacesPanel />
-      <TravelLocationPanel />
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="col-span-12 space-y-4 xl:col-span-7">
-          <div className="card">
-            <div className="card-header">
-              <div className="flex flex-wrap items-center gap-3 text-[10px]">
-                {(['gold', 'green', 'blue', 'orange'] as const).map((tone) => <div key={tone} className="flex items-center gap-1"><div className={`h-2 w-2 rounded ${tierColorClasses[tone]}`} /><span className="text-gray-400">{tone === 'gold' ? 'Major' : tone === 'green' ? 'Ranking' : tone === 'blue' ? 'Standard' : 'Pathway'}</span></div>)}
-              </div>
-            </div>
-            <div className="card-header border-t border-border">
-              <div className="flex flex-wrap items-center gap-3">
-                {levelFilters.map((filter) => (
-                  <button key={filter} type="button" onClick={() => setLevelFilter(filter)} className={levelFilter === filter ? 'tab-active text-[10px]' : 'tab-inactive text-[10px]'}>{filter}</button>
-                ))}
-              </div>
-            </div>
-            <div className="card-body space-y-2">
-              {visibleEvents.length === 0 ? <p className="py-8 text-center text-sm text-gray-400">No events match this month and tour filter.</p> : null}
-              {visibleEvents.map((event) => {
-                const liveStatus = liveTournamentsById.get(event.id)?.status ?? event.status
-                const selected = selectedTournament?.id === event.id
-                return (
-                  <button
-                    key={event.id}
-                    type="button"
-                    onClick={() => setSelectedTournamentId(event.id)}
-                    className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${selected ? 'border-green-600/30 bg-green-600/10' : 'border-transparent bg-surface-light/50 hover:bg-surface-light'}`}
-                  >
-                    <div className={`h-12 w-1.5 shrink-0 rounded-full ${tierColorClasses[event.accent as keyof typeof tierColorClasses]}`} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="truncate text-sm font-medium text-white">{event.name}</h3>
-                        <span className={`shrink-0 rounded border px-2 py-0.5 text-[10px] ${statusClass(liveStatus)}`}>{liveStatus}</span>
-                      </div>
-                      <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
-                        <span>{formatEventDates(event.startDay, event.endDay, event.startMonth, event.endMonth)}</span>
-                        <span className="flex min-w-0 items-center gap-1"><MapPin className="h-2.5 w-2.5 shrink-0" /> <span className="truncate">{event.location}</span></span>
-                        <span>{event.tourCircuit}</span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-medium text-green-400">{formatMoney(event.totalPrizeFund)}</p>
-                      <p className="text-[10px] text-gray-500">Prize fund</p>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div className="col-span-12 space-y-4 xl:col-span-5">
+  const eventDetails = <div className="space-y-4">
           {!selectedTournament || !selectedCalendarEvent || !selectedEventDetail ? (
             <div className="card card-body p-8 text-center text-sm text-gray-400">Select an event to see entry detail.</div>
           ) : (
@@ -193,6 +133,7 @@ export function TournamentCalendarPage() {
                 </div>
               </div>
 
+              <EntryTimelinePanel event={selectedTournament} />
               <div className="card card-body space-y-3">
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div><span className="text-gray-500">Tour</span><p className="text-white">{selectedTournament.tourCircuit ?? selectedCalendarEvent.tourCircuit}</p></div>
@@ -239,8 +180,106 @@ export function TournamentCalendarPage() {
               </div>
             </>
           )}
+
+  </div>
+
+  return (
+    <div className={view === 'month' ? 'flex h-full min-h-0 flex-col gap-3' : 'space-y-6'}>
+      <div className="flex shrink-0 flex-col items-start justify-between gap-3 sm:flex-row">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-white">Tournament Calendar</h1>
+          <p className="mt-1 text-sm text-gray-400">Season pathway schedule - {activeMonth.label}</p>
+          <div className="mt-2 flex gap-1" role="group" aria-label="Calendar display">
+            <button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')} className={view === 'list' ? 'btn-primary px-3 py-1 text-xs' : 'btn-secondary px-3 py-1 text-xs'}><List className="h-3.5 w-3.5" /> List view</button>
+            <button type="button" aria-pressed={view === 'month'} onClick={() => setView('month')} className={view === 'month' ? 'btn-primary px-3 py-1 text-xs' : 'btn-secondary px-3 py-1 text-xs'}><CalendarDays className="h-3.5 w-3.5" /> Month view</button>
+            <button type="button" aria-pressed={view === 'board'} onClick={() => setView('board')} className={view === 'board' ? 'btn-primary px-3 py-1 text-xs' : 'btn-secondary px-3 py-1 text-xs'}>Planning board</button>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="btn-secondary text-xs" onClick={() => setMonthIndex(todayMonth)}><CalendarDays className="h-3.5 w-3.5" /> Today</button>
+          <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => setMonthIndex((value) => value - 1)} aria-label="Previous month"><ChevronLeft className="h-3.5 w-3.5" /></button>
+          <span className="min-w-36 text-center text-sm font-medium text-white">{activeMonth.label}</span>
+          <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => setMonthIndex((value) => value + 1)} aria-label="Next month"><ChevronRight className="h-3.5 w-3.5" /></button>
         </div>
       </div>
+
+      {view === 'board' ? <><SeasonBoardPanel year={activeMonth.year} month={activeMonth.month} onEvent={id=>{setSelectedTournamentId(id);setDetailsOpen(true)}} /><SeasonPlanningPanel />{detailsOpen && <CalendarEventDialog onClose={()=>setDetailsOpen(false)}>{eventDetails}</CalendarEventDialog>}</> : view === 'month' ? <>
+        <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-2">
+          <label className="flex items-center gap-2 text-xs text-gray-400">Tour
+            <select aria-label="Tour filter" className="max-w-[180px] rounded border border-border bg-background px-2 py-1.5 text-xs text-white" value={levelFilter} onChange={e => { setLevelFilter(e.target.value as CalendarLevelFilter); setCircuitFilter('All circuits') }}>
+              {levelFilters.map(filter => <option key={filter} value={filter}>{filter === 'Legacy' ? 'Seniors & Legends' : filter}</option>)}
+            </select>
+          </label>
+          <select aria-label="Specific circuit" className="min-w-0 max-w-full flex-1 rounded border border-border bg-background px-2 py-1.5 text-xs text-white sm:max-w-[340px]" value={circuitFilter} onChange={e => setCircuitFilter(e.target.value)}><option>All circuits</option>{circuits.map(circuit => <option key={circuit}>{circuit}</option>)}</select>
+          <span aria-live="polite" className="text-xs text-gray-400 sm:ml-auto">{visibleEvents.length ? visibleEvents.length + ' tournaments this month' : 'No tournaments match this month and tour filter.'}</span>
+        </div>
+        <MonthCalendar year={activeMonth.year} month={activeMonth.month} today={gameState.currentDate} selectedId={selectedTournament?.id}
+          events={visibleEvents.map(event => ({ id: event.id, name: event.name, startDate: liveTournamentsById.get(event.id)!.startDate, endDate: liveTournamentsById.get(event.id)!.endDate, accent: calendarAccent(event.type), status: liveTournamentsById.get(event.id)?.status ?? event.status, tourCircuit: event.tourCircuit }))}
+          onSelect={id => { setSelectedTournamentId(id); setDetailsOpen(true) }} />
+        <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-gray-400">
+          {(['gold', 'green', 'violet', 'blue', 'orange'] as const).map(tone => <span key={tone} className="flex items-center gap-1"><span className={'h-2 w-2 rounded ' + tierColorClasses[tone]} />{tone === 'gold' ? 'Major' : tone === 'green' ? 'Ranking' : tone === 'violet' ? 'Invitational' : tone === 'blue' ? 'Seniors / Exhibitions' : 'Pathway'}</span>)}
+          <span>✓ Entered · ‹ › Continues across weeks · Scroll within busy weeks for more events</span>
+        </div>
+        {detailsOpen && <CalendarEventDialog onClose={() => setDetailsOpen(false)}>{eventDetails}</CalendarEventDialog>}
+      </> : <>
+      <SeasonPlanningPanel />
+      <CoachAdvicePanel />
+      <QualificationRacesPanel />
+      <TravelLocationPanel />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="col-span-12 space-y-4 xl:col-span-7">
+          <div className="card">
+            <div className="card-header">
+              <div className="flex flex-wrap items-center gap-3 text-[10px]">
+                {(['gold', 'green', 'violet', 'blue', 'orange'] as const).map((tone) => <div key={tone} className="flex items-center gap-1"><div className={`h-2 w-2 rounded ${tierColorClasses[tone]}`} /><span className="text-gray-400">{tone === 'gold' ? 'Major' : tone === 'green' ? 'Ranking' : tone === 'violet' ? 'Invitational' : tone === 'blue' ? 'Seniors / Exhibitions' : 'Pathway'}</span></div>)}
+              </div>
+            </div>
+            <div className="card-header border-t border-border">
+              <div className="flex flex-wrap items-center gap-3">
+                {levelFilters.map((filter) => (
+                  <button key={filter} type="button" onClick={() => { setLevelFilter(filter); setCircuitFilter('All circuits') }} className={levelFilter === filter ? 'tab-active text-[10px]' : 'tab-inactive text-[10px]'}>{filter === 'Legacy' ? 'Seniors & Legends' : filter}</button>
+                ))}
+              </div>
+            </div>
+            <div className="card-body space-y-2">
+              {visibleEvents.length === 0 ? <p className="py-8 text-center text-sm text-gray-400">No events match this month and tour filter.</p> : null}
+              {visibleEvents.map((event) => {
+                const liveStatus = liveTournamentsById.get(event.id)?.status ?? event.status
+                const selected = selectedTournament?.id === event.id
+                return (
+                  <button
+                    key={event.id}
+                    type="button"
+                    onClick={() => setSelectedTournamentId(event.id)}
+                    className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${selected ? 'border-green-600/30 bg-green-600/10' : 'border-transparent bg-surface-light/50 hover:bg-surface-light'}`}
+                  >
+                    <div className={`h-12 w-1.5 shrink-0 rounded-full ${tierColorClasses[calendarAccent(event.type)]}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate text-sm font-medium text-white">{event.name}</h3>
+                        <span className={`shrink-0 rounded border px-2 py-0.5 text-[10px] ${statusClass(liveStatus)}`}>{liveStatus}</span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
+                        <span>{formatEventDates(event.startDay, event.endDay, event.startMonth, event.endMonth)}</span>
+                        <span className="flex min-w-0 items-center gap-1"><MapPin className="h-2.5 w-2.5 shrink-0" /> <span className="truncate">{event.location}</span></span>
+                        <span>{event.tourCircuit}</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-green-400">{formatMoney(event.totalPrizeFund)}</p>
+                      <p className="text-[10px] text-gray-500">Prize fund</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="col-span-12 space-y-4 xl:col-span-5">{eventDetails}
+        </div>
+      </div>
+      </>}
     </div>
   )
 }

@@ -1,3 +1,5 @@
+import { ObjectivesPanel, CoachAdvicePanel } from '../components/career/MatchInsightPanels'
+import { getBestOfForRound } from '../data/tournamentFormats'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { RivalryContext } from '../components/career/CareerDepthPanels'
@@ -80,7 +82,7 @@ function formatEdgeLabel(edge: number | null) {
 }
 
 export function MatchPreviewPage() {
-  const { gameState, startLiveMatch } = useGame()
+  const { gameState, startLiveMatch, updateLiveMatchTactics } = useGame()
   const navigate = useNavigate()
   const [plan, setPlan] = useState<(typeof FRAME_PLANS)[number]>('Balanced')
   const [focus, setFocus] = useState<(typeof MENTAL_FOCUS_OPTIONS)[number]>('Composed')
@@ -146,12 +148,15 @@ export function MatchPreviewPage() {
       return
     }
     startLiveMatch(activeTournament.id)
+    updateLiveMatchTactics({ tacticalPlan: plan, mentalFocus: focus, tempo })
     navigate('/match/live')
   }
 
   return (
-    <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+    <div className="flex min-h-0 flex-col gap-3 [&>*]:shrink-0 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-y-auto xl:p-1.5">
       <RivalryContext opponent={opponentName} />
+      {activeTournament && nextOpponent && <ObjectivesPanel opponentRank={nextOpponent.ranking} bestOf={getBestOfForRound(activeTournament, activeRound ?? '', 7)} objectives={activeLiveMatch?.objectives} />}
+      <CoachAdvicePanel opponent={opponentName} tournament={activeTournament} onUsePlan={setPlan} />
       <VenueScoutingPanel tournament={activeTournament} opponent={opponentName} />
       <div className="flex shrink-0 flex-col gap-2 rounded-lg border border-border bg-surface/85 px-3 py-2 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
@@ -272,7 +277,7 @@ export function MatchPreviewPage() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:min-h-[32rem] xl:grid-cols-12 xl:gap-2">
         <div className="grid min-h-0 gap-3 xl:col-span-4 xl:grid-rows-[0.26fr_0.74fr] xl:gap-2">
           <div className="card min-h-0 flex h-full flex-col overflow-hidden">
             <div className="card-header px-3 py-2">

@@ -1,6 +1,16 @@
+import { auditedRules, calendarRuleOverrides } from './tournamentRules'
 import type { Tournament } from '../types/game'
 
-type TournamentFormatProfile = {
+export type TournamentFormatProfile = {
+  groupSize?: number
+  groupMode?: 'ranking' | 'amateur' | 'league' | 'invitational'
+  qualifiers?: number
+  seedOffset?: number
+  entryTiers?: { through: number; round: string }[]
+  drawPolicy?: 'seeded' | 'randomEachRound'
+  specialRules?: string[]
+  sourceStatus?: string
+
   id: string
   displayName: string
   tournamentClass: string
@@ -420,6 +430,9 @@ const ROUND_BEST_OF_SHORT_FINAL = {
 } satisfies Partial<Record<string, number>>
 
 const ROUND_BEST_OF_SHOOT_OUT = {
+  'Last 128': 1,
+  'Last 64': 1,
+  'Last 32': 1,
   'Last 16': 1,
   'Quarter Final': 1,
   'Semi Final': 1,
@@ -427,6 +440,9 @@ const ROUND_BEST_OF_SHOOT_OUT = {
 } satisfies Partial<Record<string, number>>
 
 const ROUND_BEST_OF_CHAMPIONSHIP_LEAGUE = {
+  'Stage One Groups': 4,
+  'Stage Two Groups': 4,
+  'Stage Three Groups': 4,
   'Last 16': 4,
   'Quarter Final': 4,
   'Semi Final': 4,
@@ -482,7 +498,7 @@ const ROUND_BEST_OF_WORLD_SENIORS = {
   Final: 19,
 } satisfies Partial<Record<string, number>>
 
-export const TOURNAMENT_FORMATS = {
+const FORMAT_PROFILES = {
   juniorLocal: {
     id: 'juniorLocal',
     displayName: 'Junior Local Event',
@@ -925,7 +941,7 @@ export const TOURNAMENT_FORMATS = {
     prizeTier: 'Q School',
     calendarWindow: 'May-June UK / Europe Q School block',
     validationRules: ['Two UK / Europe events', 'Four semi-finalists per event win cards', 'All matches best of 7', 'Remove Event 1 card winners from Event 2'],
-    pathwayImpact: 'Each event awards four two-year World Snooker Tour cards at the semi-final card-winning round.',
+    pathwayImpact: 'Each event awards four two-year World Snooker Tour cards by winning their quarter-final.',
     expectedPlayerVolume: 'Open UK / Europe accepted-entry field with no listed maximum',
     roundBestOf: ROUND_BEST_OF_Q_SCHOOL,
     formatFamily: 'qSchool',
@@ -947,7 +963,7 @@ export const TOURNAMENT_FORMATS = {
     prizeTier: 'Q School',
     calendarWindow: 'May-June Asia-Oceania Q School block',
     validationRules: ['Two Asia-Oceania events', 'Two finalists per event win cards', 'Maximum 128 players', 'All matches best of 7'],
-    pathwayImpact: 'Each event awards two two-year World Snooker Tour cards at the final card-winning round.',
+    pathwayImpact: 'Each event awards two two-year World Snooker Tour cards by winning their semi-final.',
     expectedPlayerVolume: 'Up to 128 Asia-Oceania entrants',
     roundBestOf: ROUND_BEST_OF_Q_SCHOOL,
     formatFamily: 'qSchool',
@@ -1762,6 +1778,22 @@ export const TOURNAMENT_FORMATS = {
   },
 } satisfies Record<string, TournamentFormatProfile>
 
+const profiles = {
+  ...FORMAT_PROFILES,
+  internationalQualifier: { ...FORMAT_PROFILES.proQualifier, id: 'internationalQualifier', displayName: 'International Championship Qualifying' },
+  worldOpenQualifier: { ...FORMAT_PROFILES.proQualifier, id: 'worldOpenQualifier', displayName: 'World Open Qualifying' },
+  homeNationsMain: { ...FORMAT_PROFILES.homeNationsRanking, id: 'homeNationsMain' },
+  juniorLeague: { ...FORMAT_PROFILES.juniorLocal, id: 'juniorLeague', displayName: 'Junior Club League' },
+};
+
+// A complete, audited round table is required for every profile, including unused ones.
+export const TOURNAMENT_FORMATS = Object.fromEntries(Object.entries(profiles).map(([id, profile]) => {
+  const rules = auditedRules[id as keyof typeof profiles];
+  const merged = { ...profile, ...rules } as TournamentFormatProfile;
+  merged.frameFormat = Object.entries(merged.roundBestOf ?? {}).map(([round, bestOf]) => round + ': ' + (bestOf === 4 ? 'up to 4 frames; draws allowed' : 'best of ' + bestOf));
+  return [id, merged];
+})) as Record<keyof typeof profiles, TournamentFormatProfile>;
+
 export type TournamentFormatId = keyof typeof TOURNAMENT_FORMATS
 export type TournamentFormat = (typeof TOURNAMENT_FORMATS)[TournamentFormatId]
 
@@ -1771,6 +1803,12 @@ function normalizeLabel(value: string) {
 
 export function inferTournamentFormatId(tournament: TournamentFormatLookup): TournamentFormatId {
   const name = tournament.name.toLowerCase()
+
+  if (/international championship.*qualif/.test(name)) return 'internationalQualifier'
+  if (/world open.*qualif/.test(name)) return 'worldOpenQualifier'
+  if (/english open qualifying|welsh open qualifying/.test(name)) return 'proQualifier'
+  if (/^english open$|^welsh open$/.test(name)) return 'homeNationsMain'
+  if (name === 'summer junior club league') return 'juniorLeague'
 
   if (/world championship qualifying/.test(name)) return 'worldChampionshipQualifying'
   if (/world championship/.test(name) && !/seniors world championship/.test(name) && !/qualifying/.test(name)) return 'worldChampionshipMain'
@@ -1874,8 +1912,12 @@ export function getTournamentFormat(formatId: string | null | undefined) {
 }
 
 export function resolveTournamentFormat(tournament: TournamentFormatLookup) {
-  const formatId = getTournamentFormat(tournament.formatId)?.id ?? inferTournamentFormatId(tournament)
-  return TOURNAMENT_FORMATS[formatId as TournamentFormatId]
+  const inferred = inferTournamentFormatId(tournament)
+  const repaired = ['internationalQualifier', 'worldOpenQualifier', 'proQualifier', 'homeNationsMain', 'juniorLeague'].includes(inferred)
+  const formatId = repaired ? inferred : getTournamentFormat(tournament.formatId)?.id ?? inferred
+  const profile = TOURNAMENT_FORMATS[formatId as TournamentFormatId]
+  const merged = { ...profile, ...calendarRuleOverrides[tournament.name] }
+  return { ...merged, frameFormat: Object.entries(merged.roundBestOf ?? {}).map(([r, n]) => r + ': ' + (n === 4 ? 'up to 4 frames; draws allowed' : 'best of ' + n)) }
 }
 
 export function getBestOfForRound(tournament: TournamentFormatLookup, round: string, fallbackBestOf: number) {
@@ -2061,4 +2103,14 @@ export function isYouthFormat(format: TournamentFormat) {
 
 export function isProfessionalFormat(format: TournamentFormat) {
   return ['proQualifier', 'proEvent', 'major', 'invitational'].includes(format.formatFamily)
+}
+
+export function tournamentFormatSummary(tournament: TournamentFormatLookup) {
+  const f = resolveTournamentFormat(tournament);
+  const lengths = [...new Set(Object.values(f.roundBestOf ?? {}))].sort((a, b) => a! - b!) as number[];
+  if (!lengths.length) return 'Administrative review; no matches';
+  if (f.groupMode === 'ranking') return 'Groups: up to 4 frames, draws allowed · final best of 5';
+  if (f.groupMode === 'invitational') return 'Rolling groups and play-offs · all matches best of 5';
+  if (f.specialRules?.includes('shootOut')) return 'One frame · 10-minute limit · 15/10-second shot clock';
+  return (f.groupMode === 'league' ? 'Round robin' : f.groupMode ? 'Groups and knockout' : f.qualifiers ? f.qualifiers + ' qualification places' : 'Knockout') + ' · best of ' + (lengths.length === 1 ? lengths[0] : lengths.join('/'));
 }

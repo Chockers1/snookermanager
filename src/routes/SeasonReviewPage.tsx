@@ -102,7 +102,7 @@ export function SeasonReviewPage() {
 
         <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="card overflow-hidden border-green-500/40 bg-gradient-to-r from-green-600/10 via-surface to-surface p-4">
-            <div className="flex items-start justify-between gap-4"><div><p className="metric-label">Your Season</p><h2 className="mt-1 text-xl font-semibold text-white">{gameState.player.fullName}</h2></div><div className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 border-green-500 text-xl font-bold text-green-400">{record.titles > 1 ? 'A' : record.wins > record.losses ? 'B' : 'C'}</div></div>
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row"><div><p className="metric-label">Your Season</p><h2 className="mt-1 text-xl font-semibold text-white">{gameState.player.fullName}</h2></div><div className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 border-green-500 text-xl font-bold text-green-400">{record.titles > 1 ? 'A' : record.wins > record.losses ? 'B' : 'C'}</div></div>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <div className="rounded-lg bg-background/40 p-3"><p className="metric-label">Final Rank</p><p className="mt-1 text-lg font-bold text-white">#{record.closingRanking}</p><p className={rankingMovement >= 0 ? "text-xs text-green-400" : "text-xs text-red-400"}>{rankingMovement === 0 ? 'No change' : `${rankingMovement > 0 ? 'Up' : 'Down'} ${Math.abs(rankingMovement)}`}</p></div>
               <div className="rounded-lg bg-background/40 p-3"><p className="metric-label">Record</p><p className="mt-1 text-lg font-bold text-white">{record.wins}-{record.losses}</p><p className="text-xs text-gray-400">{record.matchesPlayed} matches</p></div>
@@ -287,7 +287,7 @@ export function SeasonReviewPage() {
         );
 
   return (
-    <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+    <div className="flex min-h-0 flex-col gap-3 [&>*]:shrink-0 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-y-auto xl:p-1.5">
       <CareerSeasonSummary />
       <WorldDigestPanel />
       <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
@@ -318,7 +318,7 @@ export function SeasonReviewPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-8 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
         {metrics.map((metric) => {
           const Icon = getMetricIcon(metric.label);
 
@@ -345,7 +345,7 @@ export function SeasonReviewPage() {
         })}
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:grid-rows-[0.37fr_0.33fr_0.3fr] xl:gap-2">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:min-h-[38rem] xl:grid-cols-12 xl:grid-rows-[0.37fr_0.33fr_0.3fr] xl:gap-2">
         <div className="card flex min-h-64 flex-col overflow-hidden xl:col-span-6 xl:min-h-0">
           <div className="card-header px-3 py-2">
             <h3 className="text-sm font-semibold text-white">
@@ -582,49 +582,37 @@ export function SeasonReviewPage() {
             </div>
           </div>
         </div>
-        <div className="card min-h-0 flex h-full flex-col overflow-hidden px-3 py-3 xl:col-span-7">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-light/50">
+        <section aria-label="Season Snapshot" className="card flex min-w-0 flex-col px-3 py-3 xl:col-span-7">
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-light/50">
               <Trophy className="h-4 w-4 text-green-400" />
             </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
-                {currentSeasonSnapshot.season} Season Snapshot
-              </p>
-            </div>
+            <h3 className="min-w-0 text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
+              {currentSeasonSnapshot.season} Season Snapshot
+            </h3>
           </div>
-          <div className="mt-3 grid min-h-0 flex-1 grid-cols-[0.2fr_0.2fr_0.2fr_0.4fr] gap-0 overflow-hidden rounded-lg border border-border bg-surface-light/35">
-            <div className="flex flex-col justify-center border-r border-border px-4">
+          <div className="mt-2 grid flex-1 grid-cols-[minmax(0,1fr)_minmax(0,0.65fr)_minmax(0,1.4fr)] rounded-lg border border-border bg-surface-light/35">
+            <div className="min-w-0 border-r border-border px-2 py-2 sm:px-3">
               <p className="text-[10px] uppercase text-gray-500">Record</p>
-              <p className="mt-1 text-2xl font-bold text-white">
-                {currentSeasonSnapshot.record}
-              </p>
+              <p className="mt-1 break-words text-lg font-bold leading-tight text-white">{currentSeasonSnapshot.record}</p>
             </div>
-            <div className="flex flex-col justify-center border-r border-border px-4">
+            <div className="min-w-0 border-r border-border px-2 py-2 sm:px-3">
               <p className="text-[10px] uppercase text-gray-500">Titles</p>
-              <p className="mt-1 text-2xl font-bold text-white">
-                {currentSeasonSnapshot.titles}
-              </p>
+              <p className="mt-1 break-words text-lg font-bold leading-tight text-white">{currentSeasonSnapshot.titles}</p>
             </div>
-            <div className="flex flex-col justify-center border-r border-border px-4">
+            <div className="min-w-0 px-2 py-2 sm:px-3">
               <p className="text-[10px] uppercase text-gray-500">Prize</p>
-              <p className="mt-1 text-2xl font-bold text-white">
-                {formatMoney(currentSeasonSnapshot.prizeMoney)}
-              </p>
+              <p className="mt-1 break-words text-lg font-bold leading-tight text-white">{formatMoney(currentSeasonSnapshot.prizeMoney)}</p>
             </div>
-            <div className="flex flex-col justify-center px-5">
-              <p className="text-2xl font-bold text-green-400">
-                {currentSeasonSnapshot.bestResult}
-              </p>
-              <p className="mt-1 text-sm text-gray-400">
-                {currentSeasonSnapshot.note}
-              </p>
+            <div className="col-span-3 min-w-0 border-t border-border px-3 py-2">
+              <p className="break-words text-sm font-bold text-green-400">{currentSeasonSnapshot.bestResult}</p>
+              <p className="mt-1 text-xs leading-relaxed text-gray-400">{currentSeasonSnapshot.note}</p>
             </div>
           </div>
-        </div>
+        </section>
       </div>
 
-      <div className="flex justify-center gap-2 rounded-lg border border-border bg-surface-light/40 px-3 py-2.5">
+      <div className="flex shrink-0 flex-wrap justify-center gap-2 rounded-lg border border-border bg-surface-light/40 px-3 py-2.5">
         <button
           type="button"
           className="btn-secondary px-3 py-2 text-xs"

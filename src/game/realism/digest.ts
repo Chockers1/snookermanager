@@ -25,7 +25,7 @@ export function updateWorldDigest(state: GameState): GameState {
       }
     } else if (finals.length) lines.push(`${event.name}: ${finals.length} qualifying sections completed; results now count toward the relevant ladder.`);
     const upset = event.bracket.flatMap(round => round.matches).find(m => typeof m.top.score === 'number' && typeof m.bottom.score === 'number' && ((m.top.rank <= 8 && m.bottom.rank >= 32 && m.bottom.score > m.top.score) || (m.bottom.rank <= 8 && m.top.rank >= 32 && m.top.score > m.bottom.score)));
-    if (upset) lines.push(`Upset: ${upset.top.name} ${upset.top.score}–${upset.bottom.score} ${upset.bottom.name}; a top-eight seed went out.`);
+    if (upset) lines.push(`Upset: ${upset.top.name} ${upset.top.score}–${upset.bottom.score} ${upset.bottom.name}; a top-eight seed was beaten.`);
     const rivals = Object.values(state.careerDepth?.relationships ?? {}).filter(x => x.rivalry);
     for (const rival of rivals) {
       const encounter = [...event.bracket].reverse().flatMap(round => round.matches).find(m => [m.top.name, m.bottom.name].includes(rival.name) && typeof m.top.score === 'number' && typeof m.bottom.score === 'number');

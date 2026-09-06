@@ -1,8 +1,19 @@
+import { reconcileAchievements } from '../game/careerAchievements';
+import { entryClosed, entryDeadline } from '../game/tournamentEntry';
+import { applyTourSkills, developmentEdge, evolveTourSkills } from '../game/tourDevelopment';
+import { frameStory, visitStory } from '../game/contextCommentary';
+import { matchObjectives, assessMatchObjectives, matchDebrief } from "../game/matchInsights";
+import { sponsorPerformance, sponsorRanking, reviewSponsorPerformance } from "../game/sponsorPerformance";
+import { careerLegacyOf, careerLegacyRating, recordLegacyMatch, type CareerLegacy } from '../game/careerLegacy';
+import { pathwayEntryReason, pathwayAgeLimit, pathwayPlacementPrize, nationRegion, residenceRegion, qTourRegion, Q_TOUR_POINTS, qTourQualification, seniorQualification, pathwayCardAwards, securedPathwayCards } from '../game/pathwayRules';
+import { stepShootOut, stepBallShootOut, attemptGoldenBall, handicapAllowance } from '../game/specialMatchRules';
+import { isChampionshipLeague, isGroupDraw, nextGroupFixture, groupFrameOrder } from '../game/championshipLeague';
+import { createGroupCompetition, resolveGroupCompetitionStage, applyGroupCompetitionResult, groupCompetitionAward, groupCompetitionChampion } from '../game/groupCompetition';
 import { useEffect, useMemo, useState } from "react";
 import type { CareerDepthState, CareerDepthAction } from "../game/careerDepth/types";
 import { initializeCareerDepth, reconcileCareerDepth, careerDepthAction, nextCareerBoundary } from "../game/careerDepth";
 import { depthOf, pendingStory, plusDays, uniqueOpponentId } from "../game/careerDepth/shared";
-import { initializeRollingRankings, recordRankingEvent, rebuildRollingRankings, lockTournamentSeedings, seedingRows, rankingEventKey, rankingCutoffDate, countsForWorldRanking, scheduleRankingExpiries, compactRankingLedger, isMajorQualifying, recordedMajorQualifiers, type RollingRankingsState } from "../game/rollingRankings";
+import { initializeRollingRankings, recordRankingEvent, rebuildRollingRankings, lockTournamentSeedings, seedingRows, rankingEventKey, rankingCutoffDate, countsForWorldRanking, scheduleRankingExpiries, compactRankingLedger, isMajorQualifying, isAttachedQualifying, attachedMainDirectSeeds, recordedMajorQualifiers, type RollingRankingsState } from "../game/rollingRankings";
 import { runScheduleAssistance } from "../game/careerDepth/seasonPlanning";
 import { developmentTrainingBonus, effectiveCareerAttributes, progressDevelopment, protectPartnerSessions } from "../game/careerDepth/developmentProjects";
 import { realismAction, reconcileRealism, realismOf, protectRealismSessions, overseasWeeklyCost } from '../game/realism';
@@ -10,9 +21,10 @@ import type { RealismAction } from '../game/realism/types';
 import { sessionPlan, pendingMatchBreak, resolveSessionBreak } from '../game/realism/sessions';
 import { venueConditions, conditionAdjustment, familiarisedFor } from '../game/realism/conditions';
 import { travelOptionsFor, journeyQuote } from '../game/realism/travel';
+import { hotelStayPlan } from '../game/realism/accommodation';
 import { trainingBaseCost, baseTrainingMultiplier } from '../game/realism/base';
 import { protectCommitmentSessions, tournamentCommitmentConflict } from "../game/careerDepth/commitments";
-import { learnedCounter, coachNegotiationAdjustment } from "../game/careerDepth/relationships";
+import { learnedCounter, getRivalry, coachNegotiationAdjustment } from "../game/careerDepth/relationships";
 import { recordProjectOutcome } from "../game/careerDepth/developmentProjects";
 import { matchConfidenceChange, settledConfidence, supportedConfidence } from "../game/confidenceSystem";
 import {
@@ -45,6 +57,7 @@ import {
 import {
   getPlayableRounds,
   getBestOfForRound,
+  tournamentFormatSummary,
   getTournamentResultExpectation,
   normalizeTournamentRoundLabel,
   resolveTournamentFormat,
@@ -264,6 +277,7 @@ export type SyntheticLiveVisitMatchResult = {
   opponentHighestBreak: number;
   playerFifties: number;
   playerCenturies: number;
+  playerMaximums?: number;
   totalVisits: number;
   decisionCounts: Record<LiveVisitDecision, number>;
   frameHistory: FrameScoreRow[];
@@ -373,6 +387,7 @@ export type NewCareerConfig = {
 };
 
 type TournamentProgressState = {
+  rulesVersion?: number;
   tournamentId: string | null;
   currentRound: TournamentRound | null;
   draw: BracketRound[];
@@ -509,7 +524,10 @@ type LiveVisitSkillProfile = {
   stamina: number;
 };
 
-type LiveMatchState = {
+export type LiveMatchState = {
+  careerBestAtStart?: number;
+  objectives?: import("../game/matchInsights").PersonalMatchObjective[];
+  special?: import('../game/specialMatchRules').SpecialMatchState;
   sessions?: import('../game/realism/types').MatchSessions;
   venue?: import('../game/realism/types').VenueConditions;
   conditionEffect?: number;
@@ -544,6 +562,7 @@ type LiveMatchState = {
   opponentHighestBreak: number;
   playerFifties: number;
   playerCenturies: number;
+  playerMaximums?: number;
   pressureValue: number;
   pressureLabel: string;
   timeElapsedMinutes: number;
@@ -692,6 +711,7 @@ type CareerSeasonRecord = {
 };
 
 type CareerHistoryState = {
+  legacy?: CareerLegacy;
   snapshots: CareerSnapshot[];
   matchLog: CareerMatchLogEntry[];
   tournamentHistory: TournamentHistoryEntry[];
@@ -795,6 +815,7 @@ type WorldPlayerSeasonRecord = {
 };
 
 type WorldPlayerRecord = {
+  skillDevelopment?: import("../game/tourDevelopment").TourDevelopment;
   id: string;
   playerName: string;
   nation: string;
@@ -932,7 +953,7 @@ export type GameState = {
   lastAction: string;
 };
 
-export const SAVE_SCHEMA_VERSION = 11;
+export const SAVE_SCHEMA_VERSION = 12;
 const STORAGE_KEY = ACTIVE_SAVE_KEY;
 const TOURNAMENT_ROUNDS: TournamentRound[] = [
   "Last 16",
@@ -943,7 +964,7 @@ const TOURNAMENT_ROUNDS: TournamentRound[] = [
 
 function getTournamentRounds(tournament: Tournament): TournamentRound[] {
   const configured = getPlayableRounds(resolveTournamentFormat(tournament));
-  return configured.length > 0 ? configured : TOURNAMENT_ROUNDS;
+  return configured.length > 0 || resolveTournamentFormat(tournament).formatFamily === "administrative" ? configured : TOURNAMENT_ROUNDS;
 }
 
 function getNamedKnockoutMatchCount(round: string) {
@@ -976,7 +997,7 @@ function getTournamentRoundMatchCount(
   let priorWinners = 0;
   for (let index = 0; index <= roundIndex; index += 1) {
     const entrantsAtRound = Array.from({ length: fieldSize }, (_, rankIndex) =>
-      getConfiguredEntryRoundForRank(tournament, rankIndex + 1 + (isMajorQualifying(tournament) ? 16 : 0), rounds),
+      getConfiguredEntryRoundForRank(tournament, rankIndex + 1 + (format.seedOffset ?? 0), rounds),
     ).filter((entryRound) => entryRound === rounds[index]).length;
     const matchCount = Math.max(
       1,
@@ -1187,7 +1208,7 @@ const ROUND_PLANS: Record<
   },
 };
 
-function getTournamentRoundPlan(
+export function getTournamentRoundPlan(
   tournament: Tournament,
   round: TournamentRound,
 ) {
@@ -1214,10 +1235,10 @@ function getTournamentPlacementAwards(
 ) {
   // Qualifying is not a championship title or an extra winner's purse.
   // Successful qualifiers receive their eventual main-draw finishing award.
-  if (champion && isMajorQualifying(tournament)) return { prizeMoney: 0, rankingPoints: 0 };
+  if (champion && isAttachedQualifying(tournament)) return { prizeMoney: 0, rankingPoints: 0 };
   const plan = getTournamentRoundPlan(tournament, round);
   const normalizedRound = normalizeTournamentRoundLabel(round);
-  const prizeMoney = champion
+  const prizeMoney = pathwayPlacementPrize(tournament, round, champion) ?? (champion
     ? (tournament.winnerPrize ?? Math.round(tournament.prizeMoney * 0.5))
     : /\bfinal\b/.test(normalizedRound) &&
         !/semi|quarter|section/.test(normalizedRound)
@@ -1232,10 +1253,10 @@ function getTournamentPlacementAwards(
             Math.max(
               0,
               Math.round(tournament.prizeMoney * plan.lossPrizeShare),
-            ));
+            )));
   const awardsRankingPoints =
     tournament.rankingValue > 0 && tournament.rankingType !== "None";
-  const rankingPoints = countsForWorldRanking(tournament)
+  const rankingPoints = tournament.type === 'Q Tour' && qTourRegion(tournament) === 'Europe' ? Q_TOUR_POINTS[champion ? 'Winner' : round] ?? 0 : countsForWorldRanking(tournament)
     ? prizeMoney
     : !awardsRankingPoints
     ? 0
@@ -1254,7 +1275,7 @@ function getQSchoolRoute(tournament: Tournament) {
 }
 
 function getQSchoolCardWinningRound(tournament: Tournament): TournamentRound {
-  return getQSchoolRoute(tournament) === "asiaOceania" ? "Final" : "Semi Final";
+  return getQSchoolRoute(tournament) === "asiaOceania" ? "Semi Final" : "Quarter Final";
 }
 const LIVE_ENDGAME_COLOURS: LiveEndgameColour[] = [
   "Yellow",
@@ -3066,6 +3087,11 @@ function buildOpponentAdjustmentEvent(params: {
   } satisfies LiveMatchOpponentAdjustment;
 }
 
+export function shuffleInPlace<T>(items: T[], random = Math.random): T[] {
+  for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
+  return items;
+}
+
 function getBracketSeedOrder(fieldSize: number): number[] {
   if (fieldSize <= 2) return [1, 2];
   const previousOrder = getBracketSeedOrder(fieldSize / 2);
@@ -3080,6 +3106,8 @@ function getConfiguredEntryRoundForRank(
   const format = resolveTournamentFormat(tournament);
   const findRound = (pattern: RegExp) =>
     rounds.find((round) => pattern.test(round));
+
+  if (format.entryTiers) return format.entryTiers.find(tier => playerRank <= tier.through)?.round ?? rounds[0];
 
   if (format.id === "shanghaiMasters") {
     return playerRank <= 8 ? (findRound(/last\s*16/i) ?? rounds[0]) : rounds[0];
@@ -3170,6 +3198,7 @@ function findPlayerBracketMatch(
 ) {
   const round = rounds.find((item) => item.label === roundLabel);
   if (!round) return null;
+  if (isGroupDraw(rounds)) return nextGroupFixture(rounds, roundLabel, playerName);
   return (
     round.matches.find(
       (match) =>
@@ -3203,7 +3232,14 @@ function buildTournamentDrawField(
   fieldSize: number,
   includePlayer = true,
 ): BracketPlayer[] {
-  const liveRows = getCompetitionRowsForTournament(state, tournament);
+  let liveRows = getCompetitionRowsForTournament(state, tournament);
+  let selectedPathwayNames: string[] | undefined;
+  if (tournament.type === 'Q Tour' && /play.off/i.test(tournament.name)) selectedPathwayNames = qTourQualification(state, tournament.startDate).playoff;
+  if (tournament.type === 'Senior') {
+    const selection = seniorQualification(state, tournament.startDate);
+    selectedPathwayNames = /golden ticket/i.test(tournament.name) ? selection.goldenField : /world seniors championship/i.test(tournament.name) ? selection.championship : /british seniors open/i.test(tournament.name) ? selection.british : undefined;
+  }
+  if (selectedPathwayNames?.length) liveRows = selectedPathwayNames.map((name, i) => ({ ...(liveRows.find(r => r.playerName === name) ?? state.competitionTables.world.find(r => r.playerName === name) ?? { id: 'qualified-' + name, playerName: name, nation: 'INT', points: 0, movement: 0, prizeMoney: 0 }), ranking: i + 1 }));
   const rankingRows = countsForWorldRanking(tournament) || tournament.type === 'Invitational' ? seedingRows(state, tournament, liveRows) : liveRows;
   const playerRow = rankingRows.find(
     (row) => row.playerName === state.player.fullName,
@@ -3220,11 +3256,22 @@ function buildTournamentDrawField(
     true,
   );
   const qualified = recordedMajorQualifiers(state, tournament);
-  const opponentEntries = rankingRows
+  const pathwayEvent = ['Junior', 'Regional Youth', 'National Youth', 'Amateur', 'Q Tour', 'Q School', 'Senior'].includes(tournament.type);
+  const pathwayCandidates = pathwayEvent ? [...rankingRows, ...Object.values(state.competitionTables).flat()] : rankingRows;
+  const playerRecords = new Map(state.worldPlayers.map(p => [p.playerName, p]));
+  const pathwayCheckState = { ...state, securedCards: tournament.type === 'Q School' ? securedPathwayCards(state, tournament.startDate) : undefined };
+  const eligibleOpponent = (row: RankingRow) => {
+    const record = playerRecords.get(row.playerName);
+    if (!record) return !pathwayEvent;
+    return !pathwayEntryReason(tournament, { name: record.playerName, nation: record.nation, age: record.age, hasTourCard: record.hasTourCard, retired: record.retired }, pathwayCheckState);
+  };
+  const opponentEntries = pathwayCandidates
+    .filter(eligibleOpponent)
+    .filter(row => !selectedPathwayNames?.length || selectedPathwayNames.includes(row.playerName))
     .filter((row) => row.playerName !== state.player.fullName)
-    .filter(row => !state.worldPlayers.find(p => p.playerName === row.playerName)?.retired)
-    .filter(row => !isMajorQualifying(tournament) || row.ranking > 16)
-    .filter(row => qualified === null || row.ranking <= 16 || qualified.includes(row.playerName))
+    .filter(row => !playerRecords.get(row.playerName)?.retired)
+    .filter(row => row.ranking > (resolveTournamentFormat(tournament).seedOffset ?? 0))
+    .filter(row => qualified === null || row.ranking <= attachedMainDirectSeeds(tournament) || qualified.includes(row.playerName))
     .filter(
       (row, index, rows) =>
         rows.findIndex((entry) => entry.playerName === row.playerName) ===
@@ -3239,9 +3286,9 @@ function buildTournamentDrawField(
     const topUps = [...state.competitionTables.qSchool, ...state.competitionTables.amateur];
     for (const row of topUps) {
       if (opponentEntries.length >= fieldSize) break;
-      if (row.playerName === state.player.fullName || opponentEntries.some(p => p.name === row.playerName) || state.worldPlayers.find(p => p.playerName === row.playerName)?.retired) continue;
+      if (row.playerName === state.player.fullName || opponentEntries.some(p => p.name === row.playerName) || playerRecords.get(row.playerName)?.retired) continue;
       if (qualified !== null && !qualified.includes(row.playerName)) continue;
-      opponentEntries.push(createBracketPlayer(row.playerName, opponentEntries.length + 1 + (isMajorQualifying(tournament) ? 16 : 0), row.nation));
+      opponentEntries.push(createBracketPlayer(row.playerName, opponentEntries.length + 1 + (resolveTournamentFormat(tournament).seedOffset ?? 0), row.nation));
     }
   }
   let field = [...(includePlayer ? [playerEntry] : []), ...opponentEntries]
@@ -3258,16 +3305,18 @@ function buildTournamentDrawField(
     field.push(createFallbackBracketEntrant(field.length + 1));
   }
 
-  return field;
+  return field.map((p, i) => ({ ...p, developmentEdge: developmentEdge(playerRecords.get(p.name)?.skillDevelopment), seed: i + 1 + (resolveTournamentFormat(tournament).seedOffset ?? 0) }));
 }
 
-function buildTournamentDraw(
+export function buildTournamentDraw(
   state: GameState,
   tournament: Tournament,
   entryRound: TournamentRound,
   includePlayer = true,
+  random = Math.random,
 ): BracketRound[] {
   const roundLabels = getTournamentRounds(tournament);
+  if (!roundLabels.length) return [];
   const format = resolveTournamentFormat(tournament);
   const fieldSize =
     format.fieldSize ??
@@ -3276,9 +3325,11 @@ function buildTournamentDraw(
       getTournamentRoundMatchCount(tournament, roundLabels[0], 0) * 2,
     );
   const field = buildTournamentDrawField(state, tournament, fieldSize, includePlayer);
+  if (format.drawPolicy === "randomEachRound") shuffleInPlace(field, random);
+  if (format.groupMode) return createGroupCompetition(tournament, field);
   const playerEntry = getConfiguredEntryRoundForRank(
     tournament,
-    field.find((entrant) => entrant.name === state.player.fullName)?.rank ??
+    field.find((entrant) => entrant.name === state.player.fullName)?.seed ??
       fieldSize,
     roundLabels,
   );
@@ -3302,41 +3353,43 @@ function buildTournamentDraw(
     ),
   }));
 
-  roundLabels.forEach((roundLabel, roundIndex) => {
-    const entrants = field.filter(
-      (entrant) =>
-        getConfiguredEntryRoundForRank(
-          tournament,
-          entrant.rank,
-          roundLabels,
-        ) === roundLabel,
-    );
-    const slots = rounds[roundIndex].matches.flatMap((match) => [
-      match.top,
-      match.bottom,
-    ]);
-    const orderedEntrants =
-      roundIndex === 0 &&
-      entrants.length > 1 &&
-      (entrants.length & (entrants.length - 1)) === 0
-        ? getBracketSeedOrder(entrants.length).map((seed) => entrants[seed - 1])
-        : entrants;
-    orderedEntrants.forEach((entrant, entrantIndex) => {
-      const slotIndex = roundIndex === 0 ? entrantIndex : entrantIndex * 2;
-      if (slotIndex < slots.length) slots[slotIndex] = entrant;
-    });
-    rounds[roundIndex].matches = rounds[roundIndex].matches.map(
-      (match, matchIndex) => {
-        const top = slots[matchIndex * 2] ?? createEmptyBracketPlayer();
-        const bottom = slots[matchIndex * 2 + 1] ?? createEmptyBracketPlayer();
-        return {
-          ...match,
-          top,
-          bottom,
-          placeholder: top.name === "TBD" || bottom.name === "TBD",
-        };
-      },
-    );
+  const entryIndexFor = (entrant: BracketPlayer) => roundLabels.indexOf(getConfiguredEntryRoundForRank(tournament, entrant.seed ?? entrant.rank, roundLabels));
+  const lastEntryIndex = Math.max(...field.map(entryIndexFor));
+  const seedOffset = format.seedOffset ?? 0;
+  const cursors = rounds.map(() => 0);
+  // Construct feeders backwards from the last entry tier. Each qualifier owns a
+  // fixed slot in the main tree, so high seeds stay in opposite halves even when
+  // lower-ranked players win their feeder matches.
+  function slot(roundIndex: number, virtualSeed: number): BracketPlayer {
+    const direct = field.find(p => (p.seed ?? p.rank) === virtualSeed && entryIndexFor(p) === roundIndex);
+    if (direct) return direct;
+    if (roundIndex === 0) throw new Error('Missing draw entrant for seed ' + virtualSeed + ' in ' + tournament.name);
+    const previousIndex = roundIndex - 1;
+    const minSeed = Math.min(...field.filter(p => entryIndexFor(p) <= previousIndex).map(p => p.seed ?? p.rank));
+    const opponentSeed = 2 * minSeed + rounds[previousIndex].matches.length * 2 - 1 - virtualSeed;
+    const match = rounds[previousIndex].matches[cursors[previousIndex]++];
+    match.top = slot(previousIndex, virtualSeed);
+    match.bottom = slot(previousIndex, opponentSeed);
+    match.placeholder = match.top.name === 'TBD' || match.bottom.name === 'TBD';
+    return createEmptyBracketPlayer();
+  }
+  const target = rounds[lastEntryIndex];
+  const capacity = target.matches.length * 2;
+  let orderedSeeds: number[];
+  if (format.drawPolicy === 'randomEachRound') orderedSeeds = field.map(p => p.seed ?? p.rank);
+  else if (format.id === 'qTourPlayoff') {
+    const sections = Array.from({ length: 3 }, () => [] as number[]);
+    field.forEach((p, i) => sections[Math.floor(i / 3) % 2 ? 2 - i % 3 : i % 3].push(p.seed ?? p.rank));
+    orderedSeeds = sections.flatMap(section => getBracketSeedOrder(8).map(n => section[n - 1]));
+  } else orderedSeeds = getBracketSeedOrder(capacity).map(seed => seed + seedOffset);
+  if (['ukMajor', 'worldChampionshipMain'].includes(format.id)) {
+    const qualifiers = shuffleInPlace(field.filter(p => (p.seed ?? p.rank) > 16).map(p => p.seed ?? p.rank), random);
+    orderedSeeds = orderedSeeds.map(seed => seed > 16 ? qualifiers[seed - 17] : seed);
+  }
+  target.matches.forEach((match, i) => {
+    match.top = slot(lastEntryIndex, orderedSeeds[i * 2]);
+    match.bottom = slot(lastEntryIndex, orderedSeeds[i * 2 + 1]);
+    match.placeholder = match.top.name === 'TBD' || match.bottom.name === 'TBD';
   });
 
   let preparedRounds = rounds;
@@ -3358,10 +3411,11 @@ function simulateBracketScore(
   topRank: number,
   bottomRank: number,
   random = Math.random,
+  developmentDifference = 0,
 ) {
   const bestOf = getTournamentRoundPlan(tournament, round).bestOf;
   const framesNeeded = Math.ceil(bestOf / 2);
-  const topWinChance = clamp(50 + (bottomRank - topRank) * 1.2, 18, 82);
+  const topWinChance = clamp(50 + (bottomRank - topRank) * 1.2 + developmentDifference, 18, 82);
   const topWon = random() * 100 < topWinChance;
   const loserFrames = clamp(
     Math.round(
@@ -3377,13 +3431,14 @@ function simulateBracketScore(
     : { topScore: loserFrames, bottomScore: framesNeeded };
 }
 
-function resolveTournamentDrawRound(
+export function resolveTournamentDrawRound(
   rounds: BracketRound[],
   tournament: Tournament,
   roundLabel: TournamentRound,
   playerName: string,
   random = Math.random,
 ) {
+  if (isGroupDraw(rounds)) return resolveGroupCompetitionStage(rounds, tournament, roundLabel, random);
   const roundIndex = rounds.findIndex((round) => round.label === roundLabel);
   if (roundIndex === -1) return rounds;
 
@@ -3412,6 +3467,7 @@ function resolveTournamentDrawRound(
       match.top.rank,
       match.bottom.rank,
       random,
+      (match.top.developmentEdge ?? 0) - (match.bottom.developmentEdge ?? 0),
     );
     return {
       ...match,
@@ -3431,6 +3487,7 @@ function resolveTournamentDrawRound(
   const winners = resolvedMatches
     .map(getBracketMatchWinner)
     .filter((winner): winner is BracketPlayer => Boolean(winner));
+  if (resolveTournamentFormat(tournament).drawPolicy === "randomEachRound" && winners.length === resolvedMatches.length) shuffleInPlace(winners, random);
   const nextSlots = nextRound.matches.flatMap((match) => [
     { ...match.top },
     { ...match.bottom },
@@ -3531,6 +3588,7 @@ function completeRemainingTournamentDraw(
  * This function never advances training, cash settlement or the player's match. */
 export function processRankingCalendar(input: GameState): GameState {
   let state = scheduleRankingExpiries(initializeRollingRankings(input));
+  state = { ...state, tournaments: state.tournaments.map(t => isChampionshipLeague(t) && t.status !== 'Completed' ? { ...t, format: 'Groups: up to 4 frames, draws allowed · final best of 5', prizeMoney: 328000, winnerPrize: 33000, runnerUpPrize: 23000 } : t) };
   const through = state.currentDate;
   const ledger = state.rollingRankings!;
   const dates = new Set<string>();
@@ -3543,6 +3601,7 @@ export function processRankingCalendar(input: GameState): GameState {
   }
   for (const e of ledger.earnings) if (e.expiresOn > ledger.processedThrough && e.expiresOn <= through) dates.add(e.expiresOn);
   for (const date of [...dates].sort()) {
+    state = { ...evolveTourSkills({ ...state, currentDate: date }), currentDate: state.currentDate };
     state = lockTournamentSeedings(state, new Date(Date.parse(`${date}T12:00:00Z`) - 86400000).toISOString().slice(0, 10));
     const events = state.tournaments.filter(t => (t.endDate ?? t.startDate) === date && t.status !== 'Entered');
     for (const t of events) {
@@ -3551,7 +3610,7 @@ export function processRankingCalendar(input: GameState): GameState {
       // The random stream is event-local: reloads and advancing in larger steps agree.
       let seed = [...`${state.worldSeed}:${key}`].reduce((s, c) => Math.imul(s ^ c.charCodeAt(0), 16777619), 2166136261) >>> 0;
       const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-      const draw = buildTournamentDraw(state, t, getTournamentRounds(t)[0], false);
+      const draw = buildTournamentDraw(state, t, getTournamentRounds(t)[0], false, random);
       for (const round of draw) resolveTournamentDrawRound(draw, t, round.label, state.player.fullName, random);
       const tables = updateCompetitionTablesFromCpuDraw(state.competitionTables, state.competitionTables, {}, t, draw, state.player, []);
       state = recordRankingEvent({ ...state, competitionTables: tables, worldPlayers: updateWorldPlayersFromCompletedDraw(state.worldPlayers, tables, draw, state.player.fullName) }, t, draw, getTournamentPlacementAwards);
@@ -3566,6 +3625,9 @@ export function processRankingCalendar(input: GameState): GameState {
   if (entered && !state.liveMatch && state.tournamentProgress.completedRounds.length === 0 && !ledger.seedings[rankingEventKey(entered)] && state.rollingRankings!.seedings[rankingEventKey(entered)]) {
     const currentRound = getTournamentEntryRound(state, entered);
     state = { ...state, tournamentProgress: { ...state.tournamentProgress, currentRound, draw: buildTournamentDraw(state, entered, currentRound) } };
+  }
+  if (entered && isChampionshipLeague(entered) && !isGroupDraw(state.tournamentProgress.draw) && !state.liveMatch && state.tournamentProgress.completedRounds.length === 0) {
+    state = { ...state, tournamentProgress: { ...state.tournamentProgress, currentRound: 'Stage One Groups', draw: buildTournamentDraw(state, entered, 'Stage One Groups') } };
   }
   return compactRankingLedger({ ...state, rollingRankings: { ...state.rollingRankings!, processedThrough: through } });
 }
@@ -4545,12 +4607,12 @@ function getCompetitionKeysForTournament(
   tournament: Tournament,
 ): CompetitionTableKey[] {
   if (tournament.type === "Amateur") {
-    if (getAmateurRouteAgeLimit(tournament) != null) {
-      return ["youth", "amateur", "qTour", "qSchool"];
+    if (pathwayAgeLimit(tournament) != null) {
+      return ["youth", "amateur"];
     }
 
     if (isDirectAmateurTourCardRoute(tournament)) {
-      return ["amateur", "qTour", "qSchool", "youth"];
+      return ["amateur"];
     }
   }
 
@@ -4594,7 +4656,7 @@ function getCompetitionKeysForTournament(
 function tournamentAwardsCareerTitle(
   tournament: Pick<Tournament, "name" | "format" | "type">,
 ) {
-  const eventDescription = `${tournament.name} ${tournament.format}`;
+  const eventDescription = tournament.name;
   return (
     tournament.type !== "Q School" &&
     tournament.type !== "Exhibition" &&
@@ -4678,75 +4740,6 @@ function buildTournamentScheduleForSeason(
         : undefined,
       status: normalizeTournamentStatusForSeason() as Tournament["status"],
     };
-  });
-}
-
-function applySeasonOpenWorldChampionshipAccess(
-  tournaments: Tournament[],
-  state: Pick<
-    GameState,
-    "player" | "careerSystems" | "competitionTables" | "history"
-  > & Partial<Pick<GameState, 'rollingRankings'>>,
-  options?: {
-    seasonOpenWorldRankOverride?: number | null;
-  },
-): Tournament[] {
-  const worldChampionshipMainDraw = tournaments.find((tournament) =>
-    isWorldChampionshipMainDrawTournament(tournament),
-  );
-  if (!worldChampionshipMainDraw) {
-    return tournaments;
-  }
-
-  const seasonOpenWorldRank =
-    options?.seasonOpenWorldRankOverride ??
-    state.careerSystems.pro.worldRank ??
-    state.competitionTables.world.find(
-      (row) => row.playerName === state.player.fullName,
-    )?.ranking ??
-    state.player.worldRanking ??
-    999;
-  const seasonOpenStatus =
-    `${state.player.competitiveStatus ?? state.player.careerStage}`.toLowerCase();
-  const seasonOpenTier =
-    `${state.careerSystems.pro.currentTier ?? ""}`.toLowerCase();
-  const seasonOpenSurvival =
-    `${state.careerSystems.pro.tourSurvivalStatus ?? ""}`.toLowerCase();
-  const hasSeasonOpenMainTourStatus =
-    state.careerSystems.pro.hasTourCard &&
-    seasonOpenWorldRank <= MAIN_TOUR_POOL_SIZE;
-  const mainDrawLocked =
-    hasSeasonOpenMainTourStatus &&
-    (seasonOpenWorldRank <= TOP_16_RANK_CUTOFF ||
-      /top 16|major contender|world champion/.test(seasonOpenStatus) ||
-      /top 16/.test(seasonOpenTier) ||
-      /top 16/.test(seasonOpenSurvival));
-  const lockedRoute: Tournament["seasonOpenAccessLock"] = mainDrawLocked
-    ? "worldMainDraw"
-    : "worldQualifying";
-
-  return tournaments.map((tournament) => {
-    if (isWorldChampionshipMainDrawTournament(tournament)) {
-      return {
-        ...tournament,
-        seasonOpenAccessLock: lockedRoute,
-        status: (mainDrawLocked
-          ? "Booked"
-          : "Available") as Tournament["status"],
-      };
-    }
-
-    if (isWorldChampionshipQualifierTournament(tournament)) {
-      return {
-        ...tournament,
-        seasonOpenAccessLock: lockedRoute,
-        status: (mainDrawLocked
-          ? "Skipped"
-          : tournament.status) as Tournament["status"],
-      };
-    }
-
-    return tournament;
   });
 }
 
@@ -5238,7 +5231,7 @@ function getQTourEligibilityAssessment(state: GameState, season: string) {
   const directPlayoffEligible =
     score >= 230 || winRoute || (qTourRank <= 2 && qTourFinals >= 1);
   const qualifiedBy = directPlayoffEligible
-    ? "Q Tour playoff route"
+    ? "Q Tour qualification"
     : seededCampaign
       ? "Seeded Q School route"
       : rawCampaignEligible
@@ -5424,7 +5417,7 @@ function getDisplayedRanking(
 
   if (
     (youthRanking ?? 999) < 999 &&
-    state.player.age <= 21 &&
+    state.player.age < 21 &&
     /youth|junior/i.test(state.player.careerStage)
   ) {
     return { ranking: youthRanking ?? 999, rankingLabel: "Youth Ranking" };
@@ -5557,19 +5550,8 @@ function applySeasonRollover(state: GameState) {
   );
   const currentHasTourCard =
     state.careerSystems.pro.hasTourCard || currentWorldRank <= 64;
-  const qTourCampaignEventsEntered = state.history.tournamentHistory.filter(
-    (entry) =>
-      entry.season === state.season &&
-      entry.eventType === "Q Tour" &&
-      getTournamentHistoryCanonicalResult(entry).matchesPlayed > 0,
-  ).length;
-  const qTourPromotionEligible =
-    state.careerSystems.qTour.playOffWinner === state.player.fullName ||
-    state.careerSystems.qTour.directCardAwarded;
-  const qTourRankingCardEligible =
-    (state.careerSystems.qTour.playerRank ?? 999) === 1 &&
-    (state.careerSystems.qTour.playerPoints ?? 0) >= 400 &&
-    qTourCampaignEventsEntered >= 4;
+  const qTourPromotionEligible = state.history.tournamentHistory.some(e => e.season === state.season && e.eventType === 'Q Tour' && /tour card/i.test(e.reward ?? ''));
+  const qTourRankingCardEligible = qTourQualification(archivedState).automatic === state.player.fullName;
   const awardedQTourCard =
     !currentHasTourCard && (qTourPromotionEligible || qTourRankingCardEligible);
   const awardedQSchoolCard =
@@ -5581,7 +5563,7 @@ function applySeasonRollover(state: GameState) {
       entry.reward?.toLowerCase().includes("tour card"),
   );
   const awardedFederationCard =
-    !currentHasTourCard && federationCardEvent != null;
+    !currentHasTourCard && (federationCardEvent != null || pathwayCardAwards(archivedState).get(state.player.fullName) === 'Federation Route');
   const rankingRetentionSafe = currentWorldRank <= TOP_64_RANK_CUTOFF;
   const retainedCard = currentHasTourCard && rankingRetentionSafe;
   const protectedCardSeason =
@@ -5724,7 +5706,7 @@ function applySeasonRollover(state: GameState) {
         : awardedQSchoolCard
           ? "Q School campaign win"
           : awardedFederationCard
-            ? federationCardEvent.tournamentName
+            ? (federationCardEvent?.tournamentName ?? "Federation qualification from recorded results")
             : lostCard
               ? state.careerSystems.pro.awardedBy
               : state.careerSystems.pro.awardedBy,
@@ -5775,6 +5757,7 @@ function applySeasonRollover(state: GameState) {
     playerHasTourCardNextSeason,
     careerSystemsSeed.pro,
     nextSeasonStartYear,
+    pathwayCardAwards(archivedState),
   );
   const livingCompetitionTables = rebuildLivingCompetitionTables(
     rolledCompetitionTables,
@@ -5838,21 +5821,7 @@ function applySeasonRollover(state: GameState) {
       ? "Retired"
       : getRankingLabelForCompetitionKey(primaryKey),
   };
-  const nextSeasonSchedule = applySeasonOpenWorldChampionshipAccess(
-    buildTournamentScheduleForSeason(nextSeasonStartYear),
-    {
-      player: nextPlayer,
-      careerSystems,
-      competitionTables: rebuiltCompetitionTables,
-      history: archivedState.history,
-    },
-    {
-      seasonOpenWorldRankOverride:
-        seasonRecord.closingRankingLabel === "World Ranking"
-          ? seasonRecord.closingRanking
-          : null,
-    },
-  );
+  const nextSeasonSchedule = buildTournamentScheduleForSeason(nextSeasonStartYear);
   const verifiedWorldRank = nextPlayer.worldRanking ?? 999;
   const verifiedPlayer = nextPlayer;
   const verifiedCareerSystems = careerSystems;
@@ -6203,7 +6172,8 @@ function advanceWholeWeekState(previousState: GameState): GameState {
       sponsor.weeksRemaining <= 5 &&
       sponsor.weeksRemaining > 1 &&
       (sponsor.renewalStatus ?? "None") === "None" &&
-      nextCompliance >= 65;
+      nextCompliance >= 65 &&
+      (sponsor.performance?.satisfaction ?? 75) >= 50;
     const renewalOfferValue = renewalOffered
       ? Math.round(
           sponsor.monthlyValue *
@@ -6648,6 +6618,7 @@ export function enterTournamentState(
       },
       tournamentProgress: {
         tournamentId,
+        rulesVersion: 3,
         currentRound: getTournamentEntryRound(previousState, tournament),
         draw: buildTournamentDraw(
           previousState,
@@ -6782,156 +6753,15 @@ export function skipTournamentState(
 }
 
 function ensureLockedWorldChampionshipEntry(state: GameState) {
-  const initialWorldChampionship = state.tournaments.find((tournament) =>
-    isWorldChampionshipMainDrawTournament(tournament),
-  );
-  if (!initialWorldChampionship) return state;
-
-  const worldQualifying = state.tournaments.find((tournament) =>
-    isWorldChampionshipQualifierTournament(tournament),
-  );
-  const seasonOpenWorldSnapshot = state.history.snapshots.find(
-    (snapshot) =>
-      snapshot.season === state.season &&
-      snapshot.rankingLabel === "World Ranking",
-  );
-  const fallbackWorldRank =
-    state.careerSystems.pro.worldRank ??
-    state.competitionTables.world.find(
-      (row) => row.playerName === state.player.fullName,
-    )?.ranking ??
-    state.player.worldRanking ??
-    999;
-  const fallbackStatus =
-    `${state.player.competitiveStatus ?? state.player.careerStage}`.toLowerCase();
-  const fallbackTier =
-    `${state.careerSystems.pro.currentTier ?? ""}`.toLowerCase();
-  const fallbackSurvival =
-    `${state.careerSystems.pro.tourSurvivalStatus ?? ""}`.toLowerCase();
-  const hasFallbackMainTourStatus =
-    state.careerSystems.pro.hasTourCard &&
-    fallbackWorldRank <= MAIN_TOUR_POOL_SIZE;
-  const inferredMainDrawLock =
-    hasFallbackMainTourStatus &&
-    (fallbackWorldRank <= TOP_16_RANK_CUTOFF ||
-      /top 16|major contender|world champion/.test(fallbackStatus) ||
-      /top 16/.test(fallbackTier) ||
-      /top 16/.test(fallbackSurvival));
-  const inferredSeasonOpenMainDrawLock =
-    state.careerSystems.pro.hasTourCard &&
-    (seasonOpenWorldSnapshot?.ranking ?? 999) <= TOP_16_RANK_CUTOFF;
-  const repairedWorldMainDrawLock =
-    initialWorldChampionship.seasonOpenAccessLock === "worldMainDraw" ||
-    inferredSeasonOpenMainDrawLock ||
-    (initialWorldChampionship.seasonOpenAccessLock == null &&
-      worldQualifying?.seasonOpenAccessLock == null &&
-      inferredMainDrawLock);
-
-  if (!repairedWorldMainDrawLock) return state;
-
-  const normalizedState =
-    repairedWorldMainDrawLock &&
-    (initialWorldChampionship.seasonOpenAccessLock !== "worldMainDraw" ||
-      (worldQualifying &&
-        worldQualifying.seasonOpenAccessLock !== "worldMainDraw") ||
-      initialWorldChampionship.status === "Available" ||
-      worldQualifying?.status === "Available")
-      ? {
-          ...state,
-          tournaments: state.tournaments.map((tournament) => {
-            if (tournament.id === initialWorldChampionship.id) {
-              return {
-                ...tournament,
-                seasonOpenAccessLock:
-                  "worldMainDraw" as Tournament["seasonOpenAccessLock"],
-                status:
-                  tournament.status === "Available"
-                    ? ("Booked" as Tournament["status"])
-                    : tournament.status,
-              };
-            }
-
-            if (worldQualifying && tournament.id === worldQualifying.id) {
-              return {
-                ...tournament,
-                seasonOpenAccessLock:
-                  "worldMainDraw" as Tournament["seasonOpenAccessLock"],
-                status:
-                  tournament.status === "Available"
-                    ? ("Skipped" as Tournament["status"])
-                    : tournament.status,
-              };
-            }
-
-            return tournament;
-          }),
-        }
-      : state;
-
-  const worldChampionship = normalizedState.tournaments.find(
-    (tournament) =>
-      isWorldChampionshipMainDrawTournament(tournament) &&
-      tournament.seasonOpenAccessLock === "worldMainDraw",
-  );
-  if (!worldChampionship) return normalizedState;
-  if (worldChampionship.status === "Entered") return normalizedState;
-
-  const alreadyRecorded = normalizedState.history.tournamentHistory.some(
-    (entry) =>
-      entry.season === normalizedState.season &&
-      entry.tournamentName === worldChampionship.name,
-  );
-  if (alreadyRecorded) return normalizedState;
-
-  const daysUntilStart = daysUntil(
-    worldChampionship.startDate,
-    normalizedState.currentDate,
-  );
-  if (daysUntilStart > 35 || daysUntilStart < 0) return normalizedState;
-
-  const enteredTournament = normalizedState.tournaments.find(
-    (tournament) => tournament.status === "Entered",
-  );
-  if (enteredTournament && enteredTournament.id !== worldChampionship.id) {
-    const skippedState: GameState = {
-      ...normalizedState,
-      tournaments: normalizedState.tournaments.map((tournament) =>
-        tournament.id === enteredTournament.id
-          ? { ...tournament, status: "Skipped" }
-          : tournament,
-      ),
-      tournamentProgress:
-        normalizedState.tournamentProgress.tournamentId === enteredTournament.id
-          ? createEmptyTournamentProgress()
-          : normalizedState.tournamentProgress,
-      history: {
-        ...normalizedState.history,
-        tournamentHistory: upsertTournamentHistoryEntry(
-          normalizedState.history.tournamentHistory,
-          synchronizeTournamentHistoryEntry(enteredTournament, {
-            ...(normalizedState.history.tournamentHistory.find(
-              (entry) =>
-                entry.id ===
-                getTournamentHistoryId(
-                  normalizedState.season,
-                  enteredTournament.id,
-                ),
-            ) ??
-              createTournamentHistoryEntry(
-                enteredTournament,
-                normalizedState.season,
-              )),
-            status: "Skipped",
-            result: "Skipped",
-          }),
-        ),
-      },
-    };
-
-    return enterTournamentState(skippedState, worldChampionship.id);
-  }
-
-  return enterTournamentState(normalizedState, worldChampionship.id);
+  const tournament = state.tournaments.find(isWorldChampionshipMainDrawTournament);
+  // An early-season reputation or reservation cannot decide the April field.
+  if (!tournament || !state.rollingRankings?.seedings[rankingEventKey(tournament)] ||
+      !getTournamentEntryAccess(state, tournament).allowed ||
+      !ENTERABLE_TOURNAMENT_STATUSES.has(tournament.status) ||
+      state.tournaments.some(t => t.status === 'Entered') ||
+      state.history.tournamentHistory.some(h => h.season === state.season && h.tournamentId === tournament.id)) return state;
+  const days = daysUntil(tournament.startDate, state.currentDate);
+  return days >= 0 && days <= 35 ? enterTournamentState(state, tournament.id) : state;
 }
 
 function getEnteredCompetitions(state: Pick<GameState, "tournaments">) {
@@ -7623,20 +7453,27 @@ function getHotelOption(hotelOptionId?: string): HotelOption {
   );
 }
 
-function getTripCost(travelOption: TravelOption, hotelOption: HotelOption) {
-  return travelOption.cost + hotelOption.cost + 20 + 35;
-}
-
-export function getTravelPackageCost(state: GameState, travelOptionId?: string, hotelOptionId?: string, tournamentId?: string) {
+export function getTravelPackageEstimate(state: GameState, travelOptionId?: string, hotelOptionId?: string, tournamentId?: string) {
   const event = state.tournaments.find(t => t.id === tournamentId) ?? state.tournaments.find(t => t.status === 'Entered');
-  const lockedJourney = event && state.realism?.journeys[`${event.id}:${event.startDate}`];
+  const savedJourney = event && state.realism?.journeys[`${event.id}:${event.startDate}`];
   const booking = event && state.travel.bookings[event.id];
-  if (booking && lockedJourney && (lockedJourney.applied || lockedJourney.departure <= state.currentDate)) return booking.totalCost;
+  const locked = Boolean(booking && savedJourney && (savedJourney.applied || savedJourney.departure <= state.currentDate));
   const options = travelOptionsFor(state, event);
-  const option = options.find(o => o.id === travelOptionId) ?? options[0];
-  const discount = state.sponsors.some((sponsor) => normalizeSponsor(sponsor, 0).perk === "Travel") ? 0.12 : 0;
-  const nights = event ? Math.max(1, Math.round((Date.parse(event.endDate ?? event.startDate) - Date.parse(journeyQuote(state, event, option.id).arrival)) / 86400000) + 1) : 1;
-  return Math.round((getTripCost(option, getHotelOption(hotelOptionId)) + (nights - 1) * getHotelOption(hotelOptionId).cost) * (1 - discount));
+  const option = options.find(o => o.id === (locked ? booking?.travelOptionId : travelOptionId)) ?? options[0];
+  const hotel = getHotelOption(locked ? booking?.hotelOptionId : hotelOptionId);
+  const discount = state.sponsors.some(sponsor => normalizeSponsor(sponsor, 0).perk === 'Travel') ? 0.12 : 0;
+  const stay = event ? hotelStayPlan(event, journeyQuote(state, event, option.id).arrival, getTournamentEntryRound(state, event)) : { minNights: 1, maxNights: 1 };
+  const nightlyRate = locked && savedJourney?.hotelNightlyRate !== undefined ? savedJourney.hotelNightlyRate : Math.round(hotel.cost * (1 - discount) * 100) / 100;
+  const minNights = locked ? savedJourney?.hotelInitialNights ?? stay.maxNights : stay.minNights;
+  const maxNights = locked ? savedJourney?.hotelMaximumNights ?? stay.maxNights : stay.maxNights;
+  const paidNights = locked && savedJourney?.hotelThrough ? Math.max(1, Math.round((Date.parse(savedJourney.hotelThrough) - Date.parse(savedJourney.arrival)) / 86400000) + 1) : minNights;
+  const fixedCost = locked && booking ? Math.round((booking.totalCost - paidNights * nightlyRate) * 100) / 100 : Math.round((option.cost + 55) * (1 - discount) * 100) / 100;
+  const minCost = Math.round((fixedCost + minNights * nightlyRate) * 100) / 100;
+  const maxCost = Math.round((fixedCost + maxNights * nightlyRate) * 100) / 100;
+  return { nightlyRate, minNights, maxNights, paidNights, fixedCost, minCost, maxCost, totalCost: locked && booking ? booking.totalCost : minCost };
+}
+export function getTravelPackageCost(state: GameState, travelOptionId?: string, hotelOptionId?: string, tournamentId?: string) {
+  return getTravelPackageEstimate(state, travelOptionId, hotelOptionId, tournamentId).totalCost;
 }
 
 function normalizeSponsor(sponsor: SponsorDeal, index: number): SponsorDeal {
@@ -7704,10 +7541,13 @@ export function bookTravelState(
   const options = travelOptionsFor(previousState, tournament);
   const travelOption = options.find(o => o.id === travelOptionId) ?? options[0];
   const hotelOption = getHotelOption(hotelOptionId);
-  const totalCost = getTravelPackageCost(previousState, travelOption.id, hotelOption.id, tournament.id);
+  const estimate = getTravelPackageEstimate(previousState, travelOption.id, hotelOption.id, tournament.id);
+  const totalCost = estimate.totalCost;
   const existingBooking = previousState.travel.bookings[tournament.id];
   const realism = realismOf(previousState);
-  const journey = journeyQuote(previousState, tournament, travelOption.id);
+  const quote = journeyQuote(previousState, tournament, travelOption.id);
+  const stay = hotelStayPlan(tournament, quote.arrival, getTournamentEntryRound(previousState, tournament));
+  const journey = { ...quote, hotelThrough: stay.through, hotelNightlyRate: estimate.nightlyRate, hotelInitialNights: stay.minNights, hotelMaximumNights: stay.maxNights };
   if (journey.arrival > tournament.startDate) return finalizeState(previousState, 'This journey cannot arrive before the tournament starts. Choose a later event.');
   const oldJourney = realism.journeys[journey.eventKey];
   if (oldJourney?.applied || (oldJourney && oldJourney.departure <= previousState.currentDate)) return finalizeState(previousState, 'This journey has started. Its package is now locked.');
@@ -7767,7 +7607,7 @@ export function bookTravelState(
           {
             sender: "Travel Desk",
             subject: `${tournament.name} travel booked`,
-            preview: `${travelOption.name} and ${hotelOption.name} are now locked in for £${totalCost}. Arrival ${journey.arrival}; accommodation through ${journey.hotelThrough}.`,
+            preview: `${travelOption.name} and ${hotelOption.name} are now locked in for £${totalCost}. Arrival ${journey.arrival}; ${stay.minNights} hotel nights through ${journey.hotelThrough}. Later rounds extend your stay at £${estimate.nightlyRate}/night; full-run trip estimate £${estimate.maxCost}.`,
             priority: "Medium",
             actionLabel: "Review Travel",
             actionRoute: "/travel",
@@ -8600,15 +8440,6 @@ function getPlayersSeriesOneYearCutoff(tournament: Pick<Tournament, "name">) {
   return 32;
 }
 
-function getAmateurRouteAgeLimit(tournament: Tournament) {
-  const text =
-    `${tournament.name} ${tournament.format} ${tournament.unlockRequirement ?? ""}`.toLowerCase();
-  if (/u16|under-?16/.test(text)) return 16;
-  if (/u18|under-?18/.test(text)) return 18;
-  if (/u21|under-?21|wsf junior/.test(text)) return 21;
-  return null;
-}
-
 function isDirectAmateurTourCardRoute(tournament: Tournament) {
   if (tournament.type !== "Amateur") return false;
   if (/women/i.test(tournament.name)) return false;
@@ -8617,11 +8448,11 @@ function isDirectAmateurTourCardRoute(tournament: Tournament) {
   );
 }
 
-function isOpenAdultOffTourQSchoolPlayer(
+function isOpenOffTourQSchoolPlayer(
   state: Pick<GameState, "player" | "careerSystems">,
 ) {
   return (
-    state.player.age >= 18 &&
+    state.player.age >= 0 &&
     !state.careerSystems.pro.hasTourCard &&
     (state.careerSystems.pro.worldRank ?? state.player.worldRanking ?? 999) >
       TOP_64_RANK_CUTOFF
@@ -8737,7 +8568,7 @@ function getPlayerTournamentProfile(
     isSeniorCircuit:
       state.careerSystems.lateCareer.seniorActive ||
       state.careerSystems.lateCareer.legendStatus,
-    isSeniorEligible: state.player.age >= 40 && !hasMainTourStatus,
+    isSeniorEligible: state.player.age >= 40,
     competitiveStatus,
     currentTier,
   };
@@ -8769,10 +8600,12 @@ export function getTournamentEntryAccess(
   state: Pick<
     GameState,
     "player" | "careerSystems" | "competitionTables" | "history"
-  > & Partial<Pick<GameState, 'rollingRankings'>>,
+  > & Partial<Pick<GameState, 'rollingRankings' | 'season' | 'realism' | 'worldPlayers' | 'currentDate'>>,
   tournament: Tournament,
 ): TournamentEntryAccess {
   const profile = getPlayerTournamentProfile(state);
+  if (entryClosed(state.currentDate,tournament)) return {allowed:false,accessBand:profile.accessBand,seededProtection:0,reason:'Entry closed on '+entryDeadline(tournament)+'. Choose another event in the calendar.'};
+  if (resolveTournamentFormat(tournament).formatFamily === 'administrative') return { allowed: false, accessBand: profile.accessBand, seededProtection: 0, reason: 'Automatic Order of Merit review; there are no matches to enter.' };
   const frozen = state.rollingRankings?.seedings[rankingEventKey(tournament)];
   const lockedWorldRank = frozen?.world[state.player.fullName];
   if (lockedWorldRank && (countsForWorldRanking(tournament) || tournament.type === 'Invitational')) {
@@ -8806,10 +8639,28 @@ export function getTournamentEntryAccess(
     return { allowed: true, accessBand, seededProtection, reason: null };
   }
 
+  const pathwayReason = pathwayEntryReason(tournament, {
+    name: state.player.fullName, nation: state.player.nationality, age: state.player.age,
+    dateOfBirth: state.player.dateOfBirth, hasTourCard: profile.hasMainTourStatus,
+    residence: state.realism?.relocationDate ? residenceRegion(state.realism.home) : nationRegion(state.player.nationality),
+    residentSince: state.realism?.regionalResidenceSince ?? state.realism?.relocationDate,
+  }, state);
+  if (tournament.type === 'Q Tour' && /play.off/i.test(tournament.name) && state.season) {
+    const qualified = qTourQualification({ rollingRankings: state.rollingRankings, season: state.season }, tournament.startDate);
+    if (!qualified.playoff.includes(state.player.fullName)) return { allowed: false, accessBand, seededProtection: 0, reason: qualified.automatic === state.player.fullName ? 'You won the Q Tour Europe automatic tour card.' : 'Qualify through the Q Tour Europe or regional standings to enter the Global Play-Offs.' };
+  }
+  if (tournament.type === 'Senior' && state.season && state.worldPlayers) {
+    const selection = seniorQualification({ ...state, season: state.season, worldPlayers: state.worldPlayers }, tournament.startDate);
+    const list = /golden ticket/i.test(tournament.name) ? selection.goldenField : /world seniors championship/i.test(tournament.name) ? selection.championship : /british seniors open/i.test(tournament.name) ? selection.british : null;
+    if (list && !list.includes(state.player.fullName)) return { allowed: false, accessBand, seededProtection: 0, reason: 'Requires a seniors ranking place, qualifying win or invitation for this event.' };
+  }
+  const pendingHumanCard = tournament.type === 'Q School' && state.history.tournamentHistory.some(e =>
+    (!state.season || e.season === state.season) && e.startDate <= tournament.startDate && /tour card/i.test(e.reward ?? ''));
+  if (pathwayReason || pendingHumanCard) return { allowed: false, accessBand, seededProtection: 0, reason: pathwayReason ?? 'You have already secured a next-season tour card.' };
+
   if (
-    profile.isTop16 &&
-    /qualifier|qualifying/i.test(tournament.name) &&
-    !isWorldChampionshipQualifierTournament(tournament)
+    isAttachedQualifying(tournament) &&
+    profile.worldRank <= (resolveTournamentFormat(tournament).seedOffset ?? 0)
   ) {
     return {
       allowed: false,
@@ -8820,9 +8671,15 @@ export function getTournamentEntryAccess(
     };
   }
 
+  const attachedQualified = recordedMajorQualifiers(state, tournament);
+  if (['internationalChampionship', 'worldOpen', 'homeNationsMain'].includes(resolveTournamentFormat(tournament).id)) {
+    const allowed = profile.hasMainTourStatus && (profile.worldRank <= attachedMainDirectSeeds(tournament) || (attachedQualified ?? []).includes(state.player.fullName));
+    return { allowed, accessBand, seededProtection, reason: allowed ? null : 'You did not qualify for this main draw.' };
+  }
+
   switch (tournamentClass) {
     case "youth": {
-      const allowed = profile.isYouthEligible;
+      const allowed = !profile.hasMainTourStatus;
       return {
         allowed,
         accessBand,
@@ -8833,13 +8690,10 @@ export function getTournamentEntryAccess(
       };
     }
     case "amateur": {
-      const ageLimit = getAmateurRouteAgeLimit(tournament);
+      const ageLimit = pathwayAgeLimit(tournament);
       const directCardRoute = isDirectAmateurTourCardRoute(tournament);
-      const ageEligible =
-        ageLimit == null
-          ? state.player.age >= 16
-          : state.player.age <= ageLimit;
-      const allowed =
+      const ageEligible = true; // Event-specific age and federation checks run above.
+      const allowed = /pro.am/i.test(tournament.name) || (
         ageEligible &&
         !profile.hasMainTourStatus &&
         (profile.isEliteAmateur ||
@@ -8849,7 +8703,7 @@ export function getTournamentEntryAccess(
           profile.primaryCircuit === "youth" ||
           profile.isSeniorCircuit ||
           directCardRoute ||
-          ageLimit != null);
+          ageLimit != null));
       const reason =
         ageLimit != null
           ? `This route is limited to age-eligible off-tour players under the event age limit (${ageLimit}).`
@@ -8864,12 +8718,7 @@ export function getTournamentEntryAccess(
       };
     }
     case "qTour": {
-      const allowed =
-        state.player.age >= 18 &&
-        !profile.hasMainTourStatus &&
-        (profile.isQTourPathway ||
-          profile.isEliteAmateur ||
-          profile.primaryCircuit === "amateur");
+      const allowed = !profile.hasMainTourStatus;
       return {
         allowed,
         accessBand,
@@ -8881,7 +8730,7 @@ export function getTournamentEntryAccess(
     }
     case "qSchool": {
       const allowed =
-        isOpenAdultOffTourQSchoolPlayer(state) &&
+        isOpenOffTourQSchoolPlayer(state) &&
         !/review|order of merit/i.test(tournament.name);
       return {
         allowed,
@@ -8889,18 +8738,18 @@ export function getTournamentEntryAccess(
         seededProtection: 0,
         reason: allowed
           ? null
-          : "Q School is open to eligible adult off-tour players who can fund entry and remain in good standing.",
+          : "Q School is open to eligible off-tour players; junior entries include guardian consent.",
       };
     }
     case "senior": {
-      const allowed = state.player.age >= 40 && !profile.hasMainTourStatus;
+      const allowed = true; // Age checked above; professionals may enter seniors events.
       return {
         allowed,
         accessBand,
         seededProtection: 0,
         reason: allowed
           ? null
-          : "Senior events require age 40+ and no active main-tour card or top-64 standing.",
+          : "Senior events require age 40+; active professionals are eligible.",
       };
     }
     case "exhibition": {
@@ -8920,66 +8769,14 @@ export function getTournamentEntryAccess(
       };
     }
     case "worldChampionshipMain": {
-      if (frozen) {
-        const allowed = profile.hasMainTourStatus && (profile.isTop16 || Boolean(recordedMajorQualifiers(state, tournament)?.includes(state.player.fullName)));
-        return { allowed, accessBand, seededProtection, reason: allowed ? null : 'Requires a top-16 place at the seeding cut-off or a completed qualifying win.' };
-      }
-      if (tournament.seasonOpenAccessLock === "worldMainDraw") {
-        return { allowed: true, accessBand, seededProtection, reason: null };
-      }
-
-      if (tournament.seasonOpenAccessLock === "worldQualifying") {
-        return {
-          allowed: false,
-          accessBand,
-          seededProtection,
-          reason:
-            "Season-open access placed this player in the World Championship qualifying route.",
-        };
-      }
-
-      const allowed =
-        profile.hasMainTourStatus &&
-        (profile.isTop16 ||
-          profile.isWorldChampion ||
-          profile.isMajorContender);
-      return {
-        allowed,
-        accessBand,
-        seededProtection,
-        reason: allowed
-          ? null
-          : "Only Top 16 or proven elite contenders enter the World Championship main draw directly.",
-      };
+      const allowed = profile.hasMainTourStatus && (profile.isTop16 || tournament.legacyEntryHonoured === true || Boolean(recordedMajorQualifiers(state, tournament)?.includes(state.player.fullName)));
+      return { allowed, accessBand, seededProtection, reason: allowed ? null : 'Requires a top-16 place at the seeding cut-off or a completed qualifying win.' };
     }
     case "worldChampionshipQualifying": {
       if (frozen) {
         const allowed = profile.hasMainTourStatus && !profile.isTop16 && profile.worldRank <= MAIN_TOUR_POOL_SIZE;
         return { allowed, accessBand, seededProtection, reason: allowed ? null : 'Qualifying is for players outside the top 16 at the designated cut-off.' };
       }
-      if (tournament.seasonOpenAccessLock === "worldMainDraw") {
-        return {
-          allowed: false,
-          accessBand,
-          seededProtection,
-          reason:
-            "Season-open access locked this player into the World Championship main draw.",
-        };
-      }
-
-      if (tournament.seasonOpenAccessLock === "worldQualifying") {
-        const allowed =
-          profile.hasMainTourStatus && profile.worldRank <= MAIN_TOUR_POOL_SIZE;
-        return {
-          allowed,
-          accessBand,
-          seededProtection,
-          reason: allowed
-            ? null
-            : "World Championship qualifying is locked to the player’s season-open route.",
-        };
-      }
-
       const allowed =
         profile.hasMainTourStatus &&
         !profile.isTop16 &&
@@ -9088,14 +8885,14 @@ export function getTournamentEntryAccess(
       const allowed =
         profile.hasMainTourStatus &&
         profile.worldRank <= MAIN_TOUR_POOL_SIZE &&
-        !(profile.isTop16 && /qualifying|qualifier/i.test(tournament.name));
+        profile.worldRank > (resolveTournamentFormat(tournament).seedOffset ?? 0);
       return {
         allowed,
         accessBand,
         seededProtection,
         reason: allowed
           ? null
-          : "Qualifier routes are for active main-tour players outside direct top-16 seeded protection.",
+          : "This qualifier requires main-tour status and a place outside its protected seed band.",
       };
     }
     case "ranking": {
@@ -9156,6 +8953,7 @@ export function getTournamentEntryCashRequirement(
     return Math.round(tournament.entryFee * 0.15);
   }
 
+  if (tournament.type === 'Q School' && !/review/i.test(tournament.name) && state.history.tournamentHistory.some(e => e.startDate.slice(0,4) === tournament.startDate.slice(0,4) && e.eventType === 'Q School' && e.entryFee > 0 && (/asia[ -]*oceania/i.test(e.tournamentName) === /asia[ -]*oceania/i.test(tournament.name)))) return 0;
   return tournament.entryFee;
 }
 
@@ -9287,8 +9085,50 @@ function isDateInsideTournament(
   );
 }
 
+/** Preserve an entry the old season-open rules already accepted. This is a
+ * one-time compatibility exception, never a title, win, or qualifying result. */
+function repairLegacyWorldEntry(state: GameState): GameState {
+  if (state.schemaVersion >= 12) return state;
+  const main = state.tournaments.find(isWorldChampionshipMainDrawTournament);
+  const qualifier = state.tournaments.find(isWorldChampionshipQualifierTournament);
+  if (!main || !qualifier) return state;
+  const history = state.history.tournamentHistory.filter(h => h.season === state.season);
+  const accepted = history.find(h => h.tournamentId === main.id && h.status === 'Entered' && h.matchesPlayed === 0);
+  const automaticQualifyingSkip = qualifier.seasonOpenAccessLock === 'worldMainDraw' && qualifier.status === 'Skipped' && !history.some(h => h.tournamentId === qualifier.id);
+  const honour = main.seasonOpenAccessLock === 'worldMainDraw' && automaticQualifyingSkip && accepted &&
+    (main.status === 'Available' || main.status === 'Booked' || main.status === 'Entered') &&
+    (main.endDate ?? main.startDate) >= state.currentDate && state.careerSystems.pro.hasTourCard;
+  const otherActive = state.tournaments.some(t => t.id !== main.id && t.status === 'Entered');
+  const tournaments = state.tournaments.map(t => {
+    if (t.id === main.id) return { ...t, seasonOpenAccessLock: null,
+      ...(honour ? { legacyEntryHonoured: true, status: otherActive ? 'Booked' as const : 'Entered' as const } : {}) };
+    if (t.id === qualifier.id) return { ...t, seasonOpenAccessLock: null,
+      ...(!honour && automaticQualifyingSkip && (t.endDate ?? t.startDate) > state.currentDate ? { status: 'Available' as const } : {}) };
+    return t;
+  });
+  let repaired = { ...state, tournaments };
+  if (honour && !otherActive && state.tournamentProgress.tournamentId !== main.id) {
+    const event = tournaments.find(t => t.id === main.id)!;
+    const currentRound = getTournamentEntryRound(repaired, event);
+    repaired = { ...repaired, tournamentProgress: { ...createEmptyTournamentProgress(), tournamentId: main.id, rulesVersion: 3, currentRound, draw: buildTournamentDraw(repaired, event, currentRound) } };
+  }
+  return repaired;
+}
+
 export function repairGameState(state: GameState): GameState {
-  state = initializeRollingRankings(state);
+  state = repairLegacyWorldEntry(initializeRollingRankings(state));
+  state = { ...state, tournaments: state.tournaments.map(t => isChampionshipLeague(t) && t.status !== 'Completed' ? { ...t, format: 'Groups: up to 4 frames, draws allowed · final best of 5', prizeMoney: 328000, winnerPrize: 33000, runnerUpPrize: 23000 } : t) };
+  state = { ...state, tournaments: state.tournaments.map(t => {
+    if (t.status === 'Completed') return t;
+    const audited = tournamentCatalog.find(a => a.id === t.id);
+    const economics = audited && (t.type === 'Q School' || t.type === 'Q Tour' && qTourRegion(t) === 'Europe' || /seniors tour.*event/i.test(t.name)) ? { prizeMoney: audited.prizeMoney, totalPrizeFund: audited.totalPrizeFund, winnerPrize: audited.winnerPrize, runnerUpPrize: audited.runnerUpPrize, semiFinalPrize: audited.semiFinalPrize, quarterFinalPrize: audited.quarterFinalPrize, rankingValue: audited.rankingValue, unlockRequirement: audited.unlockRequirement, ...(t.status !== 'Entered' ? { entryFee: audited.entryFee } : {}) } : {};
+    return { ...t, ...economics, format: tournamentFormatSummary(t) };
+  }) };
+  const activeRulesEvent = state.tournaments.find(t => t.id === state.tournamentProgress.tournamentId && t.status === 'Entered');
+  if (activeRulesEvent && (state.tournamentProgress.rulesVersion !== 3 || (resolveTournamentFormat(activeRulesEvent).groupMode && !isGroupDraw(state.tournamentProgress.draw))) && !state.liveMatch && state.tournamentProgress.completedRounds.length === 0) {
+    const currentRound = getTournamentEntryRound(state, activeRulesEvent);
+    state = { ...state, tournamentProgress: { ...state.tournamentProgress, rulesVersion: 3, currentRound, draw: buildTournamentDraw(state, activeRulesEvent, currentRound) } };
+  }
   if (!state.equipment.chalkConditions && state.equipment.currentChalkId) {
     const id = state.equipment.currentChalkId;
     state = { ...state, equipment: { ...state.equipment,
@@ -9368,7 +9208,7 @@ export function repairGameState(state: GameState): GameState {
   )
     .slice(0, 10)
     .reverse()
-    .map((entry) => (entry.result === "Won" ? "W" : "L"));
+    .map((entry) => (entry.result === "Drawn" ? "D" : entry.result === "Won" ? "W" : "L"));
   const repairedPlayerForm =
     recordedResults.length > 0 ? recordedResults : state.player.form.slice(-10);
   const playerFormRepaired =
@@ -9418,12 +9258,14 @@ export function repairGameState(state: GameState): GameState {
     ),
   );
 
-  return {
+  const repairedLegacy = state.history.legacy ?? careerLegacyOf({ ...state, matches: repairedMatches, history: { ...state.history, matchLog: repairedMatchLog, tournamentHistory: state.history.tournamentHistory.filter(entry => !invalidTournamentIds.has(entry.tournamentId)) } });
+  return evolveTourSkills(reconcileAchievements({
     ...state,
     schemaVersion: SAVE_SCHEMA_VERSION,
     player: {
       ...state.player,
       form: repairedPlayerForm,
+      legacyScore: careerLegacyRating(repairedLegacy).score,
     },
     coaches: mergeCoachCatalog(state.coaches),
     inbox: normalizeInboxMessages(
@@ -9462,6 +9304,7 @@ export function repairGameState(state: GameState): GameState {
     liveMatch: keepLiveMatch ? normalizeLiveMatchState(state.liveMatch) : null,
     history: {
       ...state.history,
+      legacy: repairedLegacy,
       matchLog: repairedMatchLog,
       tournamentHistory: state.history.tournamentHistory.filter(
         (entry) => !invalidTournamentIds.has(entry.tournamentId),
@@ -9478,7 +9321,7 @@ export function repairGameState(state: GameState): GameState {
       )
         ? "Save upgraded: repaired recent form, tournament records and title totals, then rebuilt every ranking table strictly by points."
         : state.lastAction,
-  };
+  }));
 }
 
 function shouldPlayerBeInWorldTable(
@@ -9779,6 +9622,8 @@ function updateCompetitionTablesFromCpuDraw(
         typeof match.bottom.score !== "number"
       )
         return;
+      if (tournament.type === 'Q School' || /seniors tour\s*-\s*event/i.test(tournament.name)) { getChange(match.top.name).points += match.top.score; getChange(match.bottom.name).points += match.bottom.score; }
+      if (match.top.score === match.bottom.score) return;
       const topWon = match.top.score > match.bottom.score;
       const winner = topWon ? match.top.name : match.bottom.name;
       const loser = topWon ? match.bottom.name : match.top.name;
@@ -9796,14 +9641,22 @@ function updateCompetitionTablesFromCpuDraw(
     });
   });
 
+  if (isGroupDraw(draw)) {
+    participants.forEach((_, name) => {
+      if (name !== player.fullName) Object.assign(getChange(name), { prizeMoney: groupCompetitionAward(draw, tournament, name, getTournamentPlacementAwards).prizeMoney, points: groupCompetitionAward(draw, tournament, name, getTournamentPlacementAwards).rankingPoints });
+    });
+  }
   placements.forEach((placement, name) => {
+    if (isGroupDraw(draw)) return;
     const change = getChange(name);
     const award = getTournamentPlacementAwards(
       tournament,
       placement.round,
       placement.champion,
     );
-    change.points += award.rankingPoints;
+    const frameRanking = tournament.type === 'Q School' || /seniors tour\s*-\s*event/i.test(tournament.name);
+    const openingQTourLoss = tournament.type === 'Q Tour' && qTourRegion(tournament) === 'Europe' && change.wins === 0;
+    if (!frameRanking && !openingQTourLoss) change.points += award.rankingPoints;
     change.prizeMoney += award.prizeMoney;
   });
 
@@ -9840,7 +9693,7 @@ function updateCompetitionTablesFromCpuDraw(
         prizeMoney:
           row.prizeMoney + (key === "qSchool" ? 0 : (change?.prizeMoney ?? 0)),
         eventsPlayed:
-          row.eventsPlayed + (playerOpponentSet.has(row.playerName) ? 0 : 1),
+          row.eventsPlayed + (!isGroupDraw(draw) && playerOpponentSet.has(row.playerName) ? 0 : 1),
         wins: row.wins + (change?.wins ?? 0),
         losses: row.losses + (change?.losses ?? 0),
         titles: row.titles + (change?.titles ?? 0),
@@ -9875,6 +9728,7 @@ function updateWorldPlayersFromCompletedDraw(
       ) {
         return;
       }
+      if (match.top.score === match.bottom.score) return;
       const topWon = match.top.score > match.bottom.score;
       addResult(match.top.name, topWon ? "W" : "L", match.bottom.name);
       addResult(match.bottom.name, topWon ? "L" : "W", match.top.name);
@@ -11917,19 +11771,20 @@ function shouldRetireCpuPlayer(
   });
 }
 
-function evolveWorldPlayersForNextSeason(
+export function evolveWorldPlayersForNextSeason(
   players: WorldPlayerRecord[],
   tables: CompetitionTablesState,
   nextPlayer: Player,
   playerHasTourCard: boolean,
   playerProState: ProCareerSystemState,
   nextSeasonStartYear: number,
+  earnedCards?: Map<string, 'Q School' | 'Q Tour' | 'Federation Route'>,
 ) {
   const agedPlayers = players.map((record) => {
     const isHumanPlayer = record.playerName === nextPlayer.fullName;
     const nextAge = isHumanPlayer ? nextPlayer.age : record.age + 1;
     const retired =
-      !isHumanPlayer && shouldRetireCpuPlayer(record, tables, nextAge);
+      !isHumanPlayer && !earnedCards?.has(record.playerName) && shouldRetireCpuPlayer(record, tables, nextAge);
     const worldRank =
       getCompetitionRowForPlayer(tables, "world", record.playerName)?.ranking ??
       999;
@@ -12148,7 +12003,7 @@ function evolveWorldPlayersForNextSeason(
     )
     .map((record) => ({
       record,
-      source: getWorldPlayerPromotionSource(record, promotionTables),
+      source: earnedCards ? earnedCards.get(record.playerName) ?? null : getWorldPlayerPromotionSource(record, promotionTables),
     }))
     .filter(
       (
@@ -12901,10 +12756,7 @@ function syncCareerSystems(
       (worldRank <= MAIN_TOUR_POOL_SIZE ||
         proBase.hasTourCard ||
         state.player.reputation >= 68),
-    seniorEligible:
-      state.player.age >= 40 &&
-      !proBase.hasTourCard &&
-      worldRank > TOP_64_RANK_CUTOFF,
+    seniorEligible: state.player.age >= 40,
     seniorActive:
       !retired &&
       state.player.age >= 40 &&
@@ -13483,7 +13335,9 @@ function finalizeState(
   lastAction: string,
   snapshotLabel?: string,
 ) {
-  const nextState = recalculateState(reconcileRealism(reconcileCareerDepth(processRankingCalendar(state))), lastAction);
+  state = { ...state, history: { ...state.history, legacy: careerLegacyOf(state) } };
+  const recalculated = recalculateState(reconcileRealism(reconcileCareerDepth(processRankingCalendar(state))), lastAction);
+  const nextState = { ...recalculated, player: { ...recalculated.player, legacyScore: careerLegacyRating(careerLegacyOf(recalculated)).score } };
   return snapshotLabel
     ? withHistorySnapshot(nextState, snapshotLabel)
     : nextState;
@@ -13594,19 +13448,12 @@ function getTournamentFieldRows(state: GameState, tournament: Tournament) {
 
     switch (tournamentClass) {
       case "youth":
-        return opponent.age <= 21 && !opponent.hasMainTourStatus;
+      case "qTour":
+      case "qSchool":
+      case "senior":
+        return !pathwayEntryReason(tournament, { name: row.playerName, nation: row.nation, age: opponent.age, hasTourCard: opponent.hasTourCard }, state);
       case "amateur":
         return !opponent.hasMainTourStatus || proAmAllowed;
-      case "qTour":
-        return opponent.age >= 18 && !opponent.hasMainTourStatus;
-      case "qSchool":
-        return (
-          opponent.age >= 18 &&
-          !opponent.hasMainTourStatus &&
-          opponent.worldRank > TOP_64_RANK_CUTOFF
-        );
-      case "senior":
-        return opponent.age >= 40 && !opponent.hasMainTourStatus;
       case "exhibition":
         return opponent.age >= 35 || opponent.hasMainTourStatus;
       default:
@@ -13964,6 +13811,7 @@ function createMatchSetup(state: GameState, tournament: Tournament) {
       roundDifficulty +
       opponentSupportModifier +
       persistentAbilityModifier +
+      developmentEdge(opponentProfile?.skillDevelopment) +
       Math.random() * 8 -
       qSchoolAdvantage * 0.35 -
       seededBoost * 0.75 +
@@ -14323,10 +14171,10 @@ function createLiveMatchState(
   tournament: Tournament,
 ): LiveMatchState {
   const setup = createMatchSetup(state, tournament);
-  const framesNeeded = Math.ceil(setup.roundPlan.bestOf / 2);
+  const framesNeeded = Math.floor(setup.roundPlan.bestOf / 2) + 1;
   const plannedFrameWinChance = convertMatchWinProbabilityToFrameWinProbability(
     setup.winChance,
-    setup.roundPlan.bestOf,
+    setup.roundPlan.bestOf === 4 ? 5 : setup.roundPlan.bestOf,
   );
   const travelBooking = getTravelBooking(state, tournament.id);
   const travelSummary = travelBooking
@@ -14352,14 +14200,14 @@ function createLiveMatchState(
     92,
   );
   const playerVisitProfile = buildPlayerLiveVisitProfile(state);
-  const opponentVisitProfile = buildOpponentLiveVisitProfile(
+  const opponentVisitProfile = applyTourSkills(buildOpponentLiveVisitProfile(
     setup.opponent.ranking,
     setup.opponentStrength,
     opponentArchetype,
     opponentConfidence,
     opponentFatigue,
     clamp(Math.round((100 - setup.opponent.ranking) / 14), 0, 8),
-  );
+  ), state.worldPlayers.find(p=>p.playerName===setup.opponent.playerName)?.skillDevelopment);
   const opponentApproach = learnedCounter(state, setup.opponent.playerName) ?? getLiveMatchOpponentApproach({
     playerFrames: 0,
     opponentFrames: 0,
@@ -14382,12 +14230,17 @@ function createLiveMatchState(
     activeCoach?.name,
   );
 
+  const rules = resolveTournamentFormat(tournament).specialRules ?? [];
+  const handicap = rules.includes('handicap') ? handicapAllowance(getCompetitionRowsForTournament(state, tournament).find(r => r.playerName === state.player.fullName)?.ranking ?? 1, setup.opponent.ranking) : { playerHandicap: 0, opponentHandicap: 0 };
+  const openingPlayer = rules.includes('shootOut') && Math.random() < .5 ? setup.opponent.playerName : state.player.fullName;
   return {
     tournamentId: tournament.id,
     round: setup.currentRound,
     sessions: sessionPlan(setup.roundPlan.bestOf, tournament),
+    special: { rules, elapsedSeconds: 0, ...handicap },
     venue: venueConditions(tournament),
     conditionEffect: conditionAdjustment(venueConditions(tournament), playerVisitProfile.cueBallControl, playerVisitProfile.safetyPlay, familiarisedFor(state, tournament)),
+    objectives: matchObjectives(state, setup.opponent.ranking, setup.roundPlan.bestOf),
     sessionId: `${state.season}:${tournament.id}:${setup.currentRound}:${setup.opponent.playerName}:${state.history.matchLog.length}`,
     bestOf: setup.roundPlan.bestOf,
     framesNeeded,
@@ -14398,15 +14251,15 @@ function createLiveMatchState(
     playerFrames: 0,
     opponentFrames: 0,
     currentFrame: 1,
-    playerPoints: 0,
-    opponentPoints: 0,
+    playerPoints: handicap.playerHandicap,
+    opponentPoints: handicap.opponentHandicap,
     currentVisit: 1,
     currentBreak: 0,
     tableState,
     ballsRemaining: getLegacyBallUnitsFromTableState(tableState),
-    playerAtTable: state.player.fullName,
-    frameStarterName: state.player.fullName,
-    shotClock: 30,
+    playerAtTable: openingPlayer,
+    frameStarterName: openingPlayer,
+    shotClock: rules.includes('shootOut') ? 15 : 30,
     playerConfidence: state.player.confidence,
     opponentConfidence,
     playerFatigue: state.player.fatigue,
@@ -14417,6 +14270,7 @@ function createLiveMatchState(
     opponentHighestBreak: 0,
     playerFifties: 0,
     playerCenturies: 0,
+    playerMaximums: 0,
     pressureValue: 38,
     pressureLabel: "Stable",
     timeElapsedMinutes: 0,
@@ -14434,11 +14288,12 @@ function createLiveMatchState(
     plannedMatchWinChance: setup.winChance,
     plannedPlayerStrength: setup.playerStrength,
     plannedOpponentStrength: setup.opponentStrength,
+    careerBestAtStart: careerLegacyOf(state).highestBreak,
     feed: [
       {
         id: `feed-start-${Date.now()}`,
         time: "00:00",
-        text: `${state.player.fullName} walks out to face ${setup.opponent.playerName} in the ${setup.currentRound}. Rival profile: ${getOpponentArchetypeNote(opponentArchetype)}.`,
+        text: `${state.player.fullName} walks out to face ${setup.opponent.playerName} in the ${setup.currentRound}. Rival profile: ${getOpponentArchetypeNote(opponentArchetype)}. ${getRivalry(state,setup.opponent.playerName)?.rivalry ? "An established rivalry resumes: " + getRivalry(state,setup.opponent.playerName)!.wins + " wins and " + getRivalry(state,setup.opponent.playerName)!.losses + " losses in their recorded meetings." : ""}`,
         actor: "System",
         tone: "blue",
       },
@@ -14679,6 +14534,7 @@ export function simulateSyntheticLiveVisitMatch(
       opponentHighestBreak: 0,
       playerFifties: 0,
       playerCenturies: 0,
+    playerMaximums: 0,
       pressureValue: initialPressureValue,
       pressureLabel:
         initialPressureValue >= 78
@@ -14857,6 +14713,7 @@ function resolveCompletedLiveFrame(
   liveMatch: LiveMatchState,
   mode: "Played" | "Simmed",
 ): LiveMatchState {
+  liveMatch = attemptGoldenBall(liveMatch);
   let nextPlayerPoints = liveMatch.playerPoints;
   let nextOpponentPoints = liveMatch.opponentPoints;
   let playerWinsFrame = nextPlayerPoints > nextOpponentPoints;
@@ -14946,7 +14803,8 @@ function resolveCompletedLiveFrame(
     liveMatch.opponentFrames + (playerWinsFrame ? 0 : 1);
   const matchComplete =
     nextPlayerFrames >= liveMatch.framesNeeded ||
-    nextOpponentFrames >= liveMatch.framesNeeded;
+    nextOpponentFrames >= liveMatch.framesNeeded ||
+    (liveMatch.bestOf === 4 && nextPlayerFrames + nextOpponentFrames >= 4);
   const pressureValue = clamp(
     38 +
       Math.abs(nextPlayerFrames - nextOpponentFrames) * 8 +
@@ -15004,7 +14862,7 @@ function resolveCompletedLiveFrame(
   });
   const frameFeed = buildVisitFeedEntry(
     formatLiveClock(liveMatch.timeElapsedMinutes),
-    `${mode} ${frameLabel}: ${playerWinsFrame ? liveMatch.playerName : liveMatch.opponentName} wins the frame ${nextPlayerPoints}-${nextOpponentPoints}.`,
+    `${mode} ${frameLabel}: ${playerWinsFrame ? liveMatch.playerName : liveMatch.opponentName} wins the frame ${nextPlayerPoints}-${nextOpponentPoints}. ${frameStory(liveMatch,playerWinsFrame)}`,
     playerWinsFrame ? "Player" : "Opponent",
     playerWinsFrame ? "green" : "amber",
   );
@@ -15034,8 +14892,8 @@ function resolveCompletedLiveFrame(
     currentFrame: matchComplete
       ? liveMatch.currentFrame
       : liveMatch.currentFrame + 1,
-    playerPoints: matchComplete ? nextPlayerPoints : 0,
-    opponentPoints: matchComplete ? nextOpponentPoints : 0,
+    playerPoints: matchComplete ? nextPlayerPoints : liveMatch.special?.playerHandicap ?? 0,
+    opponentPoints: matchComplete ? nextOpponentPoints : liveMatch.special?.opponentHandicap ?? 0,
     currentVisit: 1,
     currentBreak: 0,
     tableState: matchComplete
@@ -15119,6 +14977,14 @@ export function advanceLiveVisit(
   granularity: "visit" | "shot" = "visit",
 ): LiveMatchState {
   if (liveMatch.status === 'Completed' || pendingMatchBreak(liveMatch)) return liveMatch;
+  if (liveMatch.special?.rules.includes('shootOut')) {
+    const next = stepShootOut(liveMatch, decision);
+    return next.special?.frameComplete ? resolveCompletedLiveFrame(next, 'Played') : next;
+  }
+  if (liveMatch.special?.rules.includes('blackBallDecider') && liveMatch.playerFrames === liveMatch.framesNeeded - 1 && liveMatch.opponentFrames === liveMatch.framesNeeded - 1) {
+    const next = stepBallShootOut(liveMatch, 'Black');
+    return next.special?.frameComplete ? resolveCompletedLiveFrame(next, 'Played') : next;
+  }
   const actorIsPlayer = liveMatch.playerAtTable === liveMatch.playerName;
   const actor: LiveVisitActor = actorIsPlayer ? "Player" : "Opponent";
   const resolvedDecision =
@@ -15160,7 +15026,7 @@ export function advanceLiveVisit(
     liveMatch.plannedWinChance ??
     convertMatchWinProbabilityToFrameWinProbability(
       liveMatch.plannedMatchWinChance,
-      liveMatch.bestOf,
+      liveMatch.bestOf === 4 ? 5 : liveMatch.bestOf,
     );
   const actorFrameExpectation = actorIsPlayer
     ? plannedFrameWinChance
@@ -15491,6 +15357,7 @@ export function advanceLiveVisit(
       currentSideStats.safetiesWon + (isSafetyDecision && success ? 1 : 0),
     fouls: currentSideStats.fouls + (foulOccurred ? 1 : 0),
   };
+  const contextualText = visitStory({actorName:actorIsPlayer?liveMatch.playerName:liveMatch.opponentName,success,foul:foulOccurred,pot:isPotDecision,previousBreak:liveMatch.currentBreak,breakTotal:completedBreakTotal,personalBest:liveMatch.careerBestAtStart,previousMatchBest:liveMatch.playerHighestBreak,player:actorIsPlayer,pointsBefore:actorIsPlayer?liveMatch.playerPoints:liveMatch.opponentPoints,otherPoints:actorIsPlayer?liveMatch.opponentPoints:liveMatch.playerPoints,remaining:getRemainingTablePoints(liveMatch)});
   const feedText = buildRealisticVisitFeedText({
     actorName: actorIsPlayer ? liveMatch.playerName : liveMatch.opponentName,
     opponentName: actorIsPlayer
@@ -15519,7 +15386,7 @@ export function advanceLiveVisit(
         : 4;
   const feedEntry = buildVisitFeedEntry(
     formatLiveClock(liveMatch.timeElapsedMinutes + elapsedIncrement),
-    feedText,
+    feedText + (contextualText ? " " + contextualText : ""),
     foulOccurred ? "System" : actor,
     foulOccurred
       ? "red"
@@ -15573,6 +15440,7 @@ export function advanceLiveVisit(
       actorIsPlayer && completedBreakTotal >= 50 && liveMatch.currentBreak < 50
         ? liveMatch.playerFifties + 1
         : liveMatch.playerFifties,
+    playerMaximums: liveMatch.playerMaximums === undefined ? undefined : liveMatch.playerMaximums + Number(actorIsPlayer && completedBreakTotal === 147 && liveMatch.currentBreak < 147),
     playerCenturies:
       actorIsPlayer &&
       completedBreakTotal >= 100 &&
@@ -15712,20 +15580,28 @@ function resolveCareerSimulationLiveMatch(
   tournament: Tournament,
 ): LiveMatchState {
   let liveMatch = createLiveMatchState(state, tournament);
+  if (liveMatch.special?.rules.length) {
+    for (let visits = 0; visits < 20000 && liveMatch.status !== 'Completed'; visits++) {
+      if (pendingMatchBreak(liveMatch)) liveMatch = resolveSessionBreak(liveMatch, 'recover');
+      else liveMatch = advanceLiveVisit(liveMatch, undefined, 'manual');
+    }
+    if (liveMatch.status !== 'Completed') throw new Error('Special-format match did not finish');
+    return liveMatch;
+  }
   const frameWinChance = convertMatchWinProbabilityToFrameWinProbability(
     liveMatch.plannedMatchWinChance,
-    liveMatch.bestOf,
+    liveMatch.bestOf === 4 ? 5 : liveMatch.bestOf,
   );
-  const resolvedMatch = resolveCareerMatchResult(
-    liveMatch.plannedMatchWinChance,
-    liveMatch.framesNeeded,
-  );
+  const resolvedMatch = liveMatch.bestOf === 4
+    ? { frameOrder: groupFrameOrder(frameWinChance / 100) }
+    : resolveCareerMatchResult(liveMatch.plannedMatchWinChance, liveMatch.framesNeeded);
   let playerFrames = 0;
   let opponentFrames = 0;
   let playerHighestBreak = 0;
   let opponentHighestBreak = 0;
   let playerFifties = 0;
   let playerCenturies = 0;
+  let playerMaximums = 0;
   let playerPoints = 0;
   let opponentPoints = 0;
   const frameHistory: FrameScoreRow[] = [];
@@ -15755,6 +15631,7 @@ function resolveCareerSimulationLiveMatch(
     );
     if (frameOutcome.playerBreak >= 50) playerFifties += 1;
     if (frameOutcome.playerBreak >= 100) playerCenturies += 1;
+    if (frameOutcome.playerBreak === 147) playerMaximums += 1;
     frameHistory.push({
       frame: `F${frameNumber}`,
       player: `${playerPoints}`,
@@ -15794,6 +15671,7 @@ function resolveCareerSimulationLiveMatch(
     opponentHighestBreak,
     playerFifties,
     playerCenturies,
+    playerMaximums,
     pressureValue,
     pressureLabel:
       pressureValue >= 78
@@ -15838,8 +15716,11 @@ export function finalizeLiveMatch(
   const tournamentRounds = getTournamentRounds(tournament);
   const currentRoundIndex = tournamentRounds.indexOf(liveMatch.round);
   const won = liveMatch.playerFrames > liveMatch.opponentFrames;
+  const drawn = liveMatch.playerFrames === liveMatch.opponentFrames;
+  const groupMatch = isGroupDraw(state.tournamentProgress.draw);
+  const groupResult = groupMatch ? applyGroupCompetitionResult(state.tournamentProgress.draw, tournament, liveMatch.round, state.player.fullName, liveMatch.opponentName, liveMatch.playerFrames, liveMatch.opponentFrames, [liveMatch.playerHighestBreak], [liveMatch.opponentHighestBreak]) : null;
   const isFinalRound = currentRoundIndex === tournamentRounds.length - 1;
-  const nextRound = won
+  const nextRound = groupResult ? groupResult.nextRound : won
     ? (tournamentRounds[currentRoundIndex + 1] ?? null)
     : null;
   const isQSchoolTournament = tournament.type === "Q School";
@@ -15850,10 +15731,10 @@ export function finalizeLiveMatch(
     isQSchoolTournament ||
     isSeniorRegularRankingTournament ||
     (tournament.rankingValue > 0 && tournament.rankingType !== "None");
-  const playerEventComplete = !won || !nextRound;
-  const opponentEventComplete = won || !nextRound;
-  const opponentPlacementKnown = won || isFinalRound;
-  const playerPlacement = getTournamentPlacementAwards(
+  const playerEventComplete = !nextRound;
+  const opponentEventComplete = groupMatch ? false : won || !nextRound;
+  const opponentPlacementKnown = groupMatch ? false : won || isFinalRound;
+  const playerPlacement = groupResult ? groupCompetitionAward(groupResult.draw, tournament, state.player.fullName, getTournamentPlacementAwards) : getTournamentPlacementAwards(
     tournament,
     liveMatch.round,
     won && !nextRound,
@@ -15863,12 +15744,13 @@ export function finalizeLiveMatch(
     liveMatch.round,
     !won && isFinalRound,
   );
+  const qTourOpeningLoss = tournament.type === 'Q Tour' && qTourRegion(tournament) === 'Europe' && !won && state.tournamentProgress.completedRounds.length === 0;
   const protectedOpeningLoss = countsForWorldRanking(tournament) && !won && state.tournamentProgress.completedRounds.length === 0 && (
     getTournamentEntryRound(state, tournament) !== tournamentRounds[0] ||
     (['ukMajor', 'worldChampionshipMain'].includes(resolveTournamentFormat(tournament).id) && (seedingRows(state, tournament, state.competitionTables.world).find(r => r.playerName === state.player.fullName)?.ranking ?? 999) <= 16) ||
     /shoot.?out/i.test(tournament.name)
   );
-  const rankingPointsGained = !awardsRankingPoints || protectedOpeningLoss
+  const rankingPointsGained = !awardsRankingPoints || protectedOpeningLoss || qTourOpeningLoss
     ? 0
     : isQSchoolTournament
       ? liveMatch.playerFrames
@@ -15883,7 +15765,8 @@ export function finalizeLiveMatch(
     : playerEventComplete
       ? playerPlacement.prizeMoney
       : 0;
-  const opponentPointsGained = !awardsRankingPoints
+  const opponentQTourOpeningLoss = tournament.type === 'Q Tour' && qTourRegion(tournament) === 'Europe' && won && !state.tournamentProgress.draw.some(r => r.matches.some(m => typeof m.top.score === 'number' && typeof m.bottom.score === 'number' && (m.top.name === liveMatch.opponentName && m.top.score > m.bottom.score || m.bottom.name === liveMatch.opponentName && m.bottom.score > m.top.score)));
+  const opponentPointsGained = !awardsRankingPoints || opponentQTourOpeningLoss
     ? 0
     : isQSchoolTournament
       ? liveMatch.opponentFrames
@@ -15898,15 +15781,15 @@ export function finalizeLiveMatch(
     : opponentPlacementKnown
       ? opponentPlacement.prizeMoney
       : 0;
-  const confidenceChange = matchConfidenceChange(state.player.confidence, won, liveMatch.plannedMatchWinChance, isFinalRound, (depthOf(state).mediaExpectationsUntil ?? '') > state.currentDate);
+  const confidenceChange = drawn ? 0 : matchConfidenceChange(state.player.confidence, won, liveMatch.plannedMatchWinChance, isFinalRound, (depthOf(state).mediaExpectationsUntil ?? '') > state.currentDate);
   const sessionRecovery = Math.min(20, (liveMatch.sessions?.completedBreaks ?? []).reduce((n, b) => n + (b.kind === 'overnight' ? 10 : b.kind === 'session' ? 5 : 2) + (b.choice === 'recover' ? 2 : 0), 0));
   const fatigueChange = clamp(
     Math.round(liveMatch.frameHistory.length * 1.5) + (won ? 2 : 1),
     4,
     16,
   ) - sessionRecovery;
-  const playerWonTournament = won && isFinalRound;
-  const opponentWonTournament = !won && isFinalRound;
+  const playerWonTournament = groupResult ? groupCompetitionChampion(groupResult.draw, tournament) === state.player.fullName && !nextRound : won && isFinalRound;
+  const opponentWonTournament = groupResult ? groupCompetitionChampion(groupResult.draw, tournament) === liveMatch.opponentName && !nextRound : !won && isFinalRound;
   const awardsCareerTitle = tournamentAwardsCareerTitle(tournament);
   const playerWonTitle = playerWonTournament && awardsCareerTitle;
   const opponentWonTitle = opponentWonTournament && awardsCareerTitle;
@@ -15917,6 +15800,7 @@ export function finalizeLiveMatch(
   const tournamentClass = getTournamentCircuitClass(tournament);
   const equipmentProfile = getEquipmentPerformanceProfile(state.equipment);
   const latestMatch: Match = {
+    televised: tournament.televisedRounds?.includes(liveMatch.round) ?? false,
     sourceMatchId,
     season: state.season,
     id: `match-${Date.now()}-${tournament.id}-${liveMatch.round.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${state.history.matchLog.length + 1}`,
@@ -15933,11 +15817,12 @@ export function finalizeLiveMatch(
     opponentRanking: liveMatch.opponentRanking,
     playerFrames: liveMatch.playerFrames,
     opponentFrames: liveMatch.opponentFrames,
-    result: won ? "Won" : "Lost",
+    result: drawn ? "Drawn" : won ? "Won" : "Lost",
     highestBreak: liveMatch.playerHighestBreak,
     opponentHighestBreak: liveMatch.opponentHighestBreak,
     fifties: liveMatch.playerFifties,
     centuries: liveMatch.playerCenturies,
+    maximumBreaks: liveMatch.playerMaximums,
     potSuccess: getRealisticMatchSuccessRate(
       liveMatch.playerVisitProfile,
       "pot",
@@ -15959,7 +15844,7 @@ export function finalizeLiveMatch(
       liveMatch.playerConfidence,
       liveMatch.playerFatigue,
     ),
-    fouls: clamp(
+    fouls: liveMatch.playerStats.visits > 0 ? liveMatch.playerStats.fouls : clamp(
       Math.round(Math.random() * 4 - equipmentProfile.miscueReduction / 2),
       0,
       5,
@@ -15979,6 +15864,15 @@ export function finalizeLiveMatch(
     tournamentClass,
     frameHistory: liveMatch.frameHistory,
   };
+  latestMatch.objectives = assessMatchObjectives(liveMatch.objectives, latestMatch);
+  const completedObjectives = latestMatch.objectives.length > 0 && latestMatch.objectives.every(o => o.achieved);
+  const previousRival = getRivalry(state, liveMatch.opponentName);
+  const rivalryRebound = Boolean(won && previousRival?.rivalry && previousRival.recent.at(-1) === 'L');
+  const confidenceAfterResult = clamp(state.player.confidence + confidenceChange, 25, 99);
+  const developmentBonus = Math.min(99 - confidenceAfterResult, Number(completedObjectives) + Number(rivalryRebound));
+  latestMatch.confidenceChange = confidenceAfterResult + developmentBonus - state.player.confidence;
+  latestMatch.debrief = { ...matchDebrief(state, latestMatch), confidenceBonus: developmentBonus,
+    bonusReason: [completedObjectives ? 'Personal objectives completed' : '', rivalryRebound ? 'A winning response in your rivalry' : ''].filter(Boolean).join(' · ') };
   const normalizedSponsors = normalizeSponsors(state.sponsors);
   const careerCenturies =
     state.history.tournamentHistory.reduce(
@@ -16001,7 +15895,7 @@ export function finalizeLiveMatch(
     (sum, entry) => sum + entry.award.amount,
     0,
   );
-  const sponsorsAfterMatch = normalizedSponsors.map((sponsor) => {
+  const sponsorsWithBonuses = normalizedSponsors.map((sponsor) => {
     const awards = sponsorAwards.filter(
       (entry) => entry.sponsor.id === sponsor.id,
     );
@@ -16017,6 +15911,20 @@ export function finalizeLiveMatch(
         awards.reduce((sum, entry) => sum + entry.award.amount, 0),
     };
   });
+  const commercialRanking = sponsorRanking(state);
+  const sponsorReviews = sponsorsWithBonuses.map(sponsor => reviewSponsorPerformance(sponsor, {
+    matchId: sourceMatchId, result: drawn ? "Drawn" : won ? "Won" : "Lost", rank: commercialRanking.rank, rankingLabel: commercialRanking.label,
+    playerMatchRank: latestMatch.playerRanking, opponentRank: liveMatch.opponentRanking, bestOf: liveMatch.bestOf,
+    competitive: !/exhibition|pro.am/i.test(tournament.name) && tournament.type !== 'Exhibition',
+  }));
+  const sponsorsAfterMatch = sponsorReviews.filter(review => review.notice !== 'terminated').map(review => review.sponsor);
+  const performanceMessages = sponsorReviews.flatMap(({ sponsor, notice }) => !notice ? [] : [createInboxMessage({
+    sender: sponsor.name,
+    subject: notice === 'terminated' ? 'Sponsorship ended after performance review' : notice === 'warning' ? 'Sponsor performance warning' : notice === 'recovered' ? 'Sponsor confidence restored' : 'Sponsor concerned about results',
+    preview: notice === 'terminated' ? `${sponsor.name} ended the deal after the six-match recovery period with satisfaction below 25/100. The ${sponsor.slot} slot is free and £${sponsor.monthlyValue}/month has been removed.` : notice === 'warning' ? `Satisfaction is ${Math.round(sponsor.performance!.satisfaction)}/100. You have at least six further competitive matches to recover. Stay at 25 or above to avoid cancellation; reach 50 to clear the warning.` : notice === 'recovered' ? 'Satisfaction is back to 50 or above. Your performance warning has been cleared.' : 'Satisfaction has fallen below 50/100. Wins and maintaining your agreed ranking help rebuild confidence. There is no immediate cancellation.',
+    priority: notice === 'warning' || notice === 'terminated' ? 'High' : 'Medium', actionLabel: 'Review Sponsors', actionRoute: '/sponsorship',
+  }, 'Today')]);
+
   const equipmentAfterMatch = applyEquipmentMatchWear(
     state.equipment,
     liveMatch.frameHistory.length,
@@ -16099,7 +16007,7 @@ export function finalizeLiveMatch(
       opponentFrames: liveMatch.opponentFrames,
     },
   ];
-  const drawAfterMatch = applyCompletedMatchToTournamentDraw(
+  const drawAfterMatch = groupResult?.draw ?? applyCompletedMatchToTournamentDraw(
     state.tournamentProgress.draw,
     tournament,
     liveMatch.round,
@@ -16108,7 +16016,7 @@ export function finalizeLiveMatch(
     liveMatch.opponentFrames,
   );
   const completedEventDraw =
-    won && nextRound
+    nextRound
       ? drawAfterMatch
       : completeRemainingTournamentDraw(
           drawAfterMatch,
@@ -16147,18 +16055,12 @@ export function finalizeLiveMatch(
   const playerAfterMatch: Player = {
     ...state.player,
     cash: state.player.cash + prizeMoneyEarned + sponsorBonusTotal,
-    confidence: clamp(state.player.confidence + confidenceChange, 25, 99),
+    confidence: clamp(state.player.confidence + latestMatch.confidenceChange, 25, 99),
     fatigue: clamp(state.player.fatigue + fatigueChange, 0, 100),
-    morale: clamp(state.player.morale + (won ? 3 : -2), 0, 100),
-    form: [...state.player.form.slice(-9), won ? "W" : "L"],
+    morale: clamp(state.player.morale + (drawn ? 0 : won ? 3 : -2), 0, 100),
+    form: [...state.player.form.slice(-9), drawn ? "D" : won ? "W" : "L"],
     reputation: clamp(
       state.player.reputation + (won ? (nextRound ? 2 : 4) : 0),
-      0,
-      100,
-    ),
-    legacyScore: clamp(
-      state.player.legacyScore +
-        (won ? (liveMatch.round === "Final" ? 8 : 3) : 1),
       0,
       100,
     ),
@@ -16169,8 +16071,10 @@ export function finalizeLiveMatch(
     liveMatch.round === getQSchoolCardWinningRound(tournament);
   const playoffCardClinched =
     playerWonTournament && tournament.name.toLowerCase().includes("play-off");
-  const directAmateurCardClinched =
-    playerWonTournament && isDirectAmateurTourCardRoute(tournament);
+  const directAmateurCardClinched = isDirectAmateurTourCardRoute(tournament) && (
+    playerWonTournament && !securedPathwayCards(state, tournament.startDate).has(state.player.fullName) ||
+    !won && isFinalRound && /ebsa/i.test(tournament.name) && securedPathwayCards(state, tournament.startDate).has(liveMatch.opponentName)
+  );
   const directTourCardSource: Exclude<TourCardSource, null> | null =
     qSchoolCardClinched
       ? "Q School"
@@ -16199,11 +16103,17 @@ export function finalizeLiveMatch(
       ? awardsCareerTitle
         ? "Champion"
         : "Qualified"
-      : won && nextRound
+      : nextRound
         ? `Advanced to ${nextRound}`
         : `Lost in ${liveMatch.round}`,
   );
-  if (!won || !nextRound) {
+  if (drawn) {
+    for (const key of getCompetitionKeysForTournament(tournament)) competitionTables[key] = competitionTables[key].map(row => {
+      const before = state.competitionTables[key].find(r => r.playerName === row.playerName);
+      return before && [state.player.fullName, liveMatch.opponentName].includes(row.playerName) ? { ...row, wins: before.wins, losses: before.losses } : row;
+    });
+  }
+  if (!nextRound) {
     competitionTables = updateCompetitionTablesFromCpuDraw(
       competitionTables,
       state.competitionTables,
@@ -16272,7 +16182,7 @@ export function finalizeLiveMatch(
     getPrimaryCompetitionKey({ player: playerAfterMatch, careerSystems })
   ].map((row) => ({ ...row }));
   const worldPlayers =
-    won && nextRound
+    nextRound
       ? state.worldPlayers
       : updateWorldPlayersFromCompletedDraw(
           state.worldPlayers,
@@ -16311,14 +16221,14 @@ export function finalizeLiveMatch(
         item.id === tournament.id
           ? {
               ...item,
-              status: (won && nextRound
+              status: (nextRound
                 ? "Entered"
                 : "Completed") as Tournament["status"],
             }
           : item,
       ),
       tournamentProgress:
-        won && nextRound
+        nextRound
           ? {
               tournamentId: tournament.id,
               currentRound: nextRound,
@@ -16336,6 +16246,7 @@ export function finalizeLiveMatch(
       liveMatch,
       inbox: [
         ...equipmentWarnings,
+        ...performanceMessages,
         ...sponsorAwards.map(({ sponsor, award }) =>
           createInboxMessage(
             {
@@ -16349,13 +16260,13 @@ export function finalizeLiveMatch(
             "Today",
           ),
         ),
-        ...(won && nextRound
+        ...(nextRound
           ? [
               createInboxMessage(
                 {
                   sender: "Tournament Office",
                   subject: `Win at ${tournament.name}`,
-                  preview: `${state.player.fullName} beat ${liveMatch.opponentName} ${liveMatch.playerFrames}-${liveMatch.opponentFrames} in the ${liveMatch.round}. Prize: £${prizeMoneyEarned}. Ranking points: ${rankingPointsGained}. Next round: ${nextRound}.`,
+                  preview: `${state.player.fullName} ${drawn ? "drew with" : won ? "beat" : "lost to"} ${liveMatch.opponentName} ${liveMatch.playerFrames}-${liveMatch.opponentFrames} in the ${liveMatch.round}. Prize: £${prizeMoneyEarned}. Ranking points: ${rankingPointsGained}. Next round: ${nextRound}.`,
                   priority: "High",
                   actionLabel: "Continue Tournament",
                   actionRoute: "/tournaments/hub",
@@ -16368,6 +16279,12 @@ export function finalizeLiveMatch(
       ].slice(0, 18),
       history: {
         ...state.history,
+        legacy: recordLegacyMatch(careerLegacyOf(state), latestMatch, playerWonTitle ? {
+          id: state.season + ':' + tournament.id, tournamentId: tournament.id, name: tournament.name,
+          season: state.season, date: state.currentDate, category: tournament.eventClass ?? tournament.type,
+          rankingType: tournament.rankingType, circuit: tournament.tourCircuit ?? tournament.type, opponent: liveMatch.opponentName,
+          score: liveMatch.playerFrames + '–' + liveMatch.opponentFrames, prizeMoney: playerPlacement.prizeMoney,
+        } : undefined),
         matchLog: appendMatchLog(state.history.matchLog, matchLogEntry),
         tournamentHistory: upsertTournamentHistoryEntry(
           state.history.tournamentHistory,
@@ -16377,8 +16294,8 @@ export function finalizeLiveMatch(
                 entry.id ===
                 getTournamentHistoryId(state.season, tournament.id),
             ) ?? createTournamentHistoryEntry(tournament, state.season)),
-            status: won && nextRound ? "In Progress" : "Completed",
-            result: won
+            status: nextRound ? "In Progress" : "Completed",
+            result: playerWonTournament ? "Winner" : groupMatch ? (nextRound ? `Group play continues · ${nextRound}` : `Eliminated in ${liveMatch.round}`) : won
               ? tourCardClinched && nextRound
                 ? `Advanced to ${nextRound} · Tour card secured`
                 : nextRound
@@ -16434,9 +16351,11 @@ export function finalizeLiveMatch(
         ),
       },
     },
-    won && nextRound
-      ? `Won the ${liveMatch.round} at ${tournament.name} and advanced to the ${nextRound}.`
-      : won
+    nextRound
+      ? `${drawn ? "Drew" : won ? "Won" : "Lost"} ${liveMatch.playerFrames}-${liveMatch.opponentFrames} at ${tournament.name}. Next match: ${nextRound}.`
+      : groupMatch
+        ? `Group complete at ${tournament.name}. You did not qualify from ${liveMatch.round}.`
+        : won
         ? `Won the ${liveMatch.round} at ${tournament.name} and took the title.`
         : `Lost in the ${liveMatch.round} at ${tournament.name}.`,
     `${tournament.name} ${liveMatch.round}`,
@@ -16449,7 +16368,7 @@ export function finalizeLiveMatch(
       status: "Completed" as const,
     },
   };
-  if (won && nextRound) return completedMatchState;
+  if (nextRound) return completedMatchState;
 
   const previousRank =
     state.rankings.find((row) => row.playerName === state.player.fullName)
@@ -16471,7 +16390,7 @@ export function finalizeLiveMatch(
   const eventCosts = entryCost + travelCost + preparationCost;
   const eventNet = eventIncome - eventCosts;
   const nextTournament = getNextEligibleTournament(completedMatchState);
-  const finish = won ? "Winner" : `Lost in ${liveMatch.round}`;
+  const finish = playerWonTournament ? "Winner" : groupMatch ? `Eliminated in ${liveMatch.round}` : `Lost in ${liveMatch.round}`;
   const rankingSummary = currentRank
     ? `${nextState.player.rankingLabel} #${currentRank}${rankingMovement === 0 ? " (no change)" : ` (${rankingMovement > 0 ? "up" : "down"} ${Math.abs(rankingMovement)})`}`
     : `${nextState.player.rankingLabel} unchanged`;
@@ -16685,10 +16604,10 @@ function recalculateState(
       careerSystems,
       state.history,
     ),
-    nextEvent: nextEvent?.name ?? state.player.nextEvent,
+    nextEvent: nextEvent?.name ?? "No eligible event",
     daysUntilEvent: nextEvent
       ? daysUntil(nextEvent.startDate, state.currentDate)
-      : state.player.daysUntilEvent,
+      : 0,
     inboxCount: unreadCount,
     notificationCount: unreadCount,
   };
@@ -16711,7 +16630,7 @@ function recalculateState(
     sponsorOffers: refreshSponsorOffers(state),
     sponsors: normalizeSponsors(state.sponsors).filter(
       (sponsor) => sponsor.weeksRemaining > 0,
-    ),
+    ).map(sponsor => ({ ...sponsor, performance: sponsorPerformance(sponsor, sponsorRanking({ player, rankings: activeRankings }).rank, player.rankingLabel) })),
     lastAction,
   };
 }
@@ -17160,6 +17079,7 @@ function loadStoredState(): GameState {
       liveMatch: normalizeLiveMatchState(parsed.liveMatch ?? null),
       history: parsed.history
         ? {
+            legacy: parsed.history.legacy,
             snapshots: (
               parsed.history.snapshots ?? fallbackState.history.snapshots
             ).map((snapshot) => ({
@@ -18144,7 +18064,8 @@ export function renewSponsorState(previousState: GameState, sponsorId: string) {
   if (
     !sponsor ||
     sponsor.renewalStatus !== "Offered" ||
-    !sponsor.renewalOfferValue
+    !sponsor.renewalOfferValue ||
+    (sponsor.performance?.satisfaction ?? 75) < 50
   ) {
     return finalizeState(
       previousState,
