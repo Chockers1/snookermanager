@@ -70,7 +70,7 @@ export function SponsorshipOffersPage() {
         {brandMetrics.map((metric) => (
           <div key={metric.label} className="card min-h-0 px-3 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{metric.label}</p>
-            <p className="mt-1 text-2xl font-bold text-white">{metric.value}%</p>
+            <p className="mt-1 text-2xl font-bold text-white">{metric.value.toFixed(2)}%</p>
             <p className="text-[10px] text-gray-400">{metric.detail}</p>
             <div className="mt-2">
               <ProgressBar value={metric.value} tone={metric.value >= 75 ? 'green' : metric.value >= 50 ? 'amber' : 'red'} compact />

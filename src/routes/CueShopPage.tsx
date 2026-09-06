@@ -91,6 +91,7 @@ export function CueShopPage() {
     gameState,
     buyCue,
     buyChalk,
+    restockChalk,
     buyTip,
     buyCase,
     buyTableSetup,
@@ -320,7 +321,7 @@ export function CueShopPage() {
               </span>
               {owned ? (
                 <span className={equipped ? "text-green-300" : "text-sky-300"}>
-                  {equipped ? "In current setup" : "Ready to equip"}
+                  {gameState.equipment.chalkStock[chalk.id] ?? 0} units · {equipped ? "In use" : "Owned"}
                 </span>
               ) : null}
             </div>
@@ -538,36 +539,25 @@ export function CueShopPage() {
   }
 
   function renderDetail() {
-    if (activeTab === "chalk")
-      return (
-        <>
-          <h3 className="text-sm font-bold text-white">{selectedChalk.name}</h3>
-          <div className="mt-3 space-y-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Price</span>
-              <span className="font-bold text-green-400">
-                {formatMoney(selectedChalk.cost)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Current Chalk</span>
-              <span className="text-white">
-                {currentChalk?.name ?? "Empty Slot"}
-              </span>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="btn-primary mt-4 w-full justify-center text-xs"
-            onClick={() => buyChalk(selectedChalk.id)}
-          >
-            <ShoppingCart className="h-3.5 w-3.5" />{" "}
-            {gameState.equipment.chalkOwned.includes(selectedChalk.id)
-              ? "Equip Chalk"
-              : "Buy Chalk"}
-          </button>
-        </>
-      );
+    if (activeTab === "chalk") {
+      const owned = gameState.equipment.chalkOwned.includes(selectedChalk.id);
+      const equipped = gameState.equipment.currentChalkId === selectedChalk.id;
+      const condition = equipped ? gameState.equipment.chalkCondition : gameState.equipment.chalkConditions?.[selectedChalk.id] ?? 100;
+      const units = Math.max(0, (gameState.equipment.chalkStock[selectedChalk.id] ?? 0) - Number(condition <= 0));
+      const affordable = gameState.player.cash >= selectedChalk.cost;
+      return <>
+        <h3 className="text-sm font-bold text-white">{selectedChalk.name}</h3>
+        <div className="mt-3 space-y-2 text-xs">
+          <div className="flex justify-between gap-2"><span className="text-gray-500">Pack price · 5 units</span><span className="font-bold text-green-400">{formatMoney(selectedChalk.cost)}</span></div>
+          <div className="flex justify-between gap-2"><span className="text-gray-500">Usable stock</span><span aria-label="Selected chalk stock" className={units <= 1 ? 'text-amber-300' : 'text-white'}>{units} {units === 1 ? 'unit' : 'units'}</span></div>
+          <p className="text-[10px] text-gray-400">Stock includes the unit in use. Buying a pack adds five; usable chalk keeps its current condition.</p>
+          <div className="flex justify-between gap-2"><span className="text-gray-500">Current Chalk</span><span className="text-right text-white">{currentChalk?.name ?? 'Empty Slot'}</span></div>
+        </div>
+        <button type="button" disabled={!affordable} className="btn-primary mt-4 w-full justify-center text-xs" onClick={() => restockChalk(selectedChalk.id)}><ShoppingCart className="h-3.5 w-3.5" />{owned ? 'Buy another pack' : 'Buy chalk pack'} · {formatMoney(selectedChalk.cost)}</button>
+        {!affordable && <p className="mt-2 text-xs text-amber-300">Not enough funds for this pack.</p>}
+        {owned && units > 0 && <button type="button" disabled={equipped && condition > 0} className="btn-secondary mt-2 w-full justify-center text-xs" onClick={() => buyChalk(selectedChalk.id)}>{equipped && condition > 0 ? 'Chalk equipped' : 'Equip Chalk'}</button>}
+      </>;
+    }
     if (activeTab === "tips")
       return (
         <>

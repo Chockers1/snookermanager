@@ -17286,6 +17286,29 @@ export function buyChalkState(previousState: GameState, chalkId: string) {
   );
 }
 
+/** Buy more consumable stock without replacing a usable unit or changing chalk brands. */
+export function restockChalkState(previousState: GameState, chalkId: string) {
+  const chalk = chalkCatalog.find(item => item.id === chalkId);
+  if (!chalk) return previousState;
+  if (!previousState.equipment.chalkOwned.includes(chalkId)) return buyChalkState(previousState, chalkId);
+  if (previousState.player.cash < chalk.cost) return finalizeState(previousState, `Not enough cash to buy a pack of ${chalk.name}.`);
+  const equipment = previousState.equipment;
+  const equipped = equipment.currentChalkId === chalkId;
+  const condition = equipped ? equipment.chalkCondition : equipment.chalkConditions?.[chalkId] ?? 100;
+  const usableStock = Math.max(0, (equipment.chalkStock[chalkId] ?? 0) - Number(condition <= 0));
+  const nextStock = usableStock + 5;
+  const nextCondition = usableStock > 0 && condition > 0 ? condition : 100;
+  return finalizeState({
+    ...previousState,
+    player: { ...previousState.player, cash: previousState.player.cash - chalk.cost },
+    equipment: { ...equipment,
+      chalkStock: { ...equipment.chalkStock, [chalkId]: nextStock },
+      chalkConditions: { ...equipment.chalkConditions, [chalkId]: nextCondition },
+      chalkCondition: equipped ? nextCondition : equipment.chalkCondition,
+    },
+  }, `Bought five more units of ${chalk.name} for £${chalk.cost}. Stock: ${nextStock} units.`, 'Equipment Purchase');
+}
+
 export function buyTipState(previousState: GameState, tipId: string) {
   const tip = tipCatalog.find((item) => item.id === tipId);
   if (!tip) return previousState;
@@ -18656,6 +18679,9 @@ export function useGameState() {
       },
       buyCue(cueId: string) {
         setGameState((previousState) => buyCueState(previousState, cueId));
+      },
+      restockChalk(chalkId: string) {
+        setGameState(previousState => restockChalkState(previousState, chalkId));
       },
       buyChalk(chalkId: string) {
         setGameState((previousState) => buyChalkState(previousState, chalkId));

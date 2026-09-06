@@ -355,7 +355,7 @@ export function RankingsPage() {
         <span className="text-gray-400">Recorded results only{pathwayRows.length === 0 ? ' — no completed events yet' : ''}.</span>
         {qTourPlaces?.automatic && <span className="text-emerald-300">Provisional Europe card: {qTourPlaces.automatic}</span>}
       </div>}
-      <div className="rounded-xl border border-border bg-surface/85 px-4 py-3">
+      <div className="shrink-0 rounded-xl border border-border bg-surface/85 px-4 py-3">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Rankings</p>
@@ -388,9 +388,9 @@ export function RankingsPage() {
         <ul className="mt-1 max-h-24 space-y-1 overflow-y-auto">{pendingEarnings.map(e => <li key={e.id} className="text-gray-300">{gameState.rollingRankings?.events[e.eventKey]?.name ?? e.eventKey}: <strong className="text-white">+{formatMoney(e.amount)}</strong> counts from <strong className="text-white">{e.earnedOn}</strong>.</li>)}</ul>
         <p className="mt-1 text-gray-400">Your eventual position also depends on other players’ results and expiring earnings. Exhibitions award no world-ranking credit.</p>
       </section>}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
-        <div className="grid min-h-0 gap-3 xl:col-span-8 xl:grid-rows-[minmax(0,1fr)_84px] xl:gap-2">
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
+        <div className="grid min-h-0 min-w-0 gap-3 xl:col-span-8 xl:grid-rows-[minmax(0,1fr)_84px] xl:gap-2">
+          <div className="card min-h-0 min-w-0 flex h-[28rem] flex-col overflow-hidden xl:h-full">
             <div className="card-header px-3 py-2.5"><h3 className="text-sm font-semibold text-white">{activeConfig.label}</h3><span className="text-[10px] text-gray-400">{activeConfig.seasonLabel}</span></div>
             <div className="min-h-0 flex-1 overflow-auto scrollbar-thin">
               <table className="w-full text-[11px]">
@@ -452,7 +452,7 @@ export function RankingsPage() {
             </div>
           </div>
 
-          <div className="grid h-full grid-cols-4 gap-2">
+          <div className="grid h-full grid-cols-2 gap-2 sm:grid-cols-4">
             {rankingCards.map((card) => (
               <div key={card.title} className="card min-h-0 px-3 py-2.5">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{card.title}</p>
@@ -462,8 +462,8 @@ export function RankingsPage() {
           </div>
         </div>
 
-        <div className={lists.length ? "grid gap-3 xl:col-span-4" : "grid min-h-0 gap-3 xl:col-span-4 xl:grid-rows-[0.23fr_0.22fr_0.14fr_0.16fr_0.17fr_0.08fr] xl:gap-2"}>
-          <div className="card min-h-0 overflow-hidden bg-gradient-to-b from-surface-light/80 to-surface/80 px-4 py-3 text-center">
+        <div aria-label="Ranking insights" className={"flex min-h-0 min-w-0 flex-col gap-3 xl:col-span-4 xl:gap-2 [&>div]:shrink-0 " + (lists.length ? "" : "scrollbar-thin xl:overflow-y-auto xl:overscroll-contain xl:pr-1")}>
+          <div className="card min-w-0 bg-gradient-to-b from-surface-light/80 to-surface/80 px-4 py-3 text-center">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{finalRankingTab ? 'Current Ranking After Final' : `Your ${activeConfig.label}`}</p>
             <p className="mt-1 text-5xl font-bold text-white">#{playerRow?.ranking ?? '-'}</p>
             <div className={`mt-1 flex items-center justify-center gap-1 text-xs ${playerMovementTone}`}>
@@ -475,9 +475,9 @@ export function RankingsPage() {
             {activeTab === 'world' && <p className="mt-1 text-[10px] text-amber-300">Next 30 days expiring: {formatMoney(earningsSummary.expiring)}</p>}
           </div>
 
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-            <div className="card-header px-3 py-2"><h3 className="text-sm font-semibold text-white">Ranking Movement</h3></div>
-            <div className="card-body h-full min-h-0 px-2 py-2">
+          <div className="card flex h-32 flex-col overflow-hidden">
+            <div className="card-header shrink-0 px-3 py-2"><h3 className="text-sm font-semibold text-white">Ranking Movement</h3></div>
+            <div className="min-h-0 flex-1 px-2 py-2">
               <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
                 <LineChart data={rankingMomentum}>
                   <CartesianGrid stroke="#203449" vertical={false} />
@@ -497,9 +497,9 @@ export function RankingsPage() {
             <p className="mt-1 truncate text-[10px] text-gray-500">{nextTournament?.name ?? 'Next event'} can shift this race.</p>
           </div>
 
-          <div className="card min-h-0 flex h-full flex-col overflow-hidden px-3 py-2.5">
+          <div className="card flex flex-col px-3 py-2.5">
             <h3 className="mb-2 text-xs font-semibold text-white">Recent Ranking Sources</h3>
-            <div className="min-h-0 flex-1 space-y-1.5 overflow-auto text-[10px] text-gray-400 scrollbar-thin">
+            <div className="max-h-36 space-y-1.5 overflow-y-auto text-[10px] text-gray-400 scrollbar-thin">
               {activeTab === 'world' && earningsSummary.estimated > 0 && <p className="text-amber-300">Estimated opening carry-over: {formatMoney(earningsSummary.estimated)}. Replaced by recorded results as it expires. New awards post at the event's scheduled finish.</p>}
               {moneyRanking && <p className="text-sky-300">Latest world update: {gameState.rollingRankings?.revisions.at(-1)?.date ?? 'Opening list'} · {Object.values(gameState.rollingRankings?.events ?? {}).filter(e => e.applied && e.ranking && e.season === gameState.season).length} ranking events settled this season.</p>}
               {rankingSources.length > 0 ? rankingSources.map((item) => (
@@ -512,7 +512,7 @@ export function RankingsPage() {
 
           <div className="card min-h-0 px-3 py-2.5">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold text-white"><Target className="h-3 w-3 text-green-400" /> Event Scenarios</h3>
-            <div className="grid h-[calc(100%-1.5rem)] grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {rankingScenarios.map((scenario) => (
                 <div key={scenario.label} className="flex min-h-0 flex-col items-center justify-center rounded bg-surface-light/70 px-2 py-1.5 text-center">
                   <p className="text-[9px] text-gray-500">{scenario.label}</p>
@@ -525,7 +525,7 @@ export function RankingsPage() {
 
           <div className="card min-h-0 px-3 py-2.5">
             <h3 className="mb-2 text-xs font-semibold text-white">Form</h3>
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1">
               {gameState.player.form.slice(-10).map((result, index) => <span key={`${result}-${index}`} className={`h-2.5 w-2.5 rounded-full ${formTone(result)}`} />)}
             </div>
           </div>
