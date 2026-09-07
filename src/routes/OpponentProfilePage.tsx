@@ -1,5 +1,5 @@
 import { careerLegacyOf } from '../game/careerLegacy';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link,useParams } from 'react-router-dom';
 import { useGame } from '../context/useGame';
 import { PlayerLink } from '../components/game/PlayerLink';
@@ -15,8 +15,11 @@ function PlayerProfileContent(){
  const {id=''}=useParams();const {gameState,actOnRealism}=useGame();const [limit,setLimit]=useState(15);const [selectedSeason,setSelectedSeason]=useState('all');
  const player=resolveProfilePlayer(gameState,id);const name=player?.playerName??id;const human=name===gameState.player.fullName;const rank=gameState.competitionTables.world.find(p=>p.playerName===name)?.ranking;
  const legacy=human?careerLegacyOf(gameState):undefined;
- const history=playerEventHistory(gameState,name);const rankings=playerRankingHistory(gameState,name);const scouting=profileScouting(gameState,name);
- const seasons=playerSeasonHistory(gameState,name,history);
+ const {history,rankings,scouting,seasons}=useMemo(()=>{
+  const profileName=resolveProfilePlayer(gameState,id)?.playerName??id;
+  const history=playerEventHistory(gameState,profileName);
+  return {history,rankings:playerRankingHistory(gameState,profileName),scouting:profileScouting(gameState,profileName),seasons:playerSeasonHistory(gameState,profileName,history)};
+ },[gameState,id]);
  const filteredHistory=selectedSeason==='all'?history:history.filter(e=>e.season===selectedSeason);
  const seasonTotal=(key:'matches'|'wins'|'losses'|'titles'|'prize')=>seasons.reduce((sum,s)=>sum+(s[key]??0),0);
  const totals=player?{matches:Math.max(player.totalMatches,seasonTotal('matches')),wins:Math.max(player.wins,seasonTotal('wins')),losses:Math.max(player.losses,seasonTotal('losses')),titles:Math.max(player.titles,seasonTotal('titles')),prize:Math.max(player.totalPrizeMoney,seasonTotal('prize'))}:undefined;

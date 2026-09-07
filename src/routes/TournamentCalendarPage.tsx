@@ -1,11 +1,13 @@
+import { ActionBlockerNotice } from '../components/game/ActionBlockerNotice';
+import { tournamentEntryBlocker } from '../hooks/useGameState';
 import { TournamentRewards } from '../components/game/TournamentRewards';
 import { SeasonBoardPanel, EntryTimelinePanel } from '../components/career/SeasonExpansionPanels'
 import { CoachAdvicePanel } from "../components/career/MatchInsightPanels";
 import { MonthCalendar, CalendarEventDialog } from '../components/tournaments/MonthCalendar'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { SeasonPlanningPanel } from '../components/career/CareerDepthPanels'
 import { QualificationRacesPanel, TravelLocationPanel } from '../components/career/RealismPanels'
-import { tournamentCommitmentConflict } from '../game/careerDepth/commitments'
+
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, List, MapPin, Search, Trophy } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
@@ -83,7 +85,7 @@ export function TournamentCalendarPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const linkedTournament = gameState.tournaments.find(t => t.id === searchParams.get('tournament'))
-  const calendarData = buildCalendarData(gameState)
+  const calendarData = useMemo(() => buildCalendarData(gameState), [gameState])
   const liveTournamentsById = new Map(gameState.tournaments.map((event) => [event.id, event]))
   const equipmentReady = Boolean(gameState.equipment.currentCueId && gameState.equipment.currentChalkId && gameState.equipment.currentTipId)
   const currentDate = new Date(gameState.currentDate + 'T00:00:00')
@@ -105,18 +107,7 @@ export function TournamentCalendarPage() {
   const selectedStatus = selectedTournament ? liveTournamentsById.get(selectedTournament.id)?.status ?? selectedTournament.status : 'Available'
   const selectedAccess = selectedTournament ? getTournamentEntryAccess(gameState, selectedTournament) : null
   const selectedCashRequirement = selectedTournament ? getTournamentEntryCashRequirement(gameState, selectedTournament) : 0
-  const eventExpired = selectedTournament ? new Date(`${selectedTournament.endDate ?? selectedTournament.startDate}T00:00:00`) < currentDate : false
-  const existingEntry = gameState.tournaments.find((event) => event.status === 'Entered' && event.id !== selectedTournament?.id)
-  const entryConflict = selectedTournament ? tournamentCommitmentConflict(gameState, selectedTournament) : null
-  const entryBlocker = entryConflict ?? (!selectedAccess?.allowed
-    ? selectedAccess?.reason
-    : eventExpired
-      ? 'This event has already finished.'
-      : existingEntry
-        ? `Finish or withdraw from ${existingEntry.name} first.`
-        : gameState.player.cash < selectedCashRequirement
-          ? 'Not enough cash for the entry fee.'
-          : null)
+  const entryBlocker = selectedTournament ? tournamentEntryBlocker(gameState, selectedTournament) : null
 
   const eventDetails = <div className="space-y-4">
           {!selectedTournament || !selectedCalendarEvent || !selectedEventDetail ? (
@@ -154,7 +145,7 @@ export function TournamentCalendarPage() {
                     <p className="flex items-center gap-2"><span className={selectedAccess?.allowed ? 'h-2 w-2 rounded-full bg-green-500' : 'h-2 w-2 rounded-full bg-red-500'} /> {selectedAccess?.reason ?? selectedTournament.unlockRequirement ?? selectedCalendarEvent.unlockRequirement}</p>
                     <p className="flex items-center gap-2"><span className={equipmentReady ? 'h-2 w-2 rounded-full bg-green-500' : 'h-2 w-2 rounded-full bg-red-500'} /> Equipment slots ready</p>
                     <p className="flex items-center gap-2"><span className={gameState.player.cash >= selectedCashRequirement ? 'h-2 w-2 rounded-full bg-green-500' : 'h-2 w-2 rounded-full bg-red-500'} /> Entry cash available ({formatMoney(selectedCashRequirement)})</p>
-                    {entryBlocker && selectedStatus !== 'Entered' && selectedStatus !== 'Completed' ? <p className="text-red-400" role="alert">{entryBlocker}</p> : null}
+                    {entryBlocker && selectedStatus !== 'Entered' && selectedStatus !== 'Completed' ? <ActionBlockerNotice blocker={entryBlocker} /> : null}
                   </div>
                 </div>
               </div>
@@ -176,7 +167,7 @@ export function TournamentCalendarPage() {
                 ) : selectedStatus === 'Completed' ? (
                   <button type="button" className="btn-primary justify-center text-xs" onClick={() => navigate(`/tournaments/draw?tournament=${encodeURIComponent(selectedTournament.id)}`)}>View Completed Draw <ChevronRight className="h-3 w-3" /></button>
                 ) : (
-                  <button type="button" disabled={Boolean(entryBlocker)} className="btn-primary justify-center text-xs disabled:cursor-not-allowed disabled:opacity-50" onClick={() => equipmentReady ? enterTournament(selectedTournament.id) : navigate('/equipment/cues')}>{equipmentReady ? 'Enter Tournament' : 'Open Equipment'} <ChevronRight className="h-3 w-3" /></button>
+                  <button type="button" className="btn-primary justify-center text-xs" onClick={() => entryBlocker ? navigate(entryBlocker.route) : enterTournament(selectedTournament.id)}>{entryBlocker?.label ?? 'Enter Tournament'} <ChevronRight className="h-3 w-3" /></button>
                 )}
                 <button type="button" disabled={selectedStatus === 'Completed'} className="btn-secondary justify-center text-xs disabled:cursor-not-allowed disabled:opacity-40" onClick={() => navigate('/travel')}>Travel Plan</button>
                 <button type="button" className="btn-secondary justify-center text-xs" onClick={() => navigate('/finance')}>View Budget</button>

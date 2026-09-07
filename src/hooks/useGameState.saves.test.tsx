@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createPlayerBackgroundCatalog,
@@ -41,16 +41,18 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("career save slots", () => {
-  it("creates independent autosave slots and can load either career", () => {
+  it("creates independent autosave slots and can load either career", async () => {
     const { result } = renderHook(() => useGameState());
 
-    act(() => result.current.resetCareer(buildCareerConfig("Alice Breaker")));
+    await act(async () => result.current.resetCareer(buildCareerConfig("Alice Breaker")));
+    await waitFor(() => expect(result.current.savePending).toBe(false));
     const firstSlot = readSaveSlotIndex()[0];
     expect(firstSlot?.playerName).toBe("Alice Breaker");
     if (!firstSlot) return;
     expect(window.localStorage.getItem(ACTIVE_SAVE_SLOT_KEY)).toBe(firstSlot.id);
 
-    act(() => result.current.resetCareer(buildCareerConfig("Ben Safety")));
+    await act(async () => result.current.resetCareer(buildCareerConfig("Ben Safety")));
+    await waitFor(() => expect(result.current.savePending).toBe(false));
     const slots = readSaveSlotIndex();
     const secondSlot = slots.find((slot) => slot.playerName === "Ben Safety");
     expect(slots).toHaveLength(2);
@@ -59,15 +61,17 @@ describe("career save slots", () => {
       "Alice Breaker",
     );
 
-    act(() => {
+    await act(async () => {
       expect(result.current.loadSaveSlot(firstSlot.id)).toBe(true);
     });
+    await waitFor(() => expect(result.current.savePending).toBe(false));
     expect(result.current.gameState.player.fullName).toBe("Alice Breaker");
     expect(window.localStorage.getItem(ACTIVE_SAVE_SLOT_KEY)).toBe(firstSlot.id);
   }, 30000);
-  it('keeps the previous career and removes only the incomplete new slot when activation fails', () => {
+  it('keeps the previous career and removes only the incomplete new slot when activation fails', async () => {
     const { result } = renderHook(() => useGameState());
-    act(() => result.current.resetCareer(buildCareerConfig('Existing Career')));
+    await act(async () => result.current.resetCareer(buildCareerConfig('Existing Career')));
+    await waitFor(() => expect(result.current.savePending).toBe(false));
     const previousSlot = readSaveSlotIndex()[0];
     const previousSave = window.localStorage.getItem(ACTIVE_SAVE_KEY);
     const originalSetItem = Storage.prototype.setItem;

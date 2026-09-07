@@ -7902,6 +7902,7 @@ function main() {
 
   while (seasons.length < seasonsRequested && calendarSteps < maxWeeks) {
     calendarSteps += 1
+    if (process.argv.includes('--trace-steps')) process.stderr.write(`Step ${calendarSteps}: ${state.currentDate}, ${state.week}, ${state.lastAction}\n`)
     observeCareer(state)
     const waitingStory = pendingStory(state)
     if (waitingStory) state = careerDepthAction(state, { type: 'decision', id: waitingStory.id, choice: waitingStory.kind === 'deciders' || waitingStory.kind === 'early-exits' ? 'continue' : 'protect' })
@@ -8176,6 +8177,7 @@ function main() {
   report.statusIntegrityAudit = buildStatusIntegrityAudit(report, state)
   report.balanceWarnings = buildBalanceWarnings(report, state)
 
+  if (process.argv.includes('--export-final-save')) fs.writeFileSync(path.join(reportsDir, reportBaseName + '-save.json'), JSON.stringify(state))
   writeSimulationArtifacts(reportsDir, reportBaseName, report, buildMarkdown(report))
   if (!skipSharedAudits) {
     writeAiPlayerProgressionAudit(report, seasonAuditSummaries)

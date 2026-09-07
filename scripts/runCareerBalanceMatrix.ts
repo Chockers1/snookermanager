@@ -26,7 +26,7 @@ function readSeeds() {
 
 async function runScenario(level: (typeof createPlayerStartingLevelCatalog)[number], seed: number, seasons: number): Promise<MatrixRow> {
   const executable = process.execPath
-  const args = [path.resolve('node_modules', 'tsx', 'dist', 'cli.mjs'), 'scripts/simulateFiveSeasons.ts', `--seasons=${seasons}`, `--seed=${seed}`, `--starting-level-id=${level.id}`, `--start-age=${level.minAge}`, `--scenario-label=matrix-${level.id}-${seed}`, '--skip-player-snapshots', '--skip-shared-audits', ...(process.argv.includes('--progress') ? ['--progress'] : []), ...(process.argv.includes('--calibration-adjustments') ? ['--calibration-adjustments'] : [])]
+  const args = [path.resolve('node_modules', 'tsx', 'dist', 'cli.mjs'), 'scripts/simulateFiveSeasons.ts', `--seasons=${seasons}`, `--seed=${seed}`, `--starting-level-id=${level.id}`, `--start-age=${level.minAge}`, `--scenario-label=matrix-${level.id}-${seed}`, '--skip-player-snapshots', '--skip-shared-audits', ...(process.argv.includes('--export-final-save') ? ['--export-final-save'] : []), ...(process.argv.includes('--progress') ? ['--progress'] : []), ...(process.argv.includes('--calibration-adjustments') ? ['--calibration-adjustments'] : [])]
 
   return new Promise((resolve) => {
     const child = spawn(executable, args, { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'pipe'] })
@@ -71,8 +71,9 @@ async function main() {
   const failed = rows.filter((row) => row.exitCode !== 0 || row.issues.length > 0)
   const outputDirectory = path.resolve('artifacts', 'simulations')
   fs.mkdirSync(outputDirectory, { recursive: true })
-  fs.writeFileSync(path.join(outputDirectory, 'balance-matrix-latest.json'), JSON.stringify({ generatedAt: new Date().toISOString(), seasons, seedsPerPath: baseSeeds.length, scenarios: rows.length, failed: failed.length, rows }, null, 2))
-  fs.writeFileSync(path.join(outputDirectory, 'balance-matrix-latest.md'), [
+  const label = (process.argv.find(arg => arg.startsWith('--label='))?.slice(8) ?? 'latest').replace(/[^a-z0-9_-]/gi, '-')
+  fs.writeFileSync(path.join(outputDirectory, `balance-matrix-${label}.json`), JSON.stringify({ generatedAt: new Date().toISOString(), seasons, seedsPerPath: baseSeeds.length, scenarios: rows.length, failed: failed.length, rows }, null, 2))
+  fs.writeFileSync(path.join(outputDirectory, `balance-matrix-${label}.md`), [
     '# Career Balance Matrix', '',
     `- Seasons per scenario: ${seasons}`,
     `- Starting paths: ${levels.length}`,

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { detailedTournamentCatalog } from '../data/pathwayCalendarData';
 import { resolveTournamentFormat } from '../data/tournamentFormats';
-import { createStarterState, buildTournamentDraw, resolveTournamentDrawRound, getTournamentEntryAccess, getTournamentEntryCashRequirement, enterTournamentState, repairGameState, evolveWorldPlayersForNextSeason } from '../hooks/useGameState';
-import { pathwayAgeLimit, pathwayEntryReason, pathwayStandings, qTourQualification, seniorQualification, pathwayCardAwards, pathwayPlacementPrize, nationRegion } from './pathwayRules';
+import { createStarterState, buildTournamentDraw, resolveTournamentDrawRound, getTournamentEntryAccess, getTournamentEntryCashRequirement, enterTournamentState, repairGameState, evolveWorldPlayersForNextSeason, processRankingCalendar } from '../hooks/useGameState';
+import { pathwayAgeLimit, pathwayEntryReason, pathwayStandings, qTourQualification, seniorQualification, pathwayCardAwards, pathwayPlacementPrize, nationRegion, matchesPathwayList, pathwayListStatus } from './pathwayRules';
 import { recordRankingEvent, qualifiedNames } from './rollingRankings';
 import type { BracketRound } from '../types/game';
 const event = (id: string) => detailedTournamentCatalog.find(t => t.id === id)!;
@@ -18,6 +18,52 @@ function complete(state: ReturnType<typeof createStarterState>, id: string) {
 }
 function final(a: string,b: string, score=4): BracketRound[] { return [{label:'Final',matches:[{id:a+b,top:{name:a,nation:'ENG',rank:1,score},bottom:{name:b,nation:'ENG',rank:2,score:0}}]}]; }
 describe('other tour eligibility and qualification',()=>{
+  it('fills playoff withdrawals from the next earned places without moving the automatic card',()=>{
+    let {state} = complete(amateur(), 'pc-31');
+    const initial=qTourQualification(state,'2027-03-16');
+    const missing=initial.playoff[0];
+    expect(missing).toBeTruthy();
+    const beforeAuto=initial.automatic;
+    const reserve=qTourQualification(state,'2027-03-16',name=>name!==missing);
+    expect(reserve.automatic).toBe(beforeAuto);expect(reserve.playoff).toHaveLength(24);expect(reserve.playoff).not.toContain(missing);
+    // The human qualified but did not enter: CPU completion must use the next
+    // standings reserve, not crash or fabricate an anonymous participant.
+    state={...state,player:{...state.player,fullName:missing}};
+    const playoff=state.tournaments.find(t=>t.name==='Q Tour Global Play-Offs')!;
+    const draw=buildTournamentDraw(state,playoff,resolveTournamentFormat(playoff).roundStructure[0],false);
+    const names=draw[0].matches.flatMap(m=>[m.top.name,m.bottom.name]);
+    expect(names).toHaveLength(24);expect(new Set(names).size).toBe(24);expect(names).not.toContain(missing);
+    expect(names.every(name=>state.worldPlayers.some(p=>p.playerName===name&&!p.retired&&!p.hasTourCard))).toBe(true);
+  });
+  it('does not count regional Q School or federation events as Q Tour, including legacy receipts',()=>{
+    for(const eventType of [undefined,'Q School'] as const)expect(matchesPathwayList({name:'UK / Europe Q School Event 1',eventType},'Europe')).toBe(false);
+    for(const eventType of [undefined,'Amateur'] as const)expect(matchesPathwayList({name:'Americas Federation Route',eventType},'Americas')).toBe(false);
+    expect(matchesPathwayList({name:'Europe - Event 1'},'Europe')).toBe(true);
+    expect(matchesPathwayList({name:'Custom regional open',eventType:'Q Tour',tourCircuit:'WPBSA Q Tour / Asia Pacific'},'Asia Pacific')).toBe(true);
+    let s=recordRankingEvent(createStarterState(),event('pc-48'),final('School winner','School runner'),()=>({prizeMoney:0}));
+    s=recordRankingEvent(s,event('pc-31'),final('Tour winner','Tour runner'),()=>({prizeMoney:0}));
+    expect(pathwayStandings(s,'Europe').map(r=>r.name)).toEqual(['Tour winner','Tour runner']);
+    expect(pathwayStandings(s,'Q School UK').find(r=>r.name==='School winner')).toMatchObject({points:4,titles:0,events:1});
+  });
+  it('populates every regional list from CPU results without human entry and explains early-season empty lists',()=>{
+    const opening=createStarterState();opening.tournaments=opening.tournaments.map(t=>({...t,status:'Skipped'}));
+    const early=processRankingCalendar({...opening,currentDate:'2026-08-12'});
+    expect(pathwayStandings(early,'Europe',early.currentDate)).toHaveLength(0);
+    expect(pathwayListStatus(early,'Europe').empty).toContain('2026-08-30');
+    expect(pathwayStandings(early,'Asia Pacific',early.currentDate).length).toBeGreaterThan(0);
+    expect(pathwayListStatus(early,'Q School UK').empty).toContain('2027-05-16');
+    const closed=processRankingCalendar({...early,currentDate:'2027-06-29'});
+    const regions=['Europe','Asia Pacific','Middle East','Americas','Q School UK','Q School Asia'] as const;
+    for(const region of regions){
+      const rows=pathwayStandings(closed,region,closed.currentDate);
+      const expected=closed.tournaments.filter(t=>matchesPathwayList({name:t.name,eventType:t.type,tourCircuit:t.tourCircuit},region)).length;
+      expect(rows.length,region).toBeGreaterThan(0);expect(pathwayListStatus(closed,region).completed,region).toBe(expected);
+      expect(rows.every(r=>r.events<=expected),region).toBe(true);
+      expect(rows.some(r=>r.name===closed.player.fullName),region).toBe(false);
+      if(region.startsWith('Q School'))expect(rows.every(r=>r.titles===0),region).toBe(true);
+    }
+  },30000);
+
   it.each([['pc-03',15,true],['pc-03',16,false],['pc-97',15,true],['pc-97',16,false],['pc-98',17,true],['pc-98',18,false],['pc-99',20,true],['pc-99',21,false],['pc-95',18,true],['pc-95',19,false]] as const)('%s age %s eligibility is %s',(id,age,allowed)=>{
     expect(getTournamentEntryAccess(amateur(age),event(id)).allowed).toBe(allowed);
   });

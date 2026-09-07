@@ -1,8 +1,11 @@
+import { rememberSaveMetadata } from './saveMetadata';
 import LZString from 'lz-string'
 
 const COMPRESSED_SAVE_PREFIX = 'snooker-lz-v1:'
 export function encodeCareerSave(state: unknown): string {
-  return COMPRESSED_SAVE_PREFIX + LZString.compressToUTF16(JSON.stringify(state))
+  const payload = COMPRESSED_SAVE_PREFIX + LZString.compressToUTF16(JSON.stringify(state))
+  rememberSaveMetadata(payload, state)
+  return payload
 }
 export function decodeCareerSave(serialized: string): string {
   if (!serialized.startsWith(COMPRESSED_SAVE_PREFIX)) return serialized

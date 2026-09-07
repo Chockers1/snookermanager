@@ -1,3 +1,4 @@
+import { cachedSaveMetadata, rememberSaveMetadata } from './saveMetadata';
 import type { GameState } from '../hooks/useGameState';
 import { decodeCareerSave } from './saveStorage';
 
@@ -16,17 +17,21 @@ export function recoveryChecksum(text: string) {
 export function readRecoveryState(payload: string): GameState {
   const state = JSON.parse(decodeCareerSave(payload)) as GameState;
   if (!state?.player?.fullName || !state.currentDate || !state.season || !Array.isArray(state.tournaments) || !Array.isArray(state.matches) || !state.history || !Array.isArray(state.worldPlayers)) throw new Error('This backup is incomplete and cannot be restored.');
+  rememberSaveMetadata(payload, state);
   return state;
 }
+export function readRecoveryMetadata(payload: string) {
+  const cached = cachedSaveMetadata(payload);
+  if (cached) return cached;
+  readRecoveryState(payload);
+  return cachedSaveMetadata(payload)!;
+}
 export function recoveryRecord(careerId: string, payload: string, reason: RecoveryReason, now = new Date().toISOString()): RecoverySave {
-  const state = readRecoveryState(payload);
-  const event = state.tournaments.find(t => t.status === 'Entered');
-  const matches = state.history.legacy?.matchesPlayed ?? state.history.matchLog.length;
-  const progress = state.seasonReview?.pending ? 'Season review ready · before starting ' + state.seasonReview.nextSeason : event ? event.name + ' · ' + event.status : 'Between events';
-  return { id: crypto.randomUUID(), careerId, reason, savedAt: now, player: state.player.fullName,
-    season: state.seasonReview?.pending ? state.seasonReview.completedSeason.season : state.season, date: state.currentDate, rank: state.player.worldRanking ?? 0, matches,
-    progress, fingerprint: [state.season, state.currentDate, matches, state.history.matchLog.length, state.liveMatch?.currentFrame, state.liveMatch?.playerFrames, state.liveMatch?.opponentFrames].join(':'),
-    checksum: recoveryChecksum(payload), payload };
+  const info = readRecoveryMetadata(payload);
+  return { id: crypto.randomUUID(), careerId, reason, savedAt: now, player: info.player,
+    season: info.displaySeason, date: info.date, rank: info.rank, matches: info.matches,
+    progress: info.progress, fingerprint: info.fingerprint, checksum: recoveryChecksum(payload), payload };
+
 }
 export function expiredRecoveryIds(records: RecoverySave[], added: RecoverySave) {
   return [...records.filter(r => r.id !== added.id), added].filter(r => r.careerId === added.careerId && r.reason === added.reason)

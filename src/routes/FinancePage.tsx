@@ -1,3 +1,5 @@
+import { TravelLocationPanel } from '../components/career/RealismPanels';
+import { realismOf, overseasWeeklyCost } from '../game/realism';
 import { careerBudget, nextClubWorkDate } from '../game/careerBudget';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -295,6 +297,7 @@ export function FinancePage() {
         <div className="min-w-0 text-sm"><p className="font-semibold text-white">{budget.warning ? 'Cash needs attention' : 'Career cash outlook'}</p><p className="text-gray-400">Four-week projection {formatMoney(budget.projected)}{budget.runway !== null ? ' · ' + budget.runway + ' weeks of funds at current spending' : ''}. Club work pays £120 for one reserved day, once per week.</p></div>
         <button className="btn-secondary shrink-0 px-3 py-2" disabled={!workDate} onClick={() => workDate && actOnCareer({type:'commitment',kind:'club-work',startDate:workDate})}>{workDate ? 'Book club work · '+workDate : 'No free work date in next 28 days'}</button>
       </div>
+      {realismOf(gameState).location !== realismOf(gameState).home && <><p className="text-xs text-amber-300">Overseas lodging adds {formatMoney(overseasWeeklyCost(gameState))}/week. Return home to stop this cost; an emergency fare can be added to your negative balance.</p><TravelLocationPanel /></>}
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <div className="card min-h-0 p-3">
           <div className="flex items-center gap-2">

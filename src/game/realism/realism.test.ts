@@ -287,3 +287,16 @@ describe('world digest', () => {
     expect(updateWorldDigest(state).realism!.digest).toHaveLength(0);
   });
 });
+
+describe('emergency return travel',()=>{
+ it('charges the full fare once as debt and stops overseas lodging only after arrival',()=>{
+  const state=career();state.player.cash=-500;state.tournaments=state.tournaments.map(t=>({...t,status:'Skipped'}));state.realism={...realismOf(state),home:'Britain',location:'Berlin',journeys:{past:{eventKey:'past',origin:'Britain',destination:'Berlin',distanceKm:1000,zoneHours:1,mode:'Flight',departure:plusDays(state.currentDate,-8),arrival:plusDays(state.currentDate,-6),acclimatisationDays:0,fatigue:0,cost:100,applied:true}}};
+  expect(overseasWeeklyCost(state)).toBe(245);
+  const fare=Math.round(45+routeBetween('Berlin','Britain').distanceKm*.065);
+  expect(realismAction(state,{type:'return-home'}).player.cash).toBe(-500);
+  const booked=realismAction(state,{type:'return-home',emergencyCredit:true});expect(booked.player.cash).toBe(-500-fare);expect(realismOf(booked).location).toBe('Berlin');expect(overseasWeeklyCost(booked)).toBe(70);
+  const repeated=realismAction(booked,{type:'return-home',emergencyCredit:true});expect(repeated.player.cash).toBe(booked.player.cash);
+  const arrived=reconcileRealism({...booked,currentDate:plusDays(state.currentDate,2)});expect(realismOf(arrived).location).toBe('Britain');expect(overseasWeeklyCost(arrived)).toBe(0);
+  expect(realismAction(arrived,{type:'return-home',emergencyCredit:true}).player.cash).toBe(arrived.player.cash);
+ });
+});

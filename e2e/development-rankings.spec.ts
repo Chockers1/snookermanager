@@ -1,0 +1,20 @@
+import {expect,test} from '@playwright/test';
+import {createStarterState,processRankingCalendar} from '../src/hooks/useGameState';
+import {ACTIVE_SAVE_KEY,encodeCareerSave} from '../src/game/saveStorage';
+import {readCareerSave} from './read-career-save';
+test('youth and amateur tables distinguish earned points, seed order and prize money',async({page})=>{
+ const opening=createStarterState();const state=processRankingCalendar({...opening,currentDate:'2026-08-12',seasonReview:null,tournaments:opening.tournaments.map(t=>({...t,status:'Skipped'}))});
+ const unplayed=state.competitionTables.youth[0];unplayed.points=32;unplayed.eventsPlayed=0;
+ await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
+ await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+ await page.evaluate(()=>{history.pushState({},'','/rankings');dispatchEvent(new PopStateEvent('popstate'))});
+ await page.getByRole('button',{name:'Youth Ranking',exact:true}).click();
+ await expect(page.getByRole('region',{name:'Ranking points explained'})).toContainText('Prize money does not determine rank');
+ await expect(page.getByRole('region',{name:'Ranking points explained'})).toContainText('2026-08-23');
+ await expect(page.getByRole('table').first()).toContainText('No published ranking results');
+ await expect(page.getByRole('table').first().getByRole('link',{name:unplayed.playerName,exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Amateur Ranking',exact:true}).click();
+ const table=page.getByRole('table').first();await expect(table.getByRole('columnheader',{name:'Ranking points',exact:true})).toBeVisible();await expect(table.getByRole('columnheader',{name:'Prize earned',exact:true})).toBeVisible();
+ const row=table.getByRole('row').nth(1);await expect(row.getByRole('cell').nth(7)).toHaveText('140');await expect(row.getByRole('cell').nth(8)).toHaveText('£2,000');
+ expect((await readCareerSave(page)).player.cash).toBe(state.player.cash);
+});

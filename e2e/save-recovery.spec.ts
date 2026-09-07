@@ -28,3 +28,26 @@ test('season rollover preserves the completed old season before publishing the n
  const saved=await records(page);const pre=saved.find((r:{reason:string})=>r.reason==='Before season rollover');expect(pre).toMatchObject({season:'2026/27',date:'2027-06-30'});await navigate(page,'/saves');await expect(page.getByRole('region',{name:'Save recovery'})).toContainText('Before season rollover');
  await page.reload();await page.getByText('Restore automatic backup',{exact:true}).click();await expect(page.getByRole('region',{name:'Save recovery'})).toContainText('2027-06-30');
 });
+
+test('background saves preserve training and inbox reads made during compression',async({page})=>{
+ test.setTimeout(120000);const state=createStarterState();state.trainingAppliedWeek=-1;state.health.activeIssue=null;
+ state.tournaments=state.tournaments.map(t=>({...t,status:'Skipped'}));
+ await page.addInitScript(({key,value})=>{
+  if(!sessionStorage.getItem('async-fixture')){localStorage.setItem(key,value);sessionStorage.setItem('async-fixture','1')}
+  const NativeWorker=window.Worker;
+  window.Worker=class extends NativeWorker{postMessage(message:unknown){setTimeout(()=>super.postMessage(message),1500)}};
+ },{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
+ await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+ await expect(page.getByText('Saving…',{exact:true})).toBeVisible();
+ await expect(page.getByText('Saving…',{exact:true})).toBeHidden({timeout:60000});
+ await navigate(page,'/training');await page.getByRole('button',{name:/Safety & Tactical/}).click();
+ await page.getByRole('button',{name:'Apply Plan',exact:true}).click();
+ await expect(page.getByText('Saving…',{exact:true})).toBeVisible();
+ await navigate(page,'/inbox');await page.getByRole('button',{name:'Mark All Read',exact:true}).click();
+ await navigate(page,'/saves');await expect(page.getByRole('button',{name:'Create Copy',exact:true})).toBeDisabled();
+ await expect(page.getByText('Saving…',{exact:true})).toBeHidden({timeout:60000});
+ await expect(page.getByRole('button',{name:'Create Copy',exact:true})).toBeEnabled();
+ const saved=await readCareerSave(page);expect(saved.trainingAppliedWeek).toBe(saved.week);expect(saved.inbox.every(message=>message.read)).toBe(true);
+ await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();
+ const loaded=await readCareerSave(page);expect(loaded.trainingAppliedWeek).toBe(saved.trainingAppliedWeek);expect(loaded.inbox.every(message=>message.read)).toBe(true);
+});

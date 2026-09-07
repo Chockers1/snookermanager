@@ -1,3 +1,5 @@
+import { ActionBlockerNotice } from '../components/game/ActionBlockerNotice';
+import { advancementBlocker } from '../hooks/useGameState';
 import { useEffect } from 'react';
 import { ExhibitionAchievements } from '../components/career/ExhibitionAchievements';
 import { tournamentRoundHistory } from '../game/tournamentCareerHistory';
@@ -25,6 +27,7 @@ function compactMoney(value: number) {
 export function LegacyStatsPage() {
   const { gameState, continueWeek } = useGame()
   const navigate = useNavigate()
+  const advanceBlocker = advancementBlocker(gameState);
   const { hash } = useLocation()
   useEffect(() => { if (['#trophy-cabinet', '#exhibition-achievements'].includes(hash)) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' }); }, [hash])
   const career = careerLegacyOf(gameState)
@@ -80,13 +83,14 @@ export function LegacyStatsPage() {
 
   return (
     <div className="space-y-6 pb-10">
+      <ActionBlockerNotice blocker={advanceBlocker} />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-[10px] font-semibold uppercase text-gray-500">Career</p>
           <h1 className="mt-1 text-2xl font-bold text-white">Career Stats & Legacy</h1>
           <p className="mt-1 text-sm text-gray-400">Your journey, your numbers, your legacy for {gameState.player.fullName}.</p>
         </div>
-        <div className="flex gap-2"><button type="button" className="btn-secondary text-xs" onClick={() => navigate('/season-review')}>Season Review</button><button type="button" className="btn-primary text-xs" onClick={continueWeek}>Continue Career</button></div>
+        <div className="flex gap-2"><button type="button" className="btn-secondary text-xs" onClick={() => navigate('/season-review')}>Season Review</button><button type="button" className="btn-primary text-xs" title={advanceBlocker?.reason} onClick={() => advanceBlocker ? navigate(advanceBlocker.route) : continueWeek()}>Continue Career</button></div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">

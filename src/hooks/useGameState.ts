@@ -1,3 +1,7 @@
+import { encodeCareerSaveAsync } from '../game/asyncSave';
+import { rememberSaveMetadata } from '../game/saveMetadata';
+import { readRecoveryMetadata } from '../game/recoverySaves';
+import { trainingSkillWork } from '../utils/trainingPlan';
 import { updateInboxReadState, isInboxReadOnlyChange, encodeInboxReadOverlay, applyInboxReadOverlay, inboxReadStorageKey } from '../game/inboxReadState';
 import { formatPercent } from '../utils/formatters';
 import { repairTournamentPayouts, type PayoutRepair } from '../game/payoutRepair';
@@ -33,7 +37,7 @@ import { stepShootOut, stepBallShootOut, attemptGoldenBall, handicapAllowance } 
 import { isChampionshipLeague, isGroupDraw, nextGroupFixture, groupFrameOrder } from '../game/championshipLeague';
 import { createGroupCompetition, resolveGroupCompetitionStage, applyGroupCompetitionResult, groupCompetitionAward, groupCompetitionChampion } from '../game/groupCompetition';
 import { useEffect, useMemo, useRef, useState } from "react";
-import { queueProtectedSave, readRecoveryState, storeRecoverySave, listRecoverySaves, validatedRecoveryPayload } from '../game/recoverySaves';
+import { queueProtectedSave, storeRecoverySave, listRecoverySaves, validatedRecoveryPayload } from '../game/recoverySaves';
 import type { CareerDepthState, CareerDepthAction } from "../game/careerDepth/types";
 import { initializeCareerDepth, reconcileCareerDepth, careerDepthAction, nextCareerBoundary } from "../game/careerDepth";
 import { depthOf, pendingStory, plusDays, uniqueOpponentId } from "../game/careerDepth/shared";
@@ -3277,7 +3281,7 @@ function buildTournamentDrawField(
 ): BracketPlayer[] {
   let liveRows = getCompetitionRowsForTournament(state, tournament);
   let selectedPathwayNames: string[] | undefined;
-  if (tournament.type === 'Q Tour' && /play.off/i.test(tournament.name)) selectedPathwayNames = qTourQualification(state, tournament.startDate).playoff;
+  if (tournament.type === 'Q Tour' && /play.off/i.test(tournament.name)) selectedPathwayNames = qTourQualification(state, tournament.startDate, name => name === state.player.fullName ? includePlayer : state.worldPlayers.some(p => p.playerName === name && !p.retired && !p.hasTourCard)).playoff;
   if (tournament.type === 'Senior') {
     const selection = seniorQualification(state, tournament.startDate);
     selectedPathwayNames = /golden ticket/i.test(tournament.name) ? selection.goldenField : /world seniors championship/i.test(tournament.name) ? selection.championship : /british seniors open/i.test(tournament.name) ? selection.british : undefined;
@@ -3680,7 +3684,7 @@ export function processRankingCalendar(input: GameState): GameState {
       state = { ...state, tournaments: state.tournaments.map(item => item.id === t.id && item.status !== 'Skipped' ? { ...item, status: 'Completed' } : item) };
     }
     const hasRevision = events.some(t => countsForWorldRanking(t)) || state.rollingRankings!.earnings.some(e => e.expiresOn === date);
-    state = rebuildRollingRankings(state, date, hasRevision);
+    state = rebuildDevelopmentRankings(rebuildRollingRankings(state, date, hasRevision), date);
     state = lockTournamentSeedings(state, date);
   }
   state = lockTournamentSeedings(state, through);
@@ -3692,7 +3696,7 @@ export function processRankingCalendar(input: GameState): GameState {
   if (entered && isChampionshipLeague(entered) && !isGroupDraw(state.tournamentProgress.draw) && !state.liveMatch && state.tournamentProgress.completedRounds.length === 0) {
     state = { ...state, tournamentProgress: { ...state.tournamentProgress, currentRound: 'Stage One Groups', draw: buildTournamentDraw(state, entered, 'Stage One Groups') } };
   }
-  return compactRankingLedger({ ...state, rollingRankings: { ...state.rollingRankings!, processedThrough: through } });
+  return compactRankingLedger(rebuildDevelopmentRankings({ ...state, rollingRankings: { ...state.rollingRankings!, processedThrough: through } }));
 }
 
 function createEmptyTravelState(): TravelState {
@@ -3739,6 +3743,40 @@ function rerankCompetitionRows(
     ranking: index + 1,
     highlighted: row.playerName === playerName,
   }));
+}
+
+/** Youth/amateur seeds choose an opening draw; only published finishing awards earn points. */
+export function rebuildDevelopmentRankings(state: GameState, date = state.currentDate): GameState {
+  if (!state.rollingRankings) return state;
+  const players = new Map(state.worldPlayers.map(p => [p.playerName, p]));
+  const tables = { ...state.competitionTables };
+  for (const key of ['youth', 'amateur'] as const) {
+    const records = new Map<string, CompetitionTableRow>();
+    for (const row of tables[key]) records.set(row.playerName, { ...row, points: 0, prizeMoney: 0, eventsPlayed: 0, titles: 0, wins: 0, losses: 0 });
+    const events = Object.values(state.rollingRankings.events).filter(e => e.season === state.season && e.completedOn <= date).sort((a,b) => a.completedOn.localeCompare(b.completedOn));
+    for (const event of events) {
+      const tournament = state.tournaments.find(t => t.id === event.tournamentId);
+      if (!tournament || tournament.rankingType === 'None' || tournament.rankingValue <= 0 || !getCompetitionKeysForTournament(tournament).includes(key)) continue;
+      const placements = new Map<string, { round: string; champion: boolean; wins: number; losses: number; nation: string }>();
+      for (const round of event.bracket) for (const match of round.matches) {
+        if (match.placeholder || typeof match.top.score !== 'number' || typeof match.bottom.score !== 'number') continue;
+        for (const [own, other] of [[match.top, match.bottom], [match.bottom, match.top]]) {
+          if (own.name === 'TBD' || isTemporaryQualifierName(own.name)) continue;
+          const previous = placements.get(own.name);
+          placements.set(own.name, { round: round.label, champion: /^final$/i.test(round.label) && own.score! > other.score!, wins: (previous?.wins ?? 0) + Number(own.score! > other.score!), losses: (previous?.losses ?? 0) + Number(own.score! < other.score!), nation: own.nation });
+        }
+      }
+      for (const [name, finish] of placements) {
+        const award = isGroupDraw(event.bracket) ? groupCompetitionAward(event.bracket, tournament, name, getTournamentPlacementAwards) : getTournamentPlacementAwards(tournament, finish.round, finish.champion);
+        const row = records.get(name) ?? createCompetitionDefaultRow(name, players.get(name)?.nation ?? finish.nation, records.size + 1);
+        const champion = isGroupDraw(event.bracket) ? groupCompetitionChampion(event.bracket, tournament) === name : finish.champion;
+        records.set(name, { ...row, points: row.points + award.rankingPoints, prizeMoney: row.prizeMoney + (event.prizeAwards?.[name] ?? award.prizeMoney), eventsPlayed: row.eventsPlayed + 1, titles: row.titles + Number(champion && tournamentAwardsCareerTitle(tournament)), wins: row.wins + finish.wins, losses: row.losses + finish.losses });
+      }
+    }
+    // Prize money never ranks or breaks ties in these points lists.
+    tables[key] = [...records.values()].sort((a,b) => b.points-a.points || Number(b.eventsPlayed>0)-Number(a.eventsPlayed>0) || b.titles-a.titles || b.wins-a.wins || a.losses-b.losses || (a.eventsPlayed && b.eventsPlayed ? a.playerName.localeCompare(b.playerName) : a.ranking-b.ranking || a.playerName.localeCompare(b.playerName))).map((row,i) => ({ ...row, ranking:i+1, movement:row.ranking===i+1?row.movement:row.ranking-i-1, highlighted:row.playerName===state.player.fullName, statusNote:row.eventsPlayed?`Earned ${key} points · ${state.season}`:'Unranked · no published ranking results this season' }));
+  }
+  return { ...state, competitionTables: tables };
 }
 
 function isTemporaryQualifierName(playerName: string) {
@@ -4666,7 +4704,7 @@ function createCareerSystemsForStartingLevel(
   };
 }
 
-function getCompetitionKeysForTournament(
+export function getCompetitionKeysForTournament(
   tournament: Tournament,
 ): CompetitionTableKey[] {
   if (tournament.type === "Amateur") {
@@ -6606,6 +6644,43 @@ function advanceWholeWeekState(previousState: GameState): GameState {
   };
 }
 
+export type ActionBlocker = { reason: string; label: string; route: string };
+
+export function tournamentEntryBlocker(state: GameState, event: Tournament): ActionBlocker | null {
+  if (event.status === 'Entered') return null;
+  if (!ENTERABLE_TOURNAMENT_STATUSES.has(event.status) || (event.endDate ?? event.startDate) < state.currentDate)
+    return { reason: `${event.name} can no longer be entered.`, label: 'Find another event', route: '/calendar' };
+  const conflict = tournamentCommitmentConflict(state, event);
+  if (conflict) return { reason: conflict, label: 'Manage calendar clash', route: '/calendar?commitments=1' };
+  const existing = state.tournaments.find(t => t.id !== event.id && t.status === 'Entered');
+  if (existing) return { reason: `Withdraw from or finish ${existing.name} before entering another event.`, label: 'Open current tournament', route: '/tournaments/hub' };
+  const access = getTournamentEntryAccess(state, event);
+  if (!access.allowed) {
+    const qualifier = state.tournaments.find(t => /qualifying/i.test(t.name) && t.name.replace(/ qualifying/i, '').trim() === event.name && (t.endDate ?? t.startDate) >= state.currentDate && getTournamentEntryAccess(state, t).allowed);
+    return { reason: access.reason ?? 'Entry requirements are not met.', label: qualifier ? `View ${qualifier.name}` : 'View eligible events', route: qualifier ? `/calendar?tournament=${encodeURIComponent(qualifier.id)}` : '/calendar' };
+  }
+  const equipment = getTournamentEquipmentMessage(state.equipment);
+  if (equipment) return { reason: equipment, label: /chalk/i.test(equipment) ? 'Buy or equip chalk' : 'Fix equipment', route: /chalk|tip/i.test(equipment) ? '/equipment/chalk-tips' : '/equipment/cues' };
+  const required = getTournamentEntryCashRequirement(state, event);
+  if (state.player.cash < required) return { reason: `Entry needs £${required.toLocaleString('en-GB')}. You are £${Math.ceil(required - state.player.cash).toLocaleString('en-GB')} short. Review spending or book paid club work.`, label: 'Open finances & club work', route: '/finance' };
+  return null;
+}
+
+export function advancementBlocker(state: GameState): ActionBlocker | null {
+  if (state.seasonReview?.pending) return { reason: 'Complete your season review before advancing.', label: 'Review season', route: '/season-review' };
+  const decision = pendingStory(state);
+  if (decision) return { reason: `Choose a response to “${decision.title}” before advancing.`, label: 'Resolve inbox decision', route: `/inbox?message=${encodeURIComponent(decision.id)}` };
+  const entered = state.tournaments.find(t => t.status === 'Entered');
+  if (!entered) return null;
+  if (state.currentDate >= entered.startDate && state.currentDate <= (entered.endDate ?? entered.startDate))
+    return { reason: `${entered.name} is ready. Prepare and play, or withdraw before advancing.`, label: 'Open current tournament', route: '/tournaments/hub' };
+  const booking = state.travel.bookings[entered.id];
+  if (booking && !booking.preparation) return { reason: `Confirm preparation for ${entered.name} before advancing.`, label: 'Choose preparation', route: '/tournament/preparation' };
+  if (!booking && nextCareerBoundary(state) >= journeyQuote(state, entered, '').departure)
+    return { reason: `Book travel for ${entered.name} before its departure window.`, label: 'Book travel', route: '/travel' };
+  return null;
+}
+
 export function enterTournamentState(
   previousState: GameState,
   tournamentId: string,
@@ -6622,65 +6697,9 @@ export function enterTournamentState(
     );
   }
 
-  if (!ENTERABLE_TOURNAMENT_STATUSES.has(tournament.status)) {
-    return finalizeState(
-      previousState,
-      `${tournament.name} can no longer be entered.`,
-    );
-  }
-
-  const currentDateValue = getTournamentDateValue(previousState.currentDate);
-  const tournamentEndValue = getTournamentDateValue(
-    tournament.endDate ?? tournament.startDate,
-  );
-  if (currentDateValue > tournamentEndValue) {
-    return finalizeState(
-      previousState,
-      `${tournament.name} has already finished.`,
-    );
-  }
-
-  const existingEntry = previousState.tournaments.find(
-    (item) => item.id !== tournamentId && item.status === "Entered",
-  );
-  const commitmentBlocker = tournamentCommitmentConflict(previousState, tournament);
-  if (commitmentBlocker) {
-    return finalizeState(previousState, commitmentBlocker);
-  }
-  if (existingEntry) {
-    return finalizeState(
-      previousState,
-      `Withdraw from or finish ${existingEntry.name} before entering another event.`,
-    );
-  }
-
-  const entryAccess = getTournamentEntryAccess(previousState, tournament);
-  if (!entryAccess.allowed) {
-    return finalizeState(
-      previousState,
-      entryAccess.reason ??
-        `You do not have valid access for ${tournament.name}.`,
-    );
-  }
-
-  const equipmentMessage = getTournamentEquipmentMessage(
-    previousState.equipment,
-  );
-  if (equipmentMessage) {
-    return finalizeState(previousState, equipmentMessage);
-  }
-
-  const cashRequirement = getTournamentEntryCashRequirement(
-    previousState,
-    tournament,
-  );
-
-  if (previousState.player.cash < cashRequirement) {
-    return finalizeState(
-      previousState,
-      `Insufficient funds to enter ${tournament.name}.`,
-    );
-  }
+  const blocker = tournamentEntryBlocker(previousState, tournament);
+  if (blocker) return finalizeState(previousState, blocker.reason);
+  const cashRequirement = getTournamentEntryCashRequirement(previousState, tournament);
 
   return finalizeState(
     {
@@ -8276,12 +8295,6 @@ function getAttributeTrainingInterval(
   return 3;
 }
 
-function getTrainingLabelSeed(label: string) {
-  return label
-    .split("")
-    .reduce((sum, char, index) => sum + char.charCodeAt(0) * (index + 1), 0);
-}
-
 function getVeteranDevelopmentOverallCeiling(age: number) {
   if (age >= 70) return 62;
   if (age >= 65) return 65;
@@ -8314,14 +8327,12 @@ function getScaledTrainingGain(
   }
 
   const interval = getAttributeTrainingInterval(state.player, state.attributes);
-  const labelSeed = getTrainingLabelSeed(label);
-  const pulseDue = (state.week + labelSeed) % interval === 0;
-  const highLoadBonus =
-    rawGain >= 5 &&
-    interval <= 4 &&
-    (state.week + labelSeed) % (interval * 2) === 0;
+  const current = { ...state.attributes.technical, ...state.attributes.mental, ...state.attributes.physical }[label] ?? 100;
+  // Accumulate fractional progress each week. More relevant practice and better
+  // support now matter, without a calendar pulse turning tiny gains into +1.
+  const mastery = current < 80 ? 1 : Math.max(.15, (100 - current) / 20);
+  return Math.min(100 - current, rawGain / (3 * interval) * mastery);
 
-  return pulseDue || highLoadBonus ? 1 : 0;
 }
 
 function getSponsorWeeklyIncome(sponsors: SponsorDeal[]) {
@@ -8688,7 +8699,7 @@ export function getTournamentEntryAccess(
     residentSince: state.realism?.regionalResidenceSince ?? state.realism?.relocationDate,
   }, state);
   if (tournament.type === 'Q Tour' && /play.off/i.test(tournament.name) && state.season) {
-    const qualified = qTourQualification({ rollingRankings: state.rollingRankings, season: state.season }, tournament.startDate);
+    const qualified = qTourQualification({ rollingRankings: state.rollingRankings, season: state.season }, tournament.startDate, name => name === state.player.fullName || !state.worldPlayers || state.worldPlayers.some(p => p.playerName === name && !p.retired && !p.hasTourCard));
     if (!qualified.playoff.includes(state.player.fullName)) return { allowed: false, accessBand, seededProtection: 0, reason: qualified.automatic === state.player.fullName ? 'You won the Q Tour Europe automatic tour card.' : 'Qualify through the Q Tour Europe or regional standings to enter the Global Play-Offs.' };
   }
   if (tournament.type === 'Senior' && state.season && state.worldPlayers) {
@@ -16417,7 +16428,7 @@ function recalculateState(
     competitionTables,
     state.player,
   );
-  competitionTables = rebuildRollingRankings({ ...state, competitionTables }, state.currentDate, false).competitionTables;
+  competitionTables = rebuildDevelopmentRankings(rebuildRollingRankings({ ...state, competitionTables }, state.currentDate, false)).competitionTables;
   const careerSystems = syncCareerSystems({
     competitionTables,
     player: state.player,
@@ -16819,6 +16830,7 @@ function loadStoredState(input?: string): GameState {
     const parsed = JSON.parse(decodeCareerSave(saved)) as Partial<GameState> & {
       tournamentProgress?: TournamentProgressState;
     };
+    rememberSaveMetadata(saved, parsed);
     const fallbackState = createStarterState();
     const parsedPlayer = parsed.player
       ? {
@@ -17458,6 +17470,29 @@ export function buyTipState(previousState: GameState, tipId: string) {
   );
 }
 
+export function previewTrainingDevelopment(state: GameState, week: TrainingPlannerDay[]) {
+  const plan = protectRealismSessions(state, protectCommitmentSessions(state, protectPartnerSessions(state, normalizeTrainingPlan(
+    week, plusDays(depthOf(state).nextSettlementDate, -7), getEnteredCompetitions(state),
+  ))));
+  if (state.trainingAppliedWeek === state.week || state.health.activeIssue || state.trainingCondition.injuryWeeks > 0) return [];
+  const adaptation = getTrainingAdaptationMultiplier(state.player.fatigue, state.trainingCondition.strain, state.trainingCondition.burnout);
+  const facility = Math.min(1.15, getFacilityTrainingMultiplier(state.equipment) * baseTrainingMultiplier(state));
+  const specialisms: Record<string, string[]> = {
+    Technical: ['Long Potting', 'Cue Ball Control', 'Consistency', 'Hand Steadiness'],
+    'Break Building': ['Break Building', 'Cue Ball Control'], 'Cue Action': ['Consistency', 'Cue Ball Control', 'Hand Steadiness'],
+    Tactical: ['Safety Play', 'Composure'], Mental: ['Focus', 'Composure', 'Resilience', 'Big Match Nerve', 'Professionalism'],
+    Fitness: ['Stamina', 'Balance', 'Recovery Rate', 'Shoulder Health'],
+  };
+  return Object.entries(trainingSkillWork(plan)).map(([label, work]) => {
+    const coaching = state.coachContracts.reduce((bonus, contract) => {
+      const coach = state.coaches.find(c => c.id === contract.coachId);
+      return bonus + (coach && specialisms[coach.type]?.includes(label) ? (coach.level === 'Elite' ? .15 : coach.level === 'High' ? .1 : .05) * (.75 + coach.compatibility / 400) : 0);
+    }, 0);
+    const raw = Math.min(6, work) * adaptation * facility * (1 + Math.min(.3, coaching)) * developmentTrainingBonus(state, plan, label);
+    return { label, value: getScaledTrainingGain(state, label, raw) };
+  }).filter(gain => gain.value > 0).sort((a,b) => b.value - a.value || a.label.localeCompare(b.label));
+}
+
 export function applyTrainingPlanState(
   previousState: GameState,
   nextWeek?: TrainingPlannerDay[],
@@ -17487,11 +17522,8 @@ export function applyTrainingPlanState(
   const facilityMultiplier = getFacilityTrainingMultiplier(
     previousState.equipment,
   );
-  const developmentState = previousState;
-  const activeDevelopmentKind = depthOf(previousState).project?.status === 'active' ? depthOf(previousState).project?.kind : undefined;
+  const developmentGains = previewTrainingDevelopment(previousState, normalizedTrainingPlan);
   previousState = progressDevelopment(previousState, normalizedTrainingPlan);
-  const adaptedGain = (gain: number, skill: string) =>
-    gain * adaptationMultiplier * Math.min(1.15, facilityMultiplier * baseTrainingMultiplier(developmentState)) * developmentTrainingBonus(developmentState, normalizedTrainingPlan, skill);
   const recoveryCapacity =
     trainingEffects.recoverySessions * 5 + trainingEffects.restSessions * 4;
   const nextStrain = clamp(
@@ -17531,59 +17563,7 @@ export function applyTrainingPlanState(
       })
     : previousState.health.activeIssue;
   const nextAttributes = deepCloneAttributes(previousState.attributes);
-  const completedCells = normalizedTrainingPlan.filter(d => !d.careerCommitmentId).flatMap(d => [d.morning, d.afternoon, d.evening]);
-  for (const [kind, skill, title] of [
-    ['safety', 'Safety Play', 'Safety Exchanges'], ['cue-action', 'Consistency', 'Line-Up Drill'], ['pressure', 'Composure', 'Mental Training'], ['stamina', 'Recovery Rate', 'Fitness'],
-  ]) {
-    if (activeDevelopmentKind !== kind || previousState.health.activeIssue) continue;
-    const sessions = completedCells.filter(c => c.title === title).length;
-    if (sessions > 0) improveAttribute(nextAttributes, skill, getScaledTrainingGain(previousState, skill, adaptedGain(sessions / 6, skill)));
-  }
-  improveAttribute(
-    nextAttributes,
-    "Long Potting",
-    getScaledTrainingGain(
-      previousState,
-      "Long Potting",
-      adaptedGain(trainingEffects.technicalGain, 'Long Potting'),
-    ),
-  );
-  improveAttribute(
-    nextAttributes,
-    "Cue Ball Control",
-    getScaledTrainingGain(
-      previousState,
-      "Cue Ball Control",
-      adaptedGain(trainingEffects.cueControlGain, 'Cue Ball Control'),
-    ),
-  );
-  improveAttribute(
-    nextAttributes,
-    "Break Building",
-    getScaledTrainingGain(
-      previousState,
-      "Break Building",
-      adaptedGain(trainingEffects.breakBuildingGain, 'Break Building'),
-    ),
-  );
-  improveAttribute(
-    nextAttributes,
-    "Focus",
-    getScaledTrainingGain(
-      previousState,
-      "Focus",
-      adaptedGain(trainingEffects.focusGain, 'Focus'),
-    ),
-  );
-  improveAttribute(
-    nextAttributes,
-    "Stamina",
-    getScaledTrainingGain(
-      previousState,
-      "Stamina",
-      adaptedGain(trainingEffects.staminaGain, 'Stamina'),
-    ),
-  );
+  for (const gain of developmentGains) improveAttribute(nextAttributes, gain.label, gain.value);
   const currentCareerRank =
     previousState.rankings.find(
       (row) => row.playerName === previousState.player.fullName,
@@ -18369,9 +18349,11 @@ function persistCareerSlot(
 
 export function useGameState() {
   const [saveWarning, setSaveWarning] = useState('');
+  const [savePending, setSavePending] = useState(false);
+  const savePendingRef = useRef(false);
   const saveRevision = useRef(0);
   const previousAutosaveState = useRef<GameState | null>(null);
-  const lastAutosaveSnapshot = useRef<{slotId: string | null; serialized: string} | null>(null);
+  const lastAutosaveSnapshot = useRef<{slotId: string | null; serialized: string; state: GameState} | null>(null);
   const [gameState, setGameState] = useState<GameState>(() =>
     loadStoredState(),
   );
@@ -18389,6 +18371,7 @@ export function useGameState() {
     }
     const slot = persistCareerSlot(gameState, {
       id: "migrated-active-career",
+      serialized: window.localStorage.getItem(STORAGE_KEY) ?? undefined,
       name: `${gameState.player.fullName} · ${gameState.season}`,
     });
     writeActiveSaveSlotId(slot.id);
@@ -18400,7 +18383,7 @@ export function useGameState() {
     const reportSaveWarning = (message: string) => queueMicrotask(() => setSaveWarning(message));
     const previousState = previousAutosaveState.current;
     previousAutosaveState.current = gameState;
-    if (previousState && isInboxReadOnlyChange(previousState, gameState)
+    if (previousState && lastAutosaveSnapshot.current?.state === previousState && isInboxReadOnlyChange(previousState, gameState)
       && lastAutosaveSnapshot.current?.slotId === activeSaveSlotId
       && readActiveSaveSlotId() === activeSaveSlotId) {
       const base = window.localStorage.getItem(STORAGE_KEY);
@@ -18408,12 +18391,22 @@ export function useGameState() {
       if (base && base === lastAutosaveSnapshot.current.serialized) {
         try {
           writeCareerStorage(inboxReadStorageKey(activeSaveSlotId), encodeInboxReadOverlay(gameState, base));
+          lastAutosaveSnapshot.current = { ...lastAutosaveSnapshot.current!, state: gameState };
           return;
         } catch { /* Fall back to the normal save and its error reporting. */ }
       }
     }
     const revision = ++saveRevision.current;
-    const serialized = encodeCareerSave(gameState);
+    savePendingRef.current = true;
+    queueMicrotask(() => setSavePending(true));
+    const samePhaseAsLatest = () => {
+      const latest = previousAutosaveState.current;
+      return latest?.player.id === gameState.player.id && latest.season === gameState.season && Boolean(latest.seasonReview?.pending) === Boolean(gameState.seasonReview?.pending);
+    };
+    void queueProtectedSave(async () => {
+    if (readActiveSaveSlotId() !== activeSaveSlotId || (saveRevision.current !== revision && samePhaseAsLatest())) return;
+    const serialized = await encodeCareerSaveAsync(gameState);
+    if (readActiveSaveSlotId() !== activeSaveSlotId || (saveRevision.current !== revision && samePhaseAsLatest())) return;
     const publish = () => {
       writeCareerStorage(STORAGE_KEY, serialized);
       if (activeSaveSlotId) persistCareerSlot(gameState, { id: activeSaveSlotId, serialized });
@@ -18421,30 +18414,30 @@ export function useGameState() {
     };
     const previous = window.localStorage.getItem(STORAGE_KEY);
     const rendered = lastAutosaveSnapshot.current?.slotId === activeSaveSlotId ? lastAutosaveSnapshot.current.serialized : null;
-    lastAutosaveSnapshot.current = { slotId: activeSaveSlotId, serialized };
+    lastAutosaveSnapshot.current = { slotId: activeSaveSlotId, serialized, state: gameState };
     const rolloverPayloads = [...new Set([previous, rendered].filter((payload): payload is string => {
       if (!payload) return false;
       try {
-        const old = readRecoveryState(payload);
-        return old.player.id === gameState.player.id && (old.season !== gameState.season || Boolean(old.seasonReview?.pending && !gameState.seasonReview?.pending));
+        const old = readRecoveryMetadata(payload);
+        return old.playerId === gameState.player.id && (old.season !== gameState.season || Boolean(old.reviewPending && !gameState.seasonReview?.pending));
       } catch { return false; }
     }))];
     const prizeCorrection = Boolean(previous && gameState.payoutRepair?.version === 1 && (() => {
-      try { const old=readRecoveryState(previous); return old.player.id===gameState.player.id && !old.payoutRepair && Boolean(gameState.payoutRepair.events || gameState.payoutRepair.adjustments.length); } catch { return false; }
+      try { const old=readRecoveryMetadata(previous); return old.playerId===gameState.player.id && !old.payoutRepaired && Boolean(gameState.payoutRepair.events || gameState.payoutRepair.adjustments.length); } catch { return false; }
     })());
     if (typeof indexedDB === 'undefined') {
       if(prizeCorrection) {reportSaveWarning('Prize correction is not saved: backup storage is unavailable. Your original save is preserved. Enable browser storage and reload to retry.');return;}
-      try { publish(); reportSaveWarning('Automatic backups unavailable. Export a portable backup in Save Manager.'); }
+      try { if (saveRevision.current === revision) publish(); reportSaveWarning('Automatic backups unavailable. Export a portable backup in Save Manager.'); }
       catch (error) { reportSaveWarning(error instanceof Error ? error.message : 'Autosave failed.'); }
       return;
     }
     const rollover = rolloverPayloads.length > 0 || prizeCorrection;
     const careerId = activeSaveSlotId ?? gameState.player.id;
-    if (!rollover) {
+    if (!rollover && saveRevision.current === revision) {
       try { publish(); }
       catch (error) { reportSaveWarning(error instanceof Error ? error.message : 'Autosave failed.'); return; }
     }
-    void queueProtectedSave(async () => {
+    await (async () => {
       if (readActiveSaveSlotId() !== activeSaveSlotId) return;
       // Commit the recovery transaction before the old season is overwritten.
       if (rollover) {
@@ -18455,8 +18448,16 @@ export function useGameState() {
       }
       await storeRecoverySave(careerId, serialized, 'Automatic');
       if (readActiveSaveSlotId() === activeSaveSlotId) reportSaveWarning('');
-    }).catch(error => reportSaveWarning((rollover ? 'Check Save Manager before closing: recovery backup or autosave failed. ' : '') + (error instanceof Error ? error.message : 'Automatic backup failed. Export a portable backup.')));
+    })();
+    }).catch(error => reportSaveWarning('Check Save Manager before closing: ' + (error instanceof Error ? error.message : 'Automatic backup failed. Export a portable backup.'))).finally(() => { if (saveRevision.current === revision) { savePendingRef.current = false; setSavePending(false); } });
   }, [activeSaveSlotId, careerSessionMode, gameState]);
+
+  useEffect(() => {
+    if (!savePending) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [savePending]);
 
   const actions = useMemo(
     () => ({
@@ -18479,6 +18480,7 @@ export function useGameState() {
         });
       },
       beginNewCareer() {
+        if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return; }
         setCareerSessionMode("creating");
       },
       continueActiveCareer() {
@@ -18502,6 +18504,7 @@ export function useGameState() {
         return true;
       },
       startDemoCareer() {
+        if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return; }
         const demoState = createStarterState();
         const slot = persistCareerSlot(demoState, { name: "Demo Career" });
         window.localStorage.setItem(STORAGE_KEY, encodeCareerSave(demoState));
@@ -18515,6 +18518,7 @@ export function useGameState() {
         return readSaveSlotIndex();
       },
       saveToSlot(name: string) {
+        if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return null; }
         if (typeof window === "undefined") return null;
         const normalizedName =
           name.trim() || `${gameState.player.fullName} · ${gameState.season}`;
@@ -18525,6 +18529,7 @@ export function useGameState() {
         return summary;
       },
       loadSaveSlot(id: string) {
+        if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return false; }
         if (typeof window === "undefined") return false;
         const saved = window.localStorage.getItem(`${SAVE_SLOT_PREFIX}${id}`);
         if (!saved) return false;
@@ -18537,6 +18542,7 @@ export function useGameState() {
         return true;
       },
       deleteSaveSlot(id: string) {
+        if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return; }
         if (typeof window === "undefined") return;
         window.localStorage.removeItem(`${SAVE_SLOT_PREFIX}${id}`);
         window.localStorage.removeItem(inboxReadStorageKey(id));
@@ -18588,6 +18594,7 @@ export function useGameState() {
         }
       },
       importCareer(serializedState: string) {
+        if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return false; }
         if (typeof window === "undefined") return false;
         try {
           const parsed = JSON.parse(serializedState) as Partial<GameState>;
@@ -18638,6 +18645,7 @@ export function useGameState() {
         );
       },
       resetCareer(config?: NewCareerConfig) {
+        if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return; }
         const newCareer = createNewCareerState(config);
         const slot: SaveSlotSummary = {
           id: createSaveSlotId(),
@@ -19939,8 +19947,9 @@ export function useGameState() {
       hasActiveCareer,
       activeSaveSlotId,
       saveWarning,
+      savePending,
       ...actions,
     }),
-    [actions, activeSaveSlotId, careerSessionMode, gameState, hasActiveCareer, saveWarning],
+    [actions, activeSaveSlotId, careerSessionMode, gameState, hasActiveCareer, saveWarning, savePending],
   );
 }

@@ -594,6 +594,34 @@ export function summarizeTrainingPlan(
   };
 }
 
+// Each session shares a fixed development budget across the skills it practises.
+// Recovery/rest restore condition; they do not manufacture permanent skill gains.
+export const SESSION_SKILL_WEIGHTS: Record<string, Record<string, number>> = {
+  'Line-Up Drill': { 'Long Potting': .3, 'Cue Ball Control': .25, Consistency: .3, 'Hand Steadiness': .15 },
+  'Long Pot Routine': { 'Long Potting': .65, Consistency: .2, 'Hand Steadiness': .15 },
+  'Safety Exchanges': { 'Safety Play': .65, 'Cue Ball Control': .25, Composure: .1 },
+  'Break Building': { 'Break Building': .65, 'Cue Ball Control': .25, Focus: .1 },
+  'Mental Training': { Focus: .35, Composure: .25, Resilience: .25, 'Big Match Nerve': .15 },
+  Review: { Professionalism: .4, 'Safety Play': .2, Composure: .2, Resilience: .2 },
+  Fitness: { Stamina: .4, Balance: .2, 'Recovery Rate': .25, 'Shoulder Health': .15 },
+  'Match Prep': { 'Cue Ball Control': .25, Consistency: .25, Focus: .25, Professionalism: .25 },
+  'Match Simulation': { 'Break Building': .2, 'Safety Play': .2, 'Big Match Nerve': .3, Resilience: .15, Composure: .15 },
+};
+
+export function trainingSkillWork(week: TrainingPlannerDay[]) {
+  const work: Record<string, number> = {};
+  for (const day of week) {
+    if (day.careerCommitmentId || (day.competitionName && day.planningBlockKind !== 'training')) continue;
+    for (const cell of [day.morning, day.afternoon, day.evening]) {
+      if (['Rest', 'Recovery', 'Travel'].includes(cell.category)) continue;
+      for (const [skill, weight] of Object.entries(SESSION_SKILL_WEIGHTS[cell.title] ?? {})) {
+        work[skill] = (work[skill] ?? 0) + weight;
+      }
+    }
+  }
+  return work;
+}
+
 export function calculateTrainingEffects(week: TrainingPlannerDay[]) {
   const sessions = week.filter(day => !day.careerCommitmentId).flatMap((day) => [
     day.morning,

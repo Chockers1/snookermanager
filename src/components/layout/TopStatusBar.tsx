@@ -1,3 +1,4 @@
+import { tournamentEntryBlocker, advancementBlocker } from '../../hooks/useGameState';
 import { PlayerLink } from '../game/PlayerLink';
 import {
   CalendarDays,
@@ -52,6 +53,8 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
   const nextEvent = reviewPending ? undefined : getNextEligibleTournament(gameState);
   const enteredEvent = nextEvent?.status === "Entered" ? nextEvent : undefined;
   const entryConflict = nextEvent && !enteredEvent ? tournamentCommitmentConflict(gameState, nextEvent) : null;
+  const entryBlocker = nextEvent && !enteredEvent ? tournamentEntryBlocker(gameState, nextEvent) : null;
+  const advanceBlocker = advancementBlocker(gameState);
   const tournamentPlayability = enteredEvent
     ? getTournamentPlayability(gameState, enteredEvent)
     : null;
@@ -94,7 +97,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
   const eventStageLabel = hasLiveMatchInProgress
     ? (gameState.liveMatch?.round ?? "Live match")
     : (enteredEvent && gameState.tournamentProgress.tournamentId === enteredEvent.id ? gameState.tournamentProgress.currentRound ?? "Entry" : "Entry");
-  const primaryEventActionLabel = hasLiveMatchInProgress
+  const primaryEventActionLabel = entryBlocker ? entryBlocker.label : hasLiveMatchInProgress
     ? "Resume Live Match"
     : enteredEvent
       ? canPlayTournament
@@ -104,7 +107,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
           : !tournamentPlayability?.preparationConfirmed
             ? "Prepare Tournament"
             : (tournamentPlayability?.daysUntilStart ?? 0) > 0
-              ? "Advance to Tournament"
+              ? (advanceBlocker?.label ?? "Advance to Tournament")
               : "Open Tournament Hub"
       : nextEvent
         ? entryConflict ? "Manage Calendar Clash" : "Enter Tournament"
@@ -117,12 +120,14 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
       return;
     }
 
+    if (entryBlocker) { navigate(entryBlocker.route); return; }
     if (enteredEvent) {
       if (canPlayTournament) navigate("/match/preview");
       else if (!tournamentPlayability?.travelBooked) navigate("/travel");
       else if (!tournamentPlayability?.preparationConfirmed)
         navigate("/tournament/preparation");
       else if ((tournamentPlayability?.daysUntilStart ?? 0) > 0) {
+        if (advanceBlocker) { navigate(advanceBlocker.route); return; }
         continueToNextTournament();
         navigate("/tournaments/hub");
       } else navigate("/tournaments/hub");
@@ -139,6 +144,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
       return;
     }
 
+    if (advanceBlocker) { navigate(advanceBlocker.route); return; }
     finishSeason();
     navigate("/season-review");
   }
@@ -297,7 +303,6 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
               Required action
             </span>
             <span
-              title={primaryEventActionLabel}
               className="truncate text-[11px] font-semibold text-white"
             >
               {primaryEventActionLabel}
@@ -337,8 +342,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
             </button>
             <button
               type="button"
-              onClick={handlePrimaryEventAction}
-              title={primaryEventActionLabel}
+              title={entryBlocker?.reason ?? advanceBlocker?.reason ?? tournamentPlayability?.reason ?? undefined} onClick={handlePrimaryEventAction}
               aria-label={primaryEventActionLabel}
               className="btn-primary h-9 whitespace-nowrap px-3 text-[11px]"
             >
@@ -364,8 +368,8 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
             {eventMenuOpen ? (
               <div className="absolute right-0 top-12 z-50 w-56 max-w-[calc(100vw-6rem)] space-y-2 rounded-lg border border-border bg-sidebar p-3 shadow-2xl">
                 <p className="break-words text-xs font-semibold text-white">{nextEvent?.name ?? (reviewPending ? "Season review ready" : "Season run-in")}</p>
-                <p className="text-[10px] text-gray-400">{eventStatusLabel}</p>
-                <button type="button" onClick={handlePrimaryEventAction} className="btn-primary min-h-11 w-full text-xs">{primaryEventActionLabel}</button>
+                <p className="text-[10px] text-gray-400">{entryBlocker?.reason ?? advanceBlocker?.reason ?? eventStatusLabel}</p>
+                <button type="button" title={entryBlocker?.reason ?? advanceBlocker?.reason ?? tournamentPlayability?.reason ?? undefined} onClick={handlePrimaryEventAction} className="btn-primary min-h-11 w-full text-xs">{primaryEventActionLabel}</button>
                 <button type="button" onClick={handleSecondaryEventAction} className="btn-secondary min-h-11 w-full text-xs">{enteredEvent || hasLiveMatchInProgress ? "Tournament Hub" : nextEvent ? "Skip This Event" : "View Calendar"}</button>
               </div>
             ) : null}

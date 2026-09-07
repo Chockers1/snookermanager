@@ -4,7 +4,7 @@ import { CoachAdvicePanel } from "../components/career/MatchInsightPanels";
 import { useState } from "react";
 import { DevelopmentPanel } from "../components/career/CareerDepthPanels";
 import { TrainingBasePanel } from '../components/career/RealismPanels';
-import { developmentTrainingBonus } from "../game/careerDepth/developmentProjects";
+import { previewTrainingDevelopment } from "../hooks/useGameState";
 import { baseTrainingMultiplier } from '../game/realism/base';
 import { protectPartnerSessions } from "../game/careerDepth/developmentProjects";
 import { protectCommitmentSessions } from "../game/careerDepth/commitments";
@@ -92,6 +92,7 @@ function TrainingPlannerContent() {
     gameState.attributes,
     currentCoach?.compatibility ?? 0,
   );
+  const developmentGains = previewTrainingDevelopment(gameState, plannerWeek);
   const selectedPreset = TRAINING_FOCUS_PRESETS.find(
     (preset) => preset.id === selectedFocus,
   );
@@ -465,27 +466,19 @@ function TrainingPlannerContent() {
                 <span className="text-[8px] text-green-400">Estimated</span>
               </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-2 p-3 xl:flex-1 xl:content-center">
-                {summary.expectedGains.map((gain) => {
-                  const adjusted = Math.max(
-                    0,
-                    Math.round(
-                      gain.value *
-                        adaptationMultiplier *
-                        developmentTrainingBonus(gameState, plannerWeek, gain.label) *
-                        (1 + summary.coachImpact / 100) *
-                        10,
-                    ) / 10,
-                  );
+                {developmentGains.length === 0 && <p className="col-span-2 text-xs text-gray-400">{gameState.trainingAppliedWeek === gameState.week ? "This week’s gains are already applied." : "No skill gains: recovery, competition or injury takes priority."}</p>}
+                {developmentGains.map((gain) => {
+                  const adjusted = Number(gain.value.toFixed(2));
                   return (
                     <div key={gain.label}>
                       <div className="mb-1 flex justify-between gap-2 text-[9px]">
                         <span className="truncate text-gray-400">
                           {gain.label}
                         </span>
-                        <b className="text-green-400">+{adjusted}</b>
+                        <b className="text-green-400">{adjusted > 0 ? `+${adjusted}` : "<0.01"}</b>
                       </div>
                       <ProgressBar
-                        value={Math.min(100, adjusted * 15)}
+                        value={Math.min(100, adjusted * 100)}
                         compact
                       />
                     </div>

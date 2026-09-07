@@ -1,3 +1,5 @@
+import { ActionBlockerNotice } from '../components/game/ActionBlockerNotice';
+import { tournamentEntryBlocker, advancementBlocker } from '../hooks/useGameState';
 import { pendingStory } from '../game/careerDepth/shared';
 import { BetweenMatchPanel } from '../components/tournaments/BetweenMatchPanel';
 import { TournamentAtmosphere } from '../components/game/TournamentAtmosphere';
@@ -106,6 +108,8 @@ export function TournamentHubPage() {
       : "A season-defining tournament with elite rewards and pressure";
   const tournamentEntered = activeTournament?.status === "Entered";
   const entryConflict = activeTournament && !tournamentEntered ? tournamentCommitmentConflict(gameState, activeTournament) : null;
+  const entryBlocker = activeTournament && !tournamentEntered ? tournamentEntryBlocker(gameState, activeTournament) : null;
+  const advanceBlocker = advancementBlocker(gameState);
   const playability = activeTournament
     ? getTournamentPlayability(gameState, activeTournament)
     : null;
@@ -165,7 +169,7 @@ export function TournamentHubPage() {
     : "Awaiting Draw";
   const advancementDecision = tournamentEntered && equipmentReady && playability?.travelBooked && playability.preparationConfirmed && playability.daysUntilStart > 0
     ? pendingStory(gameState) : undefined;
-  const primaryActionLabel = advancementDecision
+  const primaryActionLabel = entryBlocker ? entryBlocker.label : advancementDecision
     ? "Resolve Inbox Decision"
     : entryConflict
     ? "Manage Calendar Clash"
@@ -204,6 +208,7 @@ export function TournamentHubPage() {
 
   function handlePlayLiveMatch() {
     if (!activeTournament) return;
+    if (entryBlocker) { navigate(entryBlocker.route); return; }
     if (advancementDecision) {
       navigate(`/inbox?message=${encodeURIComponent(advancementDecision.id)}`);
       return;
@@ -229,6 +234,7 @@ export function TournamentHubPage() {
       return;
     }
     if ((playability?.daysUntilStart ?? 0) > 0) {
+      if (advanceBlocker) { navigate(advanceBlocker.route); return; }
       continueToNextTournament();
       return;
     }
@@ -255,7 +261,7 @@ export function TournamentHubPage() {
           <div className="mt-6 flex flex-wrap gap-3">
             <button type="button" className="btn-primary" onClick={() => { finishSeason(); navigate('/season-review'); }}>{gameState.seasonReview?.pending ? 'Open Season Review' : 'Finish Season'}</button>
             <button type="button" className="btn-secondary" onClick={() => navigate('/calendar')}>View Tournament Calendar</button>
-            <button type="button" className="btn-secondary" onClick={continueWeek}>Advance One Week</button>
+            <button type="button" className="btn-secondary" title={advanceBlocker?.reason} onClick={() => advanceBlocker ? navigate(advanceBlocker.route) : continueWeek()}>{advanceBlocker?.label ?? "Advance One Week"}</button>
           </div>
         </section>
       </div>
@@ -413,7 +419,7 @@ export function TournamentHubPage() {
                 </div>
               </div>
               <div className="grid gap-2 xl:flex xl:flex-wrap xl:items-center">
-                {entryConflict && <p role="status" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-300">Entry blocked: {entryConflict}</p>}
+                <ActionBlockerNotice blocker={entryBlocker} />
                 <button
                   type="button"
                   className={`${
@@ -443,7 +449,7 @@ export function TournamentHubPage() {
                     <button
                       type="button"
                       className="btn-secondary min-h-10 justify-center px-3 text-xs"
-                      disabled={!playability?.canPlay}
+                      disabled={!playability?.canPlay} title={!playability?.canPlay ? (entryBlocker?.reason ?? playability?.reason ?? "Complete tournament preparation first.") : undefined}
                       onClick={handleQuickSim}
                     >
                       Quick Sim

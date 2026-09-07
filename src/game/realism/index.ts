@@ -126,9 +126,10 @@ export function realismAction(state: GameState, action: RealismAction): GameStat
     if (Object.values(r.journeys).some(j => !j.applied) || state.tournaments.some(t => t.status === 'Entered' && (t.endDate ?? t.startDate) >= state.currentDate && t.startDate <= plusDays(state.currentDate, 3))) return fail('Complete or revise existing travel and competition commitments before returning home.');
     const route = routeBetween(r.location, r.home), cost = Math.round(45 + route.distanceKm * 0.065), id = `return:${state.currentDate}`;
     if (r.journeys[id]) return fail('Your return journey is already booked.');
-    if (!affordable(cost)) return fail('Not enough unreserved cash to return home.');
+    const emergencyCredit = action.emergencyCredit === true && state.player.cash < cost;
+    if (!affordable(cost) && !emergencyCredit) return fail('Not enough unreserved cash to return home. Finance offers an emergency return fare added to your negative balance.');
     const next = spend(state, cost, id, 'Return to training base');
-    return { ...next, realism: { ...r, journeys: { ...r.journeys, [id]: { eventKey: id, origin: r.location, destination: r.home, distanceKm: route.distanceKm, zoneHours: route.zoneHours, mode: route.flight ? 'Flight' : 'Ground', departure: state.currentDate, arrival: plusDays(state.currentDate, route.flight ? 2 : 1), acclimatisationDays: 0, fatigue: route.flight ? 12 : 4, cost, applied: false } } }, lastAction: `Return travel booked for £${cost}. Staying overseas costs £35 per unbooked night; prepaid event hotel nights are excluded.` };
+    return { ...next, realism: { ...r, journeys: { ...r.journeys, [id]: { eventKey: id, origin: r.location, destination: r.home, distanceKm: route.distanceKm, zoneHours: route.zoneHours, mode: route.flight ? 'Flight' : 'Ground', departure: state.currentDate, arrival: plusDays(state.currentDate, route.flight ? 2 : 1), acclimatisationDays: 0, fatigue: route.flight ? 12 : 4, cost, applied: false } } }, lastAction: `Return travel booked for £${cost}${emergencyCredit ? '; fare added to your negative balance, repaid by future earnings' : ''}. Staying overseas costs £35 per unbooked night; prepaid event hotel nights are excluded.` };
   }
   if (action.type === 'familiarise') {
     const event = state.tournaments.find(t => t.id === action.eventId && t.status === 'Entered');

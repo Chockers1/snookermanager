@@ -1,8 +1,14 @@
 import {describe,it,expect} from 'vitest';
 import { playerWorldFixture } from '../../test-support/playerWorldFixture';
 import {encodeCareerSave} from './saveStorage';
-import {recoveryRecord,expiredRecoveryIds,validatedRecoveryPayload,queueProtectedSave} from './recoverySaves';
+import {recoveryRecord,expiredRecoveryIds,validatedRecoveryPayload,queueProtectedSave,readRecoveryMetadata} from './recoverySaves';
 describe('recovery save guarantees',()=>{
+ it('metadata describes the encoded snapshot even if the source object later changes',()=>{
+  const {state}=playerWorldFixture();const payload=encodeCareerSave(state);const before=readRecoveryMetadata(payload);
+  state.player.fullName='Changed name';state.season='2099/00';state.currentDate='2099-07-01';
+  expect(readRecoveryMetadata(payload)).toEqual(before);expect(recoveryRecord('a',payload,'Automatic').player).not.toBe('Changed name');
+  expect(()=>readRecoveryMetadata('{"player":{}}')).toThrow('incomplete');
+ });
  it('stores a readable full snapshot with career progress',()=>{const {state}=playerWorldFixture();const r=recoveryRecord('career-a',encodeCareerSave(state),'Automatic');expect(r).toMatchObject({player:state.player.fullName,season:state.season,date:state.currentDate});expect(JSON.parse(validatedRecoveryPayload(r))).toEqual(JSON.parse(JSON.stringify(state)))});
  it('detects damaged snapshots before restoration',()=>{const {state}=playerWorldFixture();const r=recoveryRecord('a',encodeCareerSave(state),'Automatic');expect(()=>validatedRecoveryPayload({...r,payload:r.payload+'broken'})).toThrow('integrity check')});
  it('rotates automatic saves independently of other careers and protected season saves',()=>{const {state}=playerWorldFixture();const payload=encodeCareerSave(state);const records=Array.from({length:6},(_,i)=>recoveryRecord('a',payload,'Automatic','2026-09-0'+(i+1)));records.push(recoveryRecord('b',payload,'Automatic','2026-09-01'),recoveryRecord('a',payload,'Before season rollover','2026-09-01'));expect(expiredRecoveryIds(records,recoveryRecord('a',payload,'Automatic','2026-09-07'))).toEqual([records[0].id])});

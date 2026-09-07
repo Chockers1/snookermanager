@@ -13,7 +13,7 @@ type AppShellProps = {
 };
 
 export function AppShell({ children }: AppShellProps) {
-  const { gameState, saveWarning } = useGame();
+  const { gameState, saveWarning, savePending } = useGame();
   const location = useLocation();
   const immersiveRoute = location.pathname === "/match/live";
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
@@ -109,7 +109,7 @@ export function AppShell({ children }: AppShellProps) {
           className="flex min-h-8 shrink-0 items-center gap-2 overflow-hidden border-t border-border bg-sidebar px-3 py-1 sm:px-4"
         >
           <span className="shrink-0 text-[9px] font-medium uppercase text-green-400">
-            Update
+            {savePending ? "Saving…" : "Update"}
           </span>
           <p className="min-w-0 flex-1 truncate text-[10px] text-gray-400">
             {gameState.lastAction}

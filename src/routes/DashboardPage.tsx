@@ -1,3 +1,5 @@
+import { ActionBlockerNotice } from '../components/game/ActionBlockerNotice';
+import { advancementBlocker } from '../hooks/useGameState';
 import { formatPercent } from '../utils/formatters';
 import { PlayerLink } from '../components/game/PlayerLink';
 import { seasonPosition, seasonWeekLabel, snapshotWeekLabel } from "../game/seasonClock";
@@ -50,6 +52,7 @@ export function DashboardPage() {
   } = useGame();
   const navigate = useNavigate();
   const { currentCue } = buildDashboardData(gameState);
+  const advanceBlocker = advancementBlocker(gameState);
   const nextEvent = getNextEligibleTournament(gameState);
   const enteredEvent = nextEvent?.status === "Entered" ? nextEvent : undefined;
   const currentRanking =
@@ -546,12 +549,13 @@ export function DashboardPage() {
                   Review Last Event
                 </button>
               </div>
+              <ActionBlockerNotice blocker={advanceBlocker} />
               <button
                 type="button"
-                onClick={continueWeek}
+                onClick={() => advanceBlocker ? navigate(advanceBlocker.route) : continueWeek()}
                 className="btn-secondary w-full justify-center text-[10px]"
               >
-                Advance One Week
+                {advanceBlocker?.label ?? "Advance One Week"}
               </button>
             </div>
           </div>

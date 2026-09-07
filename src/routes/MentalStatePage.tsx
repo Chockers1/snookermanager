@@ -1,3 +1,5 @@
+import { ActionBlockerNotice } from '../components/game/ActionBlockerNotice';
+import { advancementBlocker } from '../hooks/useGameState';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -36,6 +38,7 @@ function progressTone(value: number): "green" | "amber" | "red" {
 export function MentalStatePage() {
   const { gameState, applyRecoveryPlan, continueWeek } = useGame();
   const navigate = useNavigate();
+  const advanceBlocker = advancementBlocker(gameState);
   const mentalData = buildMentalStateData(gameState);
   const [selectedPlanTitle, setSelectedPlanTitle] = useState(
     mentalData.actionPlan[0]?.title ?? "",
@@ -49,6 +52,7 @@ export function MentalStatePage() {
       className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 pb-4 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:w-[calc(100%+3rem)] xl:max-w-none xl:gap-2 xl:overflow-hidden xl:p-1.5 xl:pb-1.5"
       data-testid="mental-viewport"
     >
+      <ActionBlockerNotice blocker={advanceBlocker} />
       <header className="card flex shrink-0 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between xl:py-2">
         <div className="min-w-0">
           <p className="metric-label text-green-400">Mental performance</p>
@@ -357,7 +361,7 @@ export function MentalStatePage() {
           <button
             type="button"
             className="btn-secondary min-h-10 justify-center text-xs"
-            onClick={continueWeek}
+            title={advanceBlocker?.reason} onClick={() => advanceBlocker ? navigate(advanceBlocker.route) : continueWeek()}
           >
             <Target className="h-4 w-4" /> Advance week
           </button>

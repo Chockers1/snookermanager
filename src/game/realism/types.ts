@@ -28,6 +28,6 @@ export type RealismState = {
 export type RealismAction =
   | { type: 'break'; choice: BreakChoice }
   | { type: 'base'; base: BaseKind; location: string }
-  | { type: 'return-home' }
+  | { type: 'return-home'; emergencyCredit?: boolean }
   | { type: 'familiarise'; eventId: string }
   | { type: 'scout'; opponentId: string };

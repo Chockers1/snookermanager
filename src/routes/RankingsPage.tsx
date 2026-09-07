@@ -1,14 +1,14 @@
 import { FormResult } from '../components/game/FormResult';
 import { PlayerLink } from '../components/game/PlayerLink';
 import { TourDevelopmentPanel } from '../components/career/SeasonExpansionPanels'
-import { pathwayStandings, qTourQualification } from '../game/pathwayRules'
+import { pathwayStandings, pathwayListStatus, qTourQualification } from '../game/pathwayRules'
 import { useState } from 'react'
 import { QualificationRacesPanel } from '../components/career/RealismPanels'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Minus, Target, TrendingDown, TrendingUp } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useGame } from '../context/useGame'
-import { getNextEligibleTournament } from '../hooks/useGameState'
+import { getNextEligibleTournament, getCompetitionKeysForTournament } from '../hooks/useGameState'
 import { getPlayableRounds, resolveTournamentFormat } from '../data/tournamentFormats'
 import { rankingEarningsSummary } from '../game/rollingRankings'
 import type { PlayerAttributes } from '../types/game'
@@ -245,7 +245,10 @@ export function RankingsPage() {
   const lists = activeTab === 'qTour' ? ['Europe', 'Asia Pacific', 'Middle East', 'Americas'] : activeTab === 'qSchool' ? ['Q School UK', 'Q School Asia'] : activeTab === 'senior' ? ['Two-year seniors', 'Race to the Crucible'] : []
   const selectedList = lists.includes(pathwayList) ? pathwayList : lists[0]
   const pathwayRows = lists.length ? pathwayStandings(gameState, activeTab === 'senior' ? 'Senior' : selectedList as Parameters<typeof pathwayStandings>[1], gameState.currentDate, selectedList === 'Two-year seniors') : []
-  const activeRows = lists.length ? pathwayRows.map((r, i) => ({ ...(gameState.competitionTables[activeConfig.key].find(p => p.playerName === r.name) ?? { id: r.name, playerName: r.name, nation: gameState.worldPlayers.find(p => p.playerName === r.name)?.nation ?? 'INT', movement: 0, prizeMoney: 0, wins: 0, losses: 0 }), ranking: i + 1, points: r.points, eventsPlayed: r.events, titles: r.titles })) : gameState.competitionTables[activeConfig.key]
+  const pathwayStatus = lists.length ? pathwayListStatus(gameState, activeTab === 'senior' ? 'Senior' : selectedList as Parameters<typeof pathwayListStatus>[1], selectedList === 'Two-year seniors') : null
+  const developmentRanking = activeTab === 'youth' || activeTab === 'amateur'
+  const nextDevelopmentEvent = developmentRanking ? gameState.tournaments.filter(t => t.rankingType !== 'None' && t.rankingValue > 0 && getCompetitionKeysForTournament(t).includes(activeTab) && (t.endDate ?? t.startDate) > gameState.currentDate).sort((a,b) => (a.endDate ?? a.startDate).localeCompare(b.endDate ?? b.startDate))[0] : undefined
+  const activeRows = lists.length ? pathwayRows.map((r, i) => ({ ...(gameState.competitionTables[activeConfig.key].find(p => p.playerName === r.name) ?? { id: r.name, playerName: r.name, nation: gameState.worldPlayers.find(p => p.playerName === r.name)?.nation ?? 'INT', movement: 0, prizeMoney: 0, wins: 0, losses: 0 }), ranking: i + 1, points: r.points, eventsPlayed: r.events, titles: r.titles })) : gameState.competitionTables[activeConfig.key].filter(row => !developmentRanking || row.eventsPlayed > 0)
   const qTourPlaces = activeTab === 'qTour' ? qTourQualification(gameState, gameState.currentDate) : null
   const playerOverall = calculateOverallRating({
     attributes: gameState.attributes,
@@ -350,7 +353,7 @@ export function RankingsPage() {
     <div className={lists.length ? "flex flex-col gap-3" : "flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5"}>
       {lists.length > 0 && <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface px-4 py-2 text-xs">
         <label>Pathway standings <select aria-label="Pathway standings" value={selectedList} onChange={e => setPathwayList(e.target.value)} className="ml-2 rounded border border-border bg-background px-2 py-1">{lists.map(list => <option key={list}>{list}</option>)}</select></label>
-        <span className="text-gray-400">Recorded results only{pathwayRows.length === 0 ? ' — no completed events yet' : ''}.</span>
+        <span className="text-gray-400">{gameState.season} · {selectedList === 'Two-year seniors' ? 'Two-year list' : 'Current season'} · {pathwayStatus?.completed ?? 0} completed events. Other players' results count even when you do not enter.</span>
         {qTourPlaces?.automatic && <span className="text-emerald-300">Provisional Europe card: {qTourPlaces.automatic}</span>}
       </div>}
       <div className="shrink-0 rounded-xl border border-border bg-surface/85 px-4 py-3">
@@ -380,6 +383,10 @@ export function RankingsPage() {
         </div>
       </div>
 
+      {developmentRanking && <section aria-label="Ranking points explained" className="shrink-0 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-gray-300">
+        <p><strong className="text-white">{gameState.season} · Finishing-position points</strong> · Prize money does not determine rank. Only published ranking events count; non-ranking club events and starting seeds earn no points.</p>
+        <p className="mt-1 text-gray-400">Ties use titles, match wins, fewer losses, then alphabetical order.{nextDevelopmentEvent ? ` Next ranking results: ${nextDevelopmentEvent.name} · ${nextDevelopmentEvent.endDate ?? nextDevelopmentEvent.startDate}.` : ''}</p>
+      </section>}
       {moneyRanking && !finalRankingTab && pendingEarnings.length > 0 && <section aria-label="Pending ranking credit" className="shrink-0 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
         <h2 className="font-semibold text-amber-300">Results recorded · ranking credit pending</h2>
         <p className="mt-1 text-gray-300">Rankings update on the event’s scheduled finish date, even if you finish your matches earlier. Prize money is paid separately.</p>
@@ -389,7 +396,7 @@ export function RankingsPage() {
       <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
         <div className="grid min-h-0 min-w-0 gap-3 xl:col-span-8 xl:grid-rows-[minmax(0,1fr)_84px] xl:gap-2">
           <div className="card min-h-0 min-w-0 flex h-[28rem] flex-col overflow-hidden xl:h-full">
-            <div className="card-header px-3 py-2.5"><h3 className="text-sm font-semibold text-white">{activeConfig.label}</h3><span className="text-[10px] text-gray-400">{activeConfig.seasonLabel}</span></div>
+            <div className="card-header px-3 py-2.5"><h3 className="text-sm font-semibold text-white">{activeConfig.label}</h3><span className="text-[10px] text-gray-400">{lists.length ? selectedList : developmentRanking ? 'Current-season points' : activeConfig.seasonLabel}</span></div>
             <div className="min-h-0 flex-1 overflow-auto scrollbar-thin">
               <table className="w-full text-[11px]">
                 <thead className="sticky top-0 z-10 bg-surface-light/95 backdrop-blur">
@@ -401,15 +408,15 @@ export function RankingsPage() {
                     <th className="px-2 py-2 text-center font-medium">Age</th>
                     <th className="px-2 py-2 text-center font-medium">OVR</th>
                     <th className="px-2 py-2 text-center font-medium">POT</th>
-                    <th className="px-3 py-2 text-right font-medium">{moneyRanking ? 'Ranking earnings' : 'Points'}</th>
-                    <th className="px-3 py-2 text-right font-medium">Prize Money</th>
+                    <th className="px-3 py-2 text-right font-medium">{moneyRanking ? 'Ranking earnings' : developmentRanking ? 'Ranking points' : 'Points'}</th>
+                    <th className="px-3 py-2 text-right font-medium">{developmentRanking ? 'Prize earned' : 'Prize Money'}</th>
                     <th className="px-2 py-2 text-center font-medium">Events</th>
                     <th className="px-2 py-2 text-center font-medium">Titles</th>
                     <th className="px-3 py-2 text-center font-medium">Form</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {activeRowsWithRatings.length === 0 && <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-400">Complete events in this circuit to start its standings.</td></tr>}
+                  {activeRowsWithRatings.length === 0 && <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-400">{pathwayStatus?.empty ?? (developmentRanking ? 'No published ranking results this season yet. Starting seed positions are not earned rankings.' : 'Complete events in this circuit to start its standings.')}</td></tr>}
                   {activeRowsWithRatings.map((row) => (
                     <tr key={row.id} className={`border-b border-border/40 ${row.highlighted ? 'bg-green-600/12' : 'hover:bg-surface-light/40'}`}>
                       <td className="px-3 py-2 font-bold text-white">{row.ranking}</td>

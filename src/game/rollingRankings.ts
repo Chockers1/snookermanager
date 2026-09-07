@@ -14,6 +14,7 @@ export type RankedEvent = {
   key: string; tournamentId: string; name: string; season: string; completedOn: string;
   ranking: boolean; bracket: BracketRound[]; applied: boolean;
   eventType?: Tournament['type'];
+  tourCircuit?: string;
   prizeAwards?: Record<string,number>;
   prizeVersion?: number;
   outcomes?: { player: string; finish: string; matches?: number; wins?: number; losses?: number; draws?: number }[];
@@ -128,7 +129,7 @@ export function recordRankingEvent(state: GameState, tournament: Tournament, bra
     const amount = isChampionshipLeague(tournament) ? championshipEarnings(bracket, playerName) : seededLoss || shootOutLoss || qualified.has(playerName) ? 0 : award(tournament, entry.lastRound, entry.champion).prizeMoney;
     additions.push({ id: `${key}:${playerName}`, eventKey: key, playerName, amount, earnedOn: completedOn, expiresOn: tournament.rankingExpiryDate ?? shiftYears(completedOn, 2), season: state.season, fixedExpiry: Boolean(tournament.rankingExpiryDate) });
   }
-  return { ...state, rollingRankings: { ...ledger, earnings: [...ledger.earnings, ...additions], events: { ...ledger.events, [key]: { key, tournamentId: tournament.id, name: tournament.name, season: state.season, completedOn, ranking: countsForWorldRanking(tournament), eventType: tournament.type, bracket, applied: false, prizeAwards, prizeVersion: 1 } } } };
+  return { ...state, rollingRankings: { ...ledger, earnings: [...ledger.earnings, ...additions], events: { ...ledger.events, [key]: { key, tournamentId: tournament.id, name: tournament.name, season: state.season, completedOn, ranking: countsForWorldRanking(tournament), eventType: tournament.type, tourCircuit: tournament.tourCircuit, bracket, applied: false, prizeAwards, prizeVersion: 1 } } } };
 }
 
 /** The ledger is authoritative for money-based points, not cash or career statistics. */

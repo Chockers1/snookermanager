@@ -6,7 +6,8 @@ import { SeasonTourChangesReport } from '../components/game/SeasonTourChangesRep
 import { TournamentHistoryBriefing } from '../components/game/TournamentHistoryBriefing';
 import { seasonStartReportForMessage } from '../game/seasonStartReport';
 import { SeasonStartReport } from '../components/game/SeasonStartReport';
-import { getTournamentEntryAccess } from '../hooks/useGameState';
+import { ActionBlockerNotice } from '../components/game/ActionBlockerNotice';
+import { getTournamentEntryAccess, tournamentEntryBlocker } from '../hooks/useGameState';
 import { seasonReportForMessage } from '../game/seasonEndReport';
 import { SeasonEndReport } from '../components/game/SeasonEndReport';
 import { financialReportForMessage } from '../game/eventFinancialReport';
@@ -135,11 +136,7 @@ export function InboxPage() {
     selectedMessage?.subject.startsWith("Post-event report:") ||
       relatedTournament?.status === "Completed",
   );
-  const equipmentReady = Boolean(
-    gameState.equipment.currentCueId &&
-    gameState.equipment.currentChalkId &&
-    gameState.equipment.currentTipId,
-  );
+  const entryBlocker = relatedTournament?.status === "Available" && !isCompletedEventReport ? tournamentEntryBlocker(gameState, relatedTournament) : null;
   const daysUntilEvent = relatedTournament
     ? Math.max(
         0,
@@ -351,6 +348,7 @@ export function InboxPage() {
                   </div>
                 </div>
               ) : null}
+              {entryBlocker && <ActionBlockerNotice blocker={entryBlocker} />}
               </div>
 
               <div data-testid="inbox-message-actions" className={(compactReport ? "mt-2 gap-1.5 pt-2 [&>button]:min-h-8 [&>button]:px-2 [&>button]:py-1 [&>button]:text-[11px]" : "mt-3 gap-2 pt-3") + " flex shrink-0 flex-wrap border-t border-border bg-surface"}>
@@ -359,12 +357,12 @@ export function InboxPage() {
                     type="button"
                     className="btn-primary min-h-10 text-xs"
                     onClick={() =>
-                      equipmentReady
-                        ? enterTournament(relatedTournament.id)
-                        : navigate("/equipment/cues")
+                      entryBlocker
+                        ? navigate(entryBlocker.route)
+                        : enterTournament(relatedTournament.id)
                     }
                   >
-                    {equipmentReady ? "Enter Tournament" : "Prepare Equipment"}{" "}
+                    {entryBlocker?.label ?? "Enter Tournament"}{" "}
                     <ChevronRight className="h-3.5 w-3.5" />
                   </button>
                 ) : selectedMessage.actionRoute &&
