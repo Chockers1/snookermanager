@@ -22,8 +22,8 @@ export function TrainingReportPage() {
   const latestReport = gameState.trainingCondition.reportSnapshot?.lastReport
   const reportMetrics = [
     { label: 'Confidence', value: formatPercent(gameState.player.confidence), subtitle: 'Current live value', tone: 'text-green-400' },
-    { label: 'Fatigue', value: `${gameState.player.fatigue}%`, subtitle: 'Recovery pressure', tone: gameState.player.fatigue >= 70 ? 'text-red-400' : 'text-amber-400' },
-    { label: 'Morale', value: `${gameState.player.morale}%`, subtitle: 'Current morale', tone: 'text-green-400' },
+    { label: 'Fatigue', value: `${formatPercent(gameState.player.fatigue)}`, subtitle: 'Recovery pressure', tone: gameState.player.fatigue >= 70 ? 'text-red-400' : 'text-amber-400' },
+    { label: 'Morale', value: `${formatPercent(gameState.player.morale)}`, subtitle: 'Current morale', tone: 'text-green-400' },
     { label: 'Technical Avg', value: technicalAverage, subtitle: 'Technical profile', tone: 'text-sky-400' },
     { label: 'Mental Avg', value: mentalAverage, subtitle: 'Mental profile', tone: 'text-sky-400' },
     { label: 'Physical Avg', value: physicalAverage, subtitle: 'Physical profile', tone: 'text-amber-400' },

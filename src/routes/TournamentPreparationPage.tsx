@@ -23,7 +23,7 @@ import {
   type PreparationSupportId,
 } from "../game/tournamentPreparation";
 import { getNextEligibleTournament } from "../hooks/useGameState";
-import { formatMoney } from "../utils/formatters";
+import { formatMoney, formatPercent } from "../utils/formatters";
 
 const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
 
@@ -44,13 +44,13 @@ function DeltaValue({
   lowerIsBetter?: boolean;
   suffix?: string;
 }) {
-  const delta = after - before;
+  const delta = Number((after - before).toFixed(2));
   const tone = getPreparationTone(delta, lowerIsBetter);
   return (
     <div className={`rounded-md border px-2 py-1.5 ${toneClasses[tone]}`}>
       <p className="text-[8px] uppercase tracking-wide text-gray-500">Before → prepared</p>
       <p className="mt-0.5 text-xs font-bold text-white">
-        {before}{suffix} <span className="text-gray-500">→</span> {after}{suffix}
+        {suffix === "%" ? formatPercent(before) : `${Number(before.toFixed(2))}${suffix}`} <span className="text-gray-500">→</span> {suffix === "%" ? formatPercent(after) : `${Number(after.toFixed(2))}${suffix}`}
         {delta !== 0 ? (
           <span className={`ml-1 ${tone === "positive" ? "text-green-400" : "text-red-400"}`}>
             {delta > 0 ? "+" : ""}{delta}
@@ -226,7 +226,7 @@ export function TournamentPreparationPage() {
         <section className="card flex min-h-[520px] flex-col overflow-hidden xl:min-h-0">
           <div className="card-header shrink-0 py-2.5">
             <div><h2 className="flex items-center gap-2 text-xs font-semibold text-white"><SlidersHorizontal className="h-4 w-4 text-green-400" />Preparation allocation</h2><p className="text-[8px] text-gray-500">Every change updates the forecast immediately.</p></div>
-            <span className={totalAllocation === 100 ? "text-[9px] font-semibold text-green-400" : totalAllocation < 100 ? "text-[9px] font-semibold text-amber-400" : "text-[9px] font-semibold text-red-400"}>{totalAllocation}% allocated{totalAllocation < 100 ? ` · ${100 - totalAllocation}% available` : ""}</span>
+            <span className={totalAllocation === 100 ? "text-[9px] font-semibold text-green-400" : totalAllocation < 100 ? "text-[9px] font-semibold text-amber-400" : "text-[9px] font-semibold text-red-400"}>{formatPercent(totalAllocation)} allocated{totalAllocation < 100 ? ` · ${formatPercent(100 - totalAllocation)} available` : ""}</span>
           </div>
           <div className="grid min-h-0 flex-1 gap-2 p-2.5 xl:grid-cols-[minmax(0,1fr)_310px] xl:grid-rows-[auto_minmax(0,1fr)]">
             <div className="grid grid-cols-2 gap-1.5 md:grid-cols-3">
@@ -235,7 +235,7 @@ export function TournamentPreparationPage() {
                 const recovery = item.id === "recovery";
                 return (
                   <div key={item.id} className={`rounded-lg border p-2.5 ${recovery ? "border-green-500/35 bg-green-500/10" : "border-border bg-surface-light/35"}`}>
-                    <div className="flex items-start justify-between gap-2"><div><p className="text-[10px] font-semibold text-white">{item.label}</p><p className={`text-[8px] ${recovery ? "text-green-400" : "text-gray-500"}`}>{item.description}</p></div><b className="text-sm text-green-400">{value}%</b></div>
+                    <div className="flex items-start justify-between gap-2"><div><p className="text-[10px] font-semibold text-white">{item.label}</p><p className={`text-[8px] ${recovery ? "text-green-400" : "text-gray-500"}`}>{item.description}</p></div><b className="text-sm text-green-400">{formatPercent(value)}</b></div>
                     <div className="mt-2.5 flex gap-1"><button type="button" aria-label={`Decrease ${item.label}`} disabled={value === 0} className="min-h-8 flex-1 rounded border border-border bg-surface text-xs text-gray-300 hover:border-green-500/40 disabled:cursor-not-allowed disabled:opacity-35" onClick={() => adjustAllocation(item.id, -5)}>−</button><button type="button" aria-label={`Increase ${item.label}`} disabled={totalAllocation >= 100 || value >= 100} className="min-h-8 flex-1 rounded border border-border bg-surface text-xs text-gray-300 hover:border-green-500/40 disabled:cursor-not-allowed disabled:opacity-35" onClick={() => adjustAllocation(item.id, 5)}>+</button></div>
                   </div>
                 );
@@ -258,9 +258,9 @@ export function TournamentPreparationPage() {
             </div>
 
             <div className="grid min-h-[150px] grid-cols-1 gap-1.5 md:grid-cols-3 xl:col-span-2">
-              <div className="flex flex-col rounded-lg border border-border bg-surface-light/25 p-3"><div className="flex justify-between"><b className="text-[10px] text-white">Arrival and reset</b><span className="text-[8px] text-sky-300">Day 1</span></div><p className="mt-1 text-[8px] text-gray-400">Recovery absorbs the booked travel load before table work.</p><div className="mt-3 grid gap-1.5 text-[8px]"><div className="flex justify-between border-b border-border/60 pb-1"><span className="text-gray-500">Recovery allocation</span><b className="text-white">{allocations.recovery}%</b></div><div className="flex justify-between border-b border-border/60 pb-1"><span className="text-gray-500">Physio support</span><b className={supportIds.includes("physio") ? "text-green-400" : "text-gray-400"}>{supportIds.includes("physio") ? "Selected" : "Not selected"}</b></div><div className="flex justify-between"><span>Fatigue <b className={effects.fatigueDelta <= 0 ? "text-green-400" : "text-red-400"}>{effects.fatigueDelta > 0 ? "+" : ""}{effects.fatigueDelta}</b></span><span>Strain <b className={effects.strainDelta <= 0 ? "text-green-400" : "text-red-400"}>{effects.strainDelta > 0 ? "+" : ""}{effects.strainDelta}</b></span></div></div></div>
-              <div className="flex flex-col rounded-lg border border-border bg-surface-light/25 p-3"><div className="flex justify-between"><b className="text-[10px] text-white">Table and tactics</b><span className="text-[8px] text-green-400">Day 2</span></div><p className="mt-1 text-[8px] text-gray-400">Practice creates temporary form for the opening match.</p><div className="mt-3 grid gap-1.5 text-[8px]"><div className="flex justify-between border-b border-border/60 pb-1"><span className="text-gray-500">Table allocation</span><b className="text-white">{allocations.potting + allocations.breakBuilding + allocations.tactical}%</b></div><div className="flex justify-between border-b border-border/60 pb-1"><span className="text-gray-500">Coach support</span><b className={supportIds.includes("coach") ? "text-green-400" : "text-gray-400"}>{supportIds.includes("coach") ? "Selected" : "Not selected"}</b></div><div className="flex justify-between"><span>Sharpness <b className="text-green-400">+{effects.sharpnessDelta}</b></span><span>Best skill boost <b className="text-green-400">+{Math.max(...Object.values(effects.attributeBonuses))}</b></span></div></div></div>
-              <div className="flex flex-col rounded-lg border border-green-500/30 bg-green-500/5 p-3"><div className="flex justify-between"><b className="text-[10px] text-white">Match-day routine</b><span className="text-[8px] text-green-400">Opening round</span></div><p className="mt-1 text-[8px] text-gray-400">Temporary bonuses peak now and decay through later rounds.</p><div className="mt-3 grid gap-1.5 text-[8px]"><div className="flex justify-between border-b border-green-500/15 pb-1"><span className="text-gray-500">Opening readiness</span><b className={preparedReadiness >= baselineReadiness ? "text-green-400" : "text-red-400"}>{baselineReadiness}% → {preparedReadiness}%</b></div><div className="flex justify-between border-b border-green-500/15 pb-1"><span className="text-gray-500">Confidence</span><b className={preparedConfidence >= baseConfidence ? "text-green-400" : "text-red-400"}>{baseConfidence}% → {preparedConfidence}%</b></div><div className="flex justify-between"><span className="text-gray-500">Later rounds</span><b className="text-amber-400">Bonuses decay 18% per round</b></div></div></div>
+              <div className="flex flex-col rounded-lg border border-border bg-surface-light/25 p-3"><div className="flex justify-between"><b className="text-[10px] text-white">Arrival and reset</b><span className="text-[8px] text-sky-300">Day 1</span></div><p className="mt-1 text-[8px] text-gray-400">Recovery absorbs the booked travel load before table work.</p><div className="mt-3 grid gap-1.5 text-[8px]"><div className="flex justify-between border-b border-border/60 pb-1"><span className="text-gray-500">Recovery allocation</span><b className="text-white">{formatPercent(allocations.recovery)}</b></div><div className="flex justify-between border-b border-border/60 pb-1"><span className="text-gray-500">Physio support</span><b className={supportIds.includes("physio") ? "text-green-400" : "text-gray-400"}>{supportIds.includes("physio") ? "Selected" : "Not selected"}</b></div><div className="flex justify-between"><span>Fatigue <b className={effects.fatigueDelta <= 0 ? "text-green-400" : "text-red-400"}>{effects.fatigueDelta > 0 ? "+" : ""}{effects.fatigueDelta}</b></span><span>Strain <b className={effects.strainDelta <= 0 ? "text-green-400" : "text-red-400"}>{effects.strainDelta > 0 ? "+" : ""}{effects.strainDelta}</b></span></div></div></div>
+              <div className="flex flex-col rounded-lg border border-border bg-surface-light/25 p-3"><div className="flex justify-between"><b className="text-[10px] text-white">Table and tactics</b><span className="text-[8px] text-green-400">Day 2</span></div><p className="mt-1 text-[8px] text-gray-400">Practice creates temporary form for the opening match.</p><div className="mt-3 grid gap-1.5 text-[8px]"><div className="flex justify-between border-b border-border/60 pb-1"><span className="text-gray-500">Table allocation</span><b className="text-white">{formatPercent(allocations.potting + allocations.breakBuilding + allocations.tactical)}</b></div><div className="flex justify-between border-b border-border/60 pb-1"><span className="text-gray-500">Coach support</span><b className={supportIds.includes("coach") ? "text-green-400" : "text-gray-400"}>{supportIds.includes("coach") ? "Selected" : "Not selected"}</b></div><div className="flex justify-between"><span>Sharpness <b className="text-green-400">+{effects.sharpnessDelta}</b></span><span>Best skill boost <b className="text-green-400">+{Math.max(...Object.values(effects.attributeBonuses))}</b></span></div></div></div>
+              <div className="flex flex-col rounded-lg border border-green-500/30 bg-green-500/5 p-3"><div className="flex justify-between"><b className="text-[10px] text-white">Match-day routine</b><span className="text-[8px] text-green-400">Opening round</span></div><p className="mt-1 text-[8px] text-gray-400">Temporary bonuses peak now and decay through later rounds.</p><div className="mt-3 grid gap-1.5 text-[8px]"><div className="flex justify-between border-b border-green-500/15 pb-1"><span className="text-gray-500">Opening readiness</span><b className={preparedReadiness >= baselineReadiness ? "text-green-400" : "text-red-400"}>{formatPercent(baselineReadiness)} → {formatPercent(preparedReadiness)}</b></div><div className="flex justify-between border-b border-green-500/15 pb-1"><span className="text-gray-500">Confidence</span><b className={preparedConfidence >= baseConfidence ? "text-green-400" : "text-red-400"}>{formatPercent(baseConfidence)} → {formatPercent(preparedConfidence)}</b></div><div className="flex justify-between"><span className="text-gray-500">Later rounds</span><b className="text-amber-400">Bonuses decay 18% per round</b></div></div></div>
             </div>
           </div>
         </section>
@@ -298,10 +298,10 @@ export function TournamentPreparationPage() {
 
       <div className="grid grid-cols-4 gap-2">
         {[
-          ["Preparation load", `${100 - allocations.recovery}%`, 100 - allocations.recovery, preparedFatigue >= 75 ? "red" : "green"],
-          ["Fatigue", `${baseFatigue}% → ${preparedFatigue}%`, preparedFatigue, preparedFatigue > baseFatigue ? "red" : "green"],
-          ["Strain", `${baseStrain}% → ${preparedStrain}%`, preparedStrain, preparedStrain > baseStrain ? "red" : "green"],
-          ["Opening readiness", `${preparedReadiness}%`, preparedReadiness, preparedReadiness < baselineReadiness ? "red" : "green"],
+          ["Preparation load", `${formatPercent(100 - allocations.recovery)}`, 100 - allocations.recovery, preparedFatigue >= 75 ? "red" : "green"],
+          ["Fatigue", `${formatPercent(baseFatigue)} → ${formatPercent(preparedFatigue)}`, preparedFatigue, preparedFatigue > baseFatigue ? "red" : "green"],
+          ["Strain", `${formatPercent(baseStrain)} → ${formatPercent(preparedStrain)}`, preparedStrain, preparedStrain > baseStrain ? "red" : "green"],
+          ["Opening readiness", `${formatPercent(preparedReadiness)}`, preparedReadiness, preparedReadiness < baselineReadiness ? "red" : "green"],
         ].map(([label, value, progress, tone]) => <div key={String(label)} className="card px-3 py-2"><div className="mb-1.5 flex justify-between gap-2"><span className="metric-label truncate">{label}</span><b className={`text-xs ${tone === "red" ? "text-red-400" : "text-green-400"}`}>{value}</b></div><ProgressBar value={Number(progress)} tone={tone as "red" | "green"} compact /></div>)}
       </div>
     </div>

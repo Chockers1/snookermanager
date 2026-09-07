@@ -1,3 +1,4 @@
+import { pendingStory } from '../game/careerDepth/shared';
 import { BetweenMatchPanel } from '../components/tournaments/BetweenMatchPanel';
 import { TournamentAtmosphere } from '../components/game/TournamentAtmosphere';
 import { TournamentRewards } from '../components/game/TournamentRewards';
@@ -162,7 +163,11 @@ export function TournamentHubPage() {
   const nextMatchStageLabel = tournamentEntered
     ? (activeRound ?? "Awaiting Draw")
     : "Awaiting Draw";
-  const primaryActionLabel = entryConflict
+  const advancementDecision = tournamentEntered && equipmentReady && playability?.travelBooked && playability.preparationConfirmed && playability.daysUntilStart > 0
+    ? pendingStory(gameState) : undefined;
+  const primaryActionLabel = advancementDecision
+    ? "Resolve Inbox Decision"
+    : entryConflict
     ? "Manage Calendar Clash"
     : !equipmentReady
     ? "Open Equipment"
@@ -199,6 +204,10 @@ export function TournamentHubPage() {
 
   function handlePlayLiveMatch() {
     if (!activeTournament) return;
+    if (advancementDecision) {
+      navigate(`/inbox?message=${encodeURIComponent(advancementDecision.id)}`);
+      return;
+    }
     if (entryConflict) {
       navigate("/calendar?commitments=1");
       return;
@@ -357,7 +366,9 @@ export function TournamentHubPage() {
               <span
                 className={`text-[9px] font-semibold uppercase tracking-[0.16em] ${playability?.canPlay ? "text-green-400" : "text-amber-400"}`}
               >
-                {playability?.canPlay
+                {advancementDecision
+                  ? "Decision Needed"
+                  : playability?.canPlay
                   ? "Playable"
                   : tournamentEntered
                     ? "Preparation Needed"
@@ -452,7 +463,7 @@ export function TournamentHubPage() {
                 {tournamentEntered && completedRounds.length === 0 && !(gameState.liveMatch?.tournamentId === activeTournament.id && gameState.liveMatch.status === "In Progress") && <button type="button" className="btn-secondary min-h-8 text-xs xl:w-full" onClick={() => withdrawTournament(activeTournament.id)}>Withdraw Entry</button>}
                 {tournamentEntered && !playability?.canPlay ? (
                   <p className="text-center text-[10px] leading-tight text-amber-300">
-                    {playability?.reason}
+                    {advancementDecision ? `Time is paused for “${advancementDecision.title}”. Choose a response in Inbox, then advance to the tournament.` : playability?.reason}
                   </p>
                 ) : null}
               </div>
@@ -524,7 +535,7 @@ export function TournamentHubPage() {
                 <span className="block text-[9px] uppercase text-gray-500">
                   Freshness
                 </span>
-                <b className="text-sm text-white">{freshness}%</b>
+                <b className="text-sm text-white">{formatPercent(freshness)}</b>
               </div>
               <div className="rounded-lg bg-surface-light/50 p-2">
                 <span className="block text-[9px] uppercase text-gray-500">

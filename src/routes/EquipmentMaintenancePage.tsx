@@ -9,7 +9,7 @@ import { SectionCard } from '../components/ui/SectionCard'
 import { useGame } from '../context/useGame'
 import { cueMarketplaceCatalog, maintenanceActionCatalog, tipCatalog } from '../data/catalogs'
 import type { MaintenanceHistoryItem } from '../types/game'
-import { formatMoney } from '../utils/formatters'
+import { formatMoney, formatPercent } from '../utils/formatters'
 
 const historyColumns: DataTableColumn<MaintenanceHistoryItem>[] = [
   { key: 'date', header: 'Date' },
@@ -81,9 +81,9 @@ export function EquipmentMaintenancePage() {
   const recommendation = cueCondition.slice().sort((left, right) => left.value - right.value)[0]
   const maintenanceImpact = selectedAction.restoration.map((item) => ({ label: item.label, value: item.value }))
   const maintenanceRisk = [
-    { label: 'Cue Reliability', value: `${Math.max(1, 100 - (currentCueState?.condition ?? currentCue.condition))}% wear`, status: (currentCueState?.condition ?? currentCue.condition) < 60 ? 'High' : 'Medium' },
-    { label: 'Tip Response', value: `${Math.max(1, 100 - (currentCueState?.tipCondition ?? 70))}% wear`, status: (currentCueState?.tipCondition ?? 70) < 60 ? 'High' : 'Medium' },
-    { label: 'Shaft Straightness', value: `${Math.max(1, 100 - (currentCueState?.shaftStraightness ?? 70))}% risk`, status: (currentCueState?.shaftStraightness ?? 70) < 60 ? 'High' : 'Medium' },
+    { label: 'Cue Reliability', value: `${formatPercent(Math.max(1, 100 - (currentCueState?.condition ?? currentCue.condition)))} wear`, status: (currentCueState?.condition ?? currentCue.condition) < 60 ? 'High' : 'Medium' },
+    { label: 'Tip Response', value: `${formatPercent(Math.max(1, 100 - (currentCueState?.tipCondition ?? 70)))} wear`, status: (currentCueState?.tipCondition ?? 70) < 60 ? 'High' : 'Medium' },
+    { label: 'Shaft Straightness', value: `${formatPercent(Math.max(1, 100 - (currentCueState?.shaftStraightness ?? 70)))} risk`, status: (currentCueState?.shaftStraightness ?? 70) < 60 ? 'High' : 'Medium' },
   ]
 
   return (
@@ -129,7 +129,7 @@ export function EquipmentMaintenancePage() {
                   <div className="mt-5 space-y-3">
                     {cueCondition.map((item) => (
                       <div key={item.label}>
-                        <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">{item.label}</span><span className="text-scm-text">{item.value}%</span></div>
+                        <div className="mb-2 flex items-center justify-between text-sm"><span className="text-scm-textSoft">{item.label}</span><span className="text-scm-text">{formatPercent(item.value)}</span></div>
                         <ProgressBar value={item.value} tone={item.value >= 75 ? 'green' : item.value >= 55 ? 'amber' : 'red'} />
                         <p className="mt-1 text-xs text-scm-textMuted">{item.description}</p>
                       </div>

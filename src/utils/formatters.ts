@@ -6,8 +6,15 @@ export function formatMoney(value: number): string {
   }).format(value)
 }
 
+const percentageNumber = new Intl.NumberFormat('en-GB', {
+  maximumFractionDigits: 2,
+  useGrouping: false,
+})
+
 export function formatPercent(value: number): string {
-  return `${Math.round(value)}%`
+  if (!Number.isFinite(value)) return '—'
+  const displayed = percentageNumber.format(value)
+  return `${displayed === '-0' ? '0' : displayed}%`
 }
 
 export function formatSigned(value: number): string {

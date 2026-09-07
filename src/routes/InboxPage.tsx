@@ -1,3 +1,4 @@
+import { InboxReportSummary } from '../components/game/InboxReportSummary';
 import { captureVictoryMessages, victoryMessageTitle, victoryMessagePreview } from '../game/victoryInbox';
 import { qualificationReportForMessage } from '../game/qualificationReport';
 import { formatInboxConfidence } from '../utils/inboxFormatting';
@@ -22,7 +23,7 @@ import {
   MapPin,
   Trophy,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useGame } from "../context/useGame";
 import type { InboxMessage } from "../types/game";
 
@@ -32,18 +33,6 @@ function priorityClass(priority: InboxMessage["priority"]) {
   if (priority === "High") return "bg-red-600/20 text-red-300";
   if (priority === "Medium") return "bg-amber-600/20 text-amber-300";
   return "bg-sky-600/20 text-sky-300";
-}
-
-function summaryToneClass(
-  tone: NonNullable<InboxMessage["summary"]>[number]["tone"],
-) {
-  if (tone === "positive")
-    return "border-green-500/35 bg-green-500/10 text-green-300";
-  if (tone === "negative")
-    return "border-red-500/35 bg-red-500/10 text-red-300";
-  if (tone === "warning")
-    return "border-amber-500/35 bg-amber-500/10 text-amber-300";
-  return "border-sky-500/25 bg-sky-500/5 text-sky-300";
 }
 
 function getMessageSummary(message: InboxMessage | null) {
@@ -94,6 +83,7 @@ function isEventMessage(message: InboxMessage) {
 
 export function InboxPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     gameState,
     enterTournament,
@@ -104,7 +94,7 @@ export function InboxPage() {
   const [categoryFilter, setCategoryFilter] = useState<InboxFilter>("All");
   const [showActionableOnly, setShowActionableOnly] = useState(false);
   const [selectedMessageId, setSelectedMessageId] = useState(
-    gameState.inbox[0]?.id ?? "",
+    searchParams.get("message") ?? gameState.inbox[0]?.id ?? "",
   );
 
   const filteredInbox = useMemo(
@@ -131,12 +121,11 @@ export function InboxPage() {
   const seasonReport = seasonReportForMessage(gameState, selectedMessage);
   const seasonStartReport = seasonStartReportForMessage(gameState, selectedMessage, getTournamentEntryAccess);
   const tourChangesReport = selectedMessage?.tourChangesReport;
-  const wideReport = Boolean(seasonStartReport);
-  const compactReport = Boolean(eventFinance || seasonReport || wideReport);
+  const compactReport = Boolean(eventFinance || seasonReport);
   const selectedText = selectedMessage
     ? `${victoryMessageTitle(selectedMessage)} ${selectedMessage.preview}`.toLowerCase()
     : "";
-  const relatedTournament = seasonReport || wideReport || tourChangesReport ? undefined : eventFinance ? gameState.tournaments.find(t=>t.id===eventFinance.tournamentId && t.startDate===eventFinance.startDate) : selectedMessage?.tournamentReference ? gameState.tournaments.find(t=>t.id===selectedMessage.tournamentReference!.id && t.startDate===selectedMessage.tournamentReference!.startDate) : gameState.tournaments.slice().sort((a,b)=>b.name.length-a.name.length).find((tournament) =>
+  const relatedTournament = seasonReport || seasonStartReport || tourChangesReport ? undefined : eventFinance ? gameState.tournaments.find(t=>t.id===eventFinance.tournamentId && t.startDate===eventFinance.startDate) : selectedMessage?.tournamentReference ? gameState.tournaments.find(t=>t.id===selectedMessage.tournamentReference!.id && t.startDate===selectedMessage.tournamentReference!.startDate) : gameState.tournaments.slice().sort((a,b)=>b.name.length-a.name.length).find((tournament) =>
     selectedText.includes(tournament.name.toLowerCase()),
   );
   const relatedTravel = relatedTournament
@@ -242,8 +231,8 @@ export function InboxPage() {
         </div>
       </div>
 
-      <section className={"card grid min-h-0 min-w-0 flex-1 overflow-hidden md:grid-rows-1 " + (wideReport ? "md:grid-cols-1 " : "md:grid-cols-[minmax(240px,0.7fr)_minmax(0,1.5fr)] ") + (compactReport ? "grid-rows-1" : "grid-rows-[minmax(9rem,0.8fr)_minmax(11rem,1.2fr)]")}>
-        <div className={(wideReport ? "hidden" : compactReport ? "hidden md:flex" : "flex") + " min-h-0 flex-col overflow-hidden border-b border-border md:border-b-0 md:border-r"}>
+      <section className={"card grid min-h-0 min-w-0 flex-1 overflow-hidden md:grid-rows-1 md:grid-cols-[minmax(240px,0.7fr)_minmax(0,1.5fr)] " + (compactReport ? "grid-rows-1" : "grid-rows-[minmax(9rem,0.8fr)_minmax(11rem,1.2fr)]")}>
+        <div className={(compactReport ? "hidden md:flex" : "flex") + " min-h-0 flex-col overflow-hidden border-b border-border md:border-b-0 md:border-r"}>
           <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
             <p className="text-xs font-semibold text-white">Messages</p>
             <span className="text-[10px] text-gray-500">
@@ -297,7 +286,7 @@ export function InboxPage() {
         </div>
 
         <article className={"flex min-h-0 min-w-0 flex-col overflow-hidden " + (compactReport ? "p-3" : "p-4 sm:p-5")}>
-          {compactReport && <label className={"mb-2 shrink-0 text-[10px] text-gray-400 " + (wideReport ? "" : "md:hidden")}>Message<select aria-label="Select inbox message" className="mt-1 w-full min-w-0 rounded border border-border bg-surface p-1.5 text-xs text-white" value={selectedMessage?.id} onChange={e=>{const message=filteredInbox.find(m=>m.id===e.target.value);if(message)openMessage(message)}}>{filteredInbox.map(m=><option key={m.id} value={m.id}>{victoryMessageTitle(m)}</option>)}</select></label>}
+          {compactReport && <label className="mb-2 shrink-0 text-[10px] text-gray-400 md:hidden">Message<select aria-label="Select inbox message" className="mt-1 w-full min-w-0 rounded border border-border bg-surface p-1.5 text-xs text-white" value={selectedMessage?.id} onChange={e=>{const message=filteredInbox.find(m=>m.id===e.target.value);if(message)openMessage(message)}}>{filteredInbox.map(m=><option key={m.id} value={m.id}>{victoryMessageTitle(m)}</option>)}</select></label>}
           {selectedMessage ? (
             <>
               <div data-testid="inbox-message-body" className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
@@ -316,43 +305,13 @@ export function InboxPage() {
                 {victoryMessageTitle(selectedMessage)}
               </h2>
               {!compactReport && <p className="mt-3 max-w-3xl text-sm leading-5 text-gray-300">
-                {gameState.realism?.digest.some(d => d.id === selectedMessage.id) ? 'Results and milestones from your simulated tour.' : selectedMessage.preview}
+                {seasonStartReport ? 'Your career position, upcoming entries and previous tournament results.' : gameState.realism?.digest.some(d => d.id === selectedMessage.id) ? 'Results and milestones from your simulated tour.' : selectedMessage.preview}
               </p>}
               <StoryDecisionPanel messageId={selectedMessage.id} />
               <WorldDigestPanel messageId={selectedMessage.id} />
 
               {tourChangesReport ? <SeasonTourChangesReport report={tourChangesReport} /> : seasonStartReport ? <SeasonStartReport report={seasonStartReport} live={seasonStartReport.season === gameState.season} /> : seasonReport ? <SeasonEndReport report={seasonReport} /> : eventFinance ? <PostEventReport finance={eventFinance} summary={selectedSummary} qualification={qualification} rankingSnapshot={selectedMessage.eventRanking} victory={selectedMessage.victoryReport} /> : selectedSummary.length ? (
-                <div className="mt-3 max-w-3xl shrink-0 rounded-lg border border-border bg-background/30">
-                  <div className="border-b border-border px-4 py-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                      Report summary
-                    </p>
-                  </div>
-                  <ul className="divide-y divide-border/70">
-                    {selectedSummary.map((item, index) => (
-                      <li
-                        key={`${item.label}-${index}`}
-                        className="grid gap-1 px-4 py-1.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-gray-300">
-                            {item.label}
-                          </p>
-                          {item.detail ? (
-                            <p className="mt-0.5 truncate text-[10px] text-gray-500">
-                              {item.detail}
-                            </p>
-                          ) : null}
-                        </div>
-                        <span
-                          className={`w-fit rounded-md border px-2.5 py-1 text-xs font-bold ${summaryToneClass(item.tone)}`}
-                        >
-                          {item.value}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <InboxReportSummary items={selectedSummary} />
               ) : null}
 
               {!compactReport && selectedMessage.tournamentBriefings?.length ? <TournamentHistoryBriefing briefings={selectedMessage.tournamentBriefings} /> : null}

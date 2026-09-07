@@ -1,5 +1,4 @@
 import { FormResult } from '../components/game/FormResult';
-import { profileScouting } from '../game/playerProfile';
 import { PlayerLink } from '../components/game/PlayerLink';
 import { TourDevelopmentPanel } from '../components/career/SeasonExpansionPanels'
 import { pathwayStandings, qTourQualification } from '../game/pathwayRules'
@@ -282,7 +281,7 @@ export function RankingsPage() {
       overall: archive?.overallRating ?? estimated.overall,
       potential: Math.max(
         archive?.overallRating ?? estimated.overall,
-        archive?.developmentPotential ?? estimated.potential,
+        archive?.developmentPotential ?? archive?.overallRating ?? estimated.potential,
       ),
       recentResults: archive?.recentResults,
     }
@@ -418,8 +417,8 @@ export function RankingsPage() {
                       <td className={`px-3 py-2 font-medium ${row.highlighted ? 'text-green-400' : 'text-white'}`}><PlayerLink name={row.playerName} /></td>
                       <td className="px-2 py-2 text-gray-400">{row.nation}</td>
                       <td className="px-2 py-2 text-center tabular-nums text-gray-300">{row.age ?? "—"}</td>
-                      <td className="px-2 py-2 text-center font-semibold text-white">{row.highlighted ? row.overall : profileScouting(gameState, row.playerName).ability}</td>
-                      <td className="px-2 py-2 text-center font-semibold text-green-400">{row.highlighted ? row.potential : 'Unknown'}</td>
+                      <td className="px-2 py-2 text-center font-semibold text-white">{Math.round(row.overall)}</td>
+                      <td className="px-2 py-2 text-center font-semibold text-green-400">{Math.round(row.potential)}</td>
                       <td className="px-3 py-2 text-right text-white">{moneyRanking ? formatMoney(row.points) : row.points}</td>
                       <td className="px-3 py-2 text-right text-white">{formatMoney(row.prizeMoney)}</td>
                       <td className="px-2 py-2 text-center text-gray-400">{row.eventsPlayed}</td>

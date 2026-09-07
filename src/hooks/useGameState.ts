@@ -1,3 +1,5 @@
+import { updateInboxReadState, isInboxReadOnlyChange, encodeInboxReadOverlay, applyInboxReadOverlay, inboxReadStorageKey } from '../game/inboxReadState';
+import { formatPercent } from '../utils/formatters';
 import { repairTournamentPayouts, type PayoutRepair } from '../game/payoutRepair';
 import { scheduledPlacementPrize } from '../data/tournamentPrizes';
 import { captureVictoryMessages } from '../game/victoryInbox';
@@ -4744,6 +4746,47 @@ function historyEntryAwardsCareerTitle(
   );
 }
 
+/** Competitive trophies only; qualifying places and exhibitions remain achievements. */
+export function seasonTitleEntries(state: GameState, season: string) {
+  const seen = new Set<string>();
+  return state.history.tournamentHistory.filter(entry => {
+    if (entry.season !== season || entry.status !== 'Completed' || !historyEntryAwardsCareerTitle(entry, state.tournaments)) return false;
+    const key = entry.tournamentId + ':' + entry.startDate;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** Repair the old Winner-based summaries only when the surviving archive explains the total. */
+export function repairSeasonTitleRecords(state: GameState): GameState {
+  const correctCount = (season: string, count: number, kind: 'titles' | 'majorTitles' | 'qTourWins' = 'titles') => {
+    const matchesKind = (entry: TournamentHistoryEntry) => kind === 'titles' || entry.eventType === (kind === 'majorTitles' ? 'Major' : 'Q Tour');
+    const oldWinners = state.history.tournamentHistory.filter(entry => entry.season === season && entry.result === 'Winner' && matchesKind(entry));
+    // Do not erase older totals when their detailed event records are missing.
+    if (oldWinners.length !== count) return count;
+    return seasonTitleEntries(state, season).filter(matchesKind).length;
+  };
+  const correctRecord = (record: CareerSeasonRecord): CareerSeasonRecord => ({ ...record,
+    titles: correctCount(record.season, record.titles),
+    majorTitles: correctCount(record.season, record.majorTitles, 'majorTitles'),
+    qTourWins: correctCount(record.season, record.qTourWins, 'qTourWins'),
+  });
+  return { ...state,
+    history: { ...state.history, seasonRecords: state.history.seasonRecords.map(correctRecord) },
+    seasonReview: state.seasonReview ? { ...state.seasonReview, completedSeason: correctRecord(state.seasonReview.completedSeason) } : state.seasonReview,
+    inbox: state.inbox.map(message => {
+      const seasonReport = message.seasonReport ? { ...message.seasonReport, record: correctRecord(message.seasonReport.record) } : undefined;
+      const start = message.seasonStartReport;
+      const seasonStartReport = start?.lastSeason ? { ...start, lastSeason: { ...start.lastSeason, titles: correctCount(start.previousSeason, start.lastSeason.titles) } } : start;
+      if (!seasonReport && !seasonStartReport) return message;
+      return { ...message, seasonReport, seasonStartReport,
+        preview: seasonReport ? message.preview.replace(/\b\d+ titles\b/, seasonReport.record.titles + ' titles') : message.preview,
+      };
+    }),
+  };
+}
+
 function formatSeasonLabel(startYear: number) {
   return `${startYear}/${String((startYear + 1) % 100).padStart(2, "0")}`;
 }
@@ -5560,13 +5603,9 @@ function createSeasonRecord(
       0,
     ),
     centuries: seasonEvents.reduce((sum, entry) => sum + entry.centuries, 0),
-    titles: seasonEvents.filter((entry) => entry.result === "Winner").length,
-    majorTitles: seasonEvents.filter(
-      (entry) => entry.result === "Winner" && entry.eventType === "Major",
-    ).length,
-    qTourWins: seasonEvents.filter(
-      (entry) => entry.result === "Winner" && entry.eventType === "Q Tour",
-    ).length,
+    titles: seasonTitleEntries(state, season).length,
+    majorTitles: seasonTitleEntries(state, season).filter(entry => entry.eventType === 'Major').length,
+    qTourWins: seasonTitleEntries(state, season).filter(entry => entry.eventType === 'Q Tour').length,
     qSchoolEventsEntered: qSchoolEvents.length,
     qSchoolCampaignsEntered: getQSchoolCampaignCount(qSchoolEvents),
     qSchoolMatchesWon,
@@ -6273,7 +6312,7 @@ function advanceWholeWeekState(previousState: GameState): GameState {
             {
               sender: "Commercial Team",
               subject: `${sponsor.name} contract terminated`,
-              preview: `Repeated missed obligations reduced compliance to ${sponsor.compliance}%. The deal has ended immediately.`,
+              preview: `Repeated missed obligations reduced compliance to ${formatPercent(sponsor.compliance)}. The deal has ended immediately.`,
               priority: "High",
               actionLabel: "Open Sponsorships",
               actionRoute: "/sponsorship",
@@ -6301,7 +6340,7 @@ function advanceWholeWeekState(previousState: GameState): GameState {
             {
               sender: sponsor.name,
               subject: "Sponsor obligation missed",
-              preview: `Fatigue or availability prevented the scheduled obligation. Compliance is now ${sponsor.compliance}%; three misses can terminate the deal.`,
+              preview: `Fatigue or availability prevented the scheduled obligation. Compliance is now ${formatPercent(sponsor.compliance)}; three misses can terminate the deal.`,
               priority: "High",
               actionLabel: "Open Health Centre",
               actionRoute: "/health",
@@ -6444,7 +6483,7 @@ function advanceWholeWeekState(previousState: GameState): GameState {
         },
         {
           label: "Confidence",
-          value: `${nextState.player.confidence}%`,
+          value: `${formatPercent(nextState.player.confidence)}`,
           detail: `${formatTrainingMetricChange(confidenceDelta)} this week`,
           tone:
             confidenceDelta > 0
@@ -6455,7 +6494,7 @@ function advanceWholeWeekState(previousState: GameState): GameState {
         },
         {
           label: "Fatigue",
-          value: `${nextState.player.fatigue}%`,
+          value: `${formatPercent(nextState.player.fatigue)}`,
           detail: `${formatTrainingMetricChange(fatigueDelta)} this week`,
           tone:
             nextState.player.fatigue >= 75
@@ -6466,7 +6505,7 @@ function advanceWholeWeekState(previousState: GameState): GameState {
         },
         {
           label: "Morale",
-          value: `${nextState.player.morale}%`,
+          value: `${formatPercent(nextState.player.morale)}`,
           detail: `${formatTrainingMetricChange(moraleDelta)} this week`,
           tone:
             moraleDelta > 0
@@ -6495,7 +6534,7 @@ function advanceWholeWeekState(previousState: GameState): GameState {
         },
         {
           label: "Strain / burnout",
-          value: `${nextState.trainingCondition.strain}% / ${nextState.trainingCondition.burnout}%`,
+          value: `${formatPercent(nextState.trainingCondition.strain)} / ${formatPercent(nextState.trainingCondition.burnout)}`,
           detail: nextState.trainingCondition.strain === 0 && nextState.trainingCondition.burnout === 0 ? "Recovered — no accumulated strain or burnout" : "Current training health",
           tone:
             nextState.trainingCondition.strain >= 70 ||
@@ -9120,7 +9159,7 @@ function repairLegacyWorldEntry(state: GameState): GameState {
 
 export function repairGameState(state: GameState): GameState {
   state = recoverTournamentArchive(state);
-  state = preserveSeasonEmails(state);
+  state = repairSeasonTitleRecords(preserveSeasonEmails(state));
   state = repairTournamentPayouts(initializeRollingRankings(state), getTournamentPlacementAwards);
   state = ensureSeasonClock(state);
   state = ensureWorldPopulation(repairCpuHistoricalRecords(repairLegacyWorldEntry(initializeRollingRankings(state))));
@@ -10651,7 +10690,7 @@ function getWorldSeedScore(
   const weightedMainTourEvents =
     getWeightedRecentSeasonValue(record, (season) => season.mainTourEvents) +
     latestMainTourEvents * 0.25;
-  const repeatedHighRankLowVolumeSeasons = record.seasons.filter(
+  const repeatedHighRankLowVolumeSeasons = record.seasons.slice(0, 12).filter(
     (season) =>
       (season.worldRank ?? 999) <= TOP_16_RANK_CUTOFF &&
       season.mainTourEvents < 6,
@@ -12650,7 +12689,7 @@ function archiveWorldPlayersForSeason(
             5,
             99,
           ),
-      seasons: seasonRows.slice(0, 12),
+      seasons: seasonRows,
     };
   });
 }
@@ -15831,7 +15870,7 @@ export function finalizeLiveMatch(
           {
             sender: "Equipment Manager",
             subject: "Cue tip needs replacing",
-            preview: `Tip condition is ${getCueState(equipmentAfterMatch, activeCueId).tipCondition}%. Fit a replacement before it reaches zero.`,
+            preview: `Tip condition is ${formatPercent(getCueState(equipmentAfterMatch, activeCueId).tipCondition)}. Fit a replacement before it reaches zero.`,
             priority: "High",
             actionLabel: "Replace Tip",
             actionRoute: "/equipment/chalk-tips",
@@ -15844,7 +15883,7 @@ export function finalizeLiveMatch(
           {
             sender: "Equipment Manager",
             subject: "Cue maintenance required",
-            preview: `Cue condition is ${getCueState(equipmentAfterMatch, activeCueId).condition}%. Service it to recover consistency.`,
+            preview: `Cue condition is ${formatPercent(getCueState(equipmentAfterMatch, activeCueId).condition)}. Service it to recover consistency.`,
             priority: "High",
             actionLabel: "Open Maintenance",
             actionRoute: "/equipment/maintenance",
@@ -16293,12 +16332,12 @@ export function finalizeLiveMatch(
               },
               {
                 label: "Pot success",
-                value: `${latestMatch.potSuccess}%`,
+                value: `${formatPercent(latestMatch.potSuccess)}`,
                 tone: latestMatch.potSuccess >= 80 ? "positive" : "warning",
               },
               {
                 label: "Safety success",
-                value: `${latestMatch.safetySuccess}%`,
+                value: `${formatPercent(latestMatch.safetySuccess)}`,
                 tone: latestMatch.safetySuccess >= 70 ? "positive" : "warning",
               },
               {
@@ -16979,7 +17018,8 @@ function loadStoredState(input?: string): GameState {
       lastAction: parsed.lastAction ?? "Loaded saved career.",
     };
 
-    const repairedState = repairGameState(hydratedState);
+    const readState = input ? hydratedState : applyInboxReadOverlay(hydratedState, saved, window.localStorage.getItem(inboxReadStorageKey(readActiveSaveSlotId())));
+    const repairedState = repairGameState(readState);
     return recalculateState(repairedState, repairedState.lastAction);
   } catch (error) {
     if (input !== undefined) throw error;
@@ -17711,7 +17751,7 @@ export function applyTrainingPlanState(
                     })),
                     {
                       label: "Recent form",
-                      value: `${currentForm}%`,
+                      value: `${formatPercent(currentForm)}`,
                       detail: `${recentMatches.filter((match) => match.result === "Won").length}-${recentMatches.filter((match) => match.result === "Lost").length} across the last ${recentMatches.length} match${recentMatches.length === 1 ? "" : "es"}`,
                       tone:
                         currentForm >= 60
@@ -17740,7 +17780,7 @@ export function applyTrainingPlanState(
                     },
                     {
                       label: "Confidence",
-                      value: `${nextPlayerConfidence}%`,
+                      value: `${formatPercent(nextPlayerConfidence)}`,
                       detail: `${formatTrainingMetricChange(nextPlayerConfidence - (previousReportSnapshot.confidence ?? previousState.player.confidence))}% over two weeks`,
                       tone:
                         nextPlayerConfidence >=
@@ -17751,7 +17791,7 @@ export function applyTrainingPlanState(
                     },
                     {
                       label: "Training load",
-                      value: `${trainingEffects.weekLoad}%`,
+                      value: `${formatPercent(trainingEffects.weekLoad)}`,
                       detail: `${Math.round(adaptationMultiplier * facilityMultiplier * 100)}% adaptation`,
                       tone:
                         trainingEffects.weekLoad > 80
@@ -17760,7 +17800,7 @@ export function applyTrainingPlanState(
                     },
                     {
                       label: "Fatigue",
-                      value: `${nextPlayerFatigue}%`,
+                      value: `${formatPercent(nextPlayerFatigue)}`,
                       detail: `${formatTrainingMetricChange(nextPlayerFatigue - previousReportSnapshot.fatigue)}% over two weeks`,
                       tone:
                         nextPlayerFatigue >= 70
@@ -17771,7 +17811,7 @@ export function applyTrainingPlanState(
                     },
                     {
                       label: "Strain / burnout",
-                      value: `${nextStrain}% / ${nextBurnout}%`,
+                      value: `${formatPercent(nextStrain)} / ${formatPercent(nextBurnout)}`,
                       detail: `${formatTrainingMetricChange(nextStrain - previousReportSnapshot.strain)} strain · ${formatTrainingMetricChange(nextBurnout - previousReportSnapshot.burnout)} burnout`,
                       tone:
                         nextStrain >= 70 || nextBurnout >= 70
@@ -18330,6 +18370,7 @@ function persistCareerSlot(
 export function useGameState() {
   const [saveWarning, setSaveWarning] = useState('');
   const saveRevision = useRef(0);
+  const previousAutosaveState = useRef<GameState | null>(null);
   const lastAutosaveSnapshot = useRef<{slotId: string | null; serialized: string} | null>(null);
   const [gameState, setGameState] = useState<GameState>(() =>
     loadStoredState(),
@@ -18357,11 +18398,26 @@ export function useGameState() {
   useEffect(() => {
     if (typeof window === "undefined" || careerSessionMode !== "active") return;
     const reportSaveWarning = (message: string) => queueMicrotask(() => setSaveWarning(message));
+    const previousState = previousAutosaveState.current;
+    previousAutosaveState.current = gameState;
+    if (previousState && isInboxReadOnlyChange(previousState, gameState)
+      && lastAutosaveSnapshot.current?.slotId === activeSaveSlotId
+      && readActiveSaveSlotId() === activeSaveSlotId) {
+      const base = window.localStorage.getItem(STORAGE_KEY);
+      // A protected rollover/correction must finish before taking the fast path.
+      if (base && base === lastAutosaveSnapshot.current.serialized) {
+        try {
+          writeCareerStorage(inboxReadStorageKey(activeSaveSlotId), encodeInboxReadOverlay(gameState, base));
+          return;
+        } catch { /* Fall back to the normal save and its error reporting. */ }
+      }
+    }
     const revision = ++saveRevision.current;
     const serialized = encodeCareerSave(gameState);
     const publish = () => {
       writeCareerStorage(STORAGE_KEY, serialized);
       if (activeSaveSlotId) persistCareerSlot(gameState, { id: activeSaveSlotId, serialized });
+      window.localStorage.removeItem(inboxReadStorageKey(activeSaveSlotId));
     };
     const previous = window.localStorage.getItem(STORAGE_KEY);
     const rendered = lastAutosaveSnapshot.current?.slotId === activeSaveSlotId ? lastAutosaveSnapshot.current.serialized : null;
@@ -18483,6 +18539,7 @@ export function useGameState() {
       deleteSaveSlot(id: string) {
         if (typeof window === "undefined") return;
         window.localStorage.removeItem(`${SAVE_SLOT_PREFIX}${id}`);
+        window.localStorage.removeItem(inboxReadStorageKey(id));
         writeSaveSlotIndex(
           readSaveSlotIndex().filter((slot) => slot.id !== id),
         );
@@ -18556,33 +18613,10 @@ export function useGameState() {
         }
       },
       markInboxMessageRead(messageId: string, read = true) {
-        setGameState((previousState) =>
-          finalizeState(
-            {
-              ...previousState,
-              inbox: previousState.inbox.map((message) =>
-                message.id === messageId ? { ...message, read } : message,
-              ),
-            },
-            read
-              ? "Marked inbox message as read."
-              : "Marked inbox message as unread.",
-          ),
-        );
+        setGameState(previousState => updateInboxReadState(previousState, messageId, read));
       },
       markAllInboxRead() {
-        setGameState((previousState) =>
-          finalizeState(
-            {
-              ...previousState,
-              inbox: previousState.inbox.map((message) => ({
-                ...message,
-                read: true,
-              })),
-            },
-            "Marked all inbox messages as read.",
-          ),
-        );
+        setGameState(previousState => updateInboxReadState(previousState));
       },
       updateBudgetTargets(targets: Record<string, number>) {
         setGameState((previousState) =>

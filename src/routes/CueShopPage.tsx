@@ -16,7 +16,7 @@ import {
   tableSetupCatalog,
   tipCatalog,
 } from "../data/catalogs";
-import { formatMoney } from "../utils/formatters";
+import { formatMoney, formatPercent } from "../utils/formatters";
 
 type EquipmentTab =
   "cues" | "chalk" | "tips" | "cases" | "table-setup" | "maintenance";
@@ -526,7 +526,7 @@ export function CueShopPage() {
             <StatLine label="Durability" value={cue.durability} />
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-[10px]">
-            <span className="text-gray-400">Condition: {cue.condition}%</span>
+            <span className="text-gray-400">Condition: {formatPercent(cue.condition)}</span>
             {owned ? (
               <span className={equipped ? "text-green-300" : "text-sky-300"}>
                 {equipped ? "In current setup" : "Ready to equip"}
@@ -689,13 +689,13 @@ export function CueShopPage() {
           <div className="flex justify-between">
             <span className="text-gray-500">Condition</span>
             <span className="text-white">
-              {currentCueState?.condition ?? selectedCue.condition}%
+              {formatPercent(currentCueState?.condition ?? selectedCue.condition)}
             </span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">Familiarity</span>
             <span className="text-white">
-              {currentCueState?.familiarity ?? selectedCue.familiarity}%
+              {formatPercent(currentCueState?.familiarity ?? selectedCue.familiarity)}
             </span>
           </div>
         </div>

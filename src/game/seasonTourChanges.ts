@@ -1,13 +1,14 @@
+import { emergingStars } from './emergingStars';
 import type { GameState } from '../hooks/useGameState';
 import type { InboxMessage } from '../types/game';
 
 type WorldPlayer = GameState['worldPlayers'][number];
 export type TourChangePerson = { id: string; name: string; nation: string; age: number; detail: string };
-export type TourChangeSection = { id: string; title: string; people: TourChangePerson[] };
+export type TourChangeSection = { id: string; title: string; people: TourChangePerson[]; asOf?: string };
 export type SeasonTourChanges = { season: string; previousSeason: string; asOf: string; complete: boolean; sections: TourChangeSection[] };
 const previousSeasonOf = (season: string) => (Number(season.slice(0,4))-1)+'/'+season.slice(2,4);
 const sectionTitles = [
-  ['retirements','Retirements'], ['seniors','Joining the seniors tour'],
+  ['retirements','Retirements'], ['emergingStars','Emerging stars to watch'], ['seniors','Joining the seniors tour'],
   ['qSchool','Q School graduates'], ['promotions','Other new professional cards'],
   ['youth','New youth players'], ['pathway','New pathway players'], ['cardLosses','Players losing tour cards'],
 ] as const;
@@ -50,13 +51,28 @@ export function createSeasonTourChanges(after: GameState, before?: GameState): S
     }
     if(old?.hasTourCard && !p.hasTourCard) add('cardLosses',p,seniors.has(p.playerName)&&p.age>=40?'Continues on the seniors tour':'Returns to the amateur / qualifying pathway');
   }
+  Object.assign(sections.find(section => section.id === 'emergingStars')!, { people: emergingStars(after, before), asOf: after.currentDate });
   return {season:after.season,previousSeason,asOf:after.currentDate,complete:Boolean(before),sections};
 }
 export function tourChangesMessage(report: SeasonTourChanges): InboxMessage {
   const count=(id:string)=>report.sections.find(s=>s.id===id)?.people.length ?? 0;
-  return {id:'tour-changes:'+report.season,sender:'Tour Newsdesk',subject:report.season+' · Changes around the tour',preview:(report.complete?'':'From retained records: ')+count('retirements')+' retirements · '+count('seniors')+' seniors arrivals · '+count('qSchool')+' Q School graduates · '+count('youth')+' youth arrivals. Review the names and other pathway changes.',date:report.asOf,priority:'Medium',read:false,actionLabel:'View Rankings',actionRoute:'/rankings',tourChangesReport:report};
+  return {id:'tour-changes:'+report.season,sender:'Tour Newsdesk',subject:report.season+' · Changes around the tour',preview:(report.complete?'':'From retained records: ')+count('retirements')+' retirements · '+count('seniors')+' seniors arrivals · '+count('qSchool')+' Q School graduates · '+count('youth')+' youth arrivals · '+count('emergingStars')+' emerging stars to watch. Review the names and other pathway changes.',date:report.asOf,priority:'Medium',read:false,actionLabel:'View Rankings',actionRoute:'/rankings',tourChangesReport:report};
 }
 export function announceSeasonTourChanges(state: GameState): GameState {
+  // Add a dated watch to this season's older reports without rewriting past-season snapshots.
+  const upgrade = (report: SeasonTourChanges) => report.season !== state.season || report.sections.some(s => s.id === 'emergingStars') ? report
+    : { ...report, sections: [...report.sections.slice(0, 1), { id: 'emergingStars', title: 'Emerging stars to watch', people: emergingStars(state), asOf: state.currentDate }, ...report.sections.slice(1)] };
+  const tourChangesReport = state.tourChangesReport ? upgrade(state.tourChangesReport) : undefined;
+  let changed = tourChangesReport !== state.tourChangesReport;
+  const upgradedInbox = state.inbox.map(message => {
+    if (!message.tourChangesReport) return message;
+    const report = upgrade(message.tourChangesReport);
+    if (report === message.tourChangesReport) return message;
+    changed = true;
+    return { ...message, tourChangesReport: report, preview: tourChangesMessage(report).preview };
+  });
+  if (changed) state = { ...state, tourChangesReport, inbox: upgradedInbox };
+
   if(state.seasonReview?.pending || state.tourChangesAnnouncedSeason===state.season) return state;
   if(state.inbox.some(m=>m.id==='tour-changes:'+state.season)) return {...state,tourChangesAnnouncedSeason:state.season};
   let report=state.tourChangesReport?.season===state.season ? state.tourChangesReport : undefined;

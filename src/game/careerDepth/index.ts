@@ -14,7 +14,10 @@ import { approveSchedule, runScheduleAssistance } from './seasonPlanning';
 import { partnerCandidates, recordEncounter, reviewCoachPlan } from './relationships';
 
 export function initializeCareerDepth(state: GameState): GameState {
-  if (state.careerDepth?.version === 1) return state;
+  if (state.careerDepth?.version === 1) {
+    const story = pendingStory(state);
+    return story ? careerMessage(state, story.id, story.title, story.evidence) : state;
+  }
   let next: GameState = { ...state, careerDepth: createCareerDepth(state), matches: state.matches.map(m => ({ ...m, opponentId: m.opponentId ?? uniqueOpponentId(state, m.opponentName) })) };
   // Reconstruct reliable H2H only. Never replay historical money or stories.
   for (const match of [...next.matches].reverse()) next = recordEncounter(next, match);

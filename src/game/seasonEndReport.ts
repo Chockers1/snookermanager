@@ -1,3 +1,4 @@
+import { emergingStars, type EmergingStar } from './emergingStars';
 import type { GameState } from '../hooks/useGameState';
 import type { InboxMessage } from '../types/game';
 
@@ -9,6 +10,7 @@ export type SeasonEndReport = {
   majorWinners?: Review['majorWinners'];
   finalRankings?: Review['finalRankings'];
   worldNumberOne?: string;
+  emergingStars?: EmergingStar[];
   closingCash?: number;
   cashMovement?: { from: string; to: string; change: number };
 };
@@ -22,7 +24,7 @@ export function createSeasonEndReport(review: Review, closingState?: GameState):
     decision: review.careerDecision, majorWinners: review.majorWinners,
     finalRankings: review.finalRankings?.filter(r => r.ranking <= 3),
     worldNumberOne: review.worldNumberOne?.playerName,
-    ...(closingState ? { closingCash: closingState.player.cash } : {}),
+    ...(closingState ? { closingCash: closingState.player.cash, emergingStars: emergingStars(closingState) } : {}),
     ...(first && closingState ? { cashMovement: { from: first.date, to: closingState.currentDate, change: closingState.player.cash - first.cash } } : {}),
   });
 }

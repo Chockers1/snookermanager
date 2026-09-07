@@ -20,6 +20,7 @@ export function seasonTourChangesFixture() {
   for(let i=1;i<=4;i++)after.worldPlayers.push(player('Youth Arrival '+i,14+i));
   after.worldPlayers.push(player('New Q School Contender',24));
   after.competitionTables.qSchool=[{...row,id:'school-news',playerName:'New Q School Contender'}];
+  Object.assign(after.worldPlayers.find(p=>p.playerName==='Youth Arrival 1')!, {overallRating:68,developmentPotential:96});
   after.tourChangesReport=createSeasonTourChanges(after,before);
   return {before,after};
 }

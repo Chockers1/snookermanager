@@ -45,10 +45,16 @@ describe('season-end email archive', () => {
     closing.currentDate = '2027-06-29';
     closing.player.cash = 188275;
     closing.history.snapshots = [{ ...closing.history.snapshots[0], season:'2026/27', date:'2027-04-13', cash:187000 }];
+    const prospect = closing.worldPlayers.find(p => p.playerName !== closing.player.fullName)!;
+    Object.assign(prospect, { age:17, hasTourCard:false, retired:false, overallRating:68, developmentPotential:96 });
+    closing.worldPlayers = [prospect];
     const review = state.seasonReview!;
     const report = createSeasonEndReport(review, closing);
     expect(report.cashMovement).toEqual({ from:'2027-04-13', to:'2027-06-29', change:1275 });
     expect(report.closingCash).toBe(188275);
+    expect(report.emergingStars).toEqual(expect.arrayContaining([expect.objectContaining({name:prospect.playerName,overall:68,potential:96})]));
+    prospect.developmentPotential = 70;
+    expect(report.emergingStars!.find(p=>p.name===prospect.playerName)?.potential).toBe(96);
     review.completedSeason.prizeMoney = 999999;
     review.majorWinners[0].winner = 'Changed later';
     expect(report.record.prizeMoney).not.toBe(999999);

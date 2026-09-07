@@ -1,0 +1,37 @@
+import { expect, test } from '@playwright/test';
+import { createStarterState, enterTournamentState, bookTravelState, confirmTournamentPreparationState } from '../src/hooks/useGameState';
+import { getDefaultPreparationAllocations } from '../src/game/tournamentPreparation';
+import { depthOf, plusDays } from '../src/game/careerDepth/shared';
+import { ACTIVE_SAVE_KEY, encodeCareerSave } from '../src/game/saveStorage';
+import { readCareerSave } from './read-career-save';
+
+for (const missingMessage of [false, true]) test(`hub resolves the blocking decision and then advances (missing message: ${missingMessage})`, async ({ page }) => {
+  let state = createStarterState(); state.player.cash = 100000;
+  const event = state.tournaments.find(t => t.name === 'Shanghai Masters')!;
+  state = enterTournamentState(state, event.id);
+  state = bookTravelState(state, event.id);
+  state = confirmTournamentPreparationState(state, event.id, 'balanced', getDefaultPreparationAllocations(), []);
+  state.currentDate = plusDays(event.startDate, -7);
+  const story = { id: 'story:advance:block', kind: 'breakthrough' as const, title: 'A breakthrough victory', evidence: 'You beat a leading player.', createdDate: state.currentDate, expiresDate: plusDays(state.currentDate, 28), status: 'pending' as const, updates: [], matchCount: state.matches.length, trainingWeeks: 0 };
+  state.careerDepth = { ...depthOf(state), stories: [story] };
+  state.inbox = [{ id: 'latest-note', sender: 'Career Manager', subject: 'A newer unrelated update', preview: 'Your latest news.', priority: 'Medium', date: state.currentDate, read: false }, ...(!missingMessage ? [{ id: story.id, sender: 'Career Manager', subject: story.title, preview: story.evidence, priority: 'Medium' as const, date: state.currentDate, read: true, actionRoute: '/inbox' }] : [])];
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.addInitScript(({ key, save }) => localStorage.setItem(key, save), { key: ACTIVE_SAVE_KEY, save: encodeCareerSave(state) });
+  await page.goto('/');
+  await page.getByRole('button', { name: /Continue Career/ }).click();
+  const navigate = async (route: string) => page.evaluate(route => { history.pushState({}, '', route); dispatchEvent(new PopStateEvent('popstate')); }, route);
+  await navigate('/tournaments/hub');
+  await expect(page.getByRole('button', { name: 'Advance to Tournament' })).toHaveCount(0);
+  const action = page.getByRole('button', { name: 'Resolve Inbox Decision' });
+  await expect(action).toBeInViewport();
+  await expect(page.getByText(/Time is paused for/)).toBeVisible();
+  await action.click();
+  await expect(page.getByRole('heading', { name: story.title, exact: true })).toBeVisible();
+  expect((await readCareerSave(page)).currentDate).toBe(state.currentDate);
+  await page.getByRole('button', { name: 'Protect preparation', exact: true }).click();
+  await expect.poll(async () => (await readCareerSave(page)).careerDepth?.stories.find(s => s.id === story.id)?.status).toBe('resolved');
+  await navigate('/tournaments/hub');
+  await expect(page.getByRole('button', { name: 'Resolve Inbox Decision' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Advance to Tournament' }).click();
+  await expect.poll(async () => (await readCareerSave(page)).currentDate).toBe(event.startDate);
+});

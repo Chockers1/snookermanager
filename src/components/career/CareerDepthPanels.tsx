@@ -1,3 +1,4 @@
+import { formatPercent } from '../../utils/formatters';
 import { PlayerLink } from '../game/PlayerLink';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -36,7 +37,7 @@ export function CareerDisclosure({ summary, title, children }: { summary: ReactN
 export function CareerDecisionNotice() {
   const { gameState } = useGame();
   const story = pendingStory(gameState);
-  return story ? <Link to="/inbox" className="block shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">Decision waiting: {story.title} · Open Inbox</Link> : null;
+  return story ? <Link to={`/inbox?message=${encodeURIComponent(story.id)}`} className="block shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">Decision waiting: {story.title} · Open Inbox</Link> : null;
 }
 
 export function StoryDecisionPanel({ messageId }: { messageId: string }) {
@@ -137,7 +138,7 @@ export function SeasonPlanningPanel() {
       {d.schedule?.pauseReason && <p className="text-amber-300">{d.schedule.pauseReason}</p>}
       <fieldset className="space-y-2 border-t border-border pt-3"><legend className="pt-3 font-semibold text-white">Off-table commitments</legend><div className="flex flex-wrap gap-2"><select aria-label="Commitment type" className={input} value={kind} onChange={e => setKind(e.target.value as CommitmentKind)}>{(['recovery', 'camp', 'appearance', 'club-work'] as const).map(k => <option key={k} value={k}>{COMMITMENTS[k].name}</option>)}</select><input aria-label="Commitment start date" type="date" className={input} min={gameState.currentDate} value={date} onChange={e => setDate(e.target.value)} /></div>
         {kind === 'appearance' && <p className="text-amber-300">{gameState.sponsors.find(s => s.id === quote.sponsorId)?.name ?? 'Requires an active sponsor'} · one paid appearance per four weeks. Completion credits this sponsor's obligation, not a later replacement.</p>}
-        <p>{quote.startDate}–{quote.endDate} · replaces {COMMITMENTS[kind].days * 3} training sessions</p><p><span className="text-red-400">Cost {money(quote.cost)}</span> · <span className="text-green-400">Income {money(quote.income)}</span> · <span className={quote.fatigue > 0 ? 'text-amber-300' : 'text-green-400'}>Fatigue {gameState.player.fatigue}% → {Math.max(0, Math.min(100, gameState.player.fatigue + quote.fatigue))}%</span> · Sharpness +{quote.sharpness} for 14 days</p><p className="text-gray-400">Forecast excludes intervening play and training. Upfront costs are non-refundable. Exhibitions require a breakthrough invitation.</p>
+        <p>{quote.startDate}–{quote.endDate} · replaces {COMMITMENTS[kind].days * 3} training sessions</p><p><span className="text-red-400">Cost {money(quote.cost)}</span> · <span className="text-green-400">Income {money(quote.income)}</span> · <span className={quote.fatigue > 0 ? 'text-amber-300' : 'text-green-400'}>Fatigue {formatPercent(gameState.player.fatigue)} → {formatPercent(Math.max(0, Math.min(100, gameState.player.fatigue + quote.fatigue)))}</span> · Sharpness +{quote.sharpness} for 14 days</p><p className="text-gray-400">Forecast excludes intervening play and training. Upfront costs are non-refundable. Exhibitions require a breakthrough invitation.</p>
         {conflict && <p className="text-amber-300">{conflict}</p>}<button className={button} disabled={Boolean(conflict) || !date} onClick={() => actOnCareer({ type: 'commitment', kind, startDate: date })}>Reserve commitment</button>
       </fieldset>
       {d.commitments.slice(-8).map(c => <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2"><span>{COMMITMENTS[c.kind].name} · {c.startDate}–{c.endDate} · {c.status}</span>{c.status === 'scheduled' && c.startDate > gameState.currentDate && <button className={button} onClick={() => actOnCareer({ type: 'cancel-commitment', id: c.id })}>Cancel (no refund)</button>}</div>)}

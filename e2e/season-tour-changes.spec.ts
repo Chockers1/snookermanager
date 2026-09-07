@@ -11,6 +11,7 @@ for(const width of [1280,390])test('separate season tour changes message at '+wi
   const report=page.getByRole('region',{name:'Season tour changes'});
   await expect(report).toContainText('Retiring Champion');await expect(report).toContainText('Senior Arrival');await expect(report).toContainText('Q School Graduate');await expect(report).toContainText('Q Tour Graduate');await expect(report).toContainText('New Q School Contender');
   await expect(report).not.toContainText('Still Professional');await expect(report).not.toContainText('Already Retired');
+  const stars=page.getByRole('region',{name:'Emerging stars to watch'});await expect(stars).toContainText('Youth Arrival 1');await expect(stars).toContainText('OVR 68');await expect(stars).toContainText('POT 96');await expect(stars).toContainText('exceptional potential');
   const youth=page.getByRole('region',{name:'New youth players'});await youth.locator('summary').click();await expect(youth.getByText('Youth Arrival 4',{exact:true})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
   const actions=page.getByTestId('inbox-message-actions');await expect(actions.getByRole('button',{name:'View Rankings',exact:true})).toBeVisible();

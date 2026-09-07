@@ -16,7 +16,7 @@ export type RankedEvent = {
   eventType?: Tournament['type'];
   prizeAwards?: Record<string,number>;
   prizeVersion?: number;
-  outcomes?: { player: string; finish: string }[];
+  outcomes?: { player: string; finish: string; matches?: number; wins?: number; losses?: number; draws?: number }[];
 };
 export type RollingRankingsState = {
   version: 1; initializedOn: string; processedThrough: string; earnings: RankingEarning[];
@@ -108,7 +108,7 @@ export function recordRankingEvent(state: GameState, tournament: Tournament, bra
   const entrants = new Map<string, { rank: number; firstRound: string; wins: number; lastRound: string; champion: boolean }>();
   for (const round of bracket) for (const match of round.matches) {
     for (const p of [match.top, match.bottom]) if (p.name !== 'TBD' && !/^Qualifier \d+$/.test(p.name) && !entrants.has(p.name)) entrants.set(p.name, { rank: p.rank, firstRound: round.label, wins: 0, lastRound: round.label, champion: false });
-    if (typeof match.top.score !== 'number' || typeof match.bottom.score !== 'number') continue;
+    if (match.placeholder || typeof match.top.score !== 'number' || typeof match.bottom.score !== 'number') continue;
     const winner = match.top.score > match.bottom.score ? match.top.name : match.bottom.name;
     for (const p of [match.top, match.bottom]) {
       const entry = entrants.get(p.name);
@@ -182,16 +182,18 @@ export function scheduleRankingExpiries(state: GameState): GameState {
 }
 
 export function compactEventOutcomes(bracket: BracketRound[]) {
-  const outcomes = new Map<string, string>();
+  const outcomes = new Map<string, { player: string; finish: string; matches: number; wins: number; losses: number; draws: number }>();
   for (const round of bracket) for (const match of round.matches) {
     if (typeof match.top.score !== 'number' || typeof match.bottom.score !== 'number') continue;
     for (const [own, other] of [[match.top, match.bottom], [match.bottom, match.top]]) {
       if (own.name === 'TBD' || /^Qualifier \d+$/.test(own.name)) continue;
       const won = own.score! > other.score!;
-      outcomes.set(own.name, won && /^final$/i.test(round.label) ? 'Winner' : own.score! < other.score! ? 'Lost in ' + round.label : 'Reached ' + round.label);
+      const previous = outcomes.get(own.name) ?? { player: own.name, finish: '', matches: 0, wins: 0, losses: 0, draws: 0 };
+      outcomes.set(own.name, { player: own.name, finish: won && /^final$/i.test(round.label) ? 'Winner' : own.score! < other.score! ? 'Lost in ' + round.label : 'Reached ' + round.label,
+        matches: previous.matches + 1, wins: previous.wins + Number(won), losses: previous.losses + Number(own.score! < other.score!), draws: previous.draws + Number(own.score === other.score) });
     }
   }
-  return [...outcomes].map(([player, finish]) => ({player, finish}));
+  return [...outcomes.values()];
 }
 /** Keep deduplication receipts indefinitely, but not decades of full CPU brackets.
  * Human tournament history is archived separately by the career system. */

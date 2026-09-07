@@ -8,7 +8,7 @@ import { SectionCard } from '../components/ui/SectionCard'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { useGame } from '../context/useGame'
 import { chalkCatalog, cueCatalog, tipCatalog } from '../data/catalogs'
-import { formatMoney } from '../utils/formatters'
+import { formatMoney, formatPercent } from '../utils/formatters'
 
 export function ChalkTipPage() {
   const { gameState, buyChalk, buyTip } = useGame()
@@ -158,9 +158,9 @@ export function ChalkTipPage() {
           <SectionCard title="Current Setup">
             <div className="space-y-4">
               {[
-                ['Chalk', currentChalk?.name ?? 'Empty Slot', currentChalk ? `${gameState.equipment.chalkCondition}% · ${gameState.equipment.chalkStock[currentChalk.id] ?? 0} units` : 'Not equipped'],
-                ['Cue Tip', currentTip?.name ?? 'Empty Slot', currentTip ? `${currentCueState?.tipCondition ?? 82}%` : 'Not equipped'],
-                ['Cue', currentCue?.name ?? 'Empty Slot', currentCue ? `${currentCueState?.condition ?? currentCue.condition}%` : 'Buy a cue first'],
+                ['Chalk', currentChalk?.name ?? 'Empty Slot', currentChalk ? `${formatPercent(gameState.equipment.chalkCondition)} · ${gameState.equipment.chalkStock[currentChalk.id] ?? 0} units` : 'Not equipped'],
+                ['Cue Tip', currentTip?.name ?? 'Empty Slot', currentTip ? `${formatPercent(currentCueState?.tipCondition ?? 82)}` : 'Not equipped'],
+                ['Cue', currentCue?.name ?? 'Empty Slot', currentCue ? `${formatPercent(currentCueState?.condition ?? currentCue.condition)}` : 'Buy a cue first'],
               ].map(([label, name, condition]) => (
                 <div key={label} className="rounded-xl border border-scm-border bg-scm-panelSoft p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-scm-gold">{label}</p>

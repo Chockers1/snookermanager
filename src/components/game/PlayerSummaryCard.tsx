@@ -1,6 +1,6 @@
 import { Flag, Sparkles } from 'lucide-react'
 import type { Player } from '../../types/game'
-import { formatMoney } from '../../utils/formatters'
+import { formatMoney, formatPercent } from '../../utils/formatters'
 import { FormDots } from './FormDots'
 import { ConfidenceMeter } from './ConfidenceMeter'
 
@@ -40,7 +40,7 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
           </div>
           <div className="rounded-lg bg-scm-deep/70 p-3">
             <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Morale</p>
-            <p className="mt-2 text-xl font-semibold">{player.morale}%</p>
+            <p className="mt-2 text-xl font-semibold">{formatPercent(player.morale)}</p>
           </div>
           <div className="rounded-lg bg-scm-deep/70 p-3">
             <p className="text-xs uppercase tracking-[0.16em] text-scm-textMuted">Recent Form</p>

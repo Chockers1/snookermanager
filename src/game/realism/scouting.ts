@@ -1,4 +1,3 @@
-import { developmentEdge } from '../tourDevelopment';
 import type { GameState } from '../../hooks/useGameState';
 export function scoutingReport(state: GameState, name: string) {
   const opponent = state.worldPlayers.find(p => p.playerName === name);
@@ -8,15 +7,15 @@ export function scoutingReport(state: GameState, name: string) {
   const practice = id ? state.careerDepth?.practiceHistory?.[id]?.sessions ?? 0 : 0;
   const samples = matches.length + watched + Math.min(4, practice);
   const uncertainty = Math.max(2, 12 - samples * 2);
-  const ability = opponent?.overallRating === undefined ? undefined : opponent.overallRating + developmentEdge(opponent.skillDevelopment);
-  // Round the estimate itself so its midpoint cannot expose an exact hidden rating.
-  const estimate = Math.round((ability ?? 65) / 5) * 5;
+  const ability = opponent?.overallRating;
+  const potential = opponent?.developmentPotential ?? ability;
   const observations = id ? state.careerDepth?.relationships[id] : undefined;
   const recorded = observations?.tactics ?? {};
   return { id, samples, watched, practice, uncertainty, confidence: Math.min(90, 35 + samples * 9),
-    ability: ability == null ? 'Unknown' : `${Math.max(1, estimate - uncertainty)}–${Math.min(99, estimate + uncertainty)}`,
+    ability: ability == null ? 'Unknown' : String(Math.round(ability)),
+    potential: potential == null ? 'Unknown' : String(Math.round(Math.max(ability ?? potential, potential))),
     evidence: matches.length < 3 ? ['At least three direct meetings are needed for a scoring assessment.'] : [`Opponent highest break averaged ${Math.round(matches.reduce((n, m) => n + m.opponentHighestBreak, 0) / matches.length)} across ${matches.length} meetings.`, `${matches.filter(m => m.playerFrames + m.opponentFrames === m.bestOf).length} meetings reached a deciding frame; results do not prove a mental trait.`],
-    note: samples < 3 ? 'Small sample: treat these ranges as uncertain. No reliable tactical conclusion yet.' : `${matches.length} direct matches, ${watched} watched matches and ${practice} shared sessions inform this report.`,
+    note: samples < 3 ? 'Small sample: no reliable tactical conclusion yet. Overall and potential ratings are public.' : `${matches.length} direct matches, ${watched} watched matches and ${practice} shared sessions inform this report.`,
     observedPlans: Object.entries(recorded).filter(([, count]) => count > 0).map(([plan, count]) => `${plan}: ${count} encounters`) };
 }
 export function watchableMatch(state: GameState, opponentId: string) {

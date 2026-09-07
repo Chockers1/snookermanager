@@ -79,17 +79,17 @@ export function MatchResultPage() {
     ? [
         {
           label: "Pot Success",
-          player: `${latestMatch.potSuccess}%`,
+          player: `${formatPercent(latestMatch.potSuccess)}`,
           opponent: null,
         },
         {
           label: "Long Pot",
-          player: `${latestMatch.longPotSuccess}%`,
+          player: `${formatPercent(latestMatch.longPotSuccess)}`,
           opponent: null,
         },
         {
           label: "Safety",
-          player: `${latestMatch.safetySuccess}%`,
+          player: `${formatPercent(latestMatch.safetySuccess)}`,
           opponent: null,
         },
         {
@@ -131,7 +131,7 @@ export function MatchResultPage() {
     {
       label: "Fatigue",
       value: signedValue(latestMatch?.fatigueChange, "%"),
-      sub: `Now ${gameState.player.fatigue}%`,
+      sub: `Now ${formatPercent(gameState.player.fatigue)}`,
       color: "text-amber-400",
       icon: TrendingUp,
     },
@@ -160,20 +160,20 @@ export function MatchResultPage() {
     },
     {
       label: "Equipment Wear",
-      value: `-${latestMatch?.equipmentWear ?? 0}%`,
+      value: `-${formatPercent(latestMatch?.equipmentWear ?? 0)}`,
       detail: "Active cue condition",
       tone: "text-amber-400",
     },
     {
       label: "Cue Familiarity",
-      value: `+${latestMatch?.familiarityGained ?? 0}%`,
+      value: `+${formatPercent(latestMatch?.familiarityGained ?? 0)}`,
       detail: "Gained from match use",
       tone: "text-sky-400",
     },
     {
       label: "Strain Penalty",
       value: `-${latestMatch?.strainImpact ?? 0}`,
-      detail: `Current strain ${gameState.trainingCondition.strain}%`,
+      detail: `Current strain ${formatPercent(gameState.trainingCondition.strain)}`,
       tone:
         (latestMatch?.strainImpact ?? 0) > 0
           ? "text-red-400"
@@ -464,7 +464,7 @@ export function MatchResultPage() {
           </h3>
           <p className="mt-1 text-[11px] leading-relaxed text-gray-400">
             {resultExplanation?.summary ??
-              `You entered with a ${matchSummary?.expectedWinChance ?? 50}% expected chance.`}
+              `You entered with a ${formatPercent(matchSummary?.expectedWinChance ?? 50)} expected chance.`}
           </p>
         </section>
         <section className="card card-body">

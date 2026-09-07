@@ -1,3 +1,4 @@
+import { formatPercent } from '../../utils/formatters';
 type CircularMeterProps = {
   value: number
   label: string
@@ -27,7 +28,7 @@ export function CircularMeter({ value, label }: CircularMeterProps) {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <div className="text-xl font-semibold text-scm-text">{clampedValue}%</div>
+          <div className="text-xl font-semibold text-scm-text">{formatPercent(clampedValue)}</div>
           <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-scm-textMuted">{label}</div>
         </div>
       </div>

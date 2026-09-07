@@ -20,6 +20,8 @@ describe('world endurance regressions',()=>{
  });
  it('runs every circuit with named eligible entrants, stores the League and archives exact match totals',()=>{
   const opening=createStarterState();
+  const veteran=opening.worldPlayers.find(p=>p.playerName!==opening.player.fullName)!;
+  veteran.seasons=Array.from({length:13},(_,i)=>({season:(2025-i)+'/'+String(2026-i).slice(2),worldRank:null,oneYearRank:null,amateurRank:null,qTourRank:null,qSchoolRank:null,seniorRank:null,youthRank:null,matches:0,wins:0,losses:0,prizeMoney:0,rankingPoints:0,titles:0,proWins:0,proLosses:0,mainTourEvents:0,status:'Amateur',hasTourCard:false,yearsRemaining:0,retainedViaRanking:false,cardSource:null,tourSurvivalStatus:'Amateur'}));
   const closed=processRankingCalendar({...opening,currentDate:'2027-06-29',tournaments:opening.tournaments.map(t=>({...t,status:'Skipped'}))});
   const events=Object.values(closed.rollingRankings!.events).filter(e=>e.season===closed.season);
   expect(events).toHaveLength(opening.tournaments.length);
@@ -32,6 +34,8 @@ describe('world endurance regressions',()=>{
   }
   const evidence=cpuSeasonEvidence(closed,()=>({prizeMoney:0}));
   const rolled=advanceWeekState({...closed,careerDepth:{...closed.careerDepth!,stories:[],nextSettlementDate:'2027-07-02'}});
+  expect(rolled.worldPlayers.find(p=>p.id===veteran.id)?.seasons).toHaveLength(14);
+  expect(rolled.worldPlayers.find(p=>p.id===veteran.id)?.seasons.at(-1)?.season).toBe('2013/14');
   expect(rolled.season).toBe('2027/28');expect(rolled.currentDate).toBe('2027-06-30');
   for(const p of rolled.worldPlayers){const s=p.seasons.find(s=>s.season===closed.season);if(!s||p.playerName===closed.player.fullName)continue;expect(s.matches).toBe(s.wins+s.losses+(evidence.get(p.playerName)?.draws??0));expect(s.matches).toBe(evidence.get(p.playerName)?.matches??0);expect(p.majorTitles).toBeGreaterThanOrEqual(evidence.get(p.playerName)?.majors??0);}
   for(const name of pathwayCardAwards(closed).keys())expect(rolled.worldPlayers.find(p=>p.playerName===name)?.hasTourCard,name).toBe(true);

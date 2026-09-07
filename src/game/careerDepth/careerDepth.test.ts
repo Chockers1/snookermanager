@@ -28,6 +28,20 @@ function addResult(state: GameState, match: Match) { return reconcileCareerDepth
 afterEach(() => vi.restoreAllMocks());
 
 describe('durable career stories and relationships', () => {
+  it('restores an actionable decision on load without replaying outcomes or duplicating messages', () => {
+    const initial = career();
+    const state = addResult(initial, { ...result(initial, 'loading-upset', true), opponentRanking: 4 });
+    const story = pendingStory(state)!;
+    const restored = initializeCareerDepth({ ...state, inbox: [] });
+    expect(restored.inbox.map(m => m.id)).toEqual([story.id]);
+    expect(restored.player).toEqual(state.player);
+    expect(restored.careerDepth).toEqual(state.careerDepth);
+    expect(initializeCareerDepth(restored)).toBe(restored);
+    const expired = { ...state, currentDate: plusDays(story.expiresDate, 1), inbox: [] };
+    expect(pendingStory(expired)).toBeUndefined();
+    expect(initializeCareerDepth(expired).inbox).toHaveLength(0);
+  });
+
   it('counts same-day matches after a decision and not training before it', () => {
     let s = addResult(career(), { ...result(career(), 'upset', true), opponentRanking: 4 });
     const story = pendingStory(s)!;

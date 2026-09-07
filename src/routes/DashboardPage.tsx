@@ -1,3 +1,4 @@
+import { formatPercent } from '../utils/formatters';
 import { PlayerLink } from '../components/game/PlayerLink';
 import { seasonPosition, seasonWeekLabel, snapshotWeekLabel } from "../game/seasonClock";
 import { CareerDecisionNotice } from '../components/career/CareerDepthPanels';
@@ -274,13 +275,13 @@ export function DashboardPage() {
                 <div>
                   <p className="text-gray-500">Condition</p>
                   <p className="font-semibold text-white">
-                    {currentCue?.condition ?? 0}%
+                    {formatPercent(currentCue?.condition ?? 0)}
                   </p>
                 </div>
                 <div>
                   <p className="text-gray-500">Familiarity</p>
                   <p className="font-semibold text-white">
-                    {currentCue?.familiarity ?? 0}%
+                    {formatPercent(currentCue?.familiarity ?? 0)}
                   </p>
                 </div>
                 <div>
@@ -477,7 +478,7 @@ export function DashboardPage() {
               <div className="flex items-center justify-between gap-3">
                 <span className="text-gray-500">Season Win Rate</span>
                 <span className="truncate text-right font-medium text-white">
-                  {seasonWinRate}%
+                  {formatPercent(seasonWinRate)}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">

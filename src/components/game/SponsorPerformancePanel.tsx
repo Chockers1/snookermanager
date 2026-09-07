@@ -1,3 +1,4 @@
+import { formatPercent } from '../../utils/formatters';
 import type { SponsorDeal } from '../../types/game';
 import { sponsorMood, sponsorPerformance } from '../../game/sponsorPerformance';
 import { ProgressBar } from '../ui/ProgressBar';
@@ -17,7 +18,7 @@ export function SponsorPerformancePanel({ sponsor, rank, rankingLabel }: { spons
       <p>{p.lastReason}</p>
       {remaining !== null ? <p className="text-amber-300">Formal warning · {remaining > 0 ? `${remaining} more competitive matches before cancellation is possible` : 'Recovery period complete'}. Stay at 25 or above to keep the deal; reach 50 to clear the warning.</p> : <p>Below 40 triggers a formal warning. Cancellation requires a score below 25 after at least six more competitive matches.</p>}
       <p>Tough opponents soften defeats. Single-frame events have half weight. Exhibitions and weeks without matches do not affect this score.</p>
-      <p>Promotional obligations: {sponsor.compliance ?? 100}% compliance · {(sponsor.missedObligations ?? 0)}/3 missed. These contract duties apply separately.</p>
+      <p>Promotional obligations: {formatPercent(sponsor.compliance ?? 100)} compliance · {(sponsor.missedObligations ?? 0)}/3 missed. These contract duties apply separately.</p>
     </div>
   </details>;
 }

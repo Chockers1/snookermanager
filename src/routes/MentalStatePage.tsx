@@ -102,7 +102,7 @@ export function MentalStatePage() {
                 <Brain className="h-4 w-4 text-amber-400" /> Current diagnosis
               </h2>
               <span className="text-xs text-amber-400">
-                Severity {mentalData.diagnosis.severity}%
+                Severity {formatPercent(mentalData.diagnosis.severity)}
               </span>
             </div>
             <div className="grid gap-3 p-3 lg:grid-cols-[1.35fr_0.65fr]">
@@ -132,7 +132,7 @@ export function MentalStatePage() {
                 <div className="rounded-lg border border-border bg-surface-light/40 p-3">
                   <p className="metric-label">Recovery chance</p>
                   <p className="mt-2 text-lg font-bold text-green-400">
-                    {mentalData.diagnosis.recoveryChance}%
+                    {formatPercent(mentalData.diagnosis.recoveryChance)}
                   </p>
                 </div>
               </div>
@@ -343,7 +343,7 @@ export function MentalStatePage() {
         <p className="flex min-w-0 items-start gap-2 text-xs text-gray-400">
           <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
           Confidence {formatPercent(gameState.player.confidence)}, fatigue{" "}
-          {gameState.player.fatigue}%, morale {gameState.player.morale}%.
+          {formatPercent(gameState.player.fatigue)}, morale {formatPercent(gameState.player.morale)}.
           Recovery choices update the live save.
         </p>
         <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-3">

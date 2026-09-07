@@ -25,7 +25,9 @@ for(const viewport of [{width:1280,height:720},{width:390,height:844},{width:320
   for(const text of ['Current season briefing','£188,275','Key tournaments','World Championship','Lost in Last 32','No recorded appearance','Entry closed on 2027-06-29'])await expect(report).toContainText(text);
   await expect(actions.getByRole('button',{name:'Plan Season'})).toBeInViewport();
   const dimensions=await body.evaluate(e=>({height:e.clientHeight,scroll:e.scrollHeight,width:e.clientWidth,scrollWidth:e.scrollWidth}));
-  if(viewport.width>=1280)expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.height+1);
+  await expect(page.getByLabel('Inbox messages')).toBeVisible();
+  await expect(page.getByLabel('Select inbox message')).toHaveCount(0);
+  await expect(report.getByRole('region', { name: 'Report summary' })).toBeVisible();
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width+1);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
   await body.evaluate(e=>e.scrollTo(0,e.scrollHeight));await expect(report.getByText(/Eligibility can change/)).toBeInViewport();

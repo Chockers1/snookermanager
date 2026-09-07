@@ -1,3 +1,4 @@
+import { formatPercent } from '../utils/formatters';
 import { seasonWeekLabel } from "../game/seasonClock";
 import { CoachAdvicePanel } from "../components/career/MatchInsightPanels";
 import { useState } from "react";
@@ -147,28 +148,28 @@ function TrainingPlannerContent() {
   const forecasts = [
     {
       label: "Weekly load",
-      value: `${summary.weekLoad}%`,
+      value: `${formatPercent(summary.weekLoad)}`,
       score: summary.weekLoad,
       text: "text-white",
       bar: "green" as const,
     },
     {
       label: "Fatigue",
-      value: `${gameState.player.fatigue}% → ${fatigueForecast}%`,
+      value: `${formatPercent(gameState.player.fatigue)} → ${formatPercent(fatigueForecast)}`,
       score: fatigueForecast,
       text: riskTone(fatigueForecast),
       bar: riskBarTone(fatigueForecast),
     },
     {
       label: "Strain",
-      value: `${gameState.trainingCondition.strain}% → ${strainForecast}%`,
+      value: `${formatPercent(gameState.trainingCondition.strain)} → ${formatPercent(strainForecast)}`,
       score: strainForecast,
       text: riskTone(strainForecast),
       bar: riskBarTone(strainForecast),
     },
     {
       label: "Adaptation",
-      value: `${adaptationPreview}%`,
+      value: `${formatPercent(adaptationPreview)}`,
       score: adaptationPreview,
       text: "text-green-400",
       bar: "green" as const,
@@ -447,7 +448,7 @@ function TrainingPlannerContent() {
               <div className="mt-2 flex justify-between border-t border-border pt-2 text-[9px] xl:mt-auto">
                 <span className="text-gray-400">Fatigue risk</span>
                 <b className={riskTone(summary.fatigueRisk)}>
-                  {summary.fatigueRisk}%
+                  {formatPercent(summary.fatigueRisk)}
                 </b>
               </div>
             </section>

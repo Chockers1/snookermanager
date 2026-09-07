@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
-import { formatMoney } from "../utils/formatters";
+import { formatMoney, formatPercent } from "../utils/formatters";
 import { buildHealthCentreData } from "../utils/liveRouteData";
 
 function toneClass(tone: "green" | "amber" | "red") {
@@ -39,13 +39,13 @@ export function HealthCentrePage() {
   const summary = [
     {
       label: "Fatigue",
-      value: `${Number(gameState.player.fatigue.toFixed(2))}%`,
+      value: formatPercent(gameState.player.fatigue),
       tone:
         gameState.player.fatigue >= 65 ? "text-amber-400" : "text-green-400",
     },
     {
       label: "Body strain",
-      value: `${gameState.trainingCondition.strain}%`,
+      value: `${formatPercent(gameState.trainingCondition.strain)}`,
       tone:
         gameState.trainingCondition.strain >= 55
           ? "text-amber-400"
@@ -53,7 +53,7 @@ export function HealthCentrePage() {
     },
     {
       label: "Burnout",
-      value: `${gameState.trainingCondition.burnout}%`,
+      value: `${formatPercent(gameState.trainingCondition.burnout)}`,
       tone:
         gameState.trainingCondition.burnout >= 55
           ? "text-amber-400"
@@ -162,9 +162,9 @@ export function HealthCentrePage() {
                 <span className="font-medium text-white">{item.label}</span>
                 <span className={toneClass(item.tone)}>{item.status}</span>
                 <div className="flex items-center gap-2">
-                  <ProgressBar value={item.risk} tone={item.tone} compact />
+                  <ProgressBar value={Number(item.risk.toFixed(2))} tone={item.tone} compact />
                   <span className="w-7 text-right text-gray-400">
-                    {item.risk}
+                    {Number(item.risk.toFixed(2))}
                   </span>
                 </div>
               </div>
@@ -203,7 +203,7 @@ export function HealthCentrePage() {
                 <div className="mb-1 flex justify-between text-xs">
                   <span className="text-gray-400">Recovery progress</span>
                   <span className="text-green-400">
-                    {currentIssue.recoveryProgress}%
+                    {formatPercent(currentIssue.recoveryProgress)}
                   </span>
                 </div>
                 <ProgressBar value={currentIssue.recoveryProgress} compact />
@@ -223,7 +223,7 @@ export function HealthCentrePage() {
               ))}
               <div className="flex items-start gap-2 rounded border border-amber-600/25 bg-amber-600/10 p-2.5 text-xs text-amber-300 xl:p-2 xl:text-[10px]">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                {recoveryNeeded ? `${currentIssue.riskOfPlaying}% risk of worsening if you play without recovery.` : "No active injury or recovery load. Treatment is not needed."}
+                {recoveryNeeded ? `${formatPercent(currentIssue.riskOfPlaying)} risk of worsening if you play without recovery.` : "No active injury or recovery load. Treatment is not needed."}
               </div>
             </div>
           </div>

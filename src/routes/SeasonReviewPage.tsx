@@ -1,3 +1,4 @@
+import { seasonTitleEntries } from '../hooks/useGameState';
 import { seasonTitle, snapshotWeekLabel } from "../game/seasonClock";
 import { SeasonRankings } from '../components/game/SeasonReviewPopup';
 import { useNavigate } from "react-router-dom";
@@ -216,16 +217,16 @@ export function SeasonReviewPage() {
               : match.tournamentName,
           value: match.prizeMoney,
         }));
+  const currentSeasonTitles = seasonTitleEntries(gameState, gameState.season);
   const currentSeasonSnapshot = {
     season: gameState.season,
     record: `${winCount}-${lossCount}`,
-    titles: currentSeasonEvents.filter((event) => event.result === "Winner")
-      .length,
+    titles: currentSeasonTitles.length,
     prizeMoney: totalPrizeMoney,
-    bestResult: currentSeasonEvents.some((event) => event.result === "Winner")
+    bestResult: currentSeasonTitles.length > 0
       ? "Winner"
       : (currentSeasonEvents[0]?.result ?? "No deep run yet"),
-    note: currentSeasonEvents.some((event) => event.result === "Winner")
+    note: currentSeasonTitles.length > 0
       ? "Silverware is now setting the tone for the next campaign."
       : currentSeasonEvents.length > 0
         ? "A platform is in place for stronger deep runs next season."
@@ -266,7 +267,7 @@ export function SeasonReviewPage() {
     },
     {
       label: "Fatigue",
-      value: `${gameState.player.fatigue}%`,
+      value: `${formatPercent(gameState.player.fatigue)}`,
       sub: "Recovery pressure",
     },
     {
@@ -511,9 +512,7 @@ export function SeasonReviewPage() {
               <span className="text-gray-400">Titles</span>
               <p className="font-medium text-white">
                 {
-                  currentSeasonEvents.filter(
-                    (event) => event.result === "Winner",
-                  ).length
+                  currentSeasonTitles.length
                 }
               </p>
             </div>

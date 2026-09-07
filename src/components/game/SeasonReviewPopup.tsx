@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../../context/useGame';
-import type { GameState } from '../../hooks/useGameState';
+import { seasonTitleEntries, type GameState } from '../../hooks/useGameState';
 import { formatMoney } from '../../utils/formatters';
 
 type Review = NonNullable<GameState['seasonReview']>;
@@ -21,12 +21,12 @@ export function SeasonReviewPopup() {
   const navigate = useNavigate();
   const review = gameState.seasonReview;
   if (!review?.pending || review.popupDismissed) return null;
-  return <ReviewDialog review={review} playerName={gameState.player.fullName} onClose={dismissSeasonReview}
+  return <ReviewDialog titleNames={seasonTitleEntries(gameState, review.completedSeason.season).map(entry => entry.tournamentName)} review={review} playerName={gameState.player.fullName} onClose={dismissSeasonReview}
     onDetails={() => { dismissSeasonReview(); navigate('/season-review'); }}
     onStart={() => { startNextSeason(); navigate('/'); }} />;
 }
-function ReviewDialog({ review, playerName, onClose, onDetails, onStart }: {
-  review: Review; playerName: string; onClose: () => void; onDetails: () => void; onStart: () => void;
+function ReviewDialog({ review, titleNames, playerName, onClose, onDetails, onStart }: {
+  review: Review; titleNames: string[]; playerName: string; onClose: () => void; onDetails: () => void; onStart: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => { ref.current?.showModal(); }, []);
@@ -40,6 +40,7 @@ function ReviewDialog({ review, playerName, onClose, onDetails, onStart }: {
       </header>
       <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain p-3 sm:p-4">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[['Record', record.wins + '–' + record.losses], ['Final rank', '#' + record.closingRanking], ['Titles', record.titles], ['Prize money', formatMoney(record.prizeMoney)]].map(([label, value]) => <div key={label} className="rounded-lg bg-background/50 p-2"><p className="text-[10px] text-gray-400">{label}</p><p className="text-base font-bold">{value}</p></div>)}</div>
+        <p className="text-xs text-gray-400">{titleNames.length === record.titles ? (titleNames.length ? 'Titles won: ' + titleNames.join(' · ') + '. ' : 'No tournament titles this season. ') : ''}Qualifying places and exhibitions are separate achievements.</p>
         <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3"><h3 className="text-sm font-semibold text-amber-300">{review.careerDecision.title}</h3><p className="mt-1 text-xs text-gray-300">{review.careerDecision.detail}</p></div>
         <div className="grid gap-3 sm:grid-cols-2">
           <SeasonRankings review={review} playerName={playerName} onNavigate={onClose} />

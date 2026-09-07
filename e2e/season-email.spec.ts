@@ -12,6 +12,7 @@ function fixture() {
   report.decision = { title:'Professional tour card retained', detail:'Your World Ranking of #18 keeps your professional career active for 2027/28.', expectation:'Improve your seeding and secure another season inside the Top 64.' };
   report.majorWinners = ['World Championship', 'UK Championship', 'Masters', 'Tour Championship', 'Champion of Champions'].map(tournamentName => ({ tournamentName, winner:'Malik Langford', playerWon:false }));
   report.finalRankings = [1,2,3].map(ranking => ({ ranking, playerName:['Malik Langford','Mateo Harrington','Tobias Harrington'][ranking-1], points:1500000-ranking*10000 }));
+  report.emergingStars=[{id:'fixture-youth-star',name:'Emerging Youth Star',nation:'ENG',age:17,overall:68,potential:96,circuit:'Youth',detail:'Youth · OVR 68 · POT 96 · exceptional potential.'}];
   report.closingCash=188275;
   report.cashMovement={from:'2026-06-30',to:'2027-06-30',change:1275};
   const next = startNextSeasonState(finished);
@@ -32,6 +33,7 @@ for (const viewport of [{width:1280,height:720},{width:390,height:844},{width:32
   if(viewport.width>=1280)expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.height+1);
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width+1);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  const stars=report.locator('details').filter({hasText:'Emerging stars to watch'});await expect(stars.locator('summary')).toContainText('Emerging Youth Star · OVR 68 / POT 96');await stars.locator('summary').click();await expect(stars).toContainText('Age 17');await expect(stars).toContainText('exceptional potential');
   await body.evaluate(e=>e.scrollTo(0,e.scrollHeight));
   await expect(report.getByText('Closing world rankings')).toBeInViewport();
   await page.screenshot({path:'artifacts/season-email-'+viewport.width+'.png'});

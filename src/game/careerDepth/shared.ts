@@ -16,7 +16,7 @@ export function createCareerDepth(state: GameState): CareerDepthState {
   };
 }
 export const depthOf = (state: GameState) => state.careerDepth ?? createCareerDepth(state);
-export const pendingStory = (state: GameState) => depthOf(state).stories.find(s => s.status === 'pending');
+export const pendingStory = (state: GameState) => depthOf(state).stories.find(s => s.status === 'pending' && s.expiresDate >= state.currentDate);
 export function peakPreparationWindows(state: GameState) {
   const plan = depthOf(state).schedule;
   if (!plan?.enabled || plan.strategy !== 'majors') return [];

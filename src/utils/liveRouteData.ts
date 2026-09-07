@@ -536,7 +536,7 @@ function formatSponsorTimeLeft(weeksRemaining: number) {
 }
 
 function formatSignedPercent(value: number) {
-  return `${value > 0 ? "+" : ""}${value}%`;
+  return `${value > 0 ? "+" : ""}${formatPercent(value)}`;
 }
 
 function getResultMarginLabel(
@@ -587,7 +587,7 @@ function isQfPlusRound(round: string) {
 function formatRecord(wins: number, losses: number) {
   const total = wins + losses;
   const percentage = total > 0 ? Math.round((wins / total) * 100) : 0;
-  return total > 0 ? `${wins}-${losses} (${percentage}%)` : "0-0";
+  return total > 0 ? `${wins}-${losses} (${formatPercent(percentage)})` : "0-0";
 }
 
 function getPressureTrait(
@@ -1358,7 +1358,7 @@ export function buildMatchResultData(state: GameState) {
   );
   const explanationSignals = [
     latestMatch && latestMatch.winProbability != null
-      ? `You went in at ${Math.round(latestMatch.winProbability)}% win probability, so this was ${latestMatch.winProbability >= 60 ? "a favourite spot" : latestMatch.winProbability <= 40 ? "an underdog assignment" : "close to even"}.`
+      ? `You went in at ${formatPercent(Math.round(latestMatch.winProbability))} win probability, so this was ${latestMatch.winProbability >= 60 ? "a favourite spot" : latestMatch.winProbability <= 40 ? "an underdog assignment" : "close to even"}.`
       : null,
     latestMatch && pressureImpact <= -3
       ? "Pressure hurt the edge once the match tightened up."
@@ -1404,13 +1404,13 @@ export function buildMatchResultData(state: GameState) {
       label: "Cue Condition",
       highlight: cue.name,
       condition: cueState?.condition ?? cue.condition,
-      detail: `${Math.max(1, cueState?.familiarity ?? cue.familiarity)}% familiarity influenced touch and positional confidence.`,
+      detail: `${formatPercent(Math.max(1, cueState?.familiarity ?? cue.familiarity))} familiarity influenced touch and positional confidence.`,
     },
     {
       label: "Tip & Contact",
       highlight: tip.name,
       condition: cueState?.tipCondition ?? 70,
-      detail: `Tip setup provides a ${tip.miscueReduction}% control rating for reducing miscues under pressure.`,
+      detail: `Tip setup provides a ${formatPercent(tip.miscueReduction)} control rating for reducing miscues under pressure.`,
     },
     {
       label: "Chalk Reliability",
@@ -1434,7 +1434,7 @@ export function buildMatchResultData(state: GameState) {
       title: "Equipment Readout",
       tone: "blue",
       items: equipmentImpact.map(
-        (item) => `${item.label}: ${item.highlight} at ${item.condition}%`,
+        (item) => `${item.label}: ${item.highlight} at ${formatPercent(item.condition)}`,
       ),
     },
   ];
@@ -1588,11 +1588,11 @@ export function buildMatchResultData(state: GameState) {
       qfPlusRecord: formatRecord(qfPlusWins, qfPlusMatches.length - qfPlusWins),
       semiFinalConversion:
         semiFinalMatches.length > 0
-          ? `${Math.round((semiFinalWins / semiFinalMatches.length) * 100)}%`
+          ? `${formatPercent(Math.round((semiFinalWins / semiFinalMatches.length) * 100))}`
           : "n/a",
       finalConversion:
         finalMatches.length > 0
-          ? `${Math.round((finalWins / finalMatches.length) * 100)}%`
+          ? `${formatPercent(Math.round((finalWins / finalMatches.length) * 100))}`
           : "n/a",
       deciderRecord: formatRecord(
         deciderWins,
@@ -1724,19 +1724,19 @@ export function buildHealthCentreData(state: GameState) {
     matchImpact: [
       {
         label: "Performance",
-        impact: `${Math.max(-18, -Math.round(state.player.fatigue / 6))}%`,
+        impact: `${formatPercent(Math.max(-18, -Math.round(state.player.fatigue / 6)))}`,
       },
       {
         label: "Long Potting",
-        impact: `${Math.max(-12, -Math.round(state.player.fatigue / 8))}%`,
+        impact: `${formatPercent(Math.max(-12, -Math.round(state.player.fatigue / 8)))}`,
       },
       {
         label: "Safety Play",
-        impact: `${Math.max(-8, -Math.round(state.player.fatigue / 10))}%`,
+        impact: `${formatPercent(Math.max(-8, -Math.round(state.player.fatigue / 10)))}`,
       },
       {
         label: "Cue Control",
-        impact: `${Math.max(-8, -Math.round(state.player.fatigue / 10))}%`,
+        impact: `${formatPercent(Math.max(-8, -Math.round(state.player.fatigue / 10)))}`,
       },
     ],
     injuryHistory,
@@ -1825,7 +1825,7 @@ export function buildSponsorshipOffersData(state: GameState) {
       sponsor: offer.name,
       exclusivity: offer.contractLength,
       obligations: offer.behaviour,
-      reputationImpact: `Fit ${offer.brandFit}%`,
+      reputationImpact: `Fit ${formatPercent(offer.brandFit)}`,
       valueScore: Math.max(
         1,
         Math.min(
@@ -1916,8 +1916,8 @@ export function buildSponsorshipContractData(
     },
     {
       metric: "Brand Fit",
-      current: `${average(state.sponsors.map((sponsor) => sponsor.brandFit || 60)) || 0}%`,
-      proposed: `${selectedOffer.brandFit}%`,
+      current: `${formatPercent(average(state.sponsors.map((sponsor) => sponsor.brandFit || 60)) || 0)}`,
+      proposed: `${formatPercent(selectedOffer.brandFit)}`,
     },
     {
       metric: "Contract Length",
@@ -1936,9 +1936,9 @@ export function buildSponsorshipContractData(
     },
   ];
   const advisor = {
-    note: `This deal adds ${selectedOffer.monthlyValue.toLocaleString("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 })} per month with ${selectedOffer.brandFit}% fit. Review obligation load against your current schedule and reputation growth stage.`,
+    note: `This deal adds ${selectedOffer.monthlyValue.toLocaleString("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 })} per month with ${formatPercent(selectedOffer.brandFit)} fit. Review obligation load against your current schedule and reputation growth stage.`,
     strengths: [
-      `Brand fit is ${selectedOffer.brandFit}%, which aligns well with the current profile.`,
+      `Brand fit is ${formatPercent(selectedOffer.brandFit)}, which aligns well with the current profile.`,
       `The deal would push monthly sponsor income to £${(currentRevenue + selectedOffer.monthlyValue).toLocaleString("en-GB")}.`,
       `Bonus structure is ${selectedOffer.bonusClause.toLowerCase()}.`,
     ],
@@ -2094,7 +2094,7 @@ export function buildMentalStateData(state: GameState) {
       title: "Reduce Match Load",
       description:
         "Protect energy and lower stress through the next event cycle.",
-      effect: `-${Math.max(8, Math.round(state.player.fatigue / 5))}% stress`,
+      effect: `-${formatPercent(Math.max(8, Math.round(state.player.fatigue / 5)))} stress`,
       effectTone: "green",
       cost: "Low",
       time: "1-2 weeks",
@@ -2102,7 +2102,7 @@ export function buildMentalStateData(state: GameState) {
     {
       title: "Simple Potting Drills",
       description: "Rebuild trust in the cueing basics.",
-      effect: `+${Math.max(6, Math.round(state.attributes.technical["Long Potting"] / 12))}% confidence`,
+      effect: `+${formatPercent(Math.max(6, Math.round(state.attributes.technical["Long Potting"] / 12)))} confidence`,
       effectTone: "green",
       cost: "Low",
       time: "Ongoing",
@@ -2110,7 +2110,7 @@ export function buildMentalStateData(state: GameState) {
     {
       title: "Sports Psychologist",
       description: "One focused intervention to steady overthinking loops.",
-      effect: `+${Math.max(8, Math.round(state.attributes.mental.Focus / 10))}% focus`,
+      effect: `+${formatPercent(Math.max(8, Math.round(state.attributes.mental.Focus / 10)))} focus`,
       effectTone: "green",
       cost: "£600",
       time: "1 session / week",
@@ -2118,7 +2118,7 @@ export function buildMentalStateData(state: GameState) {
     {
       title: "Rest Week",
       description: "Reset both fatigue and mental strain.",
-      effect: `-${Math.max(12, Math.round(state.player.fatigue / 3))}% burnout risk`,
+      effect: `-${formatPercent(Math.max(12, Math.round(state.player.fatigue / 3)))} burnout risk`,
       effectTone: "red",
       cost: "Medium",
       time: "1 week",
@@ -2147,8 +2147,8 @@ export function buildMentalStateData(state: GameState) {
         ? `${recentLoss.opponentName} exposed a dip in confidence and frame control. The current mental profile shows recoverable stress rather than a structural decline.`
         : "The live save is showing manageable pressure, but fatigue and expectation can still pull focus away from routines.",
       factors: [
-        `Fatigue currently sits at ${state.player.fatigue}%.`,
-        `Training strain is ${state.trainingCondition.strain}% and burnout is ${state.trainingCondition.burnout}%.`,
+        `Fatigue currently sits at ${formatPercent(state.player.fatigue)}.`,
+        `Training strain is ${formatPercent(state.trainingCondition.strain)} and burnout is ${formatPercent(state.trainingCondition.burnout)}.`,
         `Confidence is ${formatPercent(state.player.confidence)} with morale at ${formatPercent(state.player.morale)}.`,
         `${state.matches.length} competitive results are currently logged.`,
         `${state.sponsors.length} active sponsor deals add off-table expectation.`,
@@ -2209,20 +2209,20 @@ export function buildMentalStateData(state: GameState) {
     pressurePerformance: [
       {
         label: "Long Pot Success",
-        value: `${state.matches[0]?.longPotSuccess ?? state.attributes.technical["Long Potting"]}%`,
+        value: `${formatPercent(state.matches[0]?.longPotSuccess ?? state.attributes.technical["Long Potting"])}`,
       },
       {
         label: "Safety Success",
-        value: `${state.matches[0]?.safetySuccess ?? state.attributes.technical["Safety Play"]}%`,
+        value: `${formatPercent(state.matches[0]?.safetySuccess ?? state.attributes.technical["Safety Play"])}`,
       },
       {
         label: "Break Building",
-        value: `${state.attributes.technical["Break Building"]}%`,
+        value: `${formatPercent(state.attributes.technical["Break Building"])}`,
       },
-      { label: "Decision Quality", value: `${state.attributes.mental.Focus}%` },
+      { label: "Decision Quality", value: `${formatPercent(state.attributes.mental.Focus)}` },
       {
         label: "Clutch Performance",
-        value: `${state.attributes.mental.Composure}%`,
+        value: `${formatPercent(state.attributes.mental.Composure)}`,
       },
     ],
     copingStrategies: [
@@ -2871,7 +2871,7 @@ export function buildSeasonReviewData(state: GameState) {
       },
       {
         label: "Improve consistency",
-        progress: `${winRate}% win rate`,
+        progress: `${formatPercent(winRate)} win rate`,
         completed: winRate >= 60,
       },
     ],
@@ -2887,7 +2887,7 @@ export function buildSeasonReviewData(state: GameState) {
         note: "Commercial progress is tied to accepted deals.",
       },
       fanGrowth: {
-        growth: `+${Math.max(5, Math.round(state.player.reputation / 3))}%`,
+        growth: `+${formatPercent(Math.max(5, Math.round(state.player.reputation / 3)))}`,
         fans: Math.max(500, state.player.reputation * 120),
         delta: "Fan interest follows ranking and reputation growth.",
       },
@@ -2916,7 +2916,7 @@ export function buildSeasonReviewData(state: GameState) {
         detail: "Fan sentiment",
       },
       coachReview: getCurrentCoach(state)
-        ? `${getCurrentCoach(state)!.name} remains the active coach with ${getCurrentCoach(state)!.compatibility}% compatibility.`
+        ? `${getCurrentCoach(state)!.name} remains the active coach with ${formatPercent(getCurrentCoach(state)!.compatibility)} compatibility.`
         : "No coach is currently attached to the save.",
     },
   };

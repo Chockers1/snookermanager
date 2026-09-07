@@ -2,6 +2,7 @@ import { attributeComparison, attributePeriods, type AttributePeriod } from '../
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Activity, ChevronRight, HeartPulse, Shield, Sparkles, Star } from 'lucide-react'
+import { formatPercent } from '../utils/formatters'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { useGame } from '../context/useGame'
 import type { PlayerAttributes } from '../types/game'
@@ -142,7 +143,7 @@ export function PlayerAttributesPage() {
           { label: 'Overall Rating', value: overallRating, sub: baselineOverall === undefined ? 'Historical overall not recorded' : `Baseline ${baselineOverall} · ${formatDelta(overallDelta)}`, icon: Star, tone: 'green', delta: overallDelta },
           { label: 'Potential', value: potential, sub: '/ 100', icon: Sparkles, tone: 'blue' },
           { label: 'Morale', value: gameState.player.morale, sub: conditionLabel(gameState.player.morale), icon: Activity, tone: 'green' },
-          { label: 'Match Fitness', value: matchFitness, sub: `${matchFitness}% ready`, icon: HeartPulse, tone: 'green' },
+          { label: 'Match Fitness', value: matchFitness, sub: `${formatPercent(matchFitness)} ready`, icon: HeartPulse, tone: 'green' },
           { label: 'Fatigue', value: gameState.player.fatigue, sub: conditionLabel(gameState.player.fatigue, true), icon: Shield, tone: gameState.player.fatigue >= 70 ? 'red' : gameState.player.fatigue >= 45 ? 'amber' : 'green' },
         ].map((metric) => {
           const Icon = metric.icon
@@ -151,7 +152,7 @@ export function PlayerAttributesPage() {
               <Icon className="mx-auto mb-1 h-4 w-4 text-green-400" />
               <p className="metric-label">{metric.label}</p>
               <div className={`mx-auto mt-2 flex h-14 w-14 items-center justify-center rounded-full border-2 ${metric.tone === 'red' ? 'border-red-500 bg-red-600/20' : metric.tone === 'amber' ? 'border-amber-500 bg-amber-600/20' : metric.tone === 'blue' ? 'border-blue-500 bg-blue-600/20' : 'border-green-500 bg-green-600/20'}`}>
-                <span className="text-xl font-bold text-white">{metric.value}</span>
+                <span className="text-xl font-bold tabular-nums text-white">{Math.round(metric.value)}</span>
               </div>
               <p className={`mt-1 text-[10px] ${metric.label === 'Overall Rating' && (metric.delta ?? 0) > 0 ? 'text-green-400' : metric.label === 'Overall Rating' && (metric.delta ?? 0) < 0 ? 'text-red-400' : 'text-gray-400'}`}>{metric.sub}</p>
             </div>
@@ -202,7 +203,7 @@ export function PlayerAttributesPage() {
           <h3 className="mb-2 text-xs font-semibold text-white">Coach Notes</h3>
           <p className="text-xs leading-relaxed text-gray-400">
             {currentCoach
-              ? `${currentCoach.name} rates compatibility at ${currentCoach.compatibility}% and sees the clearest gains in ${topWeaknesses.slice(0, 2).map(([label]) => label).join(' and ')}.`
+              ? `${currentCoach.name} rates compatibility at ${formatPercent(currentCoach.compatibility)} and sees the clearest gains in ${topWeaknesses.slice(0, 2).map(([label]) => label).join(' and ')}.`
               : `No active coach is assigned. Prioritise ${topWeaknesses.slice(0, 2).map(([label]) => label).join(' and ')} while protecting ${topStrengths.slice(0, 2).map(([label]) => label).join(' and ')}.`}
           </p>
           <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs">

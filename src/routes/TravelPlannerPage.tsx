@@ -14,7 +14,7 @@ import { getNextEligibleTournament, getTravelPackageEstimate } from "../hooks/us
 import { travelOptionsFor, journeyQuote } from '../game/realism/travel';
 import { TravelLocationPanel } from '../components/career/RealismPanels';
 import type { HotelOption, TravelOption } from "../types/game";
-import { formatMoney } from "../utils/formatters";
+import { formatMoney, formatPercent } from "../utils/formatters";
 
 const iconMap: Record<
   TravelOption["icon"],
@@ -266,10 +266,10 @@ function TravelPlannerContent() {
 
         <div className="grid grid-cols-4 gap-1.5 text-center">
           {[
-            ["Fresh", `${100 - selectedTravel.fatigueValue}%`],
-            ["Delay", `${100 - selectedTravel.delayRisk}%`],
-            ["Recover", `${selectedHotel.recoveryValue}%`],
-            ["Prep", `${selectedHotel.preparationValue}%`],
+            ["Fresh", `${formatPercent(100 - selectedTravel.fatigueValue)}`],
+            ["Delay", `${formatPercent(100 - selectedTravel.delayRisk)}`],
+            ["Recover", `${formatPercent(selectedHotel.recoveryValue)}`],
+            ["Prep", `${formatPercent(selectedHotel.preparationValue)}`],
           ].map(([label, value]) => (
             <div key={label} className="rounded bg-surface-light/50 px-1 py-2">
               <p className="text-[8px] uppercase text-gray-500">{label}</p>
@@ -383,7 +383,7 @@ function TravelPlannerContent() {
           </p>
         </div>
         {[
-          ["Readiness", `${readinessScore}%`, "text-white"],
+          ["Readiness", `${formatPercent(readinessScore)}`, "text-white"],
           ["Trip Cost", formatMoney(totalTripCost), "text-amber-400"],
           ["Cash Left", formatMoney(cashRemaining), moneyHealth(cashRemaining)],
         ].map(([label, value, tone]) => (
@@ -441,7 +441,7 @@ function TravelPlannerContent() {
                     <span
                       className={`text-[9px] ${option.fatigueLabel === "High" ? "text-red-400" : option.fatigueLabel === "Medium" ? "text-amber-400" : "text-green-400"}`}
                     >
-                      {option.fatigueLabel} · {option.delayRisk}%
+                      {option.fatigueLabel} · {formatPercent(option.delayRisk)}
                     </span>
                   </span>
                 </button>
@@ -512,7 +512,7 @@ function TravelPlannerContent() {
             <div>
               <div className="mb-1 flex justify-between text-[10px]">
                 <span className="text-gray-400">Travel fatigue</span>
-                <span>{selectedTravel.fatigueValue}%</span>
+                <span>{formatPercent(selectedTravel.fatigueValue)}</span>
               </div>
               <ProgressBar
                 value={selectedTravel.fatigueValue}
@@ -523,7 +523,7 @@ function TravelPlannerContent() {
             <div>
               <div className="mb-1 flex justify-between text-[10px]">
                 <span className="text-gray-400">Hotel preparation</span>
-                <span>{selectedHotel.preparationValue}%</span>
+                <span>{formatPercent(selectedHotel.preparationValue)}</span>
               </div>
               <ProgressBar value={selectedHotel.preparationValue} compact />
             </div>
