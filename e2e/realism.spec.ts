@@ -93,6 +93,7 @@ test('international travel and conditions show costs, dates and the booking stat
   await page.screenshot({ path: 'test-results/realism-travel.png', fullPage: true });
   await journey.getByRole('button', { name: 'Close editor' }).click();
   await page.evaluate(() => { history.pushState({}, '', '/tournaments/hub'); dispatchEvent(new PopStateEvent('popstate')); });
+  await page.locator('summary').filter({ hasText: 'Match briefing · opponent & venue' }).click();
   await page.getByRole('button', { name: /Conditions & scouting/ }).click();
   const conditions = page.getByRole('dialog', { name: 'Conditions and scouting evidence' });
   await expect(conditions).toContainText('Cloth speed');
@@ -146,4 +147,51 @@ test('hotel choices show nightly rates and a range, then charge the initial stay
   await page.getByRole('button', { name: 'Confirm Travel', exact: true }).click();
   await expect.poll(async () => (await readCareerSave(page)).travel.bookings[event.id]?.totalCost).toBe(expected.minCost);
   expect((await readCareerSave(page)).player.cash).toBeCloseTo(state.player.cash - expected.minCost, 2);
+});
+
+test('a 25-frame decider carries live fatigue into the result and saved career', async ({ page }) => {
+  let state: GameState = seed();
+  const event = state.tournaments.find(t => t.name === 'Shanghai Masters')!;
+  state = confirmTournamentPreparationState(bookTravelState(enterTournamentState(state, event.id), event.id), event.id, 'balanced', getDefaultPreparationAllocations(), []);
+  state = startLiveMatchState({ ...state, currentDate: event.startDate }, event.id);
+  state.player.fatigue = 0;
+  const base = state.liveMatch!;
+  state.liveMatch = { ...base, bestOf: 25, framesNeeded: 13, sessions: sessionPlan(25),
+    playerFrames: 12, opponentFrames: 12, currentFrame: 25,
+    playerPoints: 0, opponentPoints: 0, currentBreak: 0, playerFatigue: 27.35,
+    frameHistory: Array.from({ length: 24 }, (_, i) => ({ frame: `F${i + 1}`,
+      player: i % 2 === 0 ? '70' : '0', opponent: i % 2 === 0 ? '0' : '70',
+      winner: i % 2 === 0 ? base.playerName : base.opponentName })) };
+  await open(page, '/match/live', state);
+  await expect(page.getByLabel('Live player condition', { exact: true })).toContainText('27.35%');
+  await page.getByRole('button', { name: /^Sim Frame/ }).click();
+  await expect.poll(async () => (await readCareerSave(page)).matches.some(m => m.sourceMatchId === base.sessionId)).toBe(true);
+  const saved = await readCareerSave(page);
+  const match = saved.matches.find(m => m.sourceMatchId === base.sessionId)!;
+  expect(match.playerFrames + match.opponentFrames).toBe(25);
+  expect(saved.player.fatigue).toBeGreaterThan(27.35);
+  expect(match.fatigueChange).toBe(saved.player.fatigue);
+  await page.reload();
+  await page.getByRole('button', { name: /Continue Career/ }).click();
+  expect((await readCareerSave(page)).player.fatigue).toBe(saved.player.fatigue);
+});
+
+test('Sim Frame preserves an earned century in the career result', async ({ page }) => {
+  let state: GameState = seed();
+  const event = state.tournaments.find(t => t.name === 'Shanghai Masters')!;
+  state = confirmTournamentPreparationState(bookTravelState(enterTournamentState(state, event.id), event.id), event.id, 'balanced', getDefaultPreparationAllocations(), []);
+  state = startLiveMatchState({ ...state, currentDate: event.startDate }, event.id);
+  const base = state.liveMatch!;
+  state.liveMatch = { ...base, playerFrames: base.framesNeeded - 1, opponentFrames: 0,
+    currentFrame: base.framesNeeded, playerAtTable: base.playerName,
+    playerPoints: 104, opponentPoints: 0, currentBreak: 104, playerHighestBreak: 104,
+    playerCenturies: 1, playerFifties: 1, playerConfidence: 95,
+    tableState: { redsRemaining: 0, coloursRemaining: ['Pink', 'Black'], ballOn: 'Colours' }, ballsRemaining: 2 };
+  await open(page, '/match/live', state);
+  await page.getByRole('button', { name: /^Sim Frame/ }).click();
+  await expect.poll(async () => (await readCareerSave(page)).matches.find(m => m.sourceMatchId === base.sessionId)?.centuries).toBe(1);
+  const match = (await readCareerSave(page)).matches.find(m => m.sourceMatchId === base.sessionId)!;
+  expect(match.highestBreak).toBeGreaterThanOrEqual(104);
+  expect(match.highestBreak).toBeLessThanOrEqual(117);
+  expect(match.fifties).toBe(1);
 });

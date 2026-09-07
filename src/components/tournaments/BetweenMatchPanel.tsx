@@ -4,14 +4,14 @@ import { betweenMatchChoices, betweenMatchEffects, betweenMatchInfo, type Betwee
 
 const dateLabel = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 
-export function BetweenMatchPanel({ tournamentId }: { tournamentId?: string }) {
+export function BetweenMatchPanel({ tournamentId, compact = false }: { tournamentId?: string; compact?: boolean }) {
   const { gameState, prepareBetweenMatches } = useGame();
   const [selected, setSelected] = useState<{ key: string; choice: BetweenMatchChoice } | null>(null);
   const info = betweenMatchInfo(gameState, tournamentId ? gameState.tournaments.find(t => t.id === tournamentId) : undefined);
   if (!info || (tournamentId && info.event.id !== tournamentId) || gameState.liveMatch?.status === 'In Progress') return null;
   const choice = selected?.key === info.key ? selected.choice : info.recommended;
   const applied = info.applied;
-  return <section aria-label="Between-match preparation" className="min-w-0 rounded-lg border border-border bg-surface p-3 text-xs">
+  const panel = <section aria-label="Between-match preparation" className="min-w-0 rounded-lg border border-border bg-surface p-3 text-xs">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h2 className="font-semibold text-white">Before your next match · {info.round}</h2>
       <span className="font-semibold text-amber-300">{info.days === 0 ? 'Same-day turnaround' : info.days === 1 ? 'Overnight break · 1 day between matches' : `${info.days} days between matches`}</span>
@@ -19,7 +19,7 @@ export function BetweenMatchPanel({ tournamentId }: { tournamentId?: string }) {
     <p className="mt-1 text-gray-300">{dateLabel(info.previousDate)} → {dateLabel(info.nextDate)} · Next opponent: {info.opponent}</p>
     {applied ? <p role="status" className="mt-2 text-green-300">{betweenMatchChoices.find(c => c.id === applied.choice)?.label} completed · Fatigue {applied.fatigueBefore.toFixed(2)}% → {applied.fatigueAfter.toFixed(2)}% · Confidence {applied.confidenceBefore.toFixed(2)}% → {applied.confidenceAfter.toFixed(2)}%. Ready for the next match.</p> : <>
       <p className="mt-2 text-gray-300">{gameState.player.fatigue >= 40 ? 'Fatigue is elevated: rest is recommended.' : gameState.player.confidence < 65 ? 'Confidence is low: a calm tactical review is recommended.' : 'You are fresh enough for a short practice routine.'} {info.days === 0 ? 'Only a short recovery window is available.' : 'The overnight gap allows more recovery.'}</p>
-      <div className="mt-2 grid gap-2 sm:grid-cols-3" role="group" aria-label="Preparation choices">
+      <div className={`mt-2 grid gap-2 ${compact ? '' : 'sm:grid-cols-3'}`} role="group" aria-label="Preparation choices">
         {betweenMatchChoices.map(option => {
           const effects = betweenMatchEffects(gameState, info.days, option.id);
           const confidenceGain = effects.confidence - gameState.player.confidence;
@@ -39,4 +39,12 @@ export function BetweenMatchPanel({ tournamentId }: { tournamentId?: string }) {
     </>}
     <p className="mt-2 text-[10px] text-gray-500">Estimated round dates, shared with the hotel schedule; exact session times are not available. Recovery is applied once for this fixture gap.</p>
   </section>;
+  if (!compact) return panel;
+  return <details key={info.key} className="card shrink-0 text-xs">
+    <summary className="cursor-pointer px-3 py-3 text-white">
+      <span className="font-semibold">Match preparation · {applied ? 'Complete' : 'Choose a routine'}</span>
+      <span className="mt-1 block pl-4 text-[11px] text-gray-400">{info.days === 0 ? 'Same-day turnaround' : `${info.days}-day gap`} · {dateLabel(info.nextDate)}{applied ? ` · ${betweenMatchChoices.find(c => c.id === applied.choice)?.label}` : ''}</span>
+    </summary>
+    <div className="px-2 pb-2">{panel}</div>
+  </details>;
 }

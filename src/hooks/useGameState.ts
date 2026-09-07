@@ -2353,12 +2353,11 @@ function getLiveVisitFatigueCost(
 
 function getLiveVisitFrameFatigueCost(activeProfile: LiveVisitSkillProfile) {
   return clamp(
-    (1.15 -
-      activeProfile.stamina * 0.008 -
-      activeProfile.handSteadiness * 0.004) *
-      0.62,
-    0.22,
-    0.75,
+    // Every frame costs concentration and endurance, including time seated.
+    // Stamina helps, but cannot cancel the workload of a multi-session match.
+    2.9 - activeProfile.stamina * 0.01 - activeProfile.handSteadiness * 0.003,
+    1.5,
+    2.9,
   );
 }
 
@@ -2890,7 +2889,7 @@ function buildRealisticVisitFeedText(input: {
   return `${actorName}'s break ends at ${completedBreakTotal}: ${tableProgress}. ${opponentName} comes to the table.${rhythmNote}`;
 }
 
-function playOutLiveFrame(
+export function playOutLiveFrame(
   liveMatch: LiveMatchState,
   mode: LiveMatchResolutionMode,
 ): LiveMatchState {
@@ -2902,14 +2901,14 @@ function playOutLiveFrame(
     nextLiveMatch.status === "In Progress" &&
     !pendingMatchBreak(nextLiveMatch) &&
     nextLiveMatch.currentFrame === startingFrame &&
-    guard < 60
+    guard < 400
   ) {
     const decision =
       nextLiveMatch.playerAtTable === nextLiveMatch.playerName &&
       mode === "manual"
         ? getDefaultManualVisitDecision(nextLiveMatch)
         : undefined;
-    nextLiveMatch = advanceLiveVisit(nextLiveMatch, decision, mode);
+    nextLiveMatch = advanceLiveVisit(nextLiveMatch, decision, mode, 'shot');
     guard += 1;
   }
 
@@ -15098,7 +15097,7 @@ export function advanceLiveVisit(
       : 0;
   const nextOpponentConfidence = clamp(
     liveMatch.opponentConfidence +
-      (!actorIsPlayer ? (success ? 1 : -1) : success ? -1 : 1) -
+      (!actorIsPlayer ? (success ? confidenceSwing : -confidenceSwing) : success ? -confidenceSwing : confidenceSwing) -
       deliberateRhythmPressure,
     25,
     99,
@@ -15247,12 +15246,18 @@ export function advanceLiveVisit(
         ...liveMatch.feed.slice(1),
       ]
     : [feedEntry, ...liveMatch.feed];
+  // Passing the snookers-required threshold secures the lead, but does not
+  // end a scoring visit. Let either player finish their break before the
+  // automatic concession check, so centuries and clearances can be completed.
+  const scoringBreakContinues = retainedTable && isScoringDecision && completedBreakTotal > 0;
   const frameClinched =
     (nextRemainingTablePoints === 0 &&
       nextPlayerPoints !== nextOpponentPoints) ||
-    nextPlayerPoints > nextOpponentPoints + nextRemainingTablePoints ||
-    nextOpponentPoints > nextPlayerPoints + nextRemainingTablePoints ||
-    (liveMatch.currentVisit >= 42 && nextPlayerPoints !== nextOpponentPoints);
+    (!scoringBreakContinues && (
+      nextPlayerPoints > nextOpponentPoints + nextRemainingTablePoints ||
+      nextOpponentPoints > nextPlayerPoints + nextRemainingTablePoints ||
+      (liveMatch.currentVisit >= 42 && nextPlayerPoints !== nextOpponentPoints)
+    ));
 
   const progressedLiveMatch: LiveMatchState = {
     ...liveMatch,
@@ -15480,7 +15485,20 @@ function resolveCareerSimulationLiveMatch(
     });
     // Quick simulation delegates interval decisions to the conservative rest
     // option, records them once, and preserves the same break/recovery rules.
-    liveMatch = { ...liveMatch, playerFrames, opponentFrames, status: playerFrames >= liveMatch.framesNeeded || opponentFrames >= liveMatch.framesNeeded ? 'Completed' : 'In Progress' };
+    liveMatch = {
+      ...liveMatch,
+      playerFrames,
+      opponentFrames,
+      // The baseline simulator has no visit log: charge the shared frame
+      // workload plus an estimated scoring visit for each player who scored.
+      playerFatigue: clamp(liveMatch.playerFatigue
+        + getLiveVisitFrameFatigueCost(liveMatch.playerVisitProfile)
+        + (playerPoints > 0 ? getLiveVisitFatigueCost(liveMatch.playerVisitProfile, 'Break Build', 1.15) : 0), 0, 100),
+      opponentFatigue: clamp(liveMatch.opponentFatigue
+        + getLiveVisitFrameFatigueCost(liveMatch.opponentVisitProfile)
+        + (opponentPoints > 0 ? getLiveVisitFatigueCost(liveMatch.opponentVisitProfile, 'Break Build', 1.15) : 0), 0, 100),
+      status: playerFrames >= liveMatch.framesNeeded || opponentFrames >= liveMatch.framesNeeded ? 'Completed' : 'In Progress',
+    };
     if (pendingMatchBreak(liveMatch)) liveMatch = resolveSessionBreak(liveMatch, 'recover');
   }
 
@@ -15621,12 +15639,11 @@ export function finalizeLiveMatch(
       ? opponentPlacement.prizeMoney
       : 0;
   const confidenceChange = drawn ? 0 : matchConfidenceChange(state.player.confidence, won, liveMatch.plannedMatchWinChance, isFinalRound, (depthOf(state).mediaExpectationsUntil ?? '') > state.currentDate);
-  const sessionRecovery = Math.min(20, (liveMatch.sessions?.completedBreaks ?? []).reduce((n, b) => n + (b.kind === 'overnight' ? 10 : b.kind === 'session' ? 5 : 2) + (b.choice === 'recover' ? 2 : 0), 0));
-  const fatigueChange = clamp(
-    Math.round(liveMatch.frameHistory.length * 1.5) + (won ? 2 : 1),
-    4,
-    16,
-  ) - sessionRecovery;
+  // Live play and Quick Sim have already charged frames and applied breaks.
+  // Settle that same value; recomputing a capped workload here used to erase
+  // fatigue and apply session recovery a second time after long matches.
+  const finalFatigue = Math.round(clamp(liveMatch.playerFatigue, 0, 100) * 100) / 100;
+  const fatigueChange = Math.round((finalFatigue - state.player.fatigue) * 100) / 100;
   const playerWonTournament = groupResult ? groupCompetitionChampion(groupResult.draw, tournament) === state.player.fullName && !nextRound : won && isFinalRound;
   const opponentWonTournament = groupResult ? groupCompetitionChampion(groupResult.draw, tournament) === liveMatch.opponentName && !nextRound : !won && isFinalRound;
   const awardsCareerTitle = tournamentAwardsCareerTitle(tournament);
@@ -15895,7 +15912,7 @@ export function finalizeLiveMatch(
     ...state.player,
     cash: state.player.cash + prizeMoneyEarned + sponsorBonusTotal,
     confidence: clamp(state.player.confidence + latestMatch.confidenceChange, 25, 99),
-    fatigue: clamp(state.player.fatigue + fatigueChange, 0, 100),
+    fatigue: finalFatigue,
     morale: clamp(state.player.morale + (drawn ? 0 : won ? 3 : -2), 0, 100),
     form: [...state.player.form.slice(-9), drawn ? "D" : won ? "W" : "L"],
     reputation: clamp(

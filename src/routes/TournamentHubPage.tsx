@@ -254,14 +254,9 @@ export function TournamentHubPage() {
   }
 
   return (
-    <div className="relative flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
+    <div className="relative flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-auto xl:p-1.5">
       <CareerDecisionNotice />
       {activeTournament.legacyEntryHonoured && <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">Your previously accepted entry has been restored after a save rules update. This exception applies to this event only; future World Championship entries use the ranking cutoff and qualifying results.</p>}
-      <RivalryContext opponent={nextOpponent?.playerName ?? ''} />
-      <TournamentAtmosphere event={activeTournament} rounds={drawData.bracket} opponent={nextOpponent?.playerName} />
-      <VenueScoutingPanel tournament={activeTournament} opponent={nextOpponent?.playerName} />
-      <BetweenMatchPanel tournamentId={activeTournament.id} />
-      {activeTournament && <details className="shrink-0 rounded border border-border text-xs"><summary className="cursor-pointer px-3 py-2 text-green-400">Results & rewards · prize, ranking publication and trophy status</summary><TournamentRewards event={activeTournament}/></details>}
       {isMajorEvent ? (
         <div
           aria-hidden="true"
@@ -315,11 +310,6 @@ export function TournamentHubPage() {
               {activeTournament ? tournamentFormatSummary(activeTournament) : "Format pending"}
             </p>
           </div>
-          {isMajorEvent ? (
-            <p className="mt-1 text-[10px] text-amber-100/70">
-              {majorMessage}
-            </p>
-          ) : null}
         </div>
         <div
           className={`flex shrink-0 items-center justify-between rounded-lg border px-4 py-2 sm:block sm:text-center ${
@@ -347,7 +337,7 @@ export function TournamentHubPage() {
       </header>
 
       <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-2">
-        <div className="grid min-h-0 gap-3 xl:grid-rows-[12.25rem_minmax(0,1fr)] xl:gap-2">
+        <div className="grid min-h-0 gap-3 xl:grid-rows-[auto_minmax(16rem,1fr)] xl:gap-2">
           <section
             className={`card flex min-h-0 flex-col overflow-hidden ${
               isMajorEvent
@@ -355,13 +345,15 @@ export function TournamentHubPage() {
                 : "border-green-600/40 bg-gradient-to-r from-green-600/10 via-surface to-surface"
             }`}
           >
-            <div className="card-header shrink-0">
+            <div className="card-header shrink-0 !py-2">
               <h2 className="text-sm font-semibold text-white">
                 Next Match{" "}
                 <span className="font-normal text-gray-400">
                   · {nextMatchStageLabel}
                 </span>
               </h2>
+              <div className="flex items-center gap-3">
+                <button type="button" className="hidden min-h-7 items-center gap-1 text-xs text-gray-300 hover:text-white xl:inline-flex" onClick={() => navigate(playability?.preparationConfirmed ? '/match/preview' : '/tournament/preparation')}><Search className="h-3.5 w-3.5" /> Scout</button>
               <span
                 className={`text-[9px] font-semibold uppercase tracking-[0.16em] ${playability?.canPlay ? "text-green-400" : "text-amber-400"}`}
               >
@@ -371,6 +363,7 @@ export function TournamentHubPage() {
                     ? "Preparation Needed"
                     : "Entry Needed"}
               </span>
+              </div>
             </div>
             <div className="grid min-h-0 flex-1 gap-3 p-3 md:grid-cols-[minmax(0,1fr)_15rem] md:items-center">
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-4">
@@ -408,7 +401,7 @@ export function TournamentHubPage() {
                   </div>
                 </div>
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-2 xl:flex xl:flex-wrap xl:items-center">
                 {entryConflict && <p role="status" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-300">Entry blocked: {entryConflict}</p>}
                 <button
                   type="button"
@@ -416,15 +409,15 @@ export function TournamentHubPage() {
                     isMajorEvent
                       ? "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-amber-400 px-5 text-sm font-semibold text-slate-950 transition hover:bg-amber-300"
                       : "btn-primary min-h-11 w-full justify-center px-5 text-sm"
-                  }`}
+                  } xl:w-auto xl:flex-1 xl:px-3 xl:text-xs`}
                   onClick={handlePlayLiveMatch}
                 >
                   <Play className="h-4 w-4" /> {primaryActionLabel}
                 </button>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 xl:flex">
                   <button
                     type="button"
-                    className="btn-secondary min-h-10 justify-center px-3 text-xs"
+                    className="btn-secondary min-h-10 justify-center px-3 text-xs xl:hidden"
                     onClick={() =>
                       navigate(
                         playability?.preparationConfirmed
@@ -456,7 +449,7 @@ export function TournamentHubPage() {
                     </button>
                   )}
                 </div>
-                {tournamentEntered && completedRounds.length === 0 && !(gameState.liveMatch?.tournamentId === activeTournament.id && gameState.liveMatch.status === "In Progress") && <button type="button" className="btn-secondary min-h-8 text-xs" onClick={() => withdrawTournament(activeTournament.id)}>Withdraw Entry</button>}
+                {tournamentEntered && completedRounds.length === 0 && !(gameState.liveMatch?.tournamentId === activeTournament.id && gameState.liveMatch.status === "In Progress") && <button type="button" className="btn-secondary min-h-8 text-xs xl:w-full" onClick={() => withdrawTournament(activeTournament.id)}>Withdraw Entry</button>}
                 {tournamentEntered && !playability?.canPlay ? (
                   <p className="text-center text-[10px] leading-tight text-amber-300">
                     {playability?.reason}
@@ -504,7 +497,7 @@ export function TournamentHubPage() {
           </section>
         </div>
 
-        <aside className="grid min-h-0 gap-3 md:grid-cols-3 xl:grid-cols-1 xl:grid-rows-[auto_auto_minmax(0,1fr)] xl:gap-2">
+        <aside aria-label="Tournament information" className="scrollbar-thin flex min-h-0 flex-col gap-3 xl:gap-2 xl:overflow-y-auto xl:pr-1 [&>section]:shrink-0">
           <section className="card card-body">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-white">
@@ -597,15 +590,28 @@ export function TournamentHubPage() {
             </div>
           </section>
 
+          <BetweenMatchPanel tournamentId={activeTournament.id} compact />
+          <details className="card shrink-0 text-xs">
+            <summary className="cursor-pointer px-3 py-3 font-semibold text-white">Match briefing · opponent & venue</summary>
+            <div className="space-y-2 px-2 pb-2">
+              <RivalryContext opponent={nextOpponent?.playerName ?? ''} />
+              <TournamentAtmosphere event={activeTournament} rounds={drawData.bracket} opponent={nextOpponent?.playerName} />
+              <VenueScoutingPanel tournament={activeTournament} opponent={nextOpponent?.playerName} />
+            </div>
+          </details>
+          <details className="card shrink-0 text-xs">
+            <summary className="cursor-pointer px-3 py-3 font-semibold text-green-400">Results & rewards · prize and ranking credit</summary>
+            <TournamentRewards event={activeTournament}/>
+          </details>
           <section className="card flex min-h-0 flex-col overflow-hidden">
             <div className="card-header shrink-0">
               <h2 className="text-sm font-semibold text-white">
                 Event Details
               </h2>
             </div>
-            <div className="scrollbar-thin min-h-0 flex-1 space-y-3 overflow-auto p-3 text-xs">
+            <div className="space-y-3 p-3 text-xs">
               {activeTournament && <EntryTimelinePanel event={activeTournament} />}
-              {activeTournament && <details className="rounded border border-border p-2" open={stageLabels.length <= 8}>
+              {activeTournament && <details className="rounded border border-border p-2">
                 <summary className="cursor-pointer font-semibold text-white">Round rules and format</summary>
                 <dl className="mt-2 space-y-1">{resolveTournamentFormat(activeTournament).roundStructure.map(round => <div key={round} className="flex justify-between gap-2"><dt className="text-gray-400">{round}</dt><dd className="text-white">{resolveTournamentFormat(activeTournament).roundBestOf?.[round] === 4 ? 'Up to 4 · draws' : 'Best of ' + resolveTournamentFormat(activeTournament).roundBestOf?.[round]}</dd></div>)}</dl>
                 <p className="mt-2 text-gray-400">{resolveTournamentFormat(activeTournament).seedingModel}</p>
