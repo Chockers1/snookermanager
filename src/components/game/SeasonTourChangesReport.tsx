@@ -1,6 +1,7 @@
+import { PlayerLink } from './PlayerLink';
 import type { SeasonTourChanges, TourChangePerson } from '../../game/seasonTourChanges';
 function PersonRow({person}:{person:TourChangePerson}) {
-  return <li className="min-w-0 py-1"><div className="flex flex-wrap items-baseline justify-between gap-x-2"><span className="text-xs font-medium text-white">{person.name}</span><span className="text-[10px] text-gray-400">{person.nation} · Age {person.age}</span></div><p className="mt-0.5 break-words text-[10px] leading-3.5 text-gray-400">{person.detail}</p></li>;
+  return <li className="min-w-0 py-1"><div className="flex flex-wrap items-baseline justify-between gap-x-2"><span className="text-xs font-medium text-white"><PlayerLink name={person.name} id={person.id}/></span><span className="text-[10px] text-gray-400">{person.nation} · Age {person.age}</span></div><p className="mt-0.5 break-words text-[10px] leading-3.5 text-gray-400">{person.detail}</p></li>;
 }
 export function SeasonTourChangesReport({report}:{report:SeasonTourChanges}) {
   return <section aria-label="Season tour changes" className="mt-3 min-w-0 max-w-3xl space-y-3">

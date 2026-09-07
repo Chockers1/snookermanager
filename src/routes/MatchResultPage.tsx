@@ -1,3 +1,7 @@
+import { VictoryCelebration } from '../components/game/VictoryCelebration';
+import { victoryCelebration } from '../game/victoryCelebration';
+import { BetweenMatchPanel } from '../components/tournaments/BetweenMatchPanel';
+import { PlayerLink } from '../components/game/PlayerLink';
 import { MatchReviewPanel } from "../components/career/MatchInsightPanels";
 import { GroupFixtures } from '../components/tournaments/GroupFixtures';
 import { isGroupDraw } from '../game/championshipLeague';
@@ -34,14 +38,15 @@ function feedbackTone(tone: "green" | "amber" | "blue") {
 }
 
 function signedValue(value: number | undefined, suffix = "") {
-  const amount = value ?? 0;
-  return `${amount > 0 ? "+" : ""}${amount}${suffix}`;
+  const amount = Math.round((value ?? 0) * 100) / 100;
+  return `${amount > 0 ? "+" : ""}${suffix === "%" ? amount.toFixed(2) : amount}${suffix}`;
 }
 
 export function MatchResultPage() {
   const { gameState } = useGame();
   const navigate = useNavigate();
   const latestMatch = gameState.matches[0];
+  const victory = victoryCelebration(gameState, latestMatch);
   const {
     equipmentImpact,
     coachFeedback,
@@ -214,8 +219,10 @@ export function MatchResultPage() {
 
   return (
     <div className="space-y-3 pb-8">
+      {victory && <VictoryCelebration key={victory.key} victory={victory} />}
       <CareerDecisionNotice />
       <RivalryContext opponent={latestMatch.opponentName} />
+      {tournamentContinues && <BetweenMatchPanel tournamentId={latestMatch.tournamentId} />}
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
         <div className="min-w-0">
           <p className="truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-green-400">
@@ -288,7 +295,7 @@ export function MatchResultPage() {
         <div className="flex items-center justify-end gap-3 px-4 py-4 text-right sm:px-6">
           <div className="min-w-0">
             <p className="truncate text-base font-bold text-white">
-              {opponentName}
+              <PlayerLink name={opponentName}/>
             </p>
             <p className="text-xs text-gray-400">
               Opponent ranking #{latestMatch.opponentRanking}
@@ -359,7 +366,7 @@ export function MatchResultPage() {
                       key={frame.frame}
                       className={`rounded-md border p-2 text-center text-[10px] ${wonFrame ? "border-green-500/20 bg-green-500/10" : "border-red-500/20 bg-red-500/10"}`}
                     >
-                      <span className="text-gray-500">F{frame.frame}</span>
+                      <span className="text-gray-500">{frame.frame.startsWith('F') ? frame.frame : `F${frame.frame}`}</span>
                       <strong className="block text-white">
                         {frame.player}–{frame.opponent}
                       </strong>

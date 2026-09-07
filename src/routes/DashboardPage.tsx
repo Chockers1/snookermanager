@@ -1,3 +1,4 @@
+import { PlayerLink } from '../components/game/PlayerLink';
 import { seasonPosition, seasonWeekLabel, snapshotWeekLabel } from "../game/seasonClock";
 import { CareerDecisionNotice } from '../components/career/CareerDepthPanels';
 import { DashboardCareerSummary, DashboardFinanceSummary } from '../components/game/DashboardSummaryCards';
@@ -161,7 +162,7 @@ export function DashboardPage() {
                             {match.round}
                           </td>
                           <td className="whitespace-nowrap px-3 py-1.5 text-white">
-                            {match.opponentName}
+                            <PlayerLink name={match.opponentName}/>
                           </td>
                           <td className="px-3 py-1.5">
                             <span

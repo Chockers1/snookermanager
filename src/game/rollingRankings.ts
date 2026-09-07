@@ -1,3 +1,4 @@
+import { groupCompetitionAward } from './groupCompetition';
 import { withCpuBreakRecords, uniqueRankingRows } from './worldIntegrity';
 import { isChampionshipLeague, championshipEarnings } from './championshipLeague';
 import type { GameState, CompetitionTableRow } from '../hooks/useGameState';
@@ -12,6 +13,10 @@ export type RankingRevision = { date: string; world: Record<string, number>; one
 export type RankedEvent = {
   key: string; tournamentId: string; name: string; season: string; completedOn: string;
   ranking: boolean; bracket: BracketRound[]; applied: boolean;
+  eventType?: Tournament['type'];
+  prizeAwards?: Record<string,number>;
+  prizeVersion?: number;
+  outcomes?: { player: string; finish: string }[];
 };
 export type RollingRankingsState = {
   version: 1; initializedOn: string; processedThrough: string; earnings: RankingEarning[];
@@ -115,14 +120,15 @@ export function recordRankingEvent(state: GameState, tournament: Tournament, bra
   const completedOn = tournament.endDate ?? tournament.startDate;
   const additions: RankingEarning[] = [];
   const qualified = isAttachedQualifying(tournament) ? new Set(qualifiedNames(bracket)) : new Set<string>();
+  const prizeAwards = Object.fromEntries([...entrants].map(([name,entry]) => [name, qualified.has(name) ? 0 : resolveTournamentFormat(tournament).groupMode ? groupCompetitionAward(bracket,tournament,name,(t,r,c)=>({...award(t,r,c),rankingPoints:0})).prizeMoney : award(tournament,entry.lastRound,entry.champion).prizeMoney]));
   if (countsForWorldRanking(tournament)) for (const [playerName, entry] of entrants) {
     const protectedMajorSeed = ['ukMajor', 'worldChampionshipMain'].includes(resolveTournamentFormat(tournament).id) && entry.rank <= 16;
     const seededLoss = entry.wins === 0 && (entry.firstRound !== bracket[0]?.label || protectedMajorSeed);
-    const shootOutLoss = entry.wins === 0 && /shoot.?out/i.test(tournament.name);
+    const shootOutLoss = entry.wins === 0 && (/shoot.?out/i.test(tournament.name) || /saudi arabia/i.test(tournament.name) && entry.firstRound === 'Round 1');
     const amount = isChampionshipLeague(tournament) ? championshipEarnings(bracket, playerName) : seededLoss || shootOutLoss || qualified.has(playerName) ? 0 : award(tournament, entry.lastRound, entry.champion).prizeMoney;
     additions.push({ id: `${key}:${playerName}`, eventKey: key, playerName, amount, earnedOn: completedOn, expiresOn: tournament.rankingExpiryDate ?? shiftYears(completedOn, 2), season: state.season, fixedExpiry: Boolean(tournament.rankingExpiryDate) });
   }
-  return { ...state, rollingRankings: { ...ledger, earnings: [...ledger.earnings, ...additions], events: { ...ledger.events, [key]: { key, tournamentId: tournament.id, name: tournament.name, season: state.season, completedOn, ranking: countsForWorldRanking(tournament), bracket, applied: false } } } };
+  return { ...state, rollingRankings: { ...ledger, earnings: [...ledger.earnings, ...additions], events: { ...ledger.events, [key]: { key, tournamentId: tournament.id, name: tournament.name, season: state.season, completedOn, ranking: countsForWorldRanking(tournament), eventType: tournament.type, bracket, applied: false, prizeAwards, prizeVersion: 1 } } } };
 }
 
 /** The ledger is authoritative for money-based points, not cash or career statistics. */
@@ -175,6 +181,18 @@ export function scheduleRankingExpiries(state: GameState): GameState {
   return { ...state, rollingRankings: { ...ledger, earnings } };
 }
 
+export function compactEventOutcomes(bracket: BracketRound[]) {
+  const outcomes = new Map<string, string>();
+  for (const round of bracket) for (const match of round.matches) {
+    if (typeof match.top.score !== 'number' || typeof match.bottom.score !== 'number') continue;
+    for (const [own, other] of [[match.top, match.bottom], [match.bottom, match.top]]) {
+      if (own.name === 'TBD' || /^Qualifier \d+$/.test(own.name)) continue;
+      const won = own.score! > other.score!;
+      outcomes.set(own.name, won && /^final$/i.test(round.label) ? 'Winner' : own.score! < other.score! ? 'Lost in ' + round.label : 'Reached ' + round.label);
+    }
+  }
+  return [...outcomes].map(([player, finish]) => ({player, finish}));
+}
 /** Keep deduplication receipts indefinitely, but not decades of full CPU brackets.
  * Human tournament history is archived separately by the career system. */
 export function compactRankingLedger(state: GameState): GameState {
@@ -184,7 +202,7 @@ export function compactRankingLedger(state: GameState): GameState {
   const currentKeys = new Set(state.tournaments.map(rankingEventKey));
   return { ...state, rollingRankings: { ...ledger,
     earnings: ledger.earnings.filter(e => e.expiresOn > state.currentDate),
-    events: Object.fromEntries(Object.entries(ledger.events).map(([key, e]) => [key, e.completedOn < oldest ? { ...e, bracket: [] } : e])),
+    events: Object.fromEntries(Object.entries(ledger.events).map(([key, e]) => [key, e.completedOn < oldest ? { ...e, outcomes: e.outcomes ?? compactEventOutcomes(e.bracket), bracket: [] } : e])),
     revisions: ledger.revisions.filter((r, i) => i === 0 || r.date >= oldest),
     seedings: Object.fromEntries(Object.entries(ledger.seedings).filter(([key]) => currentKeys.has(key))),
   } };

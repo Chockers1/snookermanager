@@ -1,3 +1,4 @@
+import type { GameState } from '../hooks/useGameState';
 export type TreatmentEffect = {
   id: string
   title: string
@@ -18,4 +19,17 @@ export const treatmentEffects: TreatmentEffect[] = [
 
 export function getTreatmentEffect(optionId?: string) {
   return treatmentEffects.find((item) => item.id === optionId) ?? treatmentEffects[0]
+}
+
+export function needsHealthRecovery(state: Pick<GameState, 'player' | 'trainingCondition' | 'health'>) {
+  return Boolean(state.health.activeIssue) || state.player.fatigue > 0 || state.trainingCondition.strain > 0 || state.trainingCondition.burnout > 0 || state.trainingCondition.injuryWeeks > 0;
+}
+export function treatmentPreview(state: GameState, optionId?: string) {
+  const effect = getTreatmentEffect(optionId);
+  return [
+    { label: 'Fatigue', before: state.player.fatigue, after: Math.max(0, state.player.fatigue - effect.fatigue), unit: '%' },
+    { label: 'Strain', before: state.trainingCondition.strain, after: Math.max(0, state.trainingCondition.strain - effect.strain), unit: '%' },
+    { label: 'Burnout', before: state.trainingCondition.burnout, after: Math.max(0, state.trainingCondition.burnout - effect.burnout), unit: '%' },
+    { label: 'Injury time', before: state.health.activeIssue?.weeksRemaining ?? state.trainingCondition.injuryWeeks, after: Math.max(0, (state.health.activeIssue?.weeksRemaining ?? state.trainingCondition.injuryWeeks) - effect.injuryWeeks), unit: ' wk' },
+  ];
 }

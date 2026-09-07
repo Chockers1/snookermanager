@@ -26,14 +26,14 @@ function readSeeds() {
 
 async function runScenario(level: (typeof createPlayerStartingLevelCatalog)[number], seed: number, seasons: number): Promise<MatrixRow> {
   const executable = process.execPath
-  const args = [path.resolve('node_modules', 'tsx', 'dist', 'cli.mjs'), 'scripts/simulateFiveSeasons.ts', `--seasons=${seasons}`, `--seed=${seed}`, `--starting-level-id=${level.id}`, `--start-age=${level.minAge}`, `--scenario-label=matrix-${level.id}-${seed}`, '--skip-player-snapshots', '--skip-shared-audits']
+  const args = [path.resolve('node_modules', 'tsx', 'dist', 'cli.mjs'), 'scripts/simulateFiveSeasons.ts', `--seasons=${seasons}`, `--seed=${seed}`, `--starting-level-id=${level.id}`, `--start-age=${level.minAge}`, `--scenario-label=matrix-${level.id}-${seed}`, '--skip-player-snapshots', '--skip-shared-audits', ...(process.argv.includes('--progress') ? ['--progress'] : []), ...(process.argv.includes('--calibration-adjustments') ? ['--calibration-adjustments'] : [])]
 
   return new Promise((resolve) => {
     const child = spawn(executable, args, { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'pipe'] })
     let stdout = ''
     let stderr = ''
     child.stdout.on('data', (chunk) => { stdout += String(chunk) })
-    child.stderr.on('data', (chunk) => { stderr += String(chunk) })
+    child.stderr.on('data', (chunk) => { stderr += String(chunk); if(process.argv.includes('--progress')) process.stderr.write(`[${level.id}/${seed}] ${String(chunk)}`) })
     child.on('close', (code) => {
       try {
         const jsonStart = stdout.lastIndexOf('\n{')
@@ -50,7 +50,10 @@ async function main() {
   const seasons = readNumberArg('seasons', 30)
   const concurrency = Math.max(1, readNumberArg('concurrency', 3))
   const baseSeeds = readSeeds()
-  const queue = createPlayerStartingLevelCatalog.flatMap((level, levelIndex) => baseSeeds.map((seed) => ({ level, seed: seed + levelIndex * 100003 })))
+  const requestedPaths = process.argv.find(arg => arg.startsWith('--paths='))?.split('=')[1]?.split(',');
+  const levels = createPlayerStartingLevelCatalog.filter(level => !requestedPaths || requestedPaths.includes(level.id));
+  if (!levels.length || requestedPaths?.some(id => !levels.some(level => level.id === id))) throw new Error('Unknown starting path in --paths.');
+  const queue = levels.flatMap((level, levelIndex) => baseSeeds.map((seed) => ({ level, seed: seed + levelIndex * 100003 })))
   const rows: MatrixRow[] = []
 
   async function worker() {
@@ -72,7 +75,7 @@ async function main() {
   fs.writeFileSync(path.join(outputDirectory, 'balance-matrix-latest.md'), [
     '# Career Balance Matrix', '',
     `- Seasons per scenario: ${seasons}`,
-    `- Starting paths: ${createPlayerStartingLevelCatalog.length}`,
+    `- Starting paths: ${levels.length}`,
     `- Seeds per path: ${baseSeeds.length}`,
     `- Scenarios: ${rows.length}`,
     `- Requiring review: ${failed.length}`,

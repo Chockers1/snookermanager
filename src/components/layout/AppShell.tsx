@@ -1,7 +1,8 @@
+import { FirstWeekGuide } from '../game/FirstWeekGuide';
 import { seasonWeekLabel } from "../../game/seasonClock";
 import { SeasonReviewPopup } from '../game/SeasonReviewPopup';
-import { useState, type ReactNode } from "react";
-import { useLocation } from "react-router-dom";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { useGame } from "../../context/useGame";
 import { Sidebar } from "./Sidebar";
@@ -12,10 +13,25 @@ type AppShellProps = {
 };
 
 export function AppShell({ children }: AppShellProps) {
-  const { gameState } = useGame();
+  const { gameState, saveWarning } = useGame();
   const location = useLocation();
   const immersiveRoute = location.pathname === "/match/live";
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const [desktopNavigation, setDesktopNavigation] = useState(() => window.matchMedia('(min-width: 1280px)').matches);
+  const navigationRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1280px)');
+    const update = () => setDesktopNavigation(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  useEffect(() => {
+    if (mobileNavigationOpen && !desktopNavigation) navigationRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+  }, [mobileNavigationOpen, desktopNavigation]);
+  const closeNavigation = () => {
+    setMobileNavigationOpen(false);
+    document.querySelector<HTMLButtonElement>('button[aria-label="Open navigation"]')?.focus();
+  };
 
   if (immersiveRoute) {
     return (
@@ -39,10 +55,23 @@ export function AppShell({ children }: AppShellProps) {
           type="button"
           aria-label="Close navigation overlay"
           className="fixed inset-0 z-40 bg-black/60 xl:hidden"
-          onClick={() => setMobileNavigationOpen(false)}
+          onKeyDown={event => { if (event.key === "Escape") { setMobileNavigationOpen(false); document.querySelector<HTMLButtonElement>('button[aria-label="Open navigation"]')?.focus(); } }}
+        onClick={() => setMobileNavigationOpen(false)}
         />
       ) : null}
       <div
+        ref={navigationRef}
+        inert={!desktopNavigation && !mobileNavigationOpen}
+        onKeyDown={event => {
+          if (desktopNavigation || !mobileNavigationOpen) return;
+          if (event.key === 'Escape') { event.preventDefault(); closeNavigation(); }
+          if (event.key === 'Tab') {
+            const items = [...event.currentTarget.querySelectorAll<HTMLElement>('a[href],button:not([disabled])')].filter(el => el.getClientRects().length);
+            const first = items[0], last = items.at(-1);
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+          }
+        }}
         onClick={() => setMobileNavigationOpen(false)}
         className={`fixed inset-y-0 left-0 z-50 transition-transform xl:static xl:translate-x-0 ${mobileNavigationOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
@@ -66,11 +95,13 @@ export function AppShell({ children }: AppShellProps) {
           <Menu className="h-5 w-5" />
         </button>
         <TopStatusBar player={gameState.player} />
+        {saveWarning && <Link to="/saves" role="alert" className="shrink-0 bg-amber-950 px-4 py-2 text-xs text-amber-200">{saveWarning} Open Save Manager →</Link>}
         <main
           id="main-content"
           tabIndex={-1}
           className="scrollbar-thin min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-2.5 sm:p-4 xl:p-6"
         >
+          <FirstWeekGuide />
           {children}
         </main>
         <div

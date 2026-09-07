@@ -1,3 +1,4 @@
+import { PlayerLink } from '../game/PlayerLink';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
@@ -5,7 +6,7 @@ import { useGame } from '../../context/useGame';
 import { depthOf, pendingStory, plusDays } from '../../game/careerDepth/shared';
 import { PROJECTS, partnerAvailable } from '../../game/careerDepth/developmentProjects';
 import { getRivalry, partnerCandidates, coachRelationshipLabel } from '../../game/careerDepth/relationships';
-import { STRATEGIES, recommendSeason, recurringCost } from '../../game/careerDepth/seasonPlanning';
+import { STRATEGIES, recommendSeason, recurringCost, currentPlannerTour, PLANNER_TOURS, type PlannerTour } from '../../game/careerDepth/seasonPlanning';
 import { COMMITMENTS, commitmentQuote, commitmentConflict } from '../../game/careerDepth/commitments';
 import { STORY_CHOICES, storyCommitmentDate } from '../../game/careerDepth/careerStories';
 import type { CommitmentKind, ProjectKind, Strategy } from '../../game/careerDepth/types';
@@ -88,26 +89,51 @@ export function DevelopmentPanel() {
 
 export function SeasonPlanningPanel() {
   const { gameState, actOnCareer } = useGame();
-  const d = depthOf(gameState), rows = recommendSeason(gameState);
+  const d = depthOf(gameState);
+  const [tourFilter, setTourFilter] = useState<PlannerTour | 'Current tour' | 'All tours'>('Current tour');
+  const [period, setPeriod] = useState<'block' | 'season'>('block');
+  const tour = tourFilter === 'Current tour' ? currentPlannerTour(gameState) : tourFilter;
+  const rows = recommendSeason(gameState, tour);
+  const visibleRows = period === 'block' ? rows.filter(r => r.inApprovalWindow) : rows;
   const [ids, setIds] = useState<string[]>([]);
-  const [cap, setCap] = useState(0);
+  const [cap, setCap] = useState<number | null>(null);
   const [reserve, setReserve] = useState(recurringCost(gameState) * 4);
   const [kind, setKind] = useState<CommitmentKind>('recovery');
   const [date, setDate] = useState(plusDays(gameState.currentDate, 7));
   const quote = commitmentQuote(gameState, kind, date || plusDays(gameState.currentDate, 7));
   const conflict = commitmentConflict(gameState, quote.startDate, quote.endDate);
-  const selected = rows.filter(r => ids.includes(r.event.id));
+  const selected = rows.filter(r => ids.includes(r.event.id) && r.inApprovalWindow && !r.blockedReason);
   const total = selected.reduce((n, r) => n + r.total, 0);
   return <CareerDisclosure title="Plan your season and commitments" summary={<>Season strategy & commitments · {STRATEGIES[d.strategy]} · {d.schedule?.enabled ? `${money(d.schedule.spent)} / ${money(d.schedule.cap)} approved` : 'Assistance off'}</>}>
     <div className={body}>
       <label className="flex flex-col gap-1">Career strategy<select className={input} value={d.strategy} onChange={e => { actOnCareer({ type: 'strategy', strategy: e.target.value as Strategy, targets: d.targets }); setIds([]); }}>{Object.entries(STRATEGIES).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
       {d.strategy === 'majors' && <fieldset className="flex flex-wrap gap-3"><legend className="mb-2 text-gray-400">Choose up to three peak events</legend>{rows.filter(r => (r.event.prestige ?? 0) >= 4 || r.event.type === 'Major').map(r => <label key={r.event.id} className="flex items-center gap-2"><input type="checkbox" checked={d.targets.includes(r.event.id)} disabled={!d.targets.includes(r.event.id) && d.targets.length >= 3} onChange={e => actOnCareer({ type: 'strategy', strategy: d.strategy, targets: e.target.checked ? [...d.targets, r.event.id] : d.targets.filter(id => id !== r.event.id) })} />{r.event.name}</label>)}</fieldset>}
-      <p className="text-gray-400">Season outline below. Only the next six weeks can be approved; no future winnings are included. Entry and your selected travel package are automated, preparation and matches remain yours.</p>
+      <p className="text-gray-400">Tick an Available event and approve your schedule, then choose Book next approved event to enter and arrange travel. Only one tournament can be active at a time. Optional advice does not prevent selection. Use Season priorities to mark events further ahead; priorities do not book entry or spend money. Approved bookings cover entry and your travel package; preparation and matches remain yours.</p>
       {d.strategy === 'majors' && <p className="text-green-400">An approved peak event protects the three preceding days for light match preparation, review and rest. Off-table bookings cannot use this time.</p>}
-      <div className="max-h-52 divide-y divide-border overflow-y-auto rounded border border-border">{rows.map(r => <label key={r.event.id} className="flex items-start gap-3 p-2"><input type="checkbox" aria-label={`Approve ${r.event.name}`} className="mt-1" disabled={!r.inApprovalWindow} checked={ids.includes(r.event.id)} onChange={e => setIds(e.target.checked ? [...ids, r.event.id] : ids.filter(id => id !== r.event.id))} /><span className="min-w-0 flex-1"><span className="font-semibold text-white">{r.event.name}</span><span className="block text-gray-400">{r.event.startDate} · {r.reason} {!r.inApprovalWindow && 'Outside this approval block.'}</span></span><span className="text-right text-gray-300">Entry {money(r.entry)}<br />Travel {money(r.travel)}<br /><span className={r.include ? 'text-green-400' : 'text-amber-300'}>{r.include ? 'Recommended' : 'Optional / omitted'}</span></span></label>)}</div>
-      <div className="flex flex-wrap items-end gap-3"><label className="flex flex-col gap-1">Spending ceiling<input aria-label="Spending ceiling" type="number" min="0" className={input} value={cap} onChange={e => setCap(Number(e.target.value))} /></label><label className="flex flex-col gap-1">Minimum cash reserve<input aria-label="Minimum cash reserve" type="number" min="0" className={input} value={reserve} onChange={e => setReserve(Number(e.target.value))} /></label><button className={button} onClick={() => { const recommended = rows.filter(r => r.include && r.inApprovalWindow); setIds(recommended.map(r => r.event.id)); setCap(recommended.reduce((n, r) => n + r.total, 0)); }}>Use recommended block</button></div>
-      <p>Selected bookings <span className="text-amber-300">{money(total)}</span> · Cash after bookings <span className="text-green-400">{money(gameState.player.cash - total)}</span> · Recurring commitments <span>{money(recurringCost(gameState))}/week</span> · Four-week reserve suggestion {money(recurringCost(gameState) * 4)}</p>
-      <div className="flex flex-wrap gap-2"><button className="btn-primary min-h-9 text-xs" onClick={() => actOnCareer({ type: 'approve-schedule', eventIds: ids, cap, reserve })}>Approve six-week schedule</button><button className={button} disabled={!d.schedule?.enabled} onClick={() => actOnCareer({ type: 'run-assistance' })}>Handle next entry & travel</button><button className={button} disabled={!d.schedule?.enabled} onClick={() => actOnCareer({ type: 'pause-schedule' })}>Pause assistance</button></div>
+      <div className="flex flex-wrap gap-3">
+        <label className="flex flex-col gap-1">Tour<select aria-label="Planner tour" className={input} value={tourFilter} onChange={e => { setTourFilter(e.target.value as typeof tourFilter); setIds([]); }}><option value="Current tour">My tour · {currentPlannerTour(gameState)}</option>{PLANNER_TOURS.map(t => <option key={t}>{t}</option>)}<option>All tours</option></select></label>
+        <label className="flex flex-col gap-1">Planning view<select aria-label="Planning view" className={input} value={period} onChange={e => setPeriod(e.target.value as typeof period)}><option value="block">Book next six weeks</option><option value="season">Season priorities</option></select></label>
+      </div>
+      <p className="text-gray-300">{period === 'block' ? `Approval window: ${gameState.currentDate}–${plusDays(gameState.currentDate, 41)} · ${visibleRows.filter(r => !r.blockedReason).length} available · ${selected.length} selected. There is no one-event limit.` : 'Tick as many season priorities as you like. Saved immediately; qualification and booking still apply.'}</p>
+      <div className="max-h-72 divide-y divide-border overflow-y-auto rounded border border-border">{visibleRows.map(r => {
+        const priority = d.board?.priorities.includes(r.event.id) ?? false;
+        const status = r.blockedReason ? (r.eligible ? 'Calendar conflict' : r.qualifier ? 'Qualification required' : 'Entry unavailable') : r.include ? 'Available · Recommended' : 'Available · Optional';
+        return <div key={r.event.id} className="p-2"><label className="flex cursor-pointer items-start gap-3"><input type="checkbox" aria-label={`${period === 'season' ? 'Prioritise' : 'Approve'} ${r.event.name}`} className="mt-1 h-5 w-5 shrink-0 accent-green-500" disabled={period === 'block' && Boolean(r.blockedReason)} checked={period === 'season' ? priority : selected.some(x => x.event.id === r.event.id)} onChange={e => {
+          if (period === 'season') actOnCareer({ type: 'priority-event', id: r.event.id });
+          else { const checked = e.target.checked; setIds(previous => checked ? [...previous, r.event.id] : previous.filter(id => id !== r.event.id)); }
+        }} /><span className="min-w-0 flex-1"><span className="font-semibold text-white">{r.event.name}</span><span className="block text-gray-400">{r.event.startDate} · {r.blockedReason ?? r.reason}</span>{period === 'season' && <span className="block text-gray-400">{priority ? 'Season priority saved' : 'Not a season priority'} · {r.inApprovalWindow ? 'Within booking window' : 'Booking available in a later six-week block'}</span>}</span><span className="shrink-0 text-right text-gray-300">Entry {money(r.entry)}<br />Travel {money(r.travel)}<br /><span className={r.blockedReason ? 'text-amber-300' : 'text-gray-300'}>{status}</span></span></label>
+          {r.conflictingCommitment && r.conflictingCommitment.startDate > gameState.currentDate && <div className="mt-2 ml-8 space-y-1">
+            <button className={button} onClick={() => actOnCareer({ type: 'cancel-commitment', id: r.conflictingCommitment!.id })}>Cancel {COMMITMENTS[r.conflictingCommitment.kind].name.toLowerCase()} to free these dates</button>
+            <p className="text-gray-400">No refund of {money(r.conflictingCommitment.cost)} paid; {money(r.conflictingCommitment.income)} completion income is forfeited. This does not enter the tournament.</p>
+          </div>}
+        </div>;
+      })}{!visibleRows.length && <p className="p-3 text-gray-400">No upcoming events for this tour in this view. Choose Season priorities or another tour.</p>}</div>
+      <div className="flex flex-wrap items-end gap-3"><label className="flex flex-col gap-1">Spending ceiling<input aria-label="Spending ceiling" type="number" min="0" className={input} value={cap ?? total} onChange={e => setCap(Number(e.target.value))} /></label><label className="flex flex-col gap-1">Minimum cash reserve<input aria-label="Minimum cash reserve" type="number" min="0" className={input} value={reserve} onChange={e => setReserve(Number(e.target.value))} /></label><button className={button} onClick={() => { const recommended = rows.filter(r => r.include && r.inApprovalWindow); setIds(recommended.map(r => r.event.id)); setCap(null); }}>Use recommended block</button></div>
+      <p>{selected.length} events selected · Selected bookings <span className="text-amber-300">{money(total)}</span> · Cash after bookings <span className="text-green-400">{money(gameState.player.cash - total)}</span> · Recurring commitments <span>{money(recurringCost(gameState))}/week</span> · Four-week reserve suggestion {money(recurringCost(gameState) * 4)}</p>
+      <div className="flex flex-wrap gap-2"><button className="btn-primary min-h-9 text-xs" disabled={!selected.length} onClick={() => actOnCareer({ type: 'approve-schedule', eventIds: selected.map(r => r.event.id), cap: cap ?? total, reserve })}>Approve six-week schedule</button><button className={button} disabled={!d.schedule?.enabled} onClick={() => actOnCareer({ type: 'run-assistance' })}>Book next approved event</button><button className={button} disabled={!d.schedule?.enabled} onClick={() => actOnCareer({ type: 'pause-schedule' })}>Pause assistance</button></div>
+      {!selected.length && <p className="text-gray-300">Tick an Available event above, or use recommended block. The booking button activates after selection.</p>}
+      <p role="status" className="rounded border border-border bg-background p-2 text-amber-300">{gameState.lastAction}</p>
+      {d.schedule?.enabled && <p className="text-gray-300">{d.schedule.completedEventIds.length} booked · {d.schedule.eventIds.length - d.schedule.completedEventIds.length} queued. <Link className="text-green-400 underline" to="/tournaments/hub">Open Tournament Hub</Link></p>}
       {d.schedule?.pauseReason && <p className="text-amber-300">{d.schedule.pauseReason}</p>}
       <fieldset className="space-y-2 border-t border-border pt-3"><legend className="pt-3 font-semibold text-white">Off-table commitments</legend><div className="flex flex-wrap gap-2"><select aria-label="Commitment type" className={input} value={kind} onChange={e => setKind(e.target.value as CommitmentKind)}>{(['recovery', 'camp', 'appearance', 'club-work'] as const).map(k => <option key={k} value={k}>{COMMITMENTS[k].name}</option>)}</select><input aria-label="Commitment start date" type="date" className={input} min={gameState.currentDate} value={date} onChange={e => setDate(e.target.value)} /></div>
         {kind === 'appearance' && <p className="text-amber-300">{gameState.sponsors.find(s => s.id === quote.sponsorId)?.name ?? 'Requires an active sponsor'} · one paid appearance per four weeks. Completion credits this sponsor's obligation, not a later replacement.</p>}
@@ -115,7 +141,6 @@ export function SeasonPlanningPanel() {
         {conflict && <p className="text-amber-300">{conflict}</p>}<button className={button} disabled={Boolean(conflict) || !date} onClick={() => actOnCareer({ type: 'commitment', kind, startDate: date })}>Reserve commitment</button>
       </fieldset>
       {d.commitments.slice(-8).map(c => <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2"><span>{COMMITMENTS[c.kind].name} · {c.startDate}–{c.endDate} · {c.status}</span>{c.status === 'scheduled' && c.startDate > gameState.currentDate && <button className={button} onClick={() => actOnCareer({ type: 'cancel-commitment', id: c.id })}>Cancel (no refund)</button>}</div>)}
-      <p role="status" className="text-amber-300">{gameState.lastAction}</p>
     </div>
   </CareerDisclosure>;
 }
@@ -146,7 +171,7 @@ export function CareerSeasonSummary() {
       {[...d.stories].reverse().map(s => <details key={s.id} className="rounded border border-border p-3"><summary className="cursor-pointer font-semibold text-white">{s.createdDate} · {s.title} · {s.status}</summary><p className="mt-2 text-gray-400">{s.evidence}</p>{s.updates.map((update, i) => <p key={i} className="mt-2 border-l-2 border-green-600 pl-2 text-gray-300">{update}</p>)}</details>)}
       {d.projectHistory.map(p => <div key={p.id}><p className="text-white">{PROJECTS[p.kind].name} · {p.status} · {p.completedWeeks} training weeks</p>{p.closingAttributes && <p className="text-gray-400">{Object.entries(p.baseline).map(([skill, before]) => `${skill}: ${before} → ${p.closingAttributes![skill]}`).join(' · ')}</p>}</div>)}
       {Object.entries(d.coachRelationships).map(([id, relation]) => <p key={id}>{gameState.coaches.find(c => c.id === id)?.name ?? 'Former coach'} · {coachRelationshipLabel(relation.trust)} · {relation.note}</p>)}
-      {Object.values(d.relationships).filter(r => r.rivalry).map(r => <p key={r.opponentId}>{r.name} · competitive rivalry · H2H {r.wins}–{r.losses}{gameState.worldPlayers.find(p => p.id === r.opponentId)?.retired ? ' · retired' : ''}</p>)}
+      {Object.values(d.relationships).filter(r => r.rivalry).map(r => <p key={r.opponentId}><PlayerLink name={r.name} id={r.opponentId}/> · competitive rivalry · H2H {r.wins}–{r.losses}{gameState.worldPlayers.find(p => p.id === r.opponentId)?.retired ? ' · retired' : ''}</p>)}
       <Link className="text-green-400" to="/calendar">Set the next season strategy</Link>
     </div>
   </CareerDisclosure>;

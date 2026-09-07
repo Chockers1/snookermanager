@@ -1,3 +1,7 @@
+import { BetweenMatchPanel } from '../components/tournaments/BetweenMatchPanel';
+import { TournamentAtmosphere } from '../components/game/TournamentAtmosphere';
+import { TournamentRewards } from '../components/game/TournamentRewards';
+import { PlayerLink } from '../components/game/PlayerLink';
 import { EntryTimelinePanel } from '../components/career/SeasonExpansionPanels';
 import { pathwayRuleSummary } from '../game/pathwayRules'
 import { resolveTournamentFormat, tournamentFormatSummary } from '../data/tournamentFormats';
@@ -254,7 +258,10 @@ export function TournamentHubPage() {
       <CareerDecisionNotice />
       {activeTournament.legacyEntryHonoured && <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">Your previously accepted entry has been restored after a save rules update. This exception applies to this event only; future World Championship entries use the ranking cutoff and qualifying results.</p>}
       <RivalryContext opponent={nextOpponent?.playerName ?? ''} />
+      <TournamentAtmosphere event={activeTournament} rounds={drawData.bracket} opponent={nextOpponent?.playerName} />
       <VenueScoutingPanel tournament={activeTournament} opponent={nextOpponent?.playerName} />
+      <BetweenMatchPanel tournamentId={activeTournament.id} />
+      {activeTournament && <details className="shrink-0 rounded border border-border text-xs"><summary className="cursor-pointer px-3 py-2 text-green-400">Results & rewards · prize, ranking publication and trophy status</summary><TournamentRewards event={activeTournament}/></details>}
       {isMajorEvent ? (
         <div
           aria-hidden="true"
@@ -389,7 +396,7 @@ export function TournamentHubPage() {
                 <div className="flex min-w-0 flex-col-reverse items-center gap-2 text-center sm:flex-row sm:text-left">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-white sm:text-base">
-                      {nextOpponent?.playerName ?? "Opponent TBD"}
+                      <PlayerLink name={nextOpponent?.playerName ?? "Opponent TBD"}/>
                     </p>
                     <p className="text-[11px] text-gray-400">
                       Rank {nextOpponent?.ranking ?? "-"} ·{" "}

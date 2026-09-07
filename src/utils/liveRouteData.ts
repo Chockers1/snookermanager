@@ -1,3 +1,4 @@
+import { needsHealthRecovery } from '../game/healthSystem';
 import { seasonPosition, snapshotWeekLabel } from "../game/seasonClock";
 import { getBestOfForRound } from '../data/tournamentFormats';
 import { protectCommitmentSessions } from '../game/careerDepth/commitments';
@@ -1604,6 +1605,7 @@ export function buildMatchResultData(state: GameState) {
 }
 
 export function buildHealthCentreData(state: GameState) {
+  const recoveryNeeded = needsHealthRecovery(state);
   const treatments = treatmentOptionCatalog.map((option) => ({
     ...option,
     selected: option.id === "treat-1",
@@ -1670,13 +1672,13 @@ export function buildHealthCentreData(state: GameState) {
           : ("green" as const),
     },
   ];
-  const issueTitle =
+  const issueTitle = !recoveryNeeded ? "No treatment needed" :
     activeIssue?.issue ??
     (state.player.fatigue >= 65
       ? "Accumulated Fatigue"
       : "Routine Recovery Monitoring");
   const recoveryProgress =
-    activeIssue?.recoveryProgress ?? clamp(100 - fatigueRisk, 20, 96);
+    !recoveryNeeded ? 100 : activeIssue?.recoveryProgress ?? clamp(100 - fatigueRisk, 20, 96);
   const injuryHistory = state.health.history.slice(0, 8);
   const estimatedReturnDate = new Date(`${state.currentDate}T12:00:00`);
   estimatedReturnDate.setDate(
@@ -1689,7 +1691,7 @@ export function buildHealthCentreData(state: GameState) {
     currentIssue: {
       title: issueTitle,
       bodyArea: activeIssue?.bodyArea ?? "General",
-      severity:
+      severity: !recoveryNeeded ? "None" :
         activeIssue?.severity ??
         (state.player.fatigue >= 70 ? "Moderate" : "Minor"),
       sustained: activeIssue?.startedDate ?? state.currentDate,
@@ -1698,11 +1700,11 @@ export function buildHealthCentreData(state: GameState) {
         (state.player.fatigue >= 55
           ? "Heavy match and training load"
           : "Preventative monitoring"),
-      painLevel: `${activeIssue ? (activeIssue.severity === "Serious" ? 7 : activeIssue.severity === "Moderate" ? 5 : 3) : Math.max(1, Math.round(state.player.fatigue / 25))} / 10`,
+      painLevel: !recoveryNeeded ? "0 / 10" : `${activeIssue ? (activeIssue.severity === "Serious" ? 7 : activeIssue.severity === "Moderate" ? 5 : 3) : Math.max(1, Math.round(state.player.fatigue / 25))} / 10`,
       overallRisk:
         activeIssue?.severity ??
         (state.player.fatigue >= 70 ? "Medium" : "Low"),
-      recoveryTime: activeIssue
+      recoveryTime: !recoveryNeeded ? "Not needed" : activeIssue
         ? `${activeIssue.weeksRemaining} week${activeIssue.weeksRemaining === 1 ? "" : "s"}`
         : state.player.fatigue >= 70
           ? "4-6 days"
@@ -1711,7 +1713,7 @@ export function buildHealthCentreData(state: GameState) {
         ? estimatedReturnDate.toISOString().slice(0, 10)
         : "Available now",
       recoveryProgress,
-      riskOfPlaying: clamp(
+      riskOfPlaying: !recoveryNeeded ? 0 : clamp(
         Math.round(
           (state.player.fatigue + (100 - state.player.confidence)) / 2,
         ),

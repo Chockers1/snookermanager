@@ -1,3 +1,12 @@
+import { repairTournamentPayouts, type PayoutRepair } from '../game/payoutRepair';
+import { scheduledPlacementPrize } from '../data/tournamentPrizes';
+import { captureVictoryMessages } from '../game/victoryInbox';
+import { capturePostEventRankings } from '../game/postEventRanking';
+import { prepareBetweenMatchesState, type BetweenMatchChoice, type BetweenMatchPreparation } from '../game/betweenMatches';
+import { qualificationReport } from '../game/qualificationReport';
+import { formatInboxConfidence } from '../utils/inboxFormatting';
+import { freshGuide, reconcileFirstWeekGuide, type GuideStep } from '../game/firstWeekGuide';
+import { eventAtmosphere, matchWalkout, crowdReaction } from '../game/tournamentAtmosphere';
 import { announceSeasonTourChanges, createSeasonTourChanges, type SeasonTourChanges } from '../game/seasonTourChanges';
 import { enrichTournamentMessages, retainTournamentArchive, recoverTournamentArchive } from '../game/tournamentCareerHistory';
 import { initialAttributeHistory, recordAttributeHistory, recoverAttributeHistory, type AttributeHistory } from '../game/attributeHistory';
@@ -21,7 +30,8 @@ import { pathwayEntryReason, pathwayAgeLimit, pathwayPlacementPrize, nationRegio
 import { stepShootOut, stepBallShootOut, attemptGoldenBall, handicapAllowance } from '../game/specialMatchRules';
 import { isChampionshipLeague, isGroupDraw, nextGroupFixture, groupFrameOrder } from '../game/championshipLeague';
 import { createGroupCompetition, resolveGroupCompetitionStage, applyGroupCompetitionResult, groupCompetitionAward, groupCompetitionChampion } from '../game/groupCompetition';
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { queueProtectedSave, readRecoveryState, storeRecoverySave, listRecoverySaves, validatedRecoveryPayload } from '../game/recoverySaves';
 import type { CareerDepthState, CareerDepthAction } from "../game/careerDepth/types";
 import { initializeCareerDepth, reconcileCareerDepth, careerDepthAction, nextCareerBoundary } from "../game/careerDepth";
 import { depthOf, pendingStory, plusDays, uniqueOpponentId } from "../game/careerDepth/shared";
@@ -178,7 +188,7 @@ import {
   calculateSponsorMatchBonus,
   getSponsorObligationProfile,
 } from "../game/sponsorshipSystem";
-import { getTreatmentEffect } from "../game/healthSystem";
+import { getTreatmentEffect, needsHealthRecovery, treatmentPreview } from "../game/healthSystem";
 import {
   calculatePreparationEffects,
   type PreparationAllocations,
@@ -226,6 +236,7 @@ export type TravelBookingState = {
   bookedWeek: number;
   bookedDate: string;
   preparation?: TournamentPreparationPlan;
+  betweenMatches?: BetweenMatchPreparation;
 };
 
 type TravelState = {
@@ -538,6 +549,7 @@ type LiveVisitSkillProfile = {
 };
 
 export type LiveMatchState = {
+  atmosphere?: import('../game/tournamentAtmosphere').MatchAtmosphere;
   careerBestAtStart?: number;
   objectives?: import("../game/matchInsights").PersonalMatchObjective[];
   special?: import('../game/specialMatchRules').SpecialMatchState;
@@ -941,12 +953,14 @@ type CareerSystemsState = {
 };
 
 export type GameState = {
+  firstWeekGuide?: import('../game/firstWeekGuide').FirstWeekGuideState;
   seasonClock?: SeasonClock;
   worldPopulationSeason?: string;
   realism?: import('../game/realism/types').RealismState;
   rollingRankings?: RollingRankingsState;
   careerDepth?: CareerDepthState;
   schemaVersion: number;
+  payoutRepair?: PayoutRepair;
   worldSeed: number;
   currentDate: string;
   season: string;
@@ -1258,7 +1272,7 @@ export function getTournamentRoundPlan(
   };
 }
 
-function getTournamentPlacementAwards(
+export function getTournamentPlacementAwards(
   tournament: Tournament,
   round: TournamentRound,
   champion: boolean,
@@ -1268,7 +1282,7 @@ function getTournamentPlacementAwards(
   if (champion && isAttachedQualifying(tournament)) return { prizeMoney: 0, rankingPoints: 0 };
   const plan = getTournamentRoundPlan(tournament, round);
   const normalizedRound = normalizeTournamentRoundLabel(round);
-  const prizeMoney = pathwayPlacementPrize(tournament, round, champion) ?? (champion
+  const prizeMoney = scheduledPlacementPrize(tournament, round, champion) ?? pathwayPlacementPrize(tournament, round, champion) ?? (champion
     ? (tournament.winnerPrize ?? Math.round(tournament.prizeMoney * 0.5))
     : /\bfinal\b/.test(normalizedRound) &&
         !/semi|quarter|section/.test(normalizedRound)
@@ -7108,12 +7122,12 @@ function createInboxMessage(
   partial: Omit<InboxMessage, "id" | "date">,
   date: string,
 ): InboxMessage {
-  return {
+  return formatInboxConfidence({
     id: `inbox-${date}-${Math.random().toString(36).slice(2, 8)}`,
     date,
     read: false,
     ...partial,
-  };
+  });
 }
 
 function buildTournamentInvitationContent(
@@ -7278,7 +7292,7 @@ function normalizeInboxMessages(
   currentDate?: string,
 ): InboxMessage[] {
   return messages.map((message) => {
-    const normalizedMessage = { ...message, read: Boolean(message.read) };
+    const normalizedMessage = formatInboxConfidence({ ...message, read: Boolean(message.read) });
     if (message.subject.startsWith("Invitation: ")) {
       const tournamentName = message.subject.slice("Invitation: ".length);
       const tournament = tournaments.find(
@@ -8657,7 +8671,7 @@ export function getTournamentEntryAccess(
       accessBand,
       seededProtection,
       reason:
-        "Top-16 main-tour players should enter the main draw directly rather than qualifier routes.",
+        `Top-${resolveTournamentFormat(tournament).seedOffset} main-tour players should enter the main draw directly rather than qualifier routes.`,
     };
   }
 
@@ -9108,6 +9122,7 @@ function repairLegacyWorldEntry(state: GameState): GameState {
 export function repairGameState(state: GameState): GameState {
   state = recoverTournamentArchive(state);
   state = preserveSeasonEmails(state);
+  state = repairTournamentPayouts(initializeRollingRankings(state), getTournamentPlacementAwards);
   state = ensureSeasonClock(state);
   state = ensureWorldPopulation(repairCpuHistoricalRecords(repairLegacyWorldEntry(initializeRollingRankings(state))));
   state = { ...state, tournaments: state.tournaments.map(t => isChampionshipLeague(t) && t.status !== 'Completed' ? { ...t, format: 'Groups: up to 4 frames, draws allowed · final best of 5', prizeMoney: 328000, winnerPrize: 33000, runnerUpPrize: 23000 } : t) };
@@ -13180,7 +13195,7 @@ function getCurrentCueBonus(equipment: EquipmentState) {
   return getEquipmentPerformanceProfile(equipment).totalBonus;
 }
 
-function getMissingTournamentEquipment(equipment: EquipmentState) {
+export function getMissingTournamentEquipment(equipment: EquipmentState) {
   const missing: string[] = [];
 
   if (!equipment.currentCueId) missing.push("cue");
@@ -14114,6 +14129,7 @@ function createLiveMatchState(
   return {
     tournamentId: tournament.id,
     round: setup.currentRound,
+    atmosphere: eventAtmosphere(state, tournament),
     sessions: sessionPlan(setup.roundPlan.bestOf, tournament),
     special: { rules, elapsedSeconds: 0, ...handicap },
     venue: venueConditions(tournament),
@@ -14171,7 +14187,7 @@ function createLiveMatchState(
       {
         id: `feed-start-${Date.now()}`,
         time: "00:00",
-        text: `${state.player.fullName} walks out to face ${setup.opponent.playerName} in the ${setup.currentRound}. Rival profile: ${getOpponentArchetypeNote(opponentArchetype)}. ${getRivalry(state,setup.opponent.playerName)?.rivalry ? "An established rivalry resumes: " + getRivalry(state,setup.opponent.playerName)!.wins + " wins and " + getRivalry(state,setup.opponent.playerName)!.losses + " losses in their recorded meetings." : ""}`,
+        text: `${matchWalkout(eventAtmosphere(state, tournament), [state.player.fullName, setup.opponent.playerName])} ${state.player.fullName} walks out to face ${setup.opponent.playerName} in the ${setup.currentRound}. Rival profile: ${getOpponentArchetypeNote(opponentArchetype)}. ${getRivalry(state,setup.opponent.playerName)?.rivalry ? "An established rivalry resumes: " + getRivalry(state,setup.opponent.playerName)!.wins + " wins and " + getRivalry(state,setup.opponent.playerName)!.losses + " losses in their recorded meetings." : ""}`,
         actor: "System",
         tone: "blue",
       },
@@ -14238,6 +14254,7 @@ export function startLiveMatchState(
   );
   if (equipmentMessage) return finalizeState(previousState, equipmentMessage);
 
+  previousState = prepareBetweenMatchesState(previousState, 'rest', tournament.id);
   return finalizeState(
     {
       ...previousState,
@@ -14683,7 +14700,7 @@ export function resolveCompletedLiveFrame(
   });
   const frameFeed = buildVisitFeedEntry(
     formatLiveClock(liveMatch.timeElapsedMinutes),
-    `${mode} ${frameLabel}: ${playerWinsFrame ? liveMatch.playerName : liveMatch.opponentName} wins the frame ${nextPlayerPoints}-${nextOpponentPoints}. ${frameStory(liveMatch,playerWinsFrame)}`,
+    `${mode} ${frameLabel}: ${playerWinsFrame ? liveMatch.playerName : liveMatch.opponentName} wins the frame ${nextPlayerPoints}-${nextOpponentPoints}. ${frameStory(liveMatch,playerWinsFrame)} ${liveMatch.bestOf > 1 && (playerWinsFrame ? liveMatch.playerFrames + 1 === liveMatch.framesNeeded - 1 && liveMatch.opponentFrames === liveMatch.framesNeeded - 1 : liveMatch.opponentFrames + 1 === liveMatch.framesNeeded - 1 && liveMatch.playerFrames === liveMatch.framesNeeded - 1) ? crowdReaction(liveMatch.atmosphere, liveMatch.playerName, "decider") : ""}`,
     playerWinsFrame ? "Player" : "Opponent",
     playerWinsFrame ? "green" : "amber",
   );
@@ -15178,7 +15195,7 @@ export function advanceLiveVisit(
       currentSideStats.safetiesWon + (isSafetyDecision && success ? 1 : 0),
     fouls: currentSideStats.fouls + (foulOccurred ? 1 : 0),
   };
-  const contextualText = visitStory({actorName:actorIsPlayer?liveMatch.playerName:liveMatch.opponentName,success,foul:foulOccurred,pot:isPotDecision,previousBreak:liveMatch.currentBreak,breakTotal:completedBreakTotal,personalBest:liveMatch.careerBestAtStart,previousMatchBest:liveMatch.playerHighestBreak,player:actorIsPlayer,pointsBefore:actorIsPlayer?liveMatch.playerPoints:liveMatch.opponentPoints,otherPoints:actorIsPlayer?liveMatch.opponentPoints:liveMatch.playerPoints,remaining:getRemainingTablePoints(liveMatch)});
+  const contextualText = visitStory({actorName:actorIsPlayer?liveMatch.playerName:liveMatch.opponentName,success,foul:foulOccurred,pot:isPotDecision,previousBreak:liveMatch.currentBreak,breakTotal:completedBreakTotal,personalBest:liveMatch.careerBestAtStart,previousMatchBest:liveMatch.playerHighestBreak,player:actorIsPlayer,pointsBefore:actorIsPlayer?liveMatch.playerPoints:liveMatch.opponentPoints,otherPoints:actorIsPlayer?liveMatch.opponentPoints:liveMatch.playerPoints,remaining:getRemainingTablePoints(liveMatch)}) + (success && completedBreakTotal >= 100 && liveMatch.currentBreak < 100 ? ' ' + crowdReaction(liveMatch.atmosphere, actorIsPlayer ? liveMatch.playerName : liveMatch.opponentName, 'century') : '');
   const feedText = buildRealisticVisitFeedText({
     actorName: actorIsPlayer ? liveMatch.playerName : liveMatch.opponentName,
     opponentName: actorIsPlayer
@@ -15569,7 +15586,8 @@ export function finalizeLiveMatch(
   const protectedOpeningLoss = countsForWorldRanking(tournament) && !won && state.tournamentProgress.completedRounds.length === 0 && (
     getTournamentEntryRound(state, tournament) !== tournamentRounds[0] ||
     (['ukMajor', 'worldChampionshipMain'].includes(resolveTournamentFormat(tournament).id) && (seedingRows(state, tournament, state.competitionTables.world).find(r => r.playerName === state.player.fullName)?.ranking ?? 999) <= 16) ||
-    /shoot.?out/i.test(tournament.name)
+    /shoot.?out/i.test(tournament.name) ||
+    (/saudi arabia/i.test(tournament.name) && liveMatch.round === 'Round 1')
   );
   const rankingPointsGained = !awardsRankingPoints || protectedOpeningLoss || qTourOpeningLoss
     ? 0
@@ -16178,7 +16196,7 @@ export function finalizeLiveMatch(
       : groupMatch
         ? `Group complete at ${tournament.name}. You did not qualify from ${liveMatch.round}.`
         : won
-        ? `Won the ${liveMatch.round} at ${tournament.name} and took the title.`
+        ? isAttachedQualifying(tournament) ? `Qualified for ${tournament.name.replace(/\s+Qualifying.*$/i, "")}. Your main-draw place is secured.` : `Won the ${liveMatch.round} at ${tournament.name} and took the title.`
         : `Lost in the ${liveMatch.round} at ${tournament.name}.`,
     `${tournament.name} ${liveMatch.round}`,
   );
@@ -16205,8 +16223,9 @@ export function finalizeLiveMatch(
   const rankingMovement =
     previousRank && currentRank ? previousRank - currentRank : 0;
   const eventFinance = eventFinancialReport(completedMatchState, tournament);
+  const qualification = qualificationReport(completedMatchState, tournament);
   const nextTournament = getNextEligibleTournament(completedMatchState);
-  const finish = playerWonTournament ? "Winner" : groupMatch ? `Eliminated in ${liveMatch.round}` : `Lost in ${liveMatch.round}`;
+  const finish = qualification ? `Qualified for ${qualification.mainEventName}` : playerWonTournament ? "Winner" : groupMatch ? `Eliminated in ${liveMatch.round}` : `Lost in ${liveMatch.round}`;
   const rankingSummary = currentRank
     ? `${nextState.player.rankingLabel} #${currentRank}${rankingMovement === 0 ? " (no change)" : ` (${rankingMovement > 0 ? "up" : "down"} ${Math.abs(rankingMovement)})`}`
     : `${nextState.player.rankingLabel} unchanged`;
@@ -16229,7 +16248,8 @@ export function finalizeLiveMatch(
             sender: "Tournament Office",
             subject: `Post-event report: ${tournament.name}`,
             eventFinance,
-            preview: `${finish} after a ${latestMatch.playerFrames}-${latestMatch.opponentFrames} result. Review the performance, ranking and financial outcome below.`,
+            qualificationReport: qualification,
+            preview: `${finish} after a ${latestMatch.playerFrames}-${latestMatch.opponentFrames} result. ${qualification ? qualification.explanation : "Review the performance, ranking and financial outcome below."}`,
             priority: won ? "High" : "Medium",
             actionLabel: "View Completed Draw",
             actionRoute: `/tournaments/draw?tournament=${encodeURIComponent(tournament.id)}`,
@@ -16285,8 +16305,9 @@ function recalculateState(
   state: GameState,
   lastAction = state.lastAction,
 ): GameState {
-  state = enrichTournamentMessages(recordAttributeHistory(state));
+  state = reconcileFirstWeekGuide(enrichTournamentMessages(recordAttributeHistory(state)));
   state = rebuildRollingRankings(initializeRollingRankings(state), state.currentDate, false);
+  state = captureVictoryMessages(capturePostEventRankings(state));
   const coachContracts = normalizeCoachContracts(
     state.coachContracts,
     state.coaches,
@@ -16722,6 +16743,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
     lastAction: `Created a new ${selectedBackground.name} career for ${careerConfig.fullName}.`,
   };
 
+  baseState.firstWeekGuide = freshGuide(baseState);
   baseState.attributeHistory = initialAttributeHistory(baseState);
   baseState.trainingPlan = buildAutoTrainingPlanFromState(baseState);
 
@@ -16731,10 +16753,10 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
   );
 }
 
-function loadStoredState(): GameState {
+function loadStoredState(input?: string): GameState {
   if (typeof window === "undefined") return createStarterState();
 
-  const saved = window.localStorage.getItem(STORAGE_KEY);
+  const saved = input ?? window.localStorage.getItem(STORAGE_KEY);
   if (!saved) return createStarterState();
 
   try {
@@ -16756,6 +16778,7 @@ function loadStoredState(): GameState {
       ...fallbackState,
       ...parsed,
       rollingRankings: parsed.rollingRankings,
+      payoutRepair: parsed.payoutRepair,
       sponsorMarket: parsed.sponsorMarket,
       careerDepth: parsed.careerDepth,
       realism: parsed.realism,
@@ -16941,7 +16964,8 @@ function loadStoredState(): GameState {
 
     const repairedState = repairGameState(hydratedState);
     return recalculateState(repairedState, repairedState.lastAction);
-  } catch {
+  } catch (error) {
+    if (input !== undefined) throw error;
     return createStarterState();
   }
 }
@@ -16986,7 +17010,7 @@ export function simulateTournamentMatchState(
     previousState.equipment,
   );
   if (equipmentMessage) return finalizeState(previousState, equipmentMessage);
-  return runMatchSimulation(previousState, tournament);
+  return runMatchSimulation(prepareBetweenMatchesState(previousState, 'rest', tournament.id), tournament);
 }
 
 export function hireCoachState(
@@ -18050,6 +18074,13 @@ export function scheduleTreatmentState(
   optionId?: string,
 ) {
   const treatmentChoice = getTreatmentEffect(optionId);
+  if (!needsHealthRecovery(previousState)) {
+    return { ...previousState, lastAction: 'No treatment needed: no active injury, fatigue, strain or burnout. No money spent.' };
+  }
+  if (previousState.liveMatch?.status === 'In Progress') {
+    return { ...previousState, lastAction: 'Finish your current match before applying treatment. Use interval recovery during play.' };
+  }
+  const outcome = treatmentPreview(previousState, optionId).map(row => `${row.label} ${Number(row.before.toFixed(2))}${row.unit} → ${Number(row.after.toFixed(2))}${row.unit}`).join(' · ');
 
   if (previousState.player.cash < treatmentChoice.cost) {
     return finalizeState(
@@ -18101,24 +18132,20 @@ export function scheduleTreatmentState(
                 ),
               }
             : null,
-        history: previousIssue
-          ? [
+        history: [
               {
-                id: `${previousIssue.id}-${Date.now()}`,
+                id: `treatment-${previousIssue?.id ?? "recovery"}-${Date.now()}`,
                 date: previousState.currentDate,
-                issue: previousIssue.issue,
-                severity: previousIssue.severity,
+                issue: previousIssue?.issue ?? "Recovery support",
+                severity: previousIssue?.severity ?? "Minor",
                 treatment: treatmentChoice.title,
                 timeOut: issueResolved
                   ? "Cleared"
                   : `${remainingIssueWeeks} week${remainingIssueWeeks === 1 ? "" : "s"} remaining`,
-                notes: issueResolved
-                  ? "Cleared to return."
-                  : "Recovery accelerated.",
+                notes: outcome + (issueResolved ? " · Cleared to return." : ""),
               },
               ...previousState.health.history,
-            ].slice(0, 24)
-          : previousState.health.history,
+            ].slice(0, 24),
       },
       finance:
         treatmentChoice.cost > 0
@@ -18130,7 +18157,7 @@ export function scheduleTreatmentState(
                   date: previousState.currentDate,
                   description: treatmentChoice.title,
                   category: "Health",
-                  amount: -treatmentChoice.cost,
+                  amount: treatmentChoice.cost,
                   type: "Expense" as const,
                 },
                 ...previousState.finance.ledger,
@@ -18151,8 +18178,8 @@ export function scheduleTreatmentState(
         createInboxMessage(
           {
             sender: "Medical Team",
-            subject: `${treatmentChoice.title} scheduled`,
-            preview: `Recovery work has been booked. Fatigue and shoulder condition improved slightly.`,
+            subject: `${treatmentChoice.title} applied`,
+            preview: `${outcome}. Cost £${treatmentChoice.cost}. Recovery effects applied immediately; the calendar date is unchanged.`,
             priority: "Medium",
             actionLabel: "Open Health Centre",
             actionRoute: "/health",
@@ -18162,8 +18189,8 @@ export function scheduleTreatmentState(
         ...previousState.inbox,
       ].slice(0, 18),
     },
-    `Scheduled ${treatmentChoice.title.toLowerCase()}.`,
-    "Treatment Scheduled",
+    `Applied ${treatmentChoice.title.toLowerCase()}: ${outcome}. Cost £${treatmentChoice.cost}.`,
+    "Treatment Applied",
   );
 }
 
@@ -18284,6 +18311,9 @@ function persistCareerSlot(
 }
 
 export function useGameState() {
+  const [saveWarning, setSaveWarning] = useState('');
+  const saveRevision = useRef(0);
+  const lastAutosaveSnapshot = useRef<{slotId: string | null; serialized: string} | null>(null);
   const [gameState, setGameState] = useState<GameState>(() =>
     loadStoredState(),
   );
@@ -18309,13 +18339,60 @@ export function useGameState() {
 
   useEffect(() => {
     if (typeof window === "undefined" || careerSessionMode !== "active") return;
+    const reportSaveWarning = (message: string) => queueMicrotask(() => setSaveWarning(message));
+    const revision = ++saveRevision.current;
     const serialized = encodeCareerSave(gameState);
-    writeCareerStorage(STORAGE_KEY, serialized);
-    if (activeSaveSlotId) persistCareerSlot(gameState, { id: activeSaveSlotId, serialized });
+    const publish = () => {
+      writeCareerStorage(STORAGE_KEY, serialized);
+      if (activeSaveSlotId) persistCareerSlot(gameState, { id: activeSaveSlotId, serialized });
+    };
+    const previous = window.localStorage.getItem(STORAGE_KEY);
+    const rendered = lastAutosaveSnapshot.current?.slotId === activeSaveSlotId ? lastAutosaveSnapshot.current.serialized : null;
+    lastAutosaveSnapshot.current = { slotId: activeSaveSlotId, serialized };
+    const rolloverPayloads = [...new Set([previous, rendered].filter((payload): payload is string => {
+      if (!payload) return false;
+      try {
+        const old = readRecoveryState(payload);
+        return old.player.id === gameState.player.id && (old.season !== gameState.season || Boolean(old.seasonReview?.pending && !gameState.seasonReview?.pending));
+      } catch { return false; }
+    }))];
+    const prizeCorrection = Boolean(previous && gameState.payoutRepair?.version === 1 && (() => {
+      try { const old=readRecoveryState(previous); return old.player.id===gameState.player.id && !old.payoutRepair && Boolean(gameState.payoutRepair.events || gameState.payoutRepair.adjustments.length); } catch { return false; }
+    })());
+    if (typeof indexedDB === 'undefined') {
+      if(prizeCorrection) {reportSaveWarning('Prize correction is not saved: backup storage is unavailable. Your original save is preserved. Enable browser storage and reload to retry.');return;}
+      try { publish(); reportSaveWarning('Automatic backups unavailable. Export a portable backup in Save Manager.'); }
+      catch (error) { reportSaveWarning(error instanceof Error ? error.message : 'Autosave failed.'); }
+      return;
+    }
+    const rollover = rolloverPayloads.length > 0 || prizeCorrection;
+    const careerId = activeSaveSlotId ?? gameState.player.id;
+    if (!rollover) {
+      try { publish(); }
+      catch (error) { reportSaveWarning(error instanceof Error ? error.message : 'Autosave failed.'); return; }
+    }
+    void queueProtectedSave(async () => {
+      if (readActiveSaveSlotId() !== activeSaveSlotId) return;
+      // Commit the recovery transaction before the old season is overwritten.
+      if (rollover) {
+        for (const payload of rolloverPayloads) await storeRecoverySave(careerId, payload, 'Before season rollover');
+        if (prizeCorrection && previous) await storeRecoverySave(careerId, previous, 'Before prize correction');
+        if (readActiveSaveSlotId() !== activeSaveSlotId || saveRevision.current !== revision) return;
+        publish();
+      }
+      await storeRecoverySave(careerId, serialized, 'Automatic');
+      if (readActiveSaveSlotId() === activeSaveSlotId) reportSaveWarning('');
+    }).catch(error => reportSaveWarning((rollover ? 'Check Save Manager before closing: recovery backup or autosave failed. ' : '') + (error instanceof Error ? error.message : 'Automatic backup failed. Export a portable backup.')));
   }, [activeSaveSlotId, careerSessionMode, gameState]);
 
   const actions = useMemo(
     () => ({
+      updateFirstWeekGuide(action:'dismiss'|'resume'|'skip'|'equipment',step?:GuideStep) {
+        setGameState(previous=>{
+          const guide=previous.firstWeekGuide??freshGuide(previous);
+          return reconcileFirstWeekGuide({...previous,firstWeekGuide:{...guide,dismissed:action==='dismiss'?true:action==='resume'?false:guide.dismissed,skipped:action==='resume'?[]:action==='skip'&&step?[...new Set([...guide.skipped,step])]:guide.skipped,equipmentReviewed:action==='equipment'&&getMissingTournamentEquipment(previous.equipment).length===0||guide.equipmentReviewed}});
+        });
+      },
       actOnRealism(action: RealismAction) {
         setGameState(previous => {
           const next = realismAction(previous, action);
@@ -18406,6 +18483,26 @@ export function useGameState() {
           null,
           2,
         );
+      },
+      async restoreRecoverySave(id: string) {
+        try {
+          await queueProtectedSave(async () => undefined);
+          const record = (await listRecoverySaves()).find(item => item.id === id);
+          if (!record) throw new Error('That backup is no longer available. Refresh the list.');
+          const restored = loadStoredState(validatedRecoveryPayload(record));
+          if (careerSessionMode === 'active') {
+            await storeRecoverySave(activeSaveSlotId ?? gameState.player.id, encodeCareerSave(gameState), 'Before restore');
+          }
+          const slot: SaveSlotSummary = { id: createSaveSlotId(), name: getUniqueSaveSlotName(record.player + ' · Recovered'), playerName: restored.player.fullName, season: restored.season, date: restored.currentDate, updatedAt: new Date().toISOString() };
+          const payload = encodeCareerSave(restored);
+          writeCareerStorageBatch([
+            [SAVE_SLOT_PREFIX + slot.id, payload],
+            [SAVE_SLOT_INDEX_KEY, JSON.stringify([slot, ...readSaveSlotIndex()])],
+            [STORAGE_KEY, payload], [ACTIVE_SAVE_SLOT_KEY, slot.id],
+          ]);
+          setActiveSaveSlotId(slot.id); setGameState(restored); setCareerSessionMode('active'); setHasActiveCareer(true); setSaveWarning('');
+          return { success: true, message: 'Backup restored as a new career copy. Your previous named save is retained.' };
+        } catch (error) { return { success: false, message: error instanceof Error ? error.message : 'Could not restore this backup.' }; }
       },
       recoverAttributeHistory(serializedState: string) {
         try {
@@ -18872,6 +18969,9 @@ export function useGameState() {
             supportIds,
           ),
         );
+      },
+      prepareBetweenMatches(choice: BetweenMatchChoice, tournamentId?: string) {
+        setGameState(previousState => prepareBetweenMatchesState(previousState, choice, tournamentId));
       },
       simulateMatch(tournamentId?: string) {
         setGameState((previousState) =>
@@ -19778,7 +19878,7 @@ export function useGameState() {
         });
       },
     }),
-    [activeSaveSlotId, gameState],
+    [activeSaveSlotId, careerSessionMode, gameState],
   );
 
   return useMemo(
@@ -19787,8 +19887,9 @@ export function useGameState() {
       careerSessionMode,
       hasActiveCareer,
       activeSaveSlotId,
+      saveWarning,
       ...actions,
     }),
-    [actions, activeSaveSlotId, careerSessionMode, gameState, hasActiveCareer],
+    [actions, activeSaveSlotId, careerSessionMode, gameState, hasActiveCareer, saveWarning],
   );
 }

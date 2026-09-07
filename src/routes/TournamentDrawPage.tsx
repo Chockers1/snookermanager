@@ -1,6 +1,6 @@
 import { GroupFixtures } from '../components/tournaments/GroupFixtures';
 import { isGroupDraw } from '../game/championshipLeague';
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Download, Route, Trophy } from "lucide-react";
 import { TournamentBracket } from "../components/tournaments/TournamentBracket";
@@ -38,6 +38,8 @@ export function TournamentDrawPage() {
   const [searchParams] = useSearchParams();
   const { gameState } = useGame();
   const [compactView, setCompactView] = useState(false);
+  const [roundSelection, setRoundSelection] = useState<{ label: string } | null>(null);
+  const drawRef = useRef<HTMLDivElement>(null);
   const tournamentId = searchParams.get("tournament");
   const drawData = buildTournamentDrawData(gameState, tournamentId);
   const groupCompetition = isGroupDraw(drawData.bracket);
@@ -47,6 +49,15 @@ export function TournamentDrawPage() {
         matches: round.matches.slice(0, 2),
       }))
     : drawData.bracket;
+
+  useEffect(() => {
+    if (!roundSelection || !drawRef.current) return;
+    const target = groupCompetition
+      ? drawRef.current.querySelector<HTMLSelectElement>('select[aria-label="Group stage"]')
+      : [...drawRef.current.querySelectorAll<HTMLElement>('[data-round-label]')].find(el => el.dataset.roundLabel === roundSelection.label);
+    target?.scrollIntoView({ block: 'start', inline: 'center', behavior: 'auto' });
+    target?.focus({ preventScroll: true });
+  }, [roundSelection, groupCompetition]);
 
   if (!drawData.tournamentId) return (
     <section className="rounded-xl border border-border bg-surface p-6">
@@ -175,8 +186,8 @@ export function TournamentDrawPage() {
                 {drawData.currentPosition.currentRound}
               </span>
             </div>
-            <div className="card-body min-h-[32rem] overflow-hidden">
-              <>{groupCompetition ? <GroupFixtures rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={drawData.currentPosition.currentRound} /> : <TournamentBracket
+            <div ref={drawRef} className="card-body min-h-[32rem] overflow-hidden">
+              <>{groupCompetition ? <GroupFixtures rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={drawData.currentPosition.currentRound} selectedStage={roundSelection?.label} onStageChange={label => setRoundSelection({ label })} /> : <TournamentBracket
                 rounds={visibleBracket}
                 playerName={gameState.player.fullName}
                 currentRound={drawData.currentPosition.currentRound}
@@ -191,16 +202,20 @@ export function TournamentDrawPage() {
                 Route Progress
               </h3>
             </div>
-            <div className="card-body flex gap-2 overflow-x-auto">
+            <nav aria-label="Route Progress" className="card-body flex gap-2 overflow-x-auto">
               {drawData.progress.map((step) => (
-                <div
+                <button
+                  type="button"
                   key={step.label}
-                  className={`min-w-28 flex-1 rounded-lg border px-3 py-3 text-center text-[10px] font-semibold uppercase ${progressClass(step.status)}`}
+                  onClick={() => setRoundSelection({ label: step.label })}
+                  aria-current={roundSelection?.label === step.label ? 'location' : undefined}
+                  aria-label={`View ${step.label}`}
+                  className={`min-w-28 cursor-pointer hover:brightness-125 flex-1 rounded-lg border px-3 py-3 text-center text-[10px] font-semibold uppercase ${progressClass(step.status)}`}
                 >
                   {step.label}
-                </div>
+                </button>
               ))}
-            </div>
+            </nav>
           </div>
         </div>
 

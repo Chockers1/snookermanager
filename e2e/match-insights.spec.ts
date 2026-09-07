@@ -18,8 +18,8 @@ test('pre-match goals and coach approach carry into play and survive reload',asy
   const {state}=ready();state.player.fatigue=70;
   await page.setViewportSize({width:1280,height:720});
   await open(page,state,'/match/preview');
-  await expect(page.getByRole('region',{name:'Personal match objectives'})).toBeVisible();
-  await page.locator('summary').filter({hasText:'Tactical & scheduling advice'}).click();
+  await expect(page.getByRole('group',{name:'Personal match objectives'})).toBeVisible();
+  await page.locator('summary').filter({hasText:'Tactics & schedule'}).click();
   await expect(page.getByText('Suggested approach: Safety')).toBeVisible();
   await page.getByRole('button',{name:'Use coach’s approach'}).click();
   await page.getByRole('button',{name:'Start Match',exact:true}).click();
@@ -39,4 +39,36 @@ test('post-match evidence and completed goals open a real training project on a 
   expect((await readCareerSave(page)).careerDepth?.project?.status).toBe('active');
   await expect(review.getByRole('button',{name:'Development project already active'})).toBeDisabled();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth+1)).toBe(true);
+});
+
+for (const width of [390, 1280]) test('live condition values follow interval recovery and frame play at ' + width, async ({ page }) => {
+  const initial = ready();
+  const state = startLiveMatchState(initial.state, initial.event.id);
+  state.liveMatch = { ...state.liveMatch!, bestOf: 11, framesNeeded: 6, currentFrame: 5,
+    playerFrames: 1, opponentFrames: 3, playerPoints: 0, opponentPoints: 0, currentBreak: 0,
+    playerConfidence: 87.12, playerFatigue: 56.78, opponentConfidence: 72.34, opponentFatigue: 48.56, pressureValue: 35.34,
+    sessions: { frames: [11], overnightAfter: [], completedBreaks: [] } };
+  await page.setViewportSize({ width, height: 900 });
+  await open(page, state, '/match/live');
+  await page.getByRole('button', { name: /Mental reset/ }).click();
+  const condition = page.getByLabel('Live player condition', { exact: true });
+  await expect(condition).toContainText('89.12%');
+  await expect(condition).toContainText('54.78%');
+  await expect(condition).toContainText('32.34%');
+  expect(await condition.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  const opponentCondition = page.getByLabel('Live opponent condition', { exact: true });
+  await expect(opponentCondition).toContainText('72.34%');
+  await expect(opponentCondition).toContainText('46.56%');
+  await expect(opponentCondition).toContainText('32.34%');
+  expect(await opponentCondition.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  await page.getByRole('button', { name: /Sim Frame/ }).click();
+  await expect.poll(async () => (await readCareerSave(page)).liveMatch?.currentFrame).toBe(6);
+  const live = (await readCareerSave(page)).liveMatch!;
+  for (const [label, value] of [['Confidence', live.playerConfidence], ['Fatigue', live.playerFatigue], ['Match pressure', live.pressureValue]] as const) {
+    await expect(condition.locator('div').filter({ has: page.locator('dt', { hasText: label }) })).toContainText(value.toFixed(2) + '%');
+  }
+  for (const [label, value] of [['Confidence', live.opponentConfidence], ['Fatigue', live.opponentFatigue], ['Match pressure', live.pressureValue]] as const) {
+    await expect(opponentCondition.locator('div').filter({ has: page.locator('dt', { hasText: label }) })).toContainText(value.toFixed(2) + '%');
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 });

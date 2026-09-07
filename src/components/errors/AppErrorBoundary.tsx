@@ -1,3 +1,4 @@
+import { downloadBugReport, recordDiagnosticError } from '../../game/bugReport';
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 
 type AppErrorBoundaryProps = {
@@ -16,6 +17,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    recordDiagnosticError(error);
     console.error('The game interface could not render.', error, info.componentStack)
   }
 
@@ -28,6 +30,7 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-400">Interface recovery</p>
           <h1 className="mt-3 text-2xl font-bold text-white">The table view failed to load</h1>
           <p className="mt-3 text-sm leading-relaxed text-scm-textSoft">Your career remains saved in this browser. Reload the interface to return to the latest saved state.</p>
+          <button type="button" className="btn-secondary mt-4" onClick={() => downloadBugReport(null, this.state.error?.message ?? 'Interface error', window.location.pathname)}>Download bug report</button>
           <button type="button" className="btn-primary mt-6" onClick={() => window.location.reload()}>Reload Game</button>
         </section>
       </main>

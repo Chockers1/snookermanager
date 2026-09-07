@@ -133,3 +133,37 @@ canvas {
 ::-webkit-scrollbar-track {
   background: #07111f;
 }
+
+/* User-selected reading preferences apply to rem and compact pixel labels. */
+:root { --text-scale: 1; font-size: calc(16px * var(--text-scale)); }
+:root:not([data-text-scale="100"]) [class~="text-[6px]"] { font-size: calc(6px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[7px]"] { font-size: calc(7px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[8px]"] { font-size: calc(8px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[9px]"] { font-size: calc(9px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[10px]"] { font-size: calc(10px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[11px]"] { font-size: calc(11px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[12px]"] { font-size: calc(12px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[13px]"] { font-size: calc(13px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[14px]"] { font-size: calc(14px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[15px]"] { font-size: calc(15px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[16px]"] { font-size: calc(16px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[17px]"] { font-size: calc(17px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[18px]"] { font-size: calc(18px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[19px]"] { font-size: calc(19px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[20px]"] { font-size: calc(20px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[21px]"] { font-size: calc(21px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[22px]"] { font-size: calc(22px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[23px]"] { font-size: calc(23px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[24px]"] { font-size: calc(24px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[25px]"] { font-size: calc(25px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[26px]"] { font-size: calc(26px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[27px]"] { font-size: calc(27px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[28px]"] { font-size: calc(28px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[29px]"] { font-size: calc(29px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[30px]"] { font-size: calc(30px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[31px]"] { font-size: calc(31px * var(--text-scale)); line-height: 1.4; }
+:root:not([data-text-scale="100"]) [class~="text-[32px]"] { font-size: calc(32px * var(--text-scale)); line-height: 1.4; }
+:root[data-high-contrast="true"] [class*="text-gray-4"], :root[data-high-contrast="true"] [class*="text-gray-5"], :root[data-high-contrast="true"] [class*="text-gray-6"] { color: #cbd5e1; }
+:root[data-high-contrast="true"] .card { border-color: #718096; }
+:root[data-reduced-motion="true"] *, :root[data-reduced-motion="true"] *::before, :root[data-reduced-motion="true"] *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

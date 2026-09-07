@@ -42,8 +42,10 @@ test('a drawn match is shown as one point and the full draw offers every stage',
   await expect(page.getByRole('region',{name:'Group standings and fixtures'})).toContainText('1 point from 1 of 3 matches');
   await page.screenshot({path:'test-results/championship-group-mobile.png',fullPage:true});
   await page.evaluate(()=>{history.pushState({},'','/tournaments/draw');dispatchEvent(new PopStateEvent('popstate'));});
+  await expect(page.getByRole('button',{name:'Full Draw',exact:true})).toBeVisible();
   await page.getByLabel('Group stage').selectOption('Stage Two Groups');
-  await expect(page.getByText('Groups are drawn when the previous stage finishes.')).toBeVisible();
+  await expect(page.getByLabel('Group stage')).toHaveValue('Stage Two Groups');
+  await expect(page.getByText('Fixtures are drawn when the previous stage finishes.')).toBeVisible();
 });
 test('an existing unplayed knockout-shaped group draw upgrades on load',async({page})=>{
   const state=fixture();state.liveMatch=null;

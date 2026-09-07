@@ -45,7 +45,7 @@ export function LegacyRecords({ stats }: { stats: CareerLegacy }) {
       </div>
     </section>
 
-    <section className="card overflow-hidden" aria-labelledby="trophy-cabinet-heading">
+    <section id="trophy-cabinet" className="card scroll-mt-4 overflow-hidden" aria-labelledby="trophy-cabinet-heading">
       <div className="card-header flex-wrap gap-3"><div><h2 id="trophy-cabinet-heading" className="flex items-center gap-2 text-base font-semibold text-white"><Trophy className="h-5 w-5 text-amber-400" /> Trophy Cabinet <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-xs text-amber-300">{stats.trophies.length}</span></h2><p className="mt-1 text-xs text-gray-400">Every recorded title, from your first local win to the biggest stage.</p></div>
         {categories.length > 0 && <select aria-label="Trophy category" value={category} onChange={e => { setCategory(e.target.value); setVisible(12); }} className="max-w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-gray-200"><option>All titles</option>{categories.map(c => <option key={c}>{c}</option>)}</select>}
       </div>

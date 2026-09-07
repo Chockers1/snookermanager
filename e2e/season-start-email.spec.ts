@@ -10,7 +10,7 @@ function fixture(){
   const masters=state.tournaments.find(t=>t.name==='Masters');
   if(masters)masters.entryDeadline='2027-06-29';
   const world=state.tournaments.find(t=>t.name==='World Championship')!;
-  state.history.tournamentHistory=[{id:'previous-world',season:'2026/27',tournamentId:world.id,tournamentName:world.name,eventType:world.type,stageId:null,tourCircuit:'Main Tour',location:world.location,startDate:'2027-04-17',endDate:'2027-05-03',status:'Completed',result:'Lost in Last 32',rounds:['Last 32'],matchesPlayed:1,wins:0,losses:1,prizeMoney:0,rankingPoints:0,highestBreak:95,centuries:0,fatigueChange:0,entryFee:0,bookedTravelCost:855}];
+  state.history.tournamentHistory=[{id:'previous-world',season:'2026/27',tournamentId:world.id,tournamentName:world.name,eventType:world.type,stageId:null,tourCircuit:'Main Tour',location:world.location,startDate:'2027-04-17',endDate:'2027-05-03',status:'Completed',result:'Lost in Last 32',rounds:['Last 32'],matchesPlayed:1,wins:0,losses:1,prizeMoney:20000,rankingPoints:0,highestBreak:95,centuries:0,fatigueChange:0,entryFee:0,bookedTravelCost:855}];
   state.inbox=[{id:'legacy-season-start',sender:'Career Manager',subject:'2027/28 season started',preview:'The new July-to-June calendar is active. Shanghai Masters is your first eligible event.',date:'Today',priority:'High',read:true,actionLabel:'Open Dashboard',actionRoute:'/'}];
   return state;
 }
@@ -19,6 +19,7 @@ for(const viewport of [{width:1280,height:720},{width:390,height:844},{width:320
   await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(fixture())});
   await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
   await page.evaluate(()=>{history.pushState({},'','/inbox');dispatchEvent(new PopStateEvent('popstate'))});
+  await page.getByRole('button',{name:/^2027\/28 season started/}).click();
   const report=page.getByRole('region',{name:'New season briefing'}),body=page.getByTestId('inbox-message-body'),actions=page.getByTestId('inbox-message-actions');
   await expect(report).toBeVisible();
   for(const text of ['Current season briefing','£188,275','Key tournaments','World Championship','Lost in Last 32','No recorded appearance','Entry closed on 2027-06-29'])await expect(report).toContainText(text);

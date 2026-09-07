@@ -1,0 +1,33 @@
+import { betweenMatchEffects, betweenMatchInfo } from '../src/game/betweenMatches';
+import { test, expect } from '@playwright/test';
+import { betweenMatchFixture } from '../test-support/betweenMatchFixture';
+import { ACTIVE_SAVE_KEY, encodeCareerSave } from '../src/game/saveStorage';
+
+for (const width of [390, 1440]) test('between-match preparation is clear and persists at ' + width, async ({ page }) => {
+  const { state } = betweenMatchFixture();
+  state.player.confidence = 88.5;
+  state.player.fatigue = 36;
+  const expected = betweenMatchEffects(state, betweenMatchInfo(state)!.days, 'review');
+  await page.setViewportSize({ width, height: 960 });
+  await page.addInitScript(({ key, value }) => { if (!localStorage.getItem(key)) localStorage.setItem(key, value); }, { key: ACTIVE_SAVE_KEY, value: encodeCareerSave(state) });
+  await page.goto('/');
+  await page.getByRole('button', { name: /Continue Career/ }).click();
+  const navigate = async (path: string) => page.evaluate(path => { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate')); }, path);
+  await navigate('/match/result');
+  const panel = page.getByRole('region', { name: 'Between-match preparation' });
+  await expect(panel).toContainText('between matches');
+  await expect(panel).toContainText('Next opponent:');
+  await expect(panel.getByRole('button', { name: /Light table practice/ })).toContainText('Confidence 88.50% → 89.00% (+0.50 pts)');
+  await expect(panel.getByRole('button', { name: /Tactical review/ })).toContainText('Confidence 88.50% → 89.50% (+1.00 pts)');
+  await expect(panel.getByRole('button', { name: /Rest & recover/ })).toContainText('Confidence 88.50% → 88.50% (unchanged)');
+  await panel.getByRole('button', { name: /Tactical review/ }).click();
+  await panel.getByRole('button', { name: 'Apply match preparation' }).click();
+  await expect(panel.getByRole('status')).toContainText('Tactical review completed');
+  await expect(panel.getByRole('status')).toContainText(`Confidence 88.50% → ${expected.confidence.toFixed(2)}%`);
+  await expect(panel.getByRole('button', { name: 'Apply match preparation' })).toHaveCount(0);
+  expect(await panel.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  await navigate('/tournaments/hub');
+  await expect(panel.getByRole('status')).toContainText('Tactical review completed');
+  await navigate('/match/preview');
+  await expect(panel).toHaveCount(0);
+});

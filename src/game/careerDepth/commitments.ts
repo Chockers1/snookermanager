@@ -11,8 +11,11 @@ export const COMMITMENTS: Record<CommitmentKind, { name: string; days: number; c
   appearance: { name: 'Sponsor appearance', days: 1, cost: 0, income: 150, fatigue: 3, sharpness: 0 },
   recovery: { name: 'Protected recovery', days: 2, cost: 0, income: 0, fatigue: -8, sharpness: 0 },
 };
+export function conflictingTournamentCommitment(state: GameState, tournament: Tournament) {
+  return depthOf(state).commitments.find(c => c.status === 'scheduled' && overlaps(plusDays(tournament.startDate, -1), tournament.endDate ?? tournament.startDate, c.startDate, c.endDate));
+}
 export function tournamentCommitmentConflict(state: GameState, tournament: Tournament): string | null {
-  const conflict = depthOf(state).commitments.find(c => c.status === 'scheduled' && overlaps(plusDays(tournament.startDate, -1), tournament.endDate ?? tournament.startDate, c.startDate, c.endDate));
+  const conflict = conflictingTournamentCommitment(state, tournament);
   if (!conflict) {
     const block = depthOf(state).board?.blocks.find(b => overlaps(plusDays(tournament.startDate,-1),tournament.endDate ?? tournament.startDate,b.start,b.end));
     return block ? 'Conflicts with a protected '+block.kind+' week ('+block.start+'–'+block.end+'). Remove the block in the season planning board to enter.' : null;

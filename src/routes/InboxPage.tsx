@@ -1,3 +1,6 @@
+import { captureVictoryMessages, victoryMessageTitle, victoryMessagePreview } from '../game/victoryInbox';
+import { qualificationReportForMessage } from '../game/qualificationReport';
+import { formatInboxConfidence } from '../utils/inboxFormatting';
 import { SeasonTourChangesReport } from '../components/game/SeasonTourChangesReport';
 import { TournamentHistoryBriefing } from '../components/game/TournamentHistoryBriefing';
 import { seasonStartReportForMessage } from '../game/seasonStartReport';
@@ -79,13 +82,13 @@ function getMessageSummary(message: InboxMessage | null) {
 
 function isStaffMessage(message: InboxMessage) {
   return /coach|staff|medical|psychologist/i.test(
-    `${message.sender} ${message.subject}`,
+    `${message.sender} ${victoryMessageTitle(message)}`,
   );
 }
 
 function isEventMessage(message: InboxMessage) {
   return /tournament|event|tour|travel|league|championship|open/i.test(
-    `${message.sender} ${message.subject} ${message.preview}`,
+    `${message.sender} ${victoryMessageTitle(message)} ${victoryMessagePreview(message)}`,
   );
 }
 
@@ -106,7 +109,7 @@ export function InboxPage() {
 
   const filteredInbox = useMemo(
     () =>
-      gameState.inbox.filter((message) => {
+      captureVictoryMessages(gameState).inbox.map(formatInboxConfidence).filter((message) => {
         if (showActionableOnly && !message.actionRoute) return false;
         if (categoryFilter === "Unread") return !message.read;
         if (categoryFilter === "High Priority")
@@ -115,7 +118,7 @@ export function InboxPage() {
         if (categoryFilter === "Events") return isEventMessage(message);
         return true;
       }),
-    [categoryFilter, gameState.inbox, showActionableOnly],
+    [categoryFilter, gameState, showActionableOnly],
   );
 
   const selectedMessage =
@@ -124,13 +127,14 @@ export function InboxPage() {
     null;
   const selectedSummary = getMessageSummary(selectedMessage);
   const eventFinance = financialReportForMessage(gameState, selectedMessage);
+  const qualification = qualificationReportForMessage(gameState, selectedMessage, eventFinance ? { id: eventFinance.tournamentId, name: eventFinance.name, startDate: eventFinance.startDate } : undefined);
   const seasonReport = seasonReportForMessage(gameState, selectedMessage);
   const seasonStartReport = seasonStartReportForMessage(gameState, selectedMessage, getTournamentEntryAccess);
   const tourChangesReport = selectedMessage?.tourChangesReport;
   const wideReport = Boolean(seasonStartReport);
   const compactReport = Boolean(eventFinance || seasonReport || wideReport);
   const selectedText = selectedMessage
-    ? `${selectedMessage.subject} ${selectedMessage.preview}`.toLowerCase()
+    ? `${victoryMessageTitle(selectedMessage)} ${selectedMessage.preview}`.toLowerCase()
     : "";
   const relatedTournament = seasonReport || wideReport || tourChangesReport ? undefined : eventFinance ? gameState.tournaments.find(t=>t.id===eventFinance.tournamentId && t.startDate===eventFinance.startDate) : selectedMessage?.tournamentReference ? gameState.tournaments.find(t=>t.id===selectedMessage.tournamentReference!.id && t.startDate===selectedMessage.tournamentReference!.startDate) : gameState.tournaments.slice().sort((a,b)=>b.name.length-a.name.length).find((tournament) =>
     selectedText.includes(tournament.name.toLowerCase()),
@@ -253,15 +257,15 @@ export function InboxPage() {
                   key={message.id}
                   type="button"
                   onClick={() => openMessage(message)}
-                  className={`flex min-h-[88px] w-full items-start gap-3 border-l-2 p-3 text-left transition-colors ${selectedMessage?.id === message.id ? "border-l-green-400 bg-green-600/10" : "border-l-transparent hover:bg-surface-light/50"} ${message.read ? "opacity-60" : ""}`}
+                  className={`flex min-h-[88px] w-full items-start gap-3 border-l-2 p-3 text-left transition-colors ${selectedMessage?.id === message.id ? "border-l-green-400 bg-green-600/10" : "border-l-transparent hover:bg-surface-light/50"} ${message.victoryReport ? "bg-amber-500/5" : ""} ${message.read ? "opacity-60" : ""}`}
                 >
-                  <span
+                  {message.victoryReport ? <Trophy aria-label="Tournament victory" className="mt-1 h-4 w-4 shrink-0 text-amber-300"/> : <span
                     className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${message.read ? "bg-transparent" : "bg-green-400"}`}
-                  />
+                  />}
                   <span className="min-w-0 flex-1">
                     <span className="flex items-start justify-between gap-2">
                       <span className="min-w-0 truncate text-sm font-medium text-white">
-                        {message.subject}
+                        {victoryMessageTitle(message)}
                       </span>
                       <span
                         className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] ${priorityClass(message.priority)}`}
@@ -270,7 +274,7 @@ export function InboxPage() {
                       </span>
                     </span>
                     <span className="mt-1 block truncate text-xs text-gray-400">
-                      {message.preview}
+                      {victoryMessagePreview(message)}
                     </span>
                     <span className="mt-1.5 block text-[10px] text-gray-500">
                       {message.sender} · {message.date}
@@ -293,7 +297,7 @@ export function InboxPage() {
         </div>
 
         <article className={"flex min-h-0 min-w-0 flex-col overflow-hidden " + (compactReport ? "p-3" : "p-4 sm:p-5")}>
-          {compactReport && <label className={"mb-2 shrink-0 text-[10px] text-gray-400 " + (wideReport ? "" : "md:hidden")}>Message<select aria-label="Select inbox message" className="mt-1 w-full min-w-0 rounded border border-border bg-surface p-1.5 text-xs text-white" value={selectedMessage?.id} onChange={e=>{const message=filteredInbox.find(m=>m.id===e.target.value);if(message)openMessage(message)}}>{filteredInbox.map(m=><option key={m.id} value={m.id}>{m.subject}</option>)}</select></label>}
+          {compactReport && <label className={"mb-2 shrink-0 text-[10px] text-gray-400 " + (wideReport ? "" : "md:hidden")}>Message<select aria-label="Select inbox message" className="mt-1 w-full min-w-0 rounded border border-border bg-surface p-1.5 text-xs text-white" value={selectedMessage?.id} onChange={e=>{const message=filteredInbox.find(m=>m.id===e.target.value);if(message)openMessage(message)}}>{filteredInbox.map(m=><option key={m.id} value={m.id}>{victoryMessageTitle(m)}</option>)}</select></label>}
           {selectedMessage ? (
             <>
               <div data-testid="inbox-message-body" className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
@@ -309,7 +313,7 @@ export function InboxPage() {
                 </span>
               </div>
               <h2 className={compactReport ? "mt-1 text-base font-semibold leading-5 text-white" : "mt-2 text-xl font-semibold text-white sm:text-2xl"}>
-                {selectedMessage.subject}
+                {victoryMessageTitle(selectedMessage)}
               </h2>
               {!compactReport && <p className="mt-3 max-w-3xl text-sm leading-5 text-gray-300">
                 {gameState.realism?.digest.some(d => d.id === selectedMessage.id) ? 'Results and milestones from your simulated tour.' : selectedMessage.preview}
@@ -317,7 +321,7 @@ export function InboxPage() {
               <StoryDecisionPanel messageId={selectedMessage.id} />
               <WorldDigestPanel messageId={selectedMessage.id} />
 
-              {tourChangesReport ? <SeasonTourChangesReport report={tourChangesReport} /> : seasonStartReport ? <SeasonStartReport report={seasonStartReport} live={seasonStartReport.season === gameState.season} /> : seasonReport ? <SeasonEndReport report={seasonReport} /> : eventFinance ? <PostEventReport finance={eventFinance} summary={selectedSummary} /> : selectedSummary.length ? (
+              {tourChangesReport ? <SeasonTourChangesReport report={tourChangesReport} /> : seasonStartReport ? <SeasonStartReport report={seasonStartReport} live={seasonStartReport.season === gameState.season} /> : seasonReport ? <SeasonEndReport report={seasonReport} /> : eventFinance ? <PostEventReport finance={eventFinance} summary={selectedSummary} qualification={qualification} rankingSnapshot={selectedMessage.eventRanking} victory={selectedMessage.victoryReport} /> : selectedSummary.length ? (
                 <div className="mt-3 max-w-3xl shrink-0 rounded-lg border border-border bg-background/30">
                   <div className="border-b border-border px-4 py-2">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">

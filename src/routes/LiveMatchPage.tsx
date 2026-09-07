@@ -1,3 +1,4 @@
+import { PlayerLink } from '../components/game/PlayerLink';
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -86,12 +87,16 @@ function TacticButtonGroup<T extends string>({ label, value, options, onChange }
   )
 }
 
-function PlayerScore({ name, points, role, atTable, side }: { name: string; points: number; role: string; atTable: boolean; side: 'player' | 'opponent' }) {
+function PlayerScore({ name, points, role, atTable, side, condition }: { name: string; points: number; role: string; atTable: boolean; side: 'player' | 'opponent'; condition?: { confidence: number; fatigue: number; pressure: number } }) {
   const playerSide = side === 'player'
   return (
-    <div className={`flex min-w-0 items-center gap-3 px-4 sm:px-6 ${playerSide ? 'border-green-500/30 bg-green-500/10' : 'border-red-500/30 bg-red-500/5'} ${playerSide ? 'md:border-r' : 'md:flex-row-reverse md:border-l md:text-right'}`}>
+    <div className={`flex min-w-0 items-center gap-3 px-4 py-2 sm:px-6 ${playerSide ? 'border-green-500/30 bg-green-500/10' : 'border-red-500/30 bg-red-500/5'} ${playerSide ? 'lg:border-r' : 'lg:flex-row-reverse lg:border-l lg:text-right'}`}>
       <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-full border-2 font-bold ${playerSide ? 'border-green-500 bg-green-600/20' : 'border-red-500/60 bg-red-600/15'}`}>{getInitials(name)}</div>
-      <div className="min-w-0 flex-1"><p className={`text-[9px] font-semibold uppercase tracking-wider ${atTable ? 'text-green-400' : 'text-gray-500'}`}>{atTable ? 'At table' : 'Waiting'}</p><h2 className="truncate text-base font-bold sm:text-xl">{name}</h2><p className="truncate text-[10px] text-gray-400 sm:text-xs">{role}</p></div>
+      <div className="min-w-0 flex-1"><p className={`text-[9px] font-semibold uppercase tracking-wider ${atTable ? 'text-green-400' : 'text-gray-500'}`}>{atTable ? 'At table' : 'Waiting'}</p><h2 className="truncate text-base font-bold sm:text-xl"><PlayerLink name={name}/></h2><p className="truncate text-[10px] text-gray-400 sm:text-xs">{role}</p>
+        {condition && <dl aria-label={playerSide ? "Live player condition" : "Live opponent condition"} className="mt-1.5 grid grid-cols-3 gap-x-2 text-[10px] leading-snug">
+          {([['Confidence', condition.confidence], ['Fatigue', condition.fatigue], ['Match pressure', condition.pressure]] as const).map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-gray-400">{label}</dt><dd className="font-semibold tabular-nums text-white">{value.toFixed(2)}%</dd></div>)}
+        </dl>}
+      </div>
       <p className="shrink-0 text-5xl font-black leading-none sm:text-6xl">{points}</p>
     </div>
   )
@@ -196,10 +201,10 @@ export function LiveMatchPage() {
         <div className="hidden items-center gap-5 text-right sm:flex"><div><p className="text-[9px] uppercase text-gray-500">Frame</p><p className="font-bold">{liveMatch.currentFrame} of {liveMatch.bestOf}</p></div><div><p className="text-[9px] uppercase text-gray-500">At table</p><p className="max-w-32 truncate text-sm font-semibold text-green-300">{getShortName(liveMatch.playerAtTable)}</p></div></div>
       </header>
 
-      <section className="mx-auto mt-2 grid min-h-28 w-full max-w-[1580px] shrink-0 overflow-hidden rounded-xl border border-border bg-surface/90 md:h-32 md:grid-cols-[1fr_250px_1fr]">
-        <PlayerScore name={liveMatch.playerName} points={liveMatch.playerPoints} role={gameState.player.competitiveStatus ?? gameState.player.careerStage} atTable={atTableIsPlayer} side="player" />
-        <div className="order-first grid min-h-24 place-items-center border-b border-border bg-black/20 text-center md:order-none md:border-b-0"><div><p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-gray-500">Match Score</p><div className="mt-1 flex items-center justify-center gap-5"><b className="text-4xl text-green-400 md:text-5xl">{liveMatch.playerFrames}</b><span className="text-gray-600">—</span><b className="text-4xl text-red-300 md:text-5xl">{liveMatch.opponentFrames}</b></div><p className="text-[10px] text-gray-500">{liveMatch.bestOf === 4 ? "Up to 4 frames · 2–2 draw possible" : `First to ${liveMatch.framesNeeded}`}</p></div></div>
-        <PlayerScore name={liveMatch.opponentName} points={liveMatch.opponentPoints} role={`${liveMatch.opponentArchetype} · #${liveMatch.opponentRanking}`} atTable={!atTableIsPlayer} side="opponent" />
+      <section className="mx-auto mt-2 grid min-h-28 w-full max-w-[1580px] shrink-0 overflow-hidden rounded-xl border border-border bg-surface/90 lg:h-32 lg:grid-cols-[1fr_250px_1fr]">
+        <PlayerScore name={liveMatch.playerName} points={liveMatch.playerPoints} role={gameState.player.competitiveStatus ?? gameState.player.careerStage} atTable={atTableIsPlayer} side="player" condition={{ confidence: liveMatch.playerConfidence, fatigue: liveMatch.playerFatigue, pressure: liveMatch.pressureValue }} />
+        <div className="order-first grid min-h-24 place-items-center border-b border-border bg-black/20 text-center lg:order-none lg:border-b-0"><div><p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-gray-500">Match Score</p><div className="mt-1 flex items-center justify-center gap-5"><b className="text-4xl text-green-400 md:text-5xl">{liveMatch.playerFrames}</b><span className="text-gray-600">—</span><b className="text-4xl text-red-300 md:text-5xl">{liveMatch.opponentFrames}</b></div><p className="text-[10px] text-gray-500">{liveMatch.bestOf === 4 ? "Up to 4 frames · 2–2 draw possible" : `First to ${liveMatch.framesNeeded}`}</p></div></div>
+        <PlayerScore name={liveMatch.opponentName} points={liveMatch.opponentPoints} role={`${liveMatch.opponentArchetype} · #${liveMatch.opponentRanking}`} atTable={!atTableIsPlayer} side="opponent" condition={{ confidence: liveMatch.opponentConfidence, fatigue: liveMatch.opponentFatigue, pressure: liveMatch.pressureValue }} />
       </section>
 
       <main className="mx-auto mt-2 grid min-h-0 w-full max-w-[1580px] flex-1 gap-2 xl:grid-cols-[350px_minmax(0,1fr)_330px]">

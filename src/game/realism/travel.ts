@@ -38,6 +38,8 @@ export function locationFor(text: string) {
   const normalized = text.toLowerCase().replace(/[’'\s-]/g, '');
   const match = Object.keys(LOCATIONS).find(k => normalized.includes(k.toLowerCase().replace(/[’'\s-]/g, '')));
   if (match) return match;
+  // Venue listings can name the Hong Kong district without the territory.
+  if (/kowloon|kaitak/.test(normalized)) return 'HongKong';
   if (/china|guangzhou|chengdu|nanjing|dalian/i.test(text)) return 'Beijing';
   if (/german|europe|belgium|poland|gibraltar|antalya/i.test(text)) return 'Berlin';
   return 'Britain';

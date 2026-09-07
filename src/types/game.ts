@@ -287,12 +287,15 @@ export type TrainingSlot = {
 };
 
 export type InboxMessage = {
+  victoryReport?: NonNullable<ReturnType<typeof import("../game/victoryCelebration").victoryCelebration>>;
   tourChangesReport?: import("../game/seasonTourChanges").SeasonTourChanges;
   tournamentReference?: { id: string; startDate: string };
   tournamentBriefings?: import("../game/tournamentCareerHistory").TournamentBriefing[];
   seasonStartReport?: import("../game/seasonStartReport").SeasonStartReport;
   seasonReport?: import("../game/seasonEndReport").SeasonEndReport;
+  qualificationReport?: import("../game/qualificationReport").QualificationReport;
   eventFinance?: import("../game/eventFinancialReport").EventFinancialReport;
+  eventRanking?: import("../game/postEventRanking").PostEventRankingSnapshot;
   id: string;
   sender: string;
   subject: string;

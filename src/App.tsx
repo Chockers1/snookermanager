@@ -1,3 +1,5 @@
+import { DiagnosticRuntime } from './components/game/DiagnosticRuntime';
+import { AccessibilityRuntime } from './components/game/AccessibilityRuntime';
 import { Suspense, lazy } from "react";
 import {
   BrowserRouter,
@@ -11,6 +13,7 @@ import { AppErrorBoundary } from "./components/errors/AppErrorBoundary";
 import { useGame } from "./context/useGame";
 import { appRoutes } from "./utils/routing";
 
+const SettingsPage = lazy(() => import('./routes/SettingsPage').then(module => ({default:module.SettingsPage})));
 const DashboardPage = lazy(() =>
   import("./routes/DashboardPage").then((module) => ({
     default: module.DashboardPage,
@@ -26,6 +29,7 @@ const CareerProgressionPage = lazy(() =>
     default: module.CareerProgressionPage,
   })),
 );
+const OpponentProfilePage = lazy(() => import('./routes/OpponentProfilePage').then(module => ({ default: module.OpponentProfilePage })));
 const RivalriesPage = lazy(() => import('./routes/RivalriesPage').then(module => ({ default: module.RivalriesPage })));
 const LegacyStatsPage = lazy(() =>
   import("./routes/LegacyStatsPage").then((module) => ({
@@ -170,6 +174,8 @@ export function AppRoutes() {
   const { careerSessionMode, gameState } = useGame();
   const location = useLocation();
 
+  if (careerSessionMode === "launcher" && location.pathname === "/settings") return <main className="mx-auto max-w-4xl p-4"><Suspense fallback={<RouteLoadingFallback/>}><SettingsPage/></Suspense></main>;
+
   if (careerSessionMode === "launcher") {
     const knownEntryPath = appRoutes.some((route) => {
       if (!route.path.includes("/:")) return route.path === location.pathname;
@@ -196,7 +202,7 @@ export function AppRoutes() {
 
   if (
     gameState.seasonReview?.pending &&
-    location.pathname !== "/season-review"
+    !["/season-review", "/settings", "/saves"].includes(location.pathname)
   ) {
     return (
       <AppShell>
@@ -215,6 +221,7 @@ export function AppRoutes() {
             path="/career/progression"
             element={<CareerProgressionPage />}
           />
+          <Route path="/players/:id" element={<OpponentProfilePage />} />
           <Route path="/career/rivalries" element={<RivalriesPage />} />
           <Route path="/career/stats" element={<LegacyStatsPage />} />
           <Route path="/player/attributes" element={<PlayerAttributesPage />} />
@@ -249,6 +256,7 @@ export function AppRoutes() {
           <Route path="/mental" element={<MentalStatePage />} />
           <Route path="/health" element={<HealthCentrePage />} />
           <Route path="/season-review" element={<SeasonReviewPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/saves" element={<SaveManagerPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
@@ -260,6 +268,8 @@ export function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
+      <AccessibilityRuntime />
+      <DiagnosticRuntime />
       <AppErrorBoundary>
         <AppRoutes />
       </AppErrorBoundary>

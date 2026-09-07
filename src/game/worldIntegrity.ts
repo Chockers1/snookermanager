@@ -93,8 +93,7 @@ export function cpuSeasonEvidence(state:GameState, award:(t:Tournament,round:str
     }
     for(const [name,finish] of finishes) {
       const r=get(name);r.proEvents+=Number(pro);
-      const earning=state.rollingRankings?.earnings.find(a=>a.eventKey===e.key&&a.playerName===name);
-      r.prize+=earning?.amount ?? (isChampionshipLeague(t)?championshipEarnings(e.bracket,name):isAttachedQualifying(t)&&finish.winner?0:award(t,finish.round,finish.winner).prizeMoney);
+      r.prize+=e.prizeAwards?.[name] ?? (isChampionshipLeague(t)?championshipEarnings(e.bracket,name):isAttachedQualifying(t)&&finish.winner?0:award(t,finish.round,finish.winner).prizeMoney);
     }
   }
   return result;

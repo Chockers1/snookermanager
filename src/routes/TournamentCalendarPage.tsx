@@ -1,3 +1,4 @@
+import { TournamentRewards } from '../components/game/TournamentRewards';
 import { SeasonBoardPanel, EntryTimelinePanel } from '../components/career/SeasonExpansionPanels'
 import { CoachAdvicePanel } from "../components/career/MatchInsightPanels";
 import { MonthCalendar, CalendarEventDialog } from '../components/tournaments/MonthCalendar'
@@ -5,7 +6,7 @@ import { useState } from 'react'
 import { SeasonPlanningPanel } from '../components/career/CareerDepthPanels'
 import { QualificationRacesPanel, TravelLocationPanel } from '../components/career/RealismPanels'
 import { tournamentCommitmentConflict } from '../game/careerDepth/commitments'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, List, MapPin, Search, Trophy } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { useGame } from '../context/useGame'
@@ -80,17 +81,19 @@ function progressTone(tone: 'green' | 'amber' | 'red' | 'blue') {
 export function TournamentCalendarPage() {
   const { gameState, enterTournament, withdrawTournament } = useGame()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const linkedTournament = gameState.tournaments.find(t => t.id === searchParams.get('tournament'))
   const calendarData = buildCalendarData(gameState)
   const liveTournamentsById = new Map(gameState.tournaments.map((event) => [event.id, event]))
   const equipmentReady = Boolean(gameState.equipment.currentCueId && gameState.equipment.currentChalkId && gameState.equipment.currentTipId)
   const currentDate = new Date(gameState.currentDate + 'T00:00:00')
   const todayMonth = currentDate.getFullYear() * 12 + currentDate.getMonth()
-  const [monthIndex, setMonthIndex] = useState(todayMonth)
+  const [monthIndex, setMonthIndex] = useState(() => linkedTournament ? Number(linkedTournament.startDate.slice(0,4)) * 12 + Number(linkedTournament.startDate.slice(5,7)) - 1 : todayMonth)
   const [view, setView] = useState<'list' | 'month' | 'board'>('list')
   const [circuitFilter, setCircuitFilter] = useState('All circuits')
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [levelFilter, setLevelFilter] = useState<CalendarLevelFilter>('All Tours')
-  const [selectedTournamentId, setSelectedTournamentId] = useState(getNextEligibleTournament(gameState)?.id ?? gameState.tournaments[0]?.id ?? '')
+  const [selectedTournamentId, setSelectedTournamentId] = useState(linkedTournament?.id ?? getNextEligibleTournament(gameState)?.id ?? gameState.tournaments[0]?.id ?? '')
   const activeMonth = { year: Math.floor(monthIndex / 12), month: ((monthIndex % 12) + 12) % 12, label: monthLongLabels[((monthIndex % 12) + 12) % 12] + ' ' + Math.floor(monthIndex / 12) }
   const circuits = [...new Set(calendarData.events.filter(event => levelFilter === 'All Tours' || getTournamentLevel(event) === levelFilter).map(event => event.tourCircuit))].sort()
   const visibleEvents = calendarData.events.filter((event) => eventOverlapsMonth(event, activeMonth.month, activeMonth.year) && (levelFilter === 'All Tours' || getTournamentLevel(event) === levelFilter) && (circuitFilter === 'All circuits' || event.tourCircuit === circuitFilter))
@@ -157,6 +160,7 @@ export function TournamentCalendarPage() {
               </div>
 
               <div className="card card-body space-y-3">
+                <details><summary className="cursor-pointer text-xs text-green-400">Results & rewards</summary><TournamentRewards event={selectedTournament}/></details>
                 <div className="flex items-center gap-2 rounded-lg bg-surface-light/50 px-3 py-2 text-xs text-gray-400"><Search className="h-3 w-3" /> {selectedEventDetail.alertText}</div>
                 {selectedEventDetail.progressMeters.map((meter) => (
                   <div key={meter.label}>

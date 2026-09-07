@@ -1,0 +1,37 @@
+import { test, expect } from '@playwright/test';
+import { victoryFixture } from '../test-support/victoryFixture';
+import { ACTIVE_SAVE_KEY, encodeCareerSave } from '../src/game/saveStorage';
+
+for (const width of [390,1440]) test('champion ceremony and persistent review at '+width, async ({page}) => {
+  const {state} = victoryFixture();
+  await page.setViewportSize({width,height:900});
+  await page.addInitScript(({key,value}) => { if (!localStorage.getItem(key)) localStorage.setItem(key,value); },{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
+  await page.goto('/');
+  await page.getByRole('button',{name:/Continue Career/}).click();
+  const navigate = async (path:string) => page.evaluate(path=>{history.pushState({},'',path);dispatchEvent(new PopStateEvent('popstate'));},path);
+  await navigate('/match/result');
+  const modal = page.getByRole('dialog',{name:'Wuhan Open victory celebration'});
+  await expect(modal).toBeVisible();
+  await expect(modal).toContainText('10–9');
+  await expect(modal).toContainText('From 2 frames behind');
+  await expect(modal).toContainText('£140,000');
+  await expect(modal).toContainText('Deciding frame: 106–0');
+  const box = await modal.boundingBox();
+  expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.x+box!.width).toBeLessThanOrEqual(width);
+  expect(box!.y+box!.height).toBeLessThanOrEqual(900);
+  expect(await modal.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(modal).not.toBeVisible();
+  const hero=page.getByRole('region',{name:'Tournament victory'});
+  await expect(hero).toContainText('Added to your trophy cabinet');
+  await expect(page.getByText('+1.90%',{exact:true})).toBeVisible();
+  await expect(page.getByText('FF1',{exact:true})).toHaveCount(0);
+  await navigate('/dashboard'); await navigate('/match/result');
+  await expect(modal).not.toBeVisible();
+  await hero.getByRole('button',{name:'Relive the celebration'}).click();
+  await expect(modal).toBeVisible();
+  await modal.getByRole('link',{name:'View trophy cabinet'}).click();
+  await expect(page).toHaveURL(/#trophy-cabinet$/);
+  await expect(page.getByRole('region',{name:/Trophy Cabinet/})).toBeInViewport();
+});

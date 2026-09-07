@@ -1,3 +1,4 @@
+import { PlayerLink } from '../components/game/PlayerLink';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useGame } from '../context/useGame';
@@ -18,7 +19,7 @@ export function RivalriesPage() {
       const player = gameState.worldPlayers.find(p=>p.id===r.opponentId);
       const meetings = rivalryMeetings(gameState,r);
       return <article key={r.opponentId} aria-label={r.name + ' head-to-head'} className="card min-w-0 p-4 space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="text-lg font-semibold text-white break-words">{r.name}</h2><p className="text-xs text-gray-400">{player ? player.nation + ' · Age ' + player.age : 'Recorded opponent'}{player?.retired ? ' · Retired' : ''}{gameState.careerDepth?.partnerId===r.opponentId ? ' · Practice partner' : ''}</p></div><span className={r.rivalry ? 'text-sm text-amber-300' : 'text-sm text-gray-400'}>{rivalryStage(r)}</span></div>
+        <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="text-lg font-semibold text-white break-words"><PlayerLink name={r.name} id={r.opponentId}/></h2><p className="text-xs text-gray-400">{player ? player.nation + ' · Age ' + player.age : 'Recorded opponent'}{player?.retired ? ' · Retired' : ''}{gameState.careerDepth?.partnerId===r.opponentId ? ' · Practice partner' : ''}</p></div><span className={r.rivalry ? 'text-sm text-amber-300' : 'text-sm text-gray-400'}>{rivalryStage(r)}</span></div>
         <div className="flex flex-wrap justify-between gap-2"><p className="font-semibold text-white">H2H {r.wins}–{r.losses}{r.draws ? '–'+r.draws : ''}</p><span className="text-sm text-gray-400">Intensity {r.intensity === undefined ? 'Not recorded' : r.intensity + '/100'}</span></div>
         <p className="text-xs text-gray-400">Wins–losses{r.draws ? '–draws' : ''}, from your perspective · {r.deciders} deciders · {r.closeMatches ?? '—'} close matches · {r.finals ?? '—'} finals</p>
         <p className="text-sm text-gray-300">Recent decisive results: {r.recent.length ? r.recent.join(' · ') : 'None recorded'}</p>

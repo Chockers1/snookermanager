@@ -1,3 +1,4 @@
+import { RecoverySaves } from '../components/game/RecoverySaves';
 import { useRef, useState } from 'react'
 import { Download, FolderOpen, Save, Trash2, Upload } from 'lucide-react'
 import { useGame } from '../context/useGame'
@@ -5,7 +6,7 @@ import type { SaveSlotSummary } from '../hooks/useGameState'
 
 export function SaveManagerPage() {
   const { gameState, activeSaveSlotId, listSaveSlots, saveToSlot, loadSaveSlot, deleteSaveSlot, exportCareer, importCareer } = useGame()
-  const [slots, setSlots] = useState<SaveSlotSummary[]>(() => listSaveSlots())
+  const slots = listSaveSlots()
   const [slotName, setSlotName] = useState(`${gameState.player.fullName} · ${gameState.season}`)
   const [message, setMessage] = useState('Each career autosaves independently. Loading a slot makes it the active career.')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -13,7 +14,6 @@ export function SaveManagerPage() {
   function createSlot() {
     const slot = saveToSlot(slotName)
     if (!slot) return
-    setSlots(listSaveSlots())
     setMessage(`Created and switched to “${slot.name}”.`)
   }
 
@@ -37,7 +37,6 @@ export function SaveManagerPage() {
   function removeSlot(slot: SaveSlotSummary) {
     if (!window.confirm(`Delete the save slot “${slot.name}”? This cannot be undone.`)) return
     deleteSaveSlot(slot.id)
-    setSlots(listSaveSlots())
     setMessage(`Deleted “${slot.name}”.`)
   }
 
@@ -49,6 +48,7 @@ export function SaveManagerPage() {
         <p className="mt-1 text-sm text-gray-400">Manage independent autosaving careers or move one between devices with JSON import and export.</p>
       </header>
 
+      <RecoverySaves />
       <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
         <section className="card card-body">
           <h2 className="text-base font-semibold text-white">Named Save Slots</h2>

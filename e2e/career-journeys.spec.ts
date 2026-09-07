@@ -5,7 +5,7 @@ import {
   cueMarketplaceCatalog,
   tipCatalog,
 } from "../src/data/gameContent";
-import { ACTIVE_SAVE_KEY } from "../src/game/saveStorage";
+import { ACTIVE_SAVE_KEY, encodeCareerSave } from "../src/game/saveStorage";
 import {
   advanceWeekState,
   buyChalkState,
@@ -175,11 +175,12 @@ test("requires the end-of-season world report before starting the next season", 
 
   await page.addInitScript(
     ({ key, value }) => window.localStorage.setItem(key, value),
-    { key: ACTIVE_SAVE_KEY, value: JSON.stringify(rolledSeason) },
+    { key: ACTIVE_SAVE_KEY, value: encodeCareerSave(rolledSeason) },
   );
   await page.goto("/");
   await page.getByRole("button", { name: /Continue Career/ }).click();
   await expect(page).toHaveURL(/\/season-review/);
+  await page.getByRole("dialog", { name: "2026/27 Season Review" }).getByRole("button", { name: "Full Season Review", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: /End of Season Report/ }),
   ).toBeVisible();
@@ -222,6 +223,7 @@ test("enters, travels to, and completes every round of a tournament", async ({
   eliteCareer.player.confidence = 99;
   eliteCareer.player.morale = 99;
   eliteCareer.player.fatigue = 0;
+  eliteCareer.tournaments = eliteCareer.tournaments.filter(t => t.name !== 'Championship League');
   const eliteTournament = getNextEligibleTournament(eliteCareer);
   expect(eliteTournament).toBeDefined();
   if (!eliteTournament) return;
@@ -280,6 +282,7 @@ test("enters, travels to, and completes every round of a tournament", async ({
   }
 
   expect(eventCompleted).toBe(true);
+  await page.getByRole("button", { name: "Continue to match review", exact: true }).click();
   await expect(page.getByText(/Final/).first()).toBeVisible();
   await expect(page.getByText("Sponsor Bonus")).toBeVisible();
   await expect(page.getByText("Equipment Wear")).toBeVisible();
@@ -294,7 +297,7 @@ test("enters, travels to, and completes every round of a tournament", async ({
   await page.getByRole("navigation").getByRole("link", { name: /^Inbox/ }).click();
   await expect(
     page.getByRole("button", {
-      name: new RegExp(`Post-event report: ${eliteTournament.name}`),
+      name: new RegExp(`Champion: ${eliteTournament.name}`),
     }),
   ).toBeVisible();
   await expect(

@@ -72,13 +72,13 @@ test('calendar approval executes entry and travel only within the user budget', 
   await page.getByLabel('Spending ceiling', { exact: true }).fill('3000');
   await page.getByLabel('Minimum cash reserve', { exact: true }).fill('500');
   await page.getByRole('button', { name: 'Approve six-week schedule' }).click();
-  await page.getByRole('button', { name: 'Handle next entry & travel' }).click();
+  await page.getByRole('button', { name: 'Book next approved event' }).click();
   await expect.poll(async () => Boolean((await saved(page)).travel.bookings[event.id])).toBe(true);
   const snapshot = await saved(page);
   expect(snapshot.travel.bookings[event.id].preparation).toBeUndefined();
   expect(snapshot.careerDepth?.schedule?.spent).toBeLessThanOrEqual(3000);
   const cash = snapshot.player.cash;
-  await page.getByRole('button', { name: 'Handle next entry & travel' }).click();
+  await page.getByRole('button', { name: 'Book next approved event' }).click();
   expect((await saved(page)).player.cash).toBe(cash);
 });
 

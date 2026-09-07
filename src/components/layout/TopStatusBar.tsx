@@ -1,3 +1,4 @@
+import { PlayerLink } from '../game/PlayerLink';
 import {
   CalendarDays,
   CalendarClock,
@@ -308,7 +309,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
               title={opponentName}
               className="truncate text-[11px] font-semibold text-white"
             >
-              {opponentName}
+              <PlayerLink name={opponentName}/>
             </span>
           </div>
           <div className="hidden shrink-0 items-center gap-2 px-2 xl:flex">
@@ -387,7 +388,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
             </span>
           ) : null}
         </button>
-        <div className="relative">
+        <div className="relative" onKeyDown={event => { if (event.key === "Escape") { setCareerMenuOpen(false); event.currentTarget.querySelector("button")?.focus(); } }}>
           <button
             type="button"
             aria-label="Career and save options"
@@ -408,6 +409,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
                   Manage the active career outside the game navigation.
                 </p>
               </div>
+              <Link to="/settings" onClick={() => setCareerMenuOpen(false)} className="mt-1 flex min-h-10 items-center gap-3 rounded-md px-2 text-xs text-gray-300 hover:bg-white/5 hover:text-white"><Settings className="h-4 w-4 text-green-400" /> Settings &amp; help</Link>
               <Link
                 to="/saves"
                 onClick={() => setCareerMenuOpen(false)}

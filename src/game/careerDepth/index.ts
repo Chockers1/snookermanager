@@ -60,7 +60,7 @@ export function careerDepthAction(state: GameState, action: CareerDepthAction): 
     case 'strategy': return { ...state, careerDepth: { ...d, strategy: action.strategy, targets: [...new Set(action.targets)].slice(0, 3), schedule: null }, lastAction: 'Strategy updated. Approve a new six-week schedule before assistance resumes.' };
     case 'approve-schedule': return approveSchedule(state, action.eventIds, action.cap, action.reserve);
     case 'pause-schedule': return { ...state, careerDepth: { ...d, schedule: d.schedule ? { ...d.schedule, enabled: false, pauseReason: 'Paused by player.' } : null }, lastAction: 'Schedule assistance paused.' };
-    case 'run-assistance': return runScheduleAssistance(state);
+    case 'run-assistance': return runScheduleAssistance(state, true);
   }
 }
 export function nextCareerBoundary(state: GameState) {

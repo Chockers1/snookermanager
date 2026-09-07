@@ -1,3 +1,4 @@
+import { withTournamentPrizes } from './tournamentPrizes';
 import type { CareerPathStage, Tournament } from '../types/game'
 import { inferTournamentFormatId, tournamentFormatSummary } from './tournamentFormats'
 
@@ -6,7 +7,7 @@ function createTournament(entry: Tournament): Tournament {
   if (/seniors tour\s*-\s*event/i.test(entry.name)) entry = { ...entry, prizeMoney: 3000, totalPrizeFund: 3000, winnerPrize: 1000, runnerUpPrize: 500, semiFinalPrize: 250, quarterFinalPrize: 125, unlockRequirement: 'Age 40+, including active professionals; World Seniors membership accepted.' };
   if (entry.type === 'Q School' && !/review/i.test(entry.name)) entry = { ...entry, entryFee: /asia[ -]*oceania/i.test(entry.name) ? 560 : 960 };
   const broadcastFormats = ['ukMajor', 'mastersInvitational', 'shanghaiMasters', 'worldChampionshipMain', 'saudiArabiaMasters', 'britishOpen', 'homeNationsRanking', 'internationalChampionship', 'playersSeriesTop16', 'tourChampionshipTop8', 'championOfChampions'];
-  return {
+  return withTournamentPrizes({
     formatId: entry.formatId ?? inferTournamentFormatId(entry),
     televisedRounds: broadcastFormats.includes(entry.formatId ?? inferTournamentFormatId(entry)) ? ['Quarter Final', 'Semi Final', 'Final'] : [],
     totalPrizeFund: entry.prizeMoney,
@@ -22,7 +23,7 @@ function createTournament(entry: Tournament): Tournament {
     reward: undefined,
     ...entry,
     format: tournamentFormatSummary(entry),
-  }
+  })
 }
 
 export const detailedCareerPathStageCatalog: CareerPathStage[] = [

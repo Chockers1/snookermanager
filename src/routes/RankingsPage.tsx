@@ -1,3 +1,6 @@
+import { FormResult } from '../components/game/FormResult';
+import { profileScouting } from '../game/playerProfile';
+import { PlayerLink } from '../components/game/PlayerLink';
 import { TourDevelopmentPanel } from '../components/career/SeasonExpansionPanels'
 import { pathwayStandings, qTourQualification } from '../game/pathwayRules'
 import { useState } from 'react'
@@ -210,15 +213,11 @@ function Movement({ value }: { value: number }) {
   return <Minus className="mx-auto h-3 w-3 text-gray-600" />
 }
 
-function formTone(result: string) {
-  if (result === 'W') return 'bg-green-500'
-  if (result === 'L') return 'bg-red-500'
-  return 'bg-amber-500'
-}
 
-function buildFormDots(recentResults: readonly string[] | undefined): Array<'W' | 'L'> {
+
+function buildFormDots(recentResults: readonly string[] | undefined): Array<'W' | 'L' | 'D'> {
   return recentResults
-    ?.filter((result): result is 'W' | 'L' => result === 'W' || result === 'L')
+    ?.filter((result): result is 'W' | 'L' | 'D' => result === 'W' || result === 'L' || result === 'D')
     .slice(-8) ?? []
 }
 
@@ -416,11 +415,11 @@ export function RankingsPage() {
                     <tr key={row.id} className={`border-b border-border/40 ${row.highlighted ? 'bg-green-600/12' : 'hover:bg-surface-light/40'}`}>
                       <td className="px-3 py-2 font-bold text-white">{row.ranking}</td>
                       <td className="px-2 py-2 text-center"><Movement value={row.movement} /></td>
-                      <td className={`px-3 py-2 font-medium ${row.highlighted ? 'text-green-400' : 'text-white'}`}>{row.playerName}</td>
+                      <td className={`px-3 py-2 font-medium ${row.highlighted ? 'text-green-400' : 'text-white'}`}><PlayerLink name={row.playerName} /></td>
                       <td className="px-2 py-2 text-gray-400">{row.nation}</td>
                       <td className="px-2 py-2 text-center tabular-nums text-gray-300">{row.age ?? "—"}</td>
-                      <td className="px-2 py-2 text-center font-semibold text-white">{row.overall}</td>
-                      <td className="px-2 py-2 text-center font-semibold text-green-400">{row.potential}</td>
+                      <td className="px-2 py-2 text-center font-semibold text-white">{row.highlighted ? row.overall : profileScouting(gameState, row.playerName).ability}</td>
+                      <td className="px-2 py-2 text-center font-semibold text-green-400">{row.highlighted ? row.potential : 'Unknown'}</td>
                       <td className="px-3 py-2 text-right text-white">{moneyRanking ? formatMoney(row.points) : row.points}</td>
                       <td className="px-3 py-2 text-right text-white">{formatMoney(row.prizeMoney)}</td>
                       <td className="px-2 py-2 text-center text-gray-400">{row.eventsPlayed}</td>
@@ -438,7 +437,7 @@ export function RankingsPage() {
                             ? gameState.player.form.slice(-8)
                             : buildFormDots(row.recentResults)
                           ).map((result, index) => (
-                            <span key={`${row.id}-${result}-${index}`} className={`h-2 w-2 rounded-full ${formTone(result)}`} />
+                            <FormResult key={`${row.id}-${result}-${index}`} result={result} />
                           ))}
                           {!row.highlighted && buildFormDots(row.recentResults).length === 0 ? (
                             <span className="text-[9px] text-gray-600">No recent matches</span>
@@ -526,7 +525,7 @@ export function RankingsPage() {
           <div className="card min-h-0 px-3 py-2.5">
             <h3 className="mb-2 text-xs font-semibold text-white">Form</h3>
             <div className="flex flex-wrap items-center gap-1">
-              {gameState.player.form.slice(-10).map((result, index) => <span key={`${result}-${index}`} className={`h-2.5 w-2.5 rounded-full ${formTone(result)}`} />)}
+              {gameState.player.form.slice(-10).map((result, index) => <FormResult key={`${result}-${index}`} result={result} />)}
             </div>
           </div>
         </div>

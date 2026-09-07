@@ -1,3 +1,4 @@
+import { PlayerLink } from '../game/PlayerLink';
 type BracketPlayer = {
   name: string;
   rank: number;
@@ -75,6 +76,8 @@ export function TournamentBracket({
               key={round.label}
               className="flex min-h-0 flex-col"
               aria-label={`${round.label} bracket`}
+              data-round-label={round.label}
+              tabIndex={-1}
             >
               <div className="mb-2 flex shrink-0 items-center justify-between gap-2 px-1">
                 <h4
@@ -107,7 +110,7 @@ export function TournamentBracket({
                         >
                           <span className="truncate">
                             {player.rank > 0 ? `[${player.rank}] ` : ""}
-                            {player.name}
+                            <PlayerLink name={player.name} />
                           </span>
                           <span className="flex shrink-0 items-center gap-1 text-gray-400">
                             {player.name === champion ? (

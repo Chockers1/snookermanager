@@ -1,10 +1,12 @@
+import { useEffect } from 'react';
+import { ExhibitionAchievements } from '../components/career/ExhibitionAchievements';
 import { tournamentRoundHistory } from '../game/tournamentCareerHistory';
 import { TournamentCareerHistory } from '../components/career/TournamentCareerHistory';
 import { seasonWeekLabel, snapshotWeekLabel } from "../game/seasonClock";
 import { AchievementGoalsPanel } from '../components/career/SeasonExpansionPanels'
 import { careerLegacyOf, careerLegacyRating } from '../game/careerLegacy'
 import { LegacyRecords } from '../components/career/LegacyRecords'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Award, LineChart as LineChartIcon, Medal, Target, Trophy, Wallet } from 'lucide-react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ProgressBar } from '../components/ui/ProgressBar'
@@ -23,6 +25,8 @@ function compactMoney(value: number) {
 export function LegacyStatsPage() {
   const { gameState, continueWeek } = useGame()
   const navigate = useNavigate()
+  const { hash } = useLocation()
+  useEffect(() => { if (['#trophy-cabinet', '#exhibition-achievements'].includes(hash)) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' }); }, [hash])
   const career = careerLegacyOf(gameState)
   const tournamentArchive = gameState.history.tournamentHistory
   const matchesPlayed = career.matchesPlayed
@@ -100,6 +104,7 @@ export function LegacyStatsPage() {
 
       <AchievementGoalsPanel />
       <LegacyRecords stats={career} />
+      <ExhibitionAchievements />
       <TournamentCareerHistory />
 
       <div className="grid gap-4 xl:grid-cols-12">

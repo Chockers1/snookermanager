@@ -1,0 +1,11 @@
+import {describe,it,expect} from 'vitest';
+import { playerWorldFixture } from '../../test-support/playerWorldFixture';
+import {encodeCareerSave} from './saveStorage';
+import {recoveryRecord,expiredRecoveryIds,validatedRecoveryPayload,queueProtectedSave} from './recoverySaves';
+describe('recovery save guarantees',()=>{
+ it('stores a readable full snapshot with career progress',()=>{const {state}=playerWorldFixture();const r=recoveryRecord('career-a',encodeCareerSave(state),'Automatic');expect(r).toMatchObject({player:state.player.fullName,season:state.season,date:state.currentDate});expect(JSON.parse(validatedRecoveryPayload(r))).toEqual(JSON.parse(JSON.stringify(state)))});
+ it('detects damaged snapshots before restoration',()=>{const {state}=playerWorldFixture();const r=recoveryRecord('a',encodeCareerSave(state),'Automatic');expect(()=>validatedRecoveryPayload({...r,payload:r.payload+'broken'})).toThrow('integrity check')});
+ it('rotates automatic saves independently of other careers and protected season saves',()=>{const {state}=playerWorldFixture();const payload=encodeCareerSave(state);const records=Array.from({length:6},(_,i)=>recoveryRecord('a',payload,'Automatic','2026-09-0'+(i+1)));records.push(recoveryRecord('b',payload,'Automatic','2026-09-01'),recoveryRecord('a',payload,'Before season rollover','2026-09-01'));expect(expiredRecoveryIds(records,recoveryRecord('a',payload,'Automatic','2026-09-07'))).toEqual([records[0].id])});
+ it('keeps two pre-rollover seasons and does not prune them for ordinary progress',()=>{const {state}=playerWorldFixture();const p=encodeCareerSave(state);const records=[recoveryRecord('a',p,'Before season rollover','2026'),recoveryRecord('a',p,'Before season rollover','2027')];expect(expiredRecoveryIds(records,recoveryRecord('a',p,'Before season rollover','2028'))).toEqual([records[0].id]);expect(expiredRecoveryIds(records,recoveryRecord('a',p,'Automatic','2029'))).toEqual([])});
+ it('serializes writes and recovers the queue after a failed write',async()=>{const order:string[]=[];const a=queueProtectedSave(async()=>{order.push('old');throw Error('quota')});const b=queueProtectedSave(async()=>{order.push('new')});await expect(a).rejects.toThrow('quota');await b;expect(order).toEqual(['old','new'])});
+});

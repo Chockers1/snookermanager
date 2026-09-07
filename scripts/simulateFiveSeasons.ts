@@ -1,7 +1,10 @@
+import { buildFocusedTrainingPlan } from '../src/utils/trainingPlan'
+import { CareerRecoveryAudit } from './lib/careerRecoveryAudit'
+const recoveryAudit = new CareerRecoveryAudit()
 import { recordWorldAudit } from './worldAuditRecorder'
 import fs from 'node:fs'
 import { careerDepthAction } from '../src/game/careerDepth'
-import { depthOf, pendingStory } from '../src/game/careerDepth/shared'
+import { depthOf, pendingStory, plusDays } from '../src/game/careerDepth/shared'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { CALENDAR_MODEL, getCalendarModelSummary, getEventVolumeThresholdForBand } from './calendarModel'
@@ -289,6 +292,7 @@ type SimulationReport = {
   supportMetrics: SupportProfileMetrics | null
   statusIntegrityAudit: StatusIntegrityAudit
   seasons: SeasonReport[]
+  longCareerAudit?: {eligibilityPolicy:string;trainingPolicy:string;calibrationAdjustments:boolean;recovery: ReturnType<CareerRecoveryAudit['summary']>; development: ReturnType<typeof developmentSnapshot>[]; cardChanges: Array<{date:string;age:number;hasTourCard:boolean;source:string}>}
 }
 
 type CompetitionLevelKey =
@@ -2046,7 +2050,7 @@ function getTournamentFormatWarnings(tournament: Tournament, classification: Tou
     warnings.push('missing field size')
   }
 
-  if (format.frameFormat.length === 0) {
+  if (format.frameFormat.length === 0 && format.formatFamily !== 'administrative') {
     warnings.push('missing frame format')
   }
 
@@ -2479,7 +2483,7 @@ function getTournamentHistoryEntryMap(entries: TournamentHistorySnapshot[]) {
 }
 
 function hasTrackedTournamentEntry(entry: TournamentHistorySnapshot | null | undefined) {
-  return entry != null && entry.status !== 'Skipped' && entry.status !== 'High Cost'
+  return entry != null && entry.status !== 'Skipped' && entry.status !== 'High Cost' && (entry.matchesPlayed > 0 || entry.status === 'Entered' || !isNonCompetitiveTournamentResult(entry.result))
 }
 
 function getSeasonReportCanonicalResult(
@@ -4110,11 +4114,26 @@ function getFacilityWeeklyRental(state: GameState) {
   return facility ? Math.round(facility.monthlyRental / 4) : 0
 }
 
+function developmentSnapshot(state:GameState){return {date:state.currentDate,season:state.season,...snapshotPlayer(state),attributes:JSON.parse(JSON.stringify(state.attributes)) as GameState['attributes'],hasTourCard:state.careerSystems.pro.hasTourCard,cardSource:state.careerSystems.pro.cardSource}}
+
 function recordCashDelta(breakdown: FinanceBreakdown, category: keyof FinanceBreakdown, previousState: GameState, nextState: GameState) {
-  breakdown[category] += nextState.player.cash - previousState.player.cash
+  recoveryAudit.observe(previousState, 'Before '+category);
+  recoveryAudit.observe(nextState, category);
+  const delta = nextState.player.cash - previousState.player.cash;
+  if (category === 'prizeMoney' && nextState.matches[0]?.id !== previousState.matches[0]?.id) {
+    const prize = nextState.matches[0]?.prizeMoneyEarned ?? 0;
+    breakdown.prizeMoney += prize;
+    breakdown.other += delta - prize; // Hotel extensions and other concurrent costs are not negative prize money.
+  } else breakdown[category] += delta
 }
 
 function recordWeeklyFinanceDelta(breakdown: FinanceBreakdown, previousState: GameState, nextState: GameState) {
+  recoveryAudit.observe(previousState, 'Before calendar advance');
+  recoveryAudit.observe(nextState, 'Calendar advance');
+  if (nextState.week === previousState.week) {
+    breakdown.other += nextState.player.cash - previousState.player.cash;
+    return; // A calendar boundary is not a weekly salary/sponsor settlement.
+  }
   const sponsorIncome = getSponsorWeeklyIncome(previousState)
   const coachCosts = getCoachWeeklyCost(previousState)
   const facilityCosts = getFacilityWeeklyRental(previousState)
@@ -4129,7 +4148,7 @@ function recordWeeklyFinanceDelta(breakdown: FinanceBreakdown, previousState: Ga
   breakdown.other += baseAllowance
 
   if (residualDelta > 0) {
-    breakdown.prizeMoney += residualDelta
+    breakdown.other += residualDelta
   } else if (residualDelta < 0) {
     breakdown.other += residualDelta
   }
@@ -4215,77 +4234,16 @@ function scoreTournament(state: GameState, tournament: Tournament, profile: Mana
   return score
 }
 
-function getCompetitionKeyForTournament(tournament: Tournament): keyof CircuitSnapshot | null {
-  switch (tournament.rankingType) {
-    case 'World Ranking':
-    case 'One-Year':
-      return 'world'
-    case 'Q Tour':
-      return 'qTour'
-    case 'Q School OOM':
-      return 'qSchool'
-    case 'Amateur':
-      return 'amateur'
-    case 'Youth':
-      return 'youth'
-    case 'Senior':
-      return 'senior'
-    default:
-      if (tournament.type === 'Q Tour') return 'qTour'
-      if (tournament.type === 'Q School') return 'qSchool'
-      if (tournament.type === 'Senior') return 'senior'
-      if (tournament.type === 'Amateur') return 'amateur'
-      if (tournament.type === 'Junior' || tournament.type === 'Regional Youth' || tournament.type === 'National Youth') return 'youth'
-      if (tournament.type === 'Invitational') return 'world'
-      if (tournament.type === 'Professional Tour' || tournament.type === 'Ranking' || tournament.type === 'Major') return 'world'
-      return null
-  }
-}
-
-function getAmateurRouteAgeLimitForTournament(tournament: Tournament) {
-  const text = `${tournament.name} ${tournament.format} ${tournament.unlockRequirement ?? ''}`.toLowerCase()
-  if (/u16|under-?16/.test(text)) return 16
-  if (/u18|under-?18/.test(text)) return 18
-  if (/u21|under-?21|wsf junior/.test(text)) return 21
-  return null
-}
-
 function isDirectAmateurTourCardRouteForTournament(tournament: Tournament) {
   if (tournament.type !== 'Amateur') return false
   if (/women/i.test(tournament.name)) return false
   return /tour card|wst card|professional tour card/i.test(tournament.reward ?? '')
 }
 
-function getCompetitionKeysForTournament(tournament: Tournament): (keyof CircuitSnapshot)[] {
-  if (tournament.type === 'Amateur') {
-    if (getAmateurRouteAgeLimitForTournament(tournament) != null) {
-      return ['youth', 'amateur', 'qTour', 'qSchool']
-    }
-
-    if (isDirectAmateurTourCardRouteForTournament(tournament)) {
-      return ['amateur', 'qTour', 'qSchool', 'youth']
-    }
-  }
-
-  const key = getCompetitionKeyForTournament(tournament)
-  return key ? [key] : []
-}
-
 function canSafelyEnterTournament(state: GameState, tournament: Tournament) {
-  if (state.careerSystems.lateCareer.retired) return false
-
-  const entryAccess = getTournamentEntryAccess(state, tournament)
-  if (!entryAccess.allowed) return false
-
-  if (tournament.type === 'Q School') {
-    return state.competitionTables.qSchool.some((row) => row.playerName !== state.player.fullName)
-  }
-
-  return getCompetitionKeysForTournament(tournament).some((key) => {
-    const rows = state.competitionTables[key]
-    if (rows.length < 2) return false
-    return rows.some((row) => row.playerName === state.player.fullName) && rows.some((row) => row.playerName !== state.player.fullName)
-  })
+  // A ranking is an outcome of participation, not a prerequisite for an open event.
+  // The same entry rules as the UI decide access and the game constructs the field.
+  return !state.careerSystems.lateCareer.retired && getTournamentEntryAccess(state, tournament).allowed
 }
 
 function getSeasonStartYear(seasonLabel: string) {
@@ -4340,6 +4298,7 @@ function buildSeasonReport(
   }
 
   const tournaments = seasonHistoryEntries
+    .filter(hasTrackedTournamentEntry)
     .sort((left, right) => left.startDate.localeCompare(right.startDate))
     .map((entry) => {
       const tournament = openingTournamentById.get(entry.tournamentId)
@@ -7120,9 +7079,10 @@ function buildSupportComparisonMarkdown(reports: SimulationReport[]) {
   return `${lines.join('\n')}\n`
 }
 
-function writeSupportComparisonReportIfReady(seasonsRequested: number) {
+function writeSupportComparisonReportIfReady(seasonsRequested: number, calibrationAdjustments: boolean) {
+  const mode = calibrationAdjustments ? 'calibration' : 'gameplay'
   const reports = (['worst', 'middle', 'best'] as ManagedSupportProfile[])
-    .map((profile) => path.join(reportsDir, `${getSupportReportBaseName(seasonsRequested, profile)}.json`))
+    .map((profile) => path.join(reportsDir, `${getSupportReportBaseName(seasonsRequested, profile)}-${mode}-entry-v2.json`))
     .filter((filePath) => fs.existsSync(filePath))
     .map((filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as SimulationReport)
 
@@ -7130,7 +7090,7 @@ function writeSupportComparisonReportIfReady(seasonsRequested: number) {
     return null
   }
 
-  const comparisonPath = path.join(reportsDir, `support-profile-comparison-${seasonsRequested}-season-youth.md`)
+  const comparisonPath = path.join(reportsDir, `support-profile-comparison-${seasonsRequested}-season-youth-${mode}.md`)
   fs.writeFileSync(comparisonPath, buildSupportComparisonMarkdown(reports))
   return comparisonPath
 }
@@ -7349,7 +7309,11 @@ function runManagedWeeklyCare(state: GameState, financeBreakdown: FinanceBreakdo
   }
 
   if (nextState.trainingAppliedWeek !== nextState.week && nextState.player.fatigue < 82) {
-    nextState = applyTrainingPlanState(nextState)
+    const rotating = process.argv.includes('--rotate-training');
+    const entered = nextState.tournaments.filter(t=>t.status==='Entered');
+    const focuses = ['potting','safety','mental','fitness'] as const;
+    const plan = rotating ? buildFocusedTrainingPlan(nextState.player.fatigue>=65?'recovery':focuses[Math.floor((nextState.week-1)/4)%focuses.length],plusDays(depthOf(nextState).nextSettlementDate,-7),nextState.player.fatigue,entered.map(t=>({name:t.name,location:t.location,startDate:t.startDate})),entered.some(t=>Boolean(nextState.travel.bookings[t.id]))) : undefined;
+    nextState = applyTrainingPlanState(nextState,plan)
   }
 
   return nextState
@@ -7864,7 +7828,8 @@ function main() {
             : customStartingScenario
               ? `${seasonsRequested}-season-start-age-${customStartAge ?? 'default'}-${customStartingLevelId ?? 'validated'}-${getSupportProfileDisplayName(managedSupportProfile)}-support-simulation`
               : `${seasonsRequested}-season-simulation`
-  const reportBaseName = seedArg ? `${reportBaseNameRoot}-seed-${requestedSeed}` : reportBaseNameRoot
+  const calibrationAdjustments = process.argv.includes('--calibration-adjustments')
+  const reportBaseName = (seedArg ? `${reportBaseNameRoot}-seed-${requestedSeed}` : reportBaseNameRoot) + (calibrationAdjustments ? '-calibration' : '-gameplay') + (process.argv.includes('--rotate-training') ? '-rotating' : '') + '-entry-v2'
   let state = (managedYouthScenario
     ? createNewCareerState({
         fullName: createPlayerIdentitySeed.name,
@@ -7904,6 +7869,14 @@ function main() {
                 ).id,
               })
             : createStarterState()) as GameState
+  const development = [developmentSnapshot(state)]
+  const cardChanges: Array<{date:string;age:number;hasTourCard:boolean;source:string}> = []
+  let previousCard = state.careerSystems.pro.hasTourCard
+  const observeCareer = (value:GameState) => {
+    recoveryAudit.observe(value, 'Career checkpoint')
+    if(value.careerSystems.pro.hasTourCard !== previousCard){cardChanges.push({date:value.currentDate,age:value.player.age,hasTourCard:value.careerSystems.pro.hasTourCard,source:value.careerSystems.pro.cardSource ?? 'Unknown'});previousCard=value.careerSystems.pro.hasTourCard}
+  }
+  observeCareer(state)
   let openingState = state
   let previousCircuits = captureCircuits(state)
   const seasons: SeasonReport[] = []
@@ -7929,6 +7902,7 @@ function main() {
 
   while (seasons.length < seasonsRequested && calendarSteps < maxWeeks) {
     calendarSteps += 1
+    observeCareer(state)
     const waitingStory = pendingStory(state)
     if (waitingStory) state = careerDepthAction(state, { type: 'decision', id: waitingStory.id, choice: waitingStory.kind === 'deciders' || waitingStory.kind === 'early-exits' ? 'continue' : 'protect' })
     if (state.seasonReview?.pending) state = startNextSeasonState(state)
@@ -7957,7 +7931,7 @@ function main() {
     }
 
     const archivedSeason = state.season
-    const supportedState = managedScenario ? applySupportProfileState(state, managedSupportProfile) : state
+    const supportedState = managedScenario && calibrationAdjustments ? applySupportProfileState(state, managedSupportProfile) : state
     if (managedScenario) {
       recordSupportSnapshot(supportMetricsAccumulator, supportedState)
     }
@@ -8033,6 +8007,7 @@ function main() {
 
     const matchStory = pendingStory(eventResolvedState)
     if (matchStory) eventResolvedState = careerDepthAction(eventResolvedState, { type: 'decision', id: matchStory.id, choice: matchStory.kind === 'deciders' || matchStory.kind === 'early-exits' ? 'continue' : 'protect' })
+    observeCareer(eventResolvedState)
     const advancedState = advanceWeekState(eventResolvedState)
     stalledSteps = advancedState.currentDate === state.currentDate && advancedState.matches[0]?.id === state.matches[0]?.id && !advancedState.seasonReview?.pending ? stalledSteps + 1 : 0
     if (stalledSteps >= 3) {
@@ -8041,6 +8016,7 @@ function main() {
       break
     }
     recordWeeklyFinanceDelta(currentSeasonFinance, eventResolvedState, advancedState)
+    observeCareer(advancedState)
     const settledWeek = advancedState.week !== eventResolvedState.week
     weeksSimulated += Number(settledWeek)
     if (settledWeek) {
@@ -8054,9 +8030,7 @@ function main() {
     if (new Set(rewardIds).size !== rewardIds.length) seasonIssues.add(`${archivedSeason}: a career opportunity reward was applied twice.`)
     if (depth.schedule && depth.schedule.spent > depth.schedule.cap) seasonIssues.add(`${archivedSeason}: assistance exceeded the approved cap.`)
 
-    if (advancedState.player.cash < 0) {
-      seasonIssues.add(`${archivedSeason}: player cash dropped below zero (${advancedState.player.cash}).`)
-    }
+    // Debt is measured by duration and recovery, not automatically treated as a failure.
     if (advancedState.player.age > 21 && advancedState.competitionTables.youth.some((row) => row.playerName === advancedState.player.fullName)) {
       seasonIssues.add(`${archivedSeason}: player remained in youth rankings after age 21.`)
     }
@@ -8085,7 +8059,9 @@ function main() {
       }
 
       if (process.argv.includes('--world-audit')) recordWorldAudit(path.join(reportsDir, reportBaseName + '-world'), openingState, eventResolvedState, advancedState)
+      development.push(developmentSnapshot(advancedState))
       seasons.push(seasonReport)
+      if (process.argv.includes('--progress')) process.stderr.write(`Season ${seasons.length}/${seasonsRequested}: age ${advancedState.player.age}, OVR ${snapshotPlayer(advancedState).overall}, cash ${Math.round(advancedState.player.cash)}, card ${advancedState.careerSystems.pro.hasTourCard}\n`)
       finalizeWorldAccessDebugSeason(worldAccessDebugStore, reportBaseName, seasonReport)
       if (managedYouthScenario && managedSupportProfile === 'best') {
         finalizeEliteEventSelectionDebugSeason(eliteEventSelectionDebugStore, reportBaseName, seasonReport)
@@ -8171,6 +8147,7 @@ function main() {
 
   if (confidenceSamples > 20 && saturatedConfidenceWeeks / confidenceSamples > 0.25) issues.push('Confidence saturation: at least 25% of settled weeks remained at 98% or higher.')
   const report: SimulationReport = {
+    longCareerAudit: {eligibilityPolicy:'Game entry access rules; no ranking-row membership gate',trainingPolicy:process.argv.includes('--rotate-training')?'rotating focuses':'default auto plan',calibrationAdjustments,recovery:recoveryAudit.summary(),development,cardChanges},
     generatedAt: new Date().toISOString(),
     scenario,
     seasonsRequested,
@@ -8213,10 +8190,10 @@ function main() {
       writeEliteEventSelectionDebug(report, eliteEventSelectionDebugStore)
     }
   }
-  const comparisonReportPath = managedYouthScenario ? writeSupportComparisonReportIfReady(seasonsRequested) : null
+  const comparisonReportPath = managedYouthScenario ? writeSupportComparisonReportIfReady(seasonsRequested, calibrationAdjustments) : null
 
   console.log(JSON.stringify({
-    careerDepthAudit: { policy: 'conservative authored choices; explicit withdrawal if equipment cannot be serviced; no paid commitments or autonomous spending', stories: depthOf(state).stories.length, equipmentWithdrawals, calendarSteps, confidenceSamples, averageConfidence: confidenceSamples ? Math.round(confidenceTotal / confidenceSamples * 10) / 10 : 0, saturatedConfidenceWeeks },
+    careerDepthAudit: { policy: managedSupportProfile+' support manager; '+(calibrationAdjustments?'synthetic calibration adjustments enabled':'real gameplay actions only; no synthetic attribute or preparation adjustments')+'; conservative story choices; no paid story commitments', stories: depthOf(state).stories.length, equipmentWithdrawals, calendarSteps, confidenceSamples, averageConfidence: confidenceSamples ? Math.round(confidenceTotal / confidenceSamples * 10) / 10 : 0, saturatedConfidenceWeeks },
     reportPath: path.join('artifacts', 'simulations', `${reportBaseName}.md`),
     jsonPath: path.join('artifacts', 'simulations', `${reportBaseName}.json`),
     comparisonReportPath: comparisonReportPath ? path.join('artifacts', 'simulations', path.basename(comparisonReportPath)) : null,

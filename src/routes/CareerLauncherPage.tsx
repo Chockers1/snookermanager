@@ -1,3 +1,4 @@
+import { RecoverySaves } from '../components/game/RecoverySaves';
 import { useRef, useState } from 'react'
 import { ArrowRight, BriefcaseBusiness, FolderOpen, PlayCircle, Upload } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -78,6 +79,8 @@ export function CareerLauncherPage() {
           <input ref={fileInputRef} className="hidden" type="file" accept="application/json,.json" onChange={(event) => void importSave(event.target.files?.[0])} />
           <button type="button" className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-border bg-surface/80 px-4 py-3 text-sm font-semibold text-gray-300 hover:border-amber-500/40 hover:text-white" onClick={() => { startDemoCareer(); navigate('/') }}><PlayCircle className="h-4 w-4 text-amber-400" /> Demo Career</button>
         </div>
+        <details className="mt-4"><summary className="cursor-pointer rounded-lg border border-border bg-surface p-4 text-sm font-semibold">Restore automatic backup</summary><div className="mt-2"><RecoverySaves /></div></details>
+        <a href="/settings" className="mt-4 text-center text-sm text-green-300 underline">Settings, accessibility &amp; bug reports</a>
         <p role="status" className="mt-4 text-center text-xs text-gray-500">{message}</p>
       </div>
     </main>

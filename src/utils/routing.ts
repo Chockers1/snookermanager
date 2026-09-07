@@ -1,6 +1,7 @@
 import type { AppRoute } from "../types/game";
 
 export const appRoutes: AppRoute[] = [
+  { path: "/players/:id", label: "Player Profile", section: "Player" },
   { path: "/", label: "Dashboard", section: "Core" },
   { path: "/new-career", label: "New Career", section: "Career" },
   {
@@ -56,6 +57,7 @@ export const appRoutes: AppRoute[] = [
   { path: "/mental", label: "Mental State", section: "Support" },
   { path: "/health", label: "Health Centre", section: "Support" },
   { path: "/season-review", label: "Season Review", section: "Support" },
+  { path: "/settings", label: "Settings & help", section: "Career" },
   { path: "/saves", label: "Save Manager", section: "Career" },
 ];
 

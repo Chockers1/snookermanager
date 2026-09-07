@@ -1,3 +1,4 @@
+import { PlayerLink } from './PlayerLink';
 import type { RankingRow } from '../../types/game'
 import { formatMoney, formatSigned } from '../../utils/formatters'
 import { DataTable, type DataTableColumn } from '../ui/DataTable'
@@ -13,7 +14,7 @@ const columns: DataTableColumn<RankingRow>[] = [
     header: 'Player',
     render: (row) => (
       <div>
-        <div className="font-semibold text-scm-text">{row.playerName}</div>
+        <div className="font-semibold text-scm-text"><PlayerLink name={row.playerName}/></div>
         <div className="text-xs text-scm-textMuted">{row.nation}</div>
       </div>
     ),

@@ -1,3 +1,4 @@
+import { getTreatmentEffect, needsHealthRecovery, treatmentPreview } from '../game/healthSystem';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -32,10 +33,13 @@ export function HealthCentrePage() {
   const selectedTreatment =
     treatments.find((option) => option.id === selectedTreatmentId) ??
     treatments[0];
+  const recoveryNeeded = needsHealthRecovery(gameState);
+  const preview = treatmentPreview(gameState, selectedTreatment.id);
+  const duringMatch = gameState.liveMatch?.status === "In Progress";
   const summary = [
     {
       label: "Fatigue",
-      value: `${gameState.player.fatigue}%`,
+      value: `${Number(gameState.player.fatigue.toFixed(2))}%`,
       tone:
         gameState.player.fatigue >= 65 ? "text-amber-400" : "text-green-400",
     },
@@ -219,8 +223,7 @@ export function HealthCentrePage() {
               ))}
               <div className="flex items-start gap-2 rounded border border-amber-600/25 bg-amber-600/10 p-2.5 text-xs text-amber-300 xl:p-2 xl:text-[10px]">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                {currentIssue.riskOfPlaying}% risk of worsening if you play
-                without recovery.
+                {recoveryNeeded ? `${currentIssue.riskOfPlaying}% risk of worsening if you play without recovery.` : "No active injury or recovery load. Treatment is not needed."}
               </div>
             </div>
           </div>
@@ -235,7 +238,7 @@ export function HealthCentrePage() {
                 Treatment options
               </h2>
               <p className="mt-0.5 text-[10px] text-gray-500">
-                Choose one treatment and review the cost before confirming.
+                Recovery effects apply immediately. Review the changes and cost before confirming.
               </p>
             </div>
           </div>
@@ -262,7 +265,7 @@ export function HealthCentrePage() {
                     {option.description}
                   </p>
                   <p className="mt-2 flex items-center gap-1 text-[10px] text-gray-500 xl:mt-1">
-                    <CalendarClock className="h-3 w-3" /> {option.timeRequired}
+                    <CalendarClock className="h-3 w-3" /> Up to −{getTreatmentEffect(option.id).fatigue} fatigue · −{getTreatmentEffect(option.id).strain} strain
                   </p>
                 </button>
               );
@@ -270,7 +273,7 @@ export function HealthCentrePage() {
           </div>
         </section>
 
-        <aside className="card min-h-0 min-w-0 border-green-600/30 bg-green-600/5 p-4 xl:col-span-4 xl:p-3">
+        <aside className="card min-h-0 min-w-0 border-green-600/30 bg-green-600/5 p-4 overflow-y-auto xl:col-span-4 xl:p-3">
           <p className="metric-label text-green-400">Selected treatment</p>
           <h2 className="mt-2 text-lg font-bold text-white">
             {selectedTreatment.title}
@@ -288,20 +291,23 @@ export function HealthCentrePage() {
               </p>
             </div>
             <div className="rounded bg-surface/70 p-2.5">
-              <p className="metric-label">Time</p>
+              <p className="metric-label">Effect</p>
               <p className="mt-1 text-sm font-bold text-white">
-                {selectedTreatment.timeRequired}
+                Immediate
               </p>
             </div>
           </div>
+          <p className="mt-2 text-[11px] text-gray-300">{recoveryNeeded ? preview.filter(r => r.before !== r.after).map(r => `${r.label} ${Number(r.before.toFixed(2))}${r.unit} → ${Number(r.after.toFixed(2))}${r.unit}`).join(' · ') || 'Clear the recorded issue.' : 'No treatment needed. Fatigue, strain, burnout and injury time are already zero.'}</p>
           <button
             type="button"
+            disabled={!recoveryNeeded || duringMatch || gameState.player.cash < selectedTreatment.cost}
             className="btn-primary mt-4 min-h-11 w-full justify-center text-xs xl:mt-2 xl:min-h-9"
             onClick={() => scheduleTreatment(selectedTreatment.id)}
           >
-            <BedDouble className="h-4 w-4" /> Schedule treatment{" "}
+            <BedDouble className="h-4 w-4" /> {recoveryNeeded ? "Apply treatment" : "No treatment needed"}{" "}
             <ChevronRight className="h-4 w-4" />
           </button>
+          <p role="status" className="mt-2 text-[11px] text-amber-300">{duringMatch ? 'Use interval recovery during your match; treatment is available afterwards.' : gameState.player.cash < selectedTreatment.cost && recoveryNeeded ? 'Not enough cash for this treatment.' : gameState.lastAction}</p>
         </aside>
       </div>
 

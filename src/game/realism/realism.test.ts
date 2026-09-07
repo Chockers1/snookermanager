@@ -4,7 +4,7 @@ import { getDefaultPreparationAllocations } from '../tournamentPreparation';
 import { depthOf, plusDays } from '../careerDepth/shared';
 import { realismOf, realismAction, reconcileRealism, overseasWeeklyCost, protectRealismSessions } from './index';
 import { sessionPlan, pendingMatchBreak, resolveSessionBreak, sessionAssessment } from './sessions';
-import { journeyQuote, travelOptionsFor, routeBetween } from './travel';
+import { journeyQuote, travelOptionsFor, routeBetween, locationFor } from './travel';
 import { conditionAdjustment, venueConditions, familiarisedFor } from './conditions';
 import { TRAINING_BASES, baseTrainingMultiplier } from './base';
 import { qualificationRaces, survivalRace } from './races';
@@ -78,6 +78,28 @@ describe('match sessions and reloads', () => {
 });
 
 describe('travel, elapsed costs and training base', () => {
+  it('recognises the Grand Prix venue as Hong Kong and quotes long-haul fares from Berlin', () => {
+    for (const venue of ['Kai Tak Arena, Kowloon City', 'Kowloon City', 'Kai Tak Arena', 'Hong Kong']) {
+      expect(locationFor(venue)).toBe('HongKong');
+    }
+    const state = career();
+    state.realism!.location = 'Berlin';
+    const catalogEvent = createStarterState().tournaments.find(t => t.name === 'World Grand Prix')!;
+    const event = eventFor(state, { location: catalogEvent.location });
+    const options = travelOptionsFor(state, event);
+    const quote = journeyQuote(state, event, options[4].id);
+    expect(quote).toMatchObject({ origin: 'Berlin', destination: 'HongKong', mode: 'Flight', zoneHours: 7, cost: options[4].cost });
+    expect(quote.distanceKm).toBeGreaterThan(8500);
+    expect(quote.distanceKm).toBeLessThan(9000);
+    expect(options[0].cost).toBeGreaterThan(450);
+    expect(options[4].cost).toBeGreaterThan(1900);
+    expect(options[4].cost).toBeGreaterThan(options[0].cost * 3);
+    expect(options.every((option, i) => i === 0 || option.cost > options[i - 1].cost)).toBe(true);
+    const shortHaul = travelOptionsFor(state, { ...event, location: 'Leicester' });
+    expect(shortHaul[4].cost).toBeLessThan(400);
+    expect(quote.acclimatisationDays).toBe(4);
+  });
+
   it('advances through booked departure and arrival in one action and stops unbooked departures', () => {
     let state = createStarterState();
     state.player.cash = 50000;

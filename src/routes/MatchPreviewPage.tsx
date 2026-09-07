@@ -1,3 +1,5 @@
+import { TournamentAtmosphere } from '../components/game/TournamentAtmosphere';
+import { PlayerLink } from '../components/game/PlayerLink';
 import { ObjectivesPanel, CoachAdvicePanel } from '../components/career/MatchInsightPanels'
 import { getBestOfForRound } from '../data/tournamentFormats'
 import { useState } from 'react'
@@ -155,7 +157,10 @@ export function MatchPreviewPage() {
   return (
     <div className="flex min-h-0 flex-col gap-3 [&>*]:shrink-0 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-y-auto xl:p-1.5">
       <RivalryContext opponent={opponentName} />
-      {activeTournament && nextOpponent && <ObjectivesPanel opponentRank={nextOpponent.ranking} bestOf={getBestOfForRound(activeTournament, activeRound ?? '', 7)} objectives={activeLiveMatch?.objectives} />}
+      <div className="grid min-w-0 items-start gap-2 md:grid-cols-2">
+        {activeTournament && <TournamentAtmosphere event={activeTournament} opponent={opponentName} />}
+        {activeTournament && nextOpponent && <ObjectivesPanel opponentRank={nextOpponent.ranking} bestOf={getBestOfForRound(activeTournament, activeRound ?? '', 7)} objectives={activeLiveMatch?.objectives} />}
+      </div>
       <div className="grid min-w-0 items-start gap-2 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] [&>section>button]:py-1.5 [&>section>button]:text-[11px] [&>section>button]:leading-5">
         <CoachAdvicePanel compact opponent={opponentName} tournament={activeTournament} onUsePlan={setPlan} />
         <VenueScoutingPanel tournament={activeTournament} opponent={opponentName} />
@@ -171,7 +176,7 @@ export function MatchPreviewPage() {
           </div>
           <div className="mt-0.5 flex min-w-0 items-baseline gap-3">
             <h1 className="shrink-0 text-xl font-bold leading-tight text-white">Match Preview</h1>
-            <p className="hidden min-w-0 truncate text-xs text-gray-400 sm:block">{gameState.player.fullName} against {opponentName}</p>
+            <p className="hidden min-w-0 truncate text-xs text-gray-400 sm:block">{gameState.player.fullName} against <PlayerLink name={opponentName}/></p>
           </div>
           <p className="mt-1 truncate text-[10px] text-gray-400">
             <span className="font-semibold uppercase tracking-wide text-gray-500">Recent opponent pattern</span>
@@ -257,7 +262,7 @@ export function MatchPreviewPage() {
               {getInitials(opponentName)}
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-bold text-white">{opponentName}</h2>
+              <h2 className="truncate text-lg font-bold text-white"><PlayerLink name={opponentName}/></h2>
               <p className="truncate text-[11px] text-gray-400">Ranking band scout - {difficultyLabel}</p>
               <p className="mt-1.5 text-[11px] text-gray-400">
                 Rank <span className="font-bold text-white">#{getRankValue(opponentRank)}</span>
