@@ -1,5 +1,5 @@
 import type { GameState } from '../../hooks/useGameState';
-import { careerMessage } from '../careerDepth/shared';
+import { dayNumber } from '../careerDepth/shared';
 export function updateWorldDigest(state: GameState): GameState {
   const r = state.realism;
   if (!r) return state;
@@ -42,8 +42,21 @@ export function updateWorldDigest(state: GameState): GameState {
   if (events.length && climber) lines.push(`Ranking mover: ${climber[0]} climbed ${climber[1]} places after the latest counting results.`);
   const next: GameState = { ...state, realism: { ...r, worldConditions, worldReviewedOn: state.currentDate, seenEvents: [...r.seenEvents, ...events.map(e => e.key)], seenMatches: [...r.seenMatches, ...matches.map(m => m.id)] } };
   if (!lines.length) return next;
-  const id = `world-digest:${events.map(e => e.key).join('|') || matches.map(m => m.id).join('|') || state.currentDate}`;
-  const digest = { id, date: state.currentDate, title: 'Around the tour', lines: lines.slice(0, 12) };
-  next.realism = { ...next.realism!, digest: [digest, ...r.digest].slice(0, 52) };
-  return careerMessage(next, id, digest.title, digest.lines.join('\n'), '/inbox');
+  // One live news edition per Monday-to-Sunday week. New results update it without
+  // creating another unread interruption if the player has already opened it.
+  const day = dayNumber(state.currentDate);
+  const monday = day - ((day + 3) % 7);
+  const week = new Date(monday * 86400000).toISOString().slice(0, 10);
+  const id = `world-digest:week:${week}`;
+  const previous = r.digest.find(d => d.id === id);
+  const digest = { id, date: state.currentDate, title: 'Around the tour',
+    lines: [...new Set([...previous?.lines ?? [], ...lines.slice(0, 12)])] };
+  next.realism = { ...next.realism!, digest: [digest, ...r.digest.filter(d => d.id !== id)].slice(0, 52) };
+  const message = state.inbox.find(m => m.id === id);
+  const update = { id, sender: 'Career Manager', subject: digest.title,
+    preview: digest.lines.join('\n'), priority: 'Medium' as const, date: state.currentDate,
+    read: message?.read ?? false, actionLabel: 'Review tour news', actionRoute: '/inbox' };
+  next.inbox = message ? state.inbox.map(m => m.id === id ? update : m)
+    : [update, ...state.inbox].slice(0, 18);
+  return next;
 }

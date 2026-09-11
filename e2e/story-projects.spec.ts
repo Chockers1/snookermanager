@@ -1,0 +1,24 @@
+import { expect, test } from '@playwright/test';
+import { storyProjectFixture } from '../test-support/storyProjectFixture';
+import { ACTIVE_SAVE_KEY, encodeCareerSave } from '../src/game/saveStorage';
+import { readCareerSave } from './read-career-save';
+for (const width of [1366, 390]) for (const replace of [false, true]) test(`resolve project conflict inside inbox ${width} replace=${replace}`, async ({ page }) => {
+ const { state, story } = storyProjectFixture();
+ await page.setViewportSize({ width, height: 900 });
+ await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), { key: ACTIVE_SAVE_KEY, value: encodeCareerSave(state) });
+ await page.goto('/'); await page.getByRole('button', { name: /Continue Career/ }).click();
+ await expect(page.locator('#main-content')).toBeVisible();
+ await page.evaluate(id => { history.pushState({}, '', '/inbox?message=' + encodeURIComponent(id)); dispatchEvent(new PopStateEvent('popstate')); }, story.id);
+ const region = page.getByRole('region', { name: 'Career decision', exact: true });
+ await expect(region).toContainText('2 / 4 training weeks completed');
+ await expect(region).toContainText('No cancellation fee');
+ await expect(region).toContainText('finishes automatically');
+ await region.getByRole('button', { name: replace ? 'Cancel current project & rebuild cue action' : 'Keep and finish current project', exact: true }).click();
+ await expect(region).toContainText('resolved');
+ const saved = await readCareerSave(page);
+ expect(saved.careerDepth!.project).toMatchObject(replace ? { kind: 'cue-action', completedWeeks: 0 } : { kind: 'long-pot', completedWeeks: 2 });
+ expect(saved.careerDepth!.projectHistory.filter(p => p.status === 'cancelled')).toHaveLength(replace ? 1 : 0);
+ expect(saved.player.cash).toBe(state.player.cash); expect(saved.attributes).toEqual(state.attributes);
+ await expect(page.getByRole('link', { name: /Decision required:/ })).toHaveCount(0);
+ expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});

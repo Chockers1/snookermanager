@@ -44,19 +44,32 @@ export function StoryDecisionPanel({ messageId }: { messageId: string }) {
   const { gameState, actOnCareer } = useGame();
   const story = depthOf(gameState).stories.find(s => s.id === messageId || `review:${s.id}` === messageId);
   if (!story) return null;
+  const project = depthOf(gameState).project;
+  const replacingProject = story.status === 'pending' && project?.status === 'active' && STORY_CHOICES[story.kind].some(c => ['programme', 'technique', 'coach-prep'].includes(c.id));
+  const keepChoice = story.kind === 'television' ? 'protect' : 'continue';
   return <section className="space-y-3 rounded-lg border border-green-500/30 bg-green-500/5 p-3" aria-label="Career decision">
     <p className="text-xs text-gray-300">{story.status === 'pending' ? `Choose a response · available until ${story.expiresDate}` : `${story.status} · ${story.reviewDate ? `review ${story.reviewDate}` : ''}`}</p>
+    {replacingProject && <div className="space-y-2 rounded border border-amber-500/40 bg-surface p-3" aria-label="Current development project">
+      <h3 className="text-sm font-semibold text-white">Current project · {PROJECTS[project.kind].name}</h3>
+      <p className="text-xs text-gray-200">{project.completedWeeks} / {PROJECTS[project.kind].weeks} training weeks completed · {Math.max(0, PROJECTS[project.kind].weeks - project.completedWeeks)} remaining</p>
+      <p className="text-xs leading-5 text-gray-300">{project.note} Keeping this project resolves this decision and lets you continue training. It finishes automatically after the remaining qualifying training weeks.</p>
+      <button type="button" className={button} onClick={() => actOnCareer({ type: 'decision', id: story.id, choice: keepChoice })}>Keep and finish current project</button>
+    </div>}
     {story.status === 'pending' && <div className="grid gap-2 lg:grid-cols-3">{STORY_CHOICES[story.kind].map(choice => {
       const kind = choice.id === 'exhibition' ? 'exhibition' : choice.id === 'media' ? 'appearance' : null;
       const date = storyCommitmentDate(gameState);
       const quote = kind ? commitmentQuote(gameState, kind, date) : null;
       const conflict = quote ? commitmentConflict(gameState, quote.startDate, quote.endDate) : null;
+      const replaces = replacingProject && ['programme', 'technique', 'coach-prep'].includes(choice.id);
+      const missingCoach = choice.id === 'coach-prep' && !gameState.coachContracts.length;
       return <div key={choice.id} className="flex min-w-0 flex-col gap-2 rounded border border-border bg-surface p-3">
         <h3 className="text-sm font-semibold text-white">{choice.label}</h3>
         <p className="flex-1 text-xs leading-5 text-gray-300">{choice.effect}</p>
         {quote && <p className="text-xs text-green-400">{date}–{quote.endDate} · income {money(quote.income)} · cost {money(quote.cost)}</p>}
         {conflict && <p className="text-xs text-amber-300">{conflict}</p>}
-        <button className={button} disabled={Boolean(conflict)} onClick={() => actOnCareer({ type: 'decision', id: story.id, choice: choice.id })}>{choice.label}</button>
+        {replaces && <p className="text-xs leading-5 text-amber-200">Cancels {PROJECTS[project.kind].name}. Earned attribute gains stay; its unfinished progress is archived. The new project starts at week 0. No cancellation fee.</p>}
+        {missingCoach && <p className="text-xs text-amber-200">Requires an active coach. You can keep your current project instead.</p>}
+        <button type="button" className={button} disabled={Boolean(conflict) || missingCoach} onClick={() => actOnCareer({ type: 'decision', id: story.id, choice: choice.id, ...(replaces ? { replaceProjectId: project.id } : {}) })}>{replaces ? `Cancel current project & ${choice.label.toLowerCase()}` : choice.label}</button>
       </div>;
     })}</div>}
     {story.updates.map((update, i) => <p key={i} className="border-l-2 border-green-600 pl-3 text-xs leading-5 text-gray-300">{update}</p>)}

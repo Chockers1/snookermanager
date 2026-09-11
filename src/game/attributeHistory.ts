@@ -39,7 +39,7 @@ function legacyHistory(state: GameState): AttributeHistory {
   if (report?.date && report.date <= state.currentDate) {
     snapshots.push({ date: report.date, attributes: clone(report.attributes) });
     const last = report.lastReport;
-    // A fortnightly report lists every changed attribute, including declines.
+    // A training report lists every changed attribute, including declines.
     if (last && last.endDate === report.date && last.startDate < report.date) {
       const before = clone(report.attributes);
       for (const change of last.changes) before[change.group][change.label] -= change.delta;

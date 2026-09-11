@@ -1,3 +1,5 @@
+import { startingPlayerAbility } from '../game/startingPlayerAbility';
+import { compactRoutineInbox } from '../game/inboxCadence';
 import { blockForRequiredDecision, gateCareerActions, requiredDecisionBlocker, REQUIRED_DECISION_EVENT } from '../game/requiredDecision';
 import { nextLeagueFixture } from '../game/leagueSchedule';
 import { announceTourBriefing } from '../game/tourBriefing';
@@ -19,7 +21,7 @@ import { rememberSaveMetadata } from '../game/saveMetadata';
 import { readRecoveryMetadata } from '../game/recoverySaves';
 import { trainingSkillWork } from '../utils/trainingPlan';
 import { updateInboxReadState, isInboxReadOnlyChange, encodeInboxReadOverlay, applyInboxReadOverlay, inboxReadStorageKey } from '../game/inboxReadState';
-import { formatPercent } from '../utils/formatters';
+import { formatPercent, formatAttribute, formatAttributeChange } from '../utils/formatters';
 import { repairTournamentPayouts, type PayoutRepair } from '../game/payoutRepair';
 import { scheduledPlacementPrize } from '../data/tournamentPrizes';
 import { captureVictoryMessages } from '../game/victoryInbox';
@@ -4605,7 +4607,17 @@ function buildWorldPlayersFromTables(
     );
   });
 
-  return Array.from(seen.values());
+  return Array.from(seen.values()).map(record => {
+    if (record.playerName === player?.fullName) return record;
+    const circuit = (["world", "qSchool", "qTour", "amateur", "senior", "youth"] as const)
+      .find(key => tables[key].some(row => row.playerName === record.playerName)) ?? "amateur";
+    const row = getCompetitionRowForPlayer(tables, circuit, record.playerName);
+    return { ...record, ...startingPlayerAbility({
+      name: record.playerName, age: record.age, circuit,
+      rank: row?.ranking ?? tables[circuit].length, fieldSize: tables[circuit].length,
+      professionalOverall: record.hasTourCard ? record.overallRating : undefined,
+    }) };
+  });
 }
 
 function createEmptyCareerSystems(): CareerSystemsState {
@@ -6599,7 +6611,7 @@ function advanceWholeWeekState(previousState: GameState): GameState {
                   .slice(0, 4)
                   .map(
                     (change) =>
-                      `${change.label} +${change.delta} (now ${change.current})`,
+                      `${change.label} ${formatAttributeChange(change.delta)} (now ${formatAttribute(change.current)})`,
                   )
                   .join(" · ")
               : "Development may be accumulating toward a future rating increase.",
@@ -6803,6 +6815,7 @@ export function enterTournamentState(
           {
             sender: "Tournament Office",
             subject: `Entered ${tournament.name}`,
+            tournamentReference: { id: tournament.id, startDate: tournament.startDate },
             preview: `Entry fee of £${cashRequirement} has been paid. Travel and hotel can now be booked separately.`,
             priority: "High",
             actionLabel: "Book Travel",
@@ -7197,7 +7210,7 @@ function getTrainingAttributeChanges(
 }
 
 function formatTrainingMetricChange(value: number) {
-  return `${value > 0 ? "+" : ""}${value}`;
+  return formatAttributeChange(value);
 }
 
 function buildPersistedPersonalityTraits(
@@ -7390,7 +7403,7 @@ function normalizeInboxMessages(
   tournaments: Tournament[] = [],
   currentDate?: string,
 ): InboxMessage[] {
-  return messages.map((message) => {
+  return compactRoutineInbox(messages.map((message) => {
     const normalizedMessage = formatInboxConfidence({ ...message, read: Boolean(message.read) });
     if (message.subject.startsWith("Invitation: ")) {
       const tournamentName = message.subject.slice("Invitation: ".length);
@@ -7418,7 +7431,7 @@ function normalizeInboxMessages(
       ...normalizedMessage,
       ...inferInboxAction(message),
     };
-  });
+  }), tournaments);
 }
 
 function buildNewCareerInboxMessages(
@@ -7737,6 +7750,7 @@ export function bookTravelState(
           {
             sender: "Travel Desk",
             subject: `${tournament.name} travel booked`,
+            tournamentReference: { id: tournament.id, startDate: tournament.startDate },
             preview: `${travelOption.name} and ${hotelOption.name} are now locked in for £${totalCost}. Arrival ${journey.arrival}; ${stay.minNights} hotel nights through ${journey.hotelThrough}. Later rounds extend your stay at £${estimate.nightlyRate}/night; full-run trip estimate £${estimate.maxCost}.`,
             priority: "Medium",
             actionLabel: "Review Travel",
@@ -7874,6 +7888,7 @@ export function confirmTournamentPreparationState(
           {
             sender: "Performance Team",
             subject: `${tournament.name} preparation confirmed`,
+            tournamentReference: { id: tournament.id, startDate: tournament.startDate },
             preview: `${effects.sharpnessDelta >= 0 ? "+" : ""}${effects.sharpnessDelta} sharpness, ${effects.confidenceDelta >= 0 ? "+" : ""}${effects.confidenceDelta} confidence, ${effects.fatigueDelta} fatigue and ${effects.strainDelta} strain. Temporary form will peak in the opening round.`,
             priority: "Medium",
             actionLabel: "Match Preview",
@@ -17684,7 +17699,9 @@ export function applyTrainingPlanState(
     form: currentForm,
   };
   const reportWeeksTracked = previousReportSnapshot.weeksTracked + 1;
-  const fortnightlyReportDue = reportWeeksTracked >= 2;
+  // The first training settlement in a new calendar month publishes the
+  // accumulated report, including any partial opening month in a new/older save.
+  const monthlyReportDue = previousState.currentDate.slice(0, 7) > previousReportSnapshot.date.slice(0, 7);
   const attributeChanges = getTrainingAttributeChanges(
     previousReportSnapshot.attributes,
     nextAttributes,
@@ -17722,7 +17739,7 @@ export function applyTrainingPlanState(
           .slice(0, 6)
           .map(
             (change) =>
-              `${change.label} +${change.delta} (now ${change.current})`,
+              `${change.label} ${formatAttributeChange(change.delta)} (now ${formatAttribute(change.current)})`,
           )
           .join(", ")
       : "No attributes increased in this block";
@@ -17731,8 +17748,8 @@ export function applyTrainingPlanState(
     : adaptationMultiplier < 0.7
       ? `Fatigue and accumulated strain limited this block to ${Math.round(adaptationMultiplier * 100)}% adaptation. Recovery will restore learning efficiency.`
       : trainingEffects.fatigueDelta < 0
-        ? `Rest and recovery worked as planned. Fatigue dropped by ${Math.abs(trainingEffects.fatigueDelta)} and adaptation capacity recovered.`
-        : `Training effects have been applied for the week. Fatigue shifted by ${trainingEffects.fatigueDelta} based on the current schedule.`;
+        ? `Rest and recovery worked as planned. Fatigue dropped by ${formatAttribute(Math.abs(trainingEffects.fatigueDelta))} and adaptation capacity recovered.`
+        : `Training effects have been applied for the week. Fatigue shifted by ${formatAttributeChange(trainingEffects.fatigueDelta)} based on the current schedule.`;
 
   return finalizeState(
     {
@@ -17752,7 +17769,7 @@ export function applyTrainingPlanState(
           ? Math.max(1, previousState.trainingCondition.injuryWeeks)
           : previousState.trainingCondition.injuryWeeks,
         burnout: nextBurnout,
-        reportSnapshot: fortnightlyReportDue
+        reportSnapshot: monthlyReportDue
           ? {
               weeksTracked: 0,
               attributes: deepCloneAttributes(nextAttributes),
@@ -17765,6 +17782,7 @@ export function applyTrainingPlanState(
               ranking: currentCareerRank,
               form: currentForm,
               lastReport: {
+                cadence: "monthly",
                 seasonNumber: seasonPosition(previousState).season,
                 seasonWeek: seasonPosition(previousState).week,
                 startDate: previousReportSnapshot.date,
@@ -17793,13 +17811,13 @@ export function applyTrainingPlanState(
         morale: nextPlayerMorale,
       },
       inbox: [
-        ...(fortnightlyReportDue
+        ...(monthlyReportDue
           ? [
               createInboxMessage(
                 {
                   sender: "Head Coach",
-                  subject: `Fortnightly training report: ${seasonWeekLabel(previousState)} · ${improvements.length} improved`,
-                  preview: `${improvementSummary}. Review your development, form, ranking and workload below.`,
+                  subject: `Monthly training report: ${seasonWeekLabel(previousState)} · ${improvements.length} improved`,
+                  preview: `${improvementSummary}. Report period: ${previousReportSnapshot.date} to ${previousState.currentDate}. Review your development, form, ranking and workload below.`,
                   priority:
                     overloadInjury || declines.length > improvements.length
                       ? "High"
@@ -17809,14 +17827,14 @@ export function applyTrainingPlanState(
                   summary: [
                     ...improvements.slice(0, 6).map((change) => ({
                       label: change.label,
-                      value: `+${change.delta}`,
-                      detail: `Now ${change.current} · ${change.group}`,
+                      value: formatAttributeChange(change.delta),
+                      detail: `Now ${formatAttribute(change.current)} · ${change.group}`,
                       tone: "positive" as const,
                     })),
                     ...declines.slice(0, 4).map((change) => ({
                       label: change.label,
-                      value: `${change.delta}`,
-                      detail: `Now ${change.current} · ${change.group}`,
+                      value: formatAttributeChange(change.delta),
+                      detail: `Now ${formatAttribute(change.current)} · ${change.group}`,
                       tone: "negative" as const,
                     })),
                     {
@@ -17851,7 +17869,7 @@ export function applyTrainingPlanState(
                     {
                       label: "Confidence",
                       value: `${formatPercent(nextPlayerConfidence)}`,
-                      detail: `${formatTrainingMetricChange(nextPlayerConfidence - (previousReportSnapshot.confidence ?? previousState.player.confidence))}% over two weeks`,
+                      detail: `${formatTrainingMetricChange(nextPlayerConfidence - (previousReportSnapshot.confidence ?? previousState.player.confidence))}% over this report period`,
                       tone:
                         nextPlayerConfidence >=
                         (previousReportSnapshot.confidence ??
@@ -17871,7 +17889,7 @@ export function applyTrainingPlanState(
                     {
                       label: "Fatigue",
                       value: `${formatPercent(nextPlayerFatigue)}`,
-                      detail: `${formatTrainingMetricChange(nextPlayerFatigue - previousReportSnapshot.fatigue)}% over two weeks`,
+                      detail: `${formatTrainingMetricChange(nextPlayerFatigue - previousReportSnapshot.fatigue)}% over this report period`,
                       tone:
                         nextPlayerFatigue >= 70
                           ? ("negative" as const)

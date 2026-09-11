@@ -6,12 +6,44 @@ import { staffUnavailable } from '../../game/seasonLife/staff';
 import { teamConflict, nextTeamMatch } from '../../game/seasonLife/teams';
 import type { TeamEvent } from '../../game/seasonLife/types';
 const button='btn-secondary min-h-10 whitespace-normal px-3 py-2 text-xs';
-export function FormRecoveryPanel(){
- const {gameState:s,actOnCareer}=useGame(),l=s.careerDepth?.seasonLife,f=l?.form;
- return <CareerDisclosure summary={f?`Form assessment · ${f.kind==='long-pot'?'Long openings':'Closing frames'} · ${f.progress.toFixed(0)}% recovery`:'Form assessment · simulation evidence'} title="Form evidence and recovery">
-  <div className="space-y-3 text-sm"><p>{f?.evidence??`${l?.evidence.length??0} matches with recorded simulation evidence. Diagnosis needs an earlier baseline and at least three consistently weaker matches; isolated bad luck causes no penalty.`}</p>
-  {f&&<><p>At assessment: fatigue {f.fatigue.toFixed(2)}%, confidence {f.confidence.toFixed(2)}%. These can contribute; they do not prove causation.</p><p>Recovery {f.progress.toFixed(0)}% · current approach {f.route} · ends by {f.ends}. Maximum three effective skill points in relevant situations; permanent attributes unchanged.</p><div className="flex flex-wrap gap-2">{(['training','coach','protect','patience'] as const).map(route=><button className={button} key={route} aria-pressed={f.route===route} disabled={route==='coach'&&!s.coachContracts.length} onClick={()=>actOnCareer({type:'life-recovery',route})}>{({training:'Targeted training',coach:'Coach-supported recovery',protect:'Tactical protection',patience:'Patience'})[route]}</button>)}</div><p>Training: three relevant sessions per free week. Coach support: two, with an employed coach. Tactical protection: three safety/preparation sessions and a safety-first match approach that sacrifices attacking openings. Benefits do not stack; suitable work aims for about three weeks.</p><Link className="text-green-400" to="/training">Open training and existing technique projects</Link><p>Without a coach, targeted training, protection and patience all remain available. A cue-action rebuild keeps its existing adjustment cost, with no duplicate form penalty.</p></>}
-  <p>Evidence comes from modelled Match Centre visits, including Auto Play and Sim Match. Aggregate Quick Sim results without visit evidence are excluded. An active form issue uses the visit engine in Quick Sim too.</p><div className="overflow-x-auto"><table className="w-full text-left"><caption className="text-left text-gray-400">Bounded evidence window · modelled openings and strong late leads</caption><thead><tr><th>Date</th><th>Openings made / attempts</th><th>Strong leads lost / held</th></tr></thead><tbody>{l?.evidence.slice(-6).map(e=><tr key={e.id}><td>{e.date}</td><td>{e.openingsMade}/{e.openings}</td><td>{e.leadsLost}/{e.strongLeads}</td></tr>)}</tbody></table></div></div>
+export function FormRecoveryPanel() {
+ const { gameState: s, actOnCareer } = useGame();
+ const life = s.careerDepth?.seasonLife, form = life?.form;
+ const evidence = life?.evidence ?? [];
+ const routes = { training: 'Targeted training', coach: 'Coach-supported recovery', protect: 'Tactical protection', patience: 'Patience' };
+ return <CareerDisclosure summary={form ? `Form assessment · ${form.kind === 'long-pot' ? 'Long openings' : 'Closing frames'} · ${form.progress.toFixed(0)}% recovery` : 'Form assessment · simulation evidence'} title="Form evidence and recovery">
+  <div className="min-h-0 space-y-5 overflow-y-auto overscroll-contain border-t border-border p-4 text-sm leading-relaxed text-gray-200 sm:p-5">
+   <section aria-label="Form assessment" className="space-y-2 rounded-lg border border-border bg-background/50 p-4">
+    <h3 className="font-semibold text-white">{form ? 'Current form concern' : evidence.length ? 'Building your performance baseline' : 'No match evidence recorded yet'}</h3>
+    <p>{form?.evidence ?? `${evidence.length} matches with recorded simulation evidence. Diagnosis needs an earlier baseline and at least three consistently weaker matches. Isolated bad luck causes no penalty.`}</p>
+    {form && <p className="text-gray-300">At assessment: fatigue {form.fatigue.toFixed(2)}%, confidence {form.confidence.toFixed(2)}%. These can contribute; they do not prove causation.</p>}
+   </section>
+   {form && <section aria-label="Form recovery choices" className="space-y-3">
+    <h3 className="font-semibold text-white">Recovery · {form.progress.toFixed(0)}%</h3>
+    <p>Current approach: {routes[form.route]}. Ends by {form.ends}.</p>
+    <p>Temporary effects are limited to three effective skill points in relevant situations. Permanent attributes remain unchanged.</p>
+    <div className="grid gap-2 sm:grid-cols-2">{(['training', 'coach', 'protect', 'patience'] as const).map(route => <button className={button} key={route} aria-pressed={form.route === route} disabled={route === 'coach' && !s.coachContracts.length} onClick={() => actOnCareer({ type: 'life-recovery', route })}>{routes[route]}</button>)}</div>
+    <ul className="list-disc space-y-2 pl-5 text-gray-300">
+     <li>Training: three relevant sessions per free week. Coach support: two, with an employed coach.</li>
+     <li>Tactical protection: three safety/preparation sessions and a safety-first match approach, sacrificing attacking openings.</li>
+     <li>Benefits do not stack. Suitable work aims for about three weeks; patience allows recovery within six weeks.</li>
+    </ul>
+    <p className="text-gray-300">Without a coach, training, protection and patience remain available. A cue-action rebuild keeps its existing adjustment cost, with no duplicate form penalty.</p>
+    <Link className="inline-block text-green-400 underline underline-offset-4" to="/training">Open training and existing technique projects</Link>
+   </section>}
+   <section aria-label="Recorded form evidence" className="space-y-3">
+    <h3 className="font-semibold text-white">Recent match evidence</h3>
+    {evidence.length ? <>
+     <p className="text-gray-300">Latest {Math.min(6, evidence.length)} recorded matches. Openings show successful long openings out of attempts; leads show strong late-frame leads lost out of those established.</p>
+     <div className="space-y-2">{evidence.slice(-6).map(record => <dl key={record.id} className="grid gap-3 rounded-lg border border-border bg-background/50 p-3 sm:grid-cols-3">
+      <div><dt className="text-gray-400">Match date</dt><dd className="mt-1 font-semibold tabular-nums text-white">{record.date}</dd></div>
+      <div><dt className="text-gray-400">Long openings made</dt><dd className="mt-1 font-semibold tabular-nums text-white">{record.openingsMade} of {record.openings}</dd></div>
+      <div><dt className="text-gray-400">Strong leads lost</dt><dd className="mt-1 font-semibold tabular-nums text-white">{record.leadsLost} of {record.strongLeads}</dd></div>
+     </dl>)}</div>
+    </> : <p className="rounded-lg border border-dashed border-border p-4 text-gray-300">Play matches in Match Centre to build an evidence record. Auto Play and Sim Match both record visits.</p>}
+    <p className="border-t border-border pt-3 text-gray-300">These are modelled Match Centre visits. Aggregate Quick Sim results without visit evidence are excluded. With an active form issue, Quick Sim also uses the visit engine.</p>
+   </section>
+  </div>
  </CareerDisclosure>;
 }
 export function StaffMovementPanel(){

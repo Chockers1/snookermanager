@@ -288,6 +288,7 @@ export type TrainingSlot = {
 };
 
 export type InboxMessage = {
+  routineArrangement?: { name: string; reference: { id: string; startDate: string }; confirmations: Array<{ stage: string; text: string }> };
   victoryReport?: NonNullable<ReturnType<typeof import("../game/victoryCelebration").victoryCelebration>>;
   tourChangesReport?: import("../game/seasonTourChanges").SeasonTourChanges;
   tournamentReference?: { id: string; startDate: string };
@@ -387,6 +388,7 @@ export type TrainingConditionState = {
     ranking?: number | null;
     form?: number;
     lastReport?: {
+      cadence?: "monthly";
       seasonNumber?: number;
       seasonWeek?: number;
       startDate: string;

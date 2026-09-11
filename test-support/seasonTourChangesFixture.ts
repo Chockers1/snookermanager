@@ -3,7 +3,7 @@ import { createSeasonTourChanges } from '../src/game/seasonTourChanges';
 export function seasonTourChangesFixture() {
   const before=createStarterState();
   const seed=before.worldPlayers.find(p=>p.playerName!==before.player.fullName)!;
-  const player=(name:string,age:number,card=false)=>({...structuredClone(seed),id:'news-'+name,playerName:name,nation:'ENG',age,hasTourCard:card,retired:false,retiredSeason:null,seasons:[],titles:0,majorTitles:0,highestWorldRank:null});
+  const player=(name:string,age:number,card=false)=>({...structuredClone(seed),id:'news-'+name,playerName:name,nation:'ENG',age,overallRating:60,developmentPotential:80,hasTourCard:card,retired:false,retiredSeason:null,seasons:[],titles:0,majorTitles:0,highestWorldRank:null});
   before.worldPlayers=[player('Retiring Champion',49,true),player('Senior Arrival',41,true),player('Q School Graduate',22),player('Q Tour Graduate',23),player('Card Lost',31,true),player('Still Professional',39,true),{...player('Already Retired',55),retired:true,retiredSeason:'2025/26'}];
   const row={...before.competitionTables.senior[0],id:'senior-news',playerName:'Senior Arrival'};
   before.competitionTables.senior=[];

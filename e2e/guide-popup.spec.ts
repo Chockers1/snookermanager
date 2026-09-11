@@ -1,5 +1,5 @@
 import {expect,test} from '@playwright/test';
-import {createNewCareerState} from '../src/hooks/useGameState';
+import {createNewCareerState,createStarterState} from '../src/hooks/useGameState';
 import {ACTIVE_SAVE_KEY,encodeCareerSave} from '../src/game/saveStorage';
 import {readCareerSave} from './read-career-save';
 for(const width of [1366,390])test('guide docks, reopens, saves progress and stays within the screen at '+width,async({page})=>{
@@ -25,4 +25,19 @@ for(const width of [1366,390])test('guide docks, reopens, saves progress and sta
  await page.screenshot({path:`artifacts/career-v012/guide-popup-${width}.png`,fullPage:true});
  await panel.getByRole('button',{name:'Dismiss guide'}).click();await expect(panel).toHaveCount(0);await expect(launcher).toHaveCount(0);
  await page.getByRole('button',{name:'Show first-week guide',exact:true}).click();await expect(panel).toBeVisible();
+});
+
+for(const width of [1366,390])test('ready equipment ticks automatically in an existing guide at '+width,async({page})=>{
+ const state=createNewCareerState();state.equipment=createStarterState().equipment;
+ state.firstWeekGuide!.completed=['training'];state.firstWeekGuide!.minimized=false;
+ await page.setViewportSize({width,height:844});
+ await page.addInitScript(({key,value})=>{if(!sessionStorage.getItem('ready-equipment')){localStorage.setItem(key,value);sessionStorage.setItem('ready-equipment','1')}},{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
+ await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+ const panel=page.getByRole('region',{name:'First week guide'});
+ await expect(panel).toContainText('2 of 6 completed');
+ await expect(panel.getByRole('heading',{name:'Choose and enter an event'})).toBeVisible();
+ await expect(panel.getByRole('button',{name:/Check your match equipment Completed/})).toBeVisible();
+ const saved=await readCareerSave(page);expect(saved.firstWeekGuide?.completed).toContain('equipment');expect(saved.player.cash).toBe(state.player.cash);
+ await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();
+ await expect(panel.getByRole('button',{name:/Check your match equipment Completed/})).toBeVisible();
 });

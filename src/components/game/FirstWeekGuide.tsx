@@ -3,7 +3,7 @@ import {BookOpen,ChevronDown,Check} from 'lucide-react';
 import {getMissingTournamentEquipment} from '../../hooks/useGameState';
 import {Link} from 'react-router-dom';
 import {useGame} from '../../context/useGame';
-import {guideSteps,guideView,type GuideStep} from '../../game/firstWeekGuide';
+import {guideSteps,guideView,firstWeekEntryRoute,type GuideStep} from '../../game/firstWeekGuide';
 
 export function FirstWeekGuide(){
  const {gameState,updateFirstWeekGuide}=useGame();
@@ -27,10 +27,9 @@ export function FirstWeekGuide(){
     {step&&<div>
      <h3 className="font-semibold text-green-300">{step.title}</h3>
      <p className="mt-1 text-xs leading-relaxed text-gray-300">{step.explanation}</p>
-     {step.id==='equipment'&&<p className="mt-2 text-xs text-amber-300">{missing.length?'Still needed: '+missing.join(', '):'Your equipment meets the entry requirements.'}</p>}
+     {step.id==='equipment'&&<p className="mt-2 text-xs text-amber-300">{missing.length?'Still needed: '+missing.join(', '):'Equipment ready — this step is completed automatically.'}</p>}
      <div className="mt-3 flex flex-wrap items-center gap-2">
-      <Link className="btn-primary text-xs" onClick={()=>close()} to={step.id==='equipment'&&!missing.includes('cue')&&missing.length?'/equipment/chalk-tips':step.route}>{step.action}</Link>
-      {step.id==='equipment'&&!guide.completed.includes('equipment')&&<button type="button" disabled={missing.length>0} className="btn-secondary text-xs disabled:opacity-50" onClick={()=>{setSelected(null);updateFirstWeekGuide('equipment')}}>Equipment checked</button>}
+      <Link className="btn-primary text-xs" onClick={()=>{setSelected(null);close()}} to={step.id==='entry'?firstWeekEntryRoute(gameState):step.id==='equipment'&&!missing.includes('cue')&&missing.length?'/equipment/chalk-tips':step.route}>{step.action}</Link>
       {!guide.completed.includes(step.id)&&!guide.skipped.includes(step.id)&&<button type="button" className="text-xs text-gray-400 underline" onClick={()=>{setSelected(null);updateFirstWeekGuide('skip',step.id)}}>Skip this explanation</button>}
      </div>
     </div>}

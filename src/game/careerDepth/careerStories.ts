@@ -2,7 +2,7 @@ import type { GameState } from '../../hooks/useGameState';
 import type { CareerStory, StoryChoice, StoryKind } from './types';
 import { careerMessage, dayNumber, depthOf, plusDays } from './shared';
 import { recordEncounter, getRivalry } from './relationships';
-import { startProject } from './developmentProjects';
+import { startProject, cancelProject, PROJECTS } from './developmentProjects';
 import { commitmentQuote, scheduleCommitment } from './commitments';
 import { supportedConfidence } from '../confidenceSystem';
 
@@ -35,15 +35,23 @@ export function storyCommitmentDate(state: GameState) {
   const earliest = plusDays(eventEnd, 1);
   return state.trainingAppliedWeek === state.week && earliest < depthOf(state).nextSettlementDate ? depthOf(state).nextSettlementDate : earliest;
 }
-export function resolveStory(state: GameState, id: string, choice: StoryChoice): GameState {
+export function resolveStory(state: GameState, id: string, choice: StoryChoice, replaceProjectId?: string): GameState {
   const story = depthOf(state).stories.find(s => s.id === id && s.status === 'pending');
   if (!story || state.currentDate > story.expiresDate || !STORY_CHOICES[story.kind].some(c => c.id === choice)) return { ...state, lastAction: 'This decision is no longer available.' };
   let next = state;
+  let replacedProject: string | undefined;
   if (choice === 'programme' || choice === 'technique' || choice === 'coach-prep') {
-    if (depthOf(state).project?.status === 'active') return { ...state, lastAction: 'Finish or cancel the current development project before replacing it.' };
+    const current = depthOf(state).project;
+    // Validate everything before cancelling. A stale click must not remove a different project.
     if (choice === 'coach-prep' && !state.coachContracts.length) return { ...state, lastAction: 'You need an active coach for coach-managed preparation.' };
-    next = startProject(state, choice === 'technique' ? 'cue-action' : 'pressure');
-  }
+    if (replaceProjectId && (current?.status !== 'active' || current.id !== replaceProjectId)) return { ...state, lastAction: 'Your development project has changed. Review the current project before replacing it.' };
+    if (current?.status === 'active') {
+      if (!replaceProjectId) return { ...state, lastAction: 'Choose whether to keep your current project or cancel and replace it using the controls in this message.' };
+      replacedProject = PROJECTS[current.kind].name;
+      next = cancelProject(state);
+    }
+    next = startProject(next, choice === 'technique' ? 'cue-action' : 'pressure');
+  } else if (replaceProjectId) return { ...state, lastAction: 'This response does not replace a development project.' };
   if (choice === 'support') {
     if (state.player.cash < 90) return { ...state, lastAction: 'Not enough cash for mental support.' };
     next = { ...state, player: { ...state.player, cash: state.player.cash - 90, confidence: supportedConfidence(state.player.confidence, 3) },
@@ -66,7 +74,7 @@ export function resolveStory(state: GameState, id: string, choice: StoryChoice):
   next = { ...next, careerDepth: { ...d, stories: d.stories.map(s => s.id === id ? {
     ...s, choice, status: 'resolved', resolvedDate: state.currentDate, reviewDate: plusDays(state.currentDate, 28),
     resolvedMatchIds: state.matches.map(m => m.id), trainingWeeks: d.trainingWeeks,
-    updates: [...s.updates, `${state.currentDate}: ${selected.label}. ${selected.effect}`],
+    updates: [...s.updates, ...(replacedProject ? [`${state.currentDate}: Cancelled ${replacedProject}; earned attribute gains retained.`] : []), `${state.currentDate}: ${selected.label}. ${selected.effect}`],
   } : s) }, lastAction: `${selected.label} selected. A follow-up is scheduled in four weeks.` };
   if (choice === 'sponsor') {
     const introduction = depthOf(next).commercialIntroduction;

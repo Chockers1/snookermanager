@@ -1,3 +1,4 @@
+import { isChampionshipLeague } from '../game/championshipLeague';
 import { seasonWeekLabel } from '../game/seasonClock';
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -1033,7 +1034,8 @@ describe("complete tournament journey", () => {
 
     expect(result?.tournamentId).toBe(tournament.id);
     expect(result?.playedOn).toBe(tournament.startDate);
-    expect(["Won", "Lost"]).toContain(result?.result);
+    expect(isChampionshipLeague(tournament) ? ["Won", "Lost", "Drawn"] : ["Won", "Lost"]).toContain(result?.result);
+    if (result?.result === "Drawn") expect(result).toMatchObject({ playerFrames: 2, opponentFrames: 2 });
     expect(result).toMatchObject({
       sponsorBonusEarned: expect.any(Number),
       equipmentWear: expect.any(Number),
@@ -1431,20 +1433,22 @@ describe("connected career systems", () => {
     expect(after.player.fatigue).toBe(62);
   });
 
-  it("automatically applies training and sends a detailed inbox report every two advanced weeks", () => {
+  it("automatically applies training and sends a detailed inbox report in the next calendar month", () => {
     const state = createStarterState();
     const firstWeek = advanceWeekState(state);
 
     expect(
       firstWeek.inbox.some((message) =>
-        message.subject.startsWith("Fortnightly training report:"),
+        message.subject.startsWith("Monthly training report:"),
       ),
     ).toBe(false);
     expect(firstWeek.trainingCondition.reportSnapshot?.weeksTracked).toBe(1);
 
-    const secondWeek = advanceWeekState(firstWeek);
+    let secondWeek = advanceWeekState(firstWeek);
+    expect(secondWeek.inbox.some(m => m.subject.startsWith("Monthly training report:"))).toBe(false);
+    for (let week = 0; week < 6 && !secondWeek.inbox.some(m => m.subject.startsWith("Monthly training report:")); week++) secondWeek = advanceWeekState(secondWeek);
     const report = secondWeek.inbox.find((message) =>
-      message.subject.startsWith("Fortnightly training report:"),
+      message.subject.startsWith("Monthly training report:"),
     );
 
     expect(report).toMatchObject({
@@ -1478,7 +1482,7 @@ describe("connected career systems", () => {
     const duplicateApply = applyTrainingPlanState(secondWeek);
     expect(
       duplicateApply.inbox.filter((message) =>
-        message.subject.startsWith("Fortnightly training report:"),
+        message.subject.startsWith("Monthly training report:"),
       ),
     ).toHaveLength(1);
   });

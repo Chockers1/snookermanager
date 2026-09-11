@@ -31,3 +31,10 @@ export function getRatingColour(value: number): 'green' | 'amber' | 'red' {
 export function formatAttribute(value: number): string {
   return Number.isFinite(value) ? value.toFixed(2) : '—'
 }
+
+/** Signed display-only change; suppress floating-point tails and negative zero. */
+export function formatAttributeChange(value: number): string {
+  if (!Number.isFinite(value)) return '—'
+  const rounded = Number(value.toFixed(2))
+  return `${rounded > 0 ? '+' : ''}${rounded.toFixed(2)}`
+}

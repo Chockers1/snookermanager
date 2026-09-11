@@ -3,7 +3,7 @@ import { Activity, AlertTriangle, BrainCircuit, HeartPulse, ShieldAlert, Target 
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { useGame } from '../context/useGame'
-import { formatPercent } from '../utils/formatters'
+import { formatPercent, formatAttribute, formatAttributeChange } from '../utils/formatters'
 
 const metricIcons = [Activity, HeartPulse, BrainCircuit, Activity, ShieldAlert, Target]
 
@@ -59,9 +59,10 @@ export function TrainingReportPage() {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase text-gray-500">Training</p>
-          <h1 className="mt-1 text-2xl font-bold text-white">Fortnightly Training Report</h1>
+          <h1 className="mt-1 text-2xl font-bold text-white">{latestReport && !latestReport.cadence ? 'Training Report' : 'Monthly Training Report'}</h1>
           {latestReport?.seasonNumber !== undefined && <p className="mt-1 text-xs text-green-400">Season {latestReport.seasonNumber} · Week {latestReport.seasonWeek}</p>}
-          <p className="mt-1 max-w-3xl text-sm text-gray-400">Two-week feedback for {gameState.player.fullName}: actual attribute movement, fatigue, and next-focus guidance{latestReport ? ` from ${latestReport.startDate} to ${latestReport.endDate}` : ''}.</p>
+          <p className="mt-1 text-xs text-gray-400">Reports arrive with the first training update of each new calendar month.</p>
+          <p className="mt-1 max-w-3xl text-sm text-gray-400">Recorded feedback for {gameState.player.fullName}: actual attribute movement, fatigue, and next-focus guidance{latestReport ? ` from ${latestReport.startDate} to ${latestReport.endDate}` : ''}.</p>
         </div>
         <button type="button" onClick={() => navigate('/training')} className="btn-primary shrink-0 text-xs">View Next Week Plan</button>
       </div>
@@ -88,7 +89,7 @@ export function TrainingReportPage() {
               <div className="card-body space-y-3">
                 {reportGains.map((gain) => (
                   <div key={gain.label}>
-                    <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{gain.label}</span><span className="text-white">{gain.current} <span className={gain.change > 0 ? 'text-green-400' : 'text-gray-500'}>{gain.change > 0 ? `+${gain.change}` : '+0'}</span></span></div>
+                    <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{gain.label}</span><span className="text-white">{formatAttribute(gain.current)} <span className={gain.change > 0 ? 'text-green-400' : 'text-gray-500'}>{formatAttributeChange(gain.change)}</span></span></div>
                     <ProgressBar value={gain.current} tone={gain.current >= 75 ? 'green' : gain.current >= 65 ? 'amber' : 'red'} compact />
                   </div>
                 ))}
@@ -145,7 +146,7 @@ export function TrainingReportPage() {
                   <LineChart data={trainingLoadChart}>
                     <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} width={30} />
-                    <Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 10 }} />
+                    <Tooltip formatter={value => formatAttribute(Number(value))} contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 10 }} />
                     <Line type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2} dot={{ r: 2 }} />
                     <Line type="monotone" dataKey="optimal" stroke="#94a3b8" strokeDasharray="5 5" dot={false} />
                   </LineChart>
@@ -160,7 +161,7 @@ export function TrainingReportPage() {
                   <BarChart data={trainingCategoryGains}>
                     <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} width={30} />
-                    <Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 10 }} />
+                    <Tooltip formatter={value => formatAttribute(Number(value))} contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 10 }} />
                     <Bar dataKey="value" fill="#22c55e" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>

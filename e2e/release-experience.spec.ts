@@ -11,6 +11,7 @@ for(const [startingLevelId,age] of [['start-club-junior',12],['start-rookie-pro'
  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
  const guide=page.getByRole('region',{name:'First week guide'});
  await guide.getByRole('link',{name:'Open training',exact:true}).click();await page.getByRole('button',{name:'Apply Plan',exact:true}).click();await page.getByRole('button',{name:'Open first-week guide',exact:true}).click();
+ await guide.getByRole('list',{name:'Six first-week steps'}).getByRole('button',{name:/Check your match equipment/}).click();
  await guide.getByRole('link',{name:'Check equipment',exact:true}).click();
  const cue=[...cueMarketplaceCatalog].sort((a,b)=>a.price-b.price)[0];
  await page.getByRole('button').filter({has:page.getByRole('heading',{name:cue.name,exact:true})}).click();
@@ -19,7 +20,7 @@ for(const [startingLevelId,age] of [['start-club-junior',12],['start-rookie-pro'
  const chalk=[...chalkCatalog].sort((a,b)=>a.cost-b.cost)[0];await page.getByRole('button').filter({has:page.getByRole('heading',{name:chalk.name,exact:true})}).click();await page.getByRole('button',{name:/Buy chalk pack/}).click();
  await page.getByRole('tablist',{name:'Equipment categories'}).getByRole('tab',{name:'Tips',exact:true}).click();
  const tip=[...tipCatalog].sort((a,b)=>a.cost-b.cost)[0];await page.getByRole('button').filter({has:page.getByRole('heading',{name:tip.name,exact:true})}).click();await page.getByRole('button',{name:'Buy Tip',exact:true}).click();
- await page.getByRole('button',{name:'Open first-week guide',exact:true}).click();await guide.getByRole('button',{name:'Equipment checked'}).click();
+ await page.getByRole('button',{name:'Open first-week guide',exact:true}).click();await expect(guide.getByRole('list',{name:'Six first-week steps'}).getByRole('button',{name:/Check your match equipment Completed/})).toBeVisible();
  await expect(guide).toContainText('Choose and enter an event');
  const equipped=await readCareerSave(page);const event=getNextEligibleTournament(equipped)!;expect(event).toBeTruthy();
  await guide.getByRole('link',{name:'Open calendar',exact:true}).click();await navigate(page,'/calendar?tournament='+event.id);

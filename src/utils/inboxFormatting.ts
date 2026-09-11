@@ -1,3 +1,4 @@
+import { formatAttribute, formatAttributeChange } from './formatters';
 import type { InboxMessage } from '../types/game';
 
 function confidenceNumber(raw: string): string {
@@ -18,6 +19,21 @@ export function formatInboxConfidence<T extends Pick<InboxMessage, 'preview' | '
       ...item,
       value: item.value.replace(/^[+-]?\d+(?:\.\d+)?/, confidenceNumber),
       detail: item.detail?.replace(/^[+-]?\d+(?:\.\d+)?/, confidenceNumber),
+    } : item),
+  };
+}
+
+/** Old inbox strings retain their historical values; round their presentation without rebuilding reports. */
+export function formatInboxTrainingReport<T extends Pick<InboxMessage, 'subject' | 'preview' | 'summary'>>(message: T): T {
+  if (!/^(?:Monthly|Fortnightly) training report:/.test(message.subject)) return message;
+  return {
+    ...message,
+    preview: message.preview.replace(/([+-]?\d+(?:\.\d+)?) \(now ([+-]?\d+(?:\.\d+)?)\)/g,
+      (_, delta: string, current: string) => `${formatAttributeChange(Number(delta))} (now ${formatAttribute(Number(current))})`),
+    summary: message.summary?.map(item => /^Now [+-]?\d/.test(item.detail ?? '') && /· (technical|mental|physical)$/.test(item.detail ?? '') ? {
+      ...item,
+      value: formatAttributeChange(Number(item.value)),
+      detail: item.detail!.replace(/^(Now )([+-]?\d+(?:\.\d+)?)/, (_, prefix: string, current: string) => prefix + formatAttribute(Number(current))),
     } : item),
   };
 }

@@ -3,7 +3,7 @@ import { SeasonLifeInbox } from '../components/career/SeasonLifePanels';
 import { InboxReportSummary } from '../components/game/InboxReportSummary';
 import { captureVictoryMessages, victoryMessageTitle, victoryMessagePreview } from '../game/victoryInbox';
 import { qualificationReportForMessage } from '../game/qualificationReport';
-import { formatInboxConfidence } from '../utils/inboxFormatting';
+import { formatInboxConfidence, formatInboxTrainingReport } from '../utils/inboxFormatting';
 import { SeasonTourChangesReport } from '../components/game/SeasonTourChangesReport';
 import { TournamentHistoryBriefing } from '../components/game/TournamentHistoryBriefing';
 import { seasonStartReportForMessage } from '../game/seasonStartReport';
@@ -102,7 +102,7 @@ export function InboxPage() {
 
   const filteredInbox = useMemo(
     () =>
-      captureVictoryMessages(gameState).inbox.map(formatInboxConfidence).filter((message) => {
+      captureVictoryMessages(gameState).inbox.map(formatInboxConfidence).map(formatInboxTrainingReport).filter((message) => {
         if (showActionableOnly && !message.actionRoute) return false;
         if (categoryFilter === "Unread") return !message.read;
         if (categoryFilter === "High Priority")

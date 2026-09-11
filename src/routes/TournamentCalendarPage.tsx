@@ -81,10 +81,17 @@ function progressTone(tone: 'green' | 'amber' | 'red' | 'blue') {
 }
 
 export function TournamentCalendarPage() {
+  const [searchParams] = useSearchParams()
+  // Following a new event link must replace stale month/filter selections on this same page.
+  return <TournamentCalendarContent key={searchParams.toString()} />
+}
+
+function TournamentCalendarContent() {
   const { gameState, enterTournament, withdrawTournament } = useGame()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const linkedTournament = gameState.tournaments.find(t => t.id === searchParams.get('tournament'))
+    ?? (searchParams.get('guide') === 'entry' ? getNextEligibleTournament(gameState) : undefined)
   const calendarData = useMemo(() => buildCalendarData(gameState), [gameState])
   const liveTournamentsById = new Map(gameState.tournaments.map((event) => [event.id, event]))
   const equipmentReady = Boolean(gameState.equipment.currentCueId && gameState.equipment.currentChalkId && gameState.equipment.currentTipId)
@@ -94,7 +101,10 @@ export function TournamentCalendarPage() {
   const [view, setView] = useState<'list' | 'month' | 'board'>('list')
   const [circuitFilter, setCircuitFilter] = useState('All circuits')
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [levelFilter, setLevelFilter] = useState<CalendarLevelFilter>('All Tours')
+  const [levelFilter, setLevelFilter] = useState<CalendarLevelFilter>(() => {
+    const event = calendarData.events.find(event => event.id === linkedTournament?.id)
+    return event ? getTournamentLevel(event) : 'All Tours'
+  })
   const [selectedTournamentId, setSelectedTournamentId] = useState(() => linkedTournament?.id ?? getNextEligibleTournament(gameState)?.id ?? gameState.tournaments[0]?.id ?? '')
   const activeMonth = { year: Math.floor(monthIndex / 12), month: ((monthIndex % 12) + 12) % 12, label: monthLongLabels[((monthIndex % 12) + 12) % 12] + ' ' + Math.floor(monthIndex / 12) }
   const circuits = [...new Set(calendarData.events.filter(event => levelFilter === 'All Tours' || getTournamentLevel(event) === levelFilter).map(event => event.tourCircuit))].sort()
@@ -232,7 +242,7 @@ export function TournamentCalendarPage() {
             <div className="card-header border-t border-border">
               <div className="flex flex-wrap items-center gap-3">
                 {levelFilters.map((filter) => (
-                  <button key={filter} type="button" onClick={() => { setLevelFilter(filter); setCircuitFilter('All circuits') }} className={levelFilter === filter ? 'tab-active text-[10px]' : 'tab-inactive text-[10px]'}>{filter === 'Legacy' ? 'Seniors & Legends' : filter}</button>
+                  <button key={filter} type="button" aria-pressed={levelFilter === filter} onClick={() => { setLevelFilter(filter); setCircuitFilter('All circuits') }} className={levelFilter === filter ? 'tab-active text-[10px]' : 'tab-inactive text-[10px]'}>{filter === 'Legacy' ? 'Seniors & Legends' : filter}</button>
                 ))}
               </div>
             </div>

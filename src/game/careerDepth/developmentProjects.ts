@@ -22,6 +22,12 @@ export function startProject(state: GameState, kind: ProjectKind): GameState {
     note: 'Complete at least three relevant sessions per training week. Competition or injury pauses progress.',
   } }, lastAction: `Started ${PROJECTS[kind].name}. Select relevant sessions in your timetable.` };
 }
+export function cancelProject(state: GameState): GameState {
+  const d = depthOf(state);
+  return { ...state, careerDepth: { ...d, project: null,
+    projectHistory: d.project?.status === 'active' ? [...d.projectHistory, { ...d.project, status: 'cancelled', note: 'Cancelled without a permanent attribute penalty.' }] : d.projectHistory },
+    lastAction: 'Project cancelled; temporary cue-action penalty removed.' };
+}
 export function partnerAvailable(state: GameState) {
   const id = depthOf(state).partnerId;
   const partner = state.worldPlayers.find(p => p.id === id);

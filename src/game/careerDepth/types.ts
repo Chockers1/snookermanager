@@ -67,7 +67,7 @@ export type CareerDepthAction =
   | { type: 'partner'; id: string | null }
   | { type: 'partner-focus'; skill: string }
   | { type: 'coach-review'; id: string }
-  | { type: 'decision'; id: string; choice: StoryChoice }
+  | { type: 'decision'; id: string; choice: StoryChoice; replaceProjectId?: string }
   | { type: 'commitment'; kind: CommitmentKind; startDate: string }
   | { type: 'cancel-commitment'; id: string }
   | { type: 'strategy'; strategy: Strategy; targets: string[] }

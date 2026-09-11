@@ -11,7 +11,7 @@ import type { CareerDepthAction } from './types';
 import { careerMessage, createCareerDepth, depthOf, pendingStory, plusDays, uniqueOpponentId } from './shared';
 import { reconcileStories, resolveStory } from './careerStories';
 import { scheduleCommitment, settleCommitments } from './commitments';
-import { startProject } from './developmentProjects';
+import { startProject, cancelProject } from './developmentProjects';
 import { approveSchedule, runScheduleAssistance } from './seasonPlanning';
 import { partnerCandidates, recordEncounter, reviewCoachPlan } from './relationships';
 
@@ -51,8 +51,7 @@ export function careerDepthAction(state: GameState, action: CareerDepthAction): 
     case 'season-block': return reserveSeasonBlock(state,action);
     case 'remove-season-block': return removeSeasonBlock(state,action.id);
     case 'project': return startProject(state, action.kind);
-    case 'cancel-project': return { ...state, careerDepth: { ...d, project: null,
-      projectHistory: d.project?.status === 'active' ? [...d.projectHistory, { ...d.project, status: 'cancelled', note: 'Cancelled without a permanent attribute penalty.' }] : d.projectHistory }, lastAction: 'Project cancelled; temporary cue-action penalty removed.' };
+    case 'cancel-project': return cancelProject(state);
     case 'partner':
       if (action.id && !partnerCandidates(state).some(p => p.id === action.id)) return { ...state, lastAction: 'This player is not available as a practice partner.' };
       return { ...state, careerDepth: { ...d, partnerId: action.id }, lastAction: action.id ? 'Practice partner selected. One existing technical session each free week becomes a shared session.' : 'Practice partnership ended.' };
@@ -60,7 +59,7 @@ export function careerDepthAction(state: GameState, action: CareerDepthAction): 
       if (!['Long Potting', 'Break Building', 'Cue Ball Control', 'Safety Play'].includes(action.skill)) return state;
       return { ...state, careerDepth: { ...d, partnerFocus: action.skill }, lastAction: `Shared practice now targets ${action.skill}.` };
     case 'coach-review': return reviewCoachPlan(state, action.id);
-    case 'decision': return resolveStory(state, action.id, action.choice);
+    case 'decision': return resolveStory(state, action.id, action.choice, action.replaceProjectId);
     case 'commitment': return scheduleCommitment(state, action.kind, action.startDate);
     case 'cancel-commitment': {
       const c = d.commitments.find(c => c.id === action.id && c.status === 'scheduled');
