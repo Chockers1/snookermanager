@@ -1,6 +1,6 @@
 import { formatPercent } from '../../utils/formatters';
 import { PlayerLink } from '../game/PlayerLink';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import { useGame } from '../../context/useGame';
@@ -28,10 +28,10 @@ export function CareerEditor({ title, children, onClose, required = false }: { t
     </div>
   </dialog>, document.body);
 }
-export function CareerDisclosure({ summary, title, children }: { summary: ReactNode; title: string; children: ReactNode }) {
+export function CareerDisclosure({ summary, title, children, onOpenChange }: { summary: ReactNode; title: string; children: ReactNode; onOpenChange?: (open:boolean)=>void }) {
   const location = useLocation();
   const [open, setOpen] = useState(title === 'Plan your season and commitments' && new URLSearchParams(location.search).has('commitments'));
-  return <section className={disclosure}><button type="button" aria-haspopup="dialog" className="w-full cursor-pointer px-3 py-2 text-left font-semibold text-white" onClick={() => setOpen(true)}>▸ {summary}</button>{open && <CareerEditor title={title} onClose={() => setOpen(false)}>{children}</CareerEditor>}</section>;
+  return <section className={disclosure}><button type="button" aria-haspopup="dialog" className="w-full cursor-pointer px-3 py-2 text-left font-semibold text-white" onClick={() => { setOpen(true); onOpenChange?.(true); }}>▸ {summary}</button>{open && <CareerEditor title={title} onClose={() => { setOpen(false); onOpenChange?.(false); }}>{children}</CareerEditor>}</section>;
 }
 
 export function CareerDecisionNotice() {
@@ -91,10 +91,12 @@ export function DevelopmentPanel() {
 export function SeasonPlanningPanel() {
   const { gameState, actOnCareer } = useGame();
   const d = depthOf(gameState);
+  const location = useLocation();
+  const [expanded, setExpanded] = useState(new URLSearchParams(location.search).has('commitments'));
   const [tourFilter, setTourFilter] = useState<PlannerTour | 'Current tour' | 'All tours'>('Current tour');
   const [period, setPeriod] = useState<'block' | 'season'>('block');
   const tour = tourFilter === 'Current tour' ? currentPlannerTour(gameState) : tourFilter;
-  const rows = recommendSeason(gameState, tour);
+  const rows = useMemo(() => expanded ? recommendSeason(gameState, tour) : [], [expanded, gameState, tour]);
   const visibleRows = period === 'block' ? rows.filter(r => r.inApprovalWindow) : rows;
   const [ids, setIds] = useState<string[]>([]);
   const [cap, setCap] = useState<number | null>(null);
@@ -105,7 +107,7 @@ export function SeasonPlanningPanel() {
   const conflict = commitmentConflict(gameState, quote.startDate, quote.endDate);
   const selected = rows.filter(r => ids.includes(r.event.id) && r.inApprovalWindow && !r.blockedReason);
   const total = selected.reduce((n, r) => n + r.total, 0);
-  return <CareerDisclosure title="Plan your season and commitments" summary={<>Season strategy & commitments · {STRATEGIES[d.strategy]} · {d.schedule?.enabled ? `${money(d.schedule.spent)} / ${money(d.schedule.cap)} approved` : 'Assistance off'}</>}>
+  return <CareerDisclosure onOpenChange={setExpanded} title="Plan your season and commitments" summary={<>Season strategy & commitments · {STRATEGIES[d.strategy]} · {d.schedule?.enabled ? `${money(d.schedule.spent)} / ${money(d.schedule.cap)} approved` : 'Assistance off'}</>}>
     <div className={body}>
       <label className="flex flex-col gap-1">Career strategy<select className={input} value={d.strategy} onChange={e => { actOnCareer({ type: 'strategy', strategy: e.target.value as Strategy, targets: d.targets }); setIds([]); }}>{Object.entries(STRATEGIES).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
       {d.strategy === 'majors' && <fieldset className="flex flex-wrap gap-3"><legend className="mb-2 text-gray-400">Choose up to three peak events</legend>{rows.filter(r => (r.event.prestige ?? 0) >= 4 || r.event.type === 'Major').map(r => <label key={r.event.id} className="flex items-center gap-2"><input type="checkbox" checked={d.targets.includes(r.event.id)} disabled={!d.targets.includes(r.event.id) && d.targets.length >= 3} onChange={e => actOnCareer({ type: 'strategy', strategy: d.strategy, targets: e.target.checked ? [...d.targets, r.event.id] : d.targets.filter(id => id !== r.event.id) })} />{r.event.name}</label>)}</fieldset>}

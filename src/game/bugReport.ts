@@ -1,5 +1,5 @@
 import type { GameState } from '../hooks/useGameState';
-import { ACTIVE_SAVE_KEY, decodeCareerSave } from './saveStorage';
+import { ACTIVE_SAVE_KEY, readCareerStorage, decodeCareerSave } from './saveStorage';
 import { readAccessibility } from './accessibility';
 declare const __GAME_BUILD__: {version:string;revision:string;builtAt:string};
 export const gameBuild=typeof __GAME_BUILD__==='undefined'?{version:'0.0.0',revision:'development',builtAt:'unknown'}:__GAME_BUILD__;
@@ -18,7 +18,7 @@ export function recordDiagnosticAction(state:GameState,route:string){
 export function recordDiagnosticError(error:unknown){const e=error instanceof Error?error:new Error(String(error));errors.push({at:new Date().toISOString(),message:e.message.slice(0,2000),stack:e.stack?.slice(0,6000)});if(errors.length>10)errors.shift()}
 export function buildBugReport(state:GameState|null,description:string,route:string){
  let save:unknown=state;let rawSave:string|null=null;
- if(!state){try{rawSave=localStorage.getItem(ACTIVE_SAVE_KEY);save=rawSave?JSON.parse(decodeCareerSave(rawSave)):null}catch{/* Retain the raw damaged save for diagnosis. */}}
+ if(!state){try{rawSave=readCareerStorage(ACTIVE_SAVE_KEY);save=rawSave?JSON.parse(decodeCareerSave(rawSave)):null}catch{/* Retain the raw damaged save for diagnosis. */}}
  const candidate=save&&typeof save==='object'?save as Partial<GameState>:null;
  const reportState=state??(candidate?.player&&typeof candidate.player.fullName==='string'&&typeof candidate.worldSeed==='number'&&candidate.tournamentProgress?candidate as GameState:null);
  return {format:'snooker-bug-report',reportVersion:1,createdAt:new Date().toISOString(),game:gameBuild,description:description.slice(0,8000),route:route.split('?')[0],environment:{userAgent:typeof navigator==='undefined'?'Unknown':navigator.userAgent,viewport:typeof window==='undefined'?null:{width:innerWidth,height:innerHeight},accessibility:readAccessibility()},progress:reportState?{player:reportState.player.fullName,season:reportState.season,date:reportState.currentDate,week:reportState.week,event:reportState.tournamentProgress.tournamentId,round:reportState.tournamentProgress.currentRound}:null,recentActions:readDiagnosticActions().filter(a=>reportState&&a.career===diagnosticCareer(reportState)),errors:[...errors],save,...(!state&&save===null&&rawSave?{unreadableSave:rawSave}:{})};

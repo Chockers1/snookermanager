@@ -1,3 +1,5 @@
+import { pendingStory } from '../game/careerDepth/shared';
+import { SeasonLifeInbox } from '../components/career/SeasonLifePanels';
 import { InboxReportSummary } from '../components/game/InboxReportSummary';
 import { captureVictoryMessages, victoryMessageTitle, victoryMessagePreview } from '../game/victoryInbox';
 import { qualificationReportForMessage } from '../game/qualificationReport';
@@ -95,7 +97,7 @@ export function InboxPage() {
   const [categoryFilter, setCategoryFilter] = useState<InboxFilter>("All");
   const [showActionableOnly, setShowActionableOnly] = useState(false);
   const [selectedMessageId, setSelectedMessageId] = useState(
-    searchParams.get("message") ?? gameState.inbox[0]?.id ?? "",
+    searchParams.get("message") ?? pendingStory(gameState)?.id ?? gameState.inbox[0]?.id ?? "",
   );
 
   const filteredInbox = useMemo(
@@ -305,6 +307,7 @@ export function InboxPage() {
                 {seasonStartReport ? 'Your career position, upcoming entries and previous tournament results.' : gameState.realism?.digest.some(d => d.id === selectedMessage.id) ? 'Results and milestones from your simulated tour.' : selectedMessage.preview}
               </p>}
               <StoryDecisionPanel messageId={selectedMessage.id} />
+      <SeasonLifeInbox messageId={selectedMessage.id} />
               <WorldDigestPanel messageId={selectedMessage.id} />
 
               {tourChangesReport ? <SeasonTourChangesReport report={tourChangesReport} /> : seasonStartReport ? <SeasonStartReport report={seasonStartReport} live={seasonStartReport.season === gameState.season} /> : seasonReport ? <SeasonEndReport report={seasonReport} /> : eventFinance ? <PostEventReport finance={eventFinance} summary={selectedSummary} qualification={qualification} rankingSnapshot={selectedMessage.eventRanking} victory={selectedMessage.victoryReport} /> : selectedSummary.length ? (

@@ -12,10 +12,10 @@ test('blocked entry names its commitment and can be resolved without bypassing g
   state.player.confidence = 79.39999999999999;
   state.careerDepth = { ...depthOf(state), commitments: [commitmentQuote(state, 'exhibition', event.startDate)] };
   await open(page, '/tournaments/hub', state);
-  await expect(page.getByText(/Entry blocked: Paid exhibition/)).toBeVisible();
-  await expect(page.locator('#main-content')).toContainText('79% confidence');
+  await expect(page.getByText(/Paid exhibition .* overlaps/)).toBeVisible();
+  await expect(page.locator('#main-content')).toContainText('79.4% confidence');
   await expect(page.locator('#main-content')).not.toContainText('79.39999999999999');
-  await page.getByRole('button', { name: 'Manage Calendar Clash', exact: true }).click();
+  await page.getByRole('button', { name: 'Manage calendar clash', exact: true }).click();
   const editor = page.getByRole('dialog', { name: 'Plan your season and commitments' });
   await expect(editor).toBeVisible();
   expect((await saved(page)).tournaments.find(t => t.id === event.id)?.status).not.toBe('Entered');

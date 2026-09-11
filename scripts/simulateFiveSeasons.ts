@@ -1,3 +1,7 @@
+import { repairAuditTournamentFlags } from '../src/utils/auditTournamentFlags';
+export { repairAuditTournamentFlags } from '../src/utils/auditTournamentFlags';
+import { recordCenturyAudit, playCenturyMatch } from './centuryAuditRecorder';
+import { manageSeasonLife } from './seasonLifeAuditPolicy';
 import { buildFocusedTrainingPlan } from '../src/utils/trainingPlan'
 import { CareerRecoveryAudit } from './lib/careerRecoveryAudit'
 const recoveryAudit = new CareerRecoveryAudit()
@@ -21,7 +25,7 @@ import {
   resolveTournamentFormat,
 } from '../src/data/tournamentFormats'
 import type { Chalk, Coach, Cue, Tip, Tournament } from '../src/types/game'
-import { buildCanonicalTournamentResult, type CanonicalTournamentResult, isNonCompetitiveTournamentResult, getBestRecordedFinish } from '../src/utils/canonicalTournamentResult'
+import { getCanonicalFinishFlags, buildCanonicalTournamentResult, type CanonicalTournamentResult, isNonCompetitiveTournamentResult, getBestRecordedFinish } from '../src/utils/canonicalTournamentResult'
 import {
   acceptSponsorState,
   advanceWeekState,
@@ -292,7 +296,7 @@ type SimulationReport = {
   supportMetrics: SupportProfileMetrics | null
   statusIntegrityAudit: StatusIntegrityAudit
   seasons: SeasonReport[]
-  longCareerAudit?: {eligibilityPolicy:string;trainingPolicy:string;calibrationAdjustments:boolean;recovery: ReturnType<CareerRecoveryAudit['summary']>; development: ReturnType<typeof developmentSnapshot>[]; cardChanges: Array<{date:string;age:number;hasTourCard:boolean;source:string}>}
+  longCareerAudit?: {managerPolicy:string;eligibilityPolicy:string;trainingPolicy:string;calibrationAdjustments:boolean;recovery: ReturnType<CareerRecoveryAudit['summary']>; development: ReturnType<typeof developmentSnapshot>[]; cardChanges: Array<{date:string;age:number;hasTourCard:boolean;source:string}>}
 }
 
 type CompetitionLevelKey =
@@ -1110,10 +1114,6 @@ function countsAsRankingTitle(classification: TournamentClassification) {
   return classification.isRankingEvent && !classification.isQualifyingEvent
 }
 
-function countsAsMajorTitle(classification: TournamentClassification) {
-  return classification.isMajor && !classification.isQualifyingEvent
-}
-
 function buildTournamentSubsetRecord(
   label: string,
   tournaments: SeasonReport['tournaments'],
@@ -1144,8 +1144,8 @@ function buildTournamentSubsetRecord(
   return record
 }
 
-function buildTitleSummary(tournaments: SeasonReport['tournaments']): TournamentTitleSummary {
-  return tournaments.reduce<TournamentTitleSummary>((summary, tournament) => ({
+export function buildTitleSummary(tournaments: SeasonReport['tournaments']): TournamentTitleSummary {
+  return tournaments.map(repairAuditTournamentFlags).reduce<TournamentTitleSummary>((summary, tournament) => ({
     totalTitles: summary.totalTitles + (tournament.countedInTotalTitleRecord ? 1 : 0),
     rankingTitles: summary.rankingTitles + (tournament.countedInRankingTitleRecord ? 1 : 0),
     majorTitles: summary.majorTitles + (tournament.countedInMajorTitleRecord ? 1 : 0),
@@ -1643,8 +1643,7 @@ function getBestTournamentResult(tournaments: SeasonReport['tournaments']) {
 }
 
 function isMajorStyleTournament(tournament: Pick<SeasonReport['tournaments'][number], 'name' | 'type'>) {
-  return /major/i.test(tournament.type)
-    || /world championship|uk major|uk championship|tour championship|masters-style|champion of champions/i.test(tournament.name)
+  return tournament.type === 'Major' && !/qualif/i.test(tournament.name)
 }
 
 function isWorldChampionshipMainDrawName(name: string | null | undefined) {
@@ -2486,24 +2485,25 @@ function hasTrackedTournamentEntry(entry: TournamentHistorySnapshot | null | und
   return entry != null && entry.status !== 'Skipped' && entry.status !== 'High Cost' && (entry.matchesPlayed > 0 || entry.status === 'Entered' || !isNonCompetitiveTournamentResult(entry.result))
 }
 
-function getSeasonReportCanonicalResult(
+export function getSeasonReportCanonicalResult(
   entry: TournamentHistorySnapshot,
   tournament: Tournament | undefined,
   classification: TournamentClassification | null,
   levelBucket: CompetitionLevelKey,
 ) {
   const rankingTitleEligible = Boolean(classification?.isRankingEvent && !classification.isQualifyingEvent)
-  const majorTitleEligible = Boolean(classification?.isMajor && !classification.isQualifyingEvent)
+  const majorTitleEligible = entry.eventType === 'Major' && !classification?.isQualifyingEvent
   const worldTitleEligible = Boolean(classification?.isWorldMainDraw)
 
   if (entry.canonicalResult) {
     return {
       ...entry.canonicalResult,
+      ...getCanonicalFinishFlags(entry.canonicalResult.roundReached,entry.result),
       levelBucket,
       reportingClass: classification?.reportingClass ?? entry.canonicalResult.reportingClass,
-      isRankingTitle: entry.canonicalResult.isTitle && rankingTitleEligible,
-      isMajorTitle: entry.canonicalResult.isTitle && majorTitleEligible,
-      isWorldTitle: entry.canonicalResult.isTitle && worldTitleEligible,
+      isRankingTitle: getCanonicalFinishFlags(entry.canonicalResult.roundReached,entry.result).isTitle && rankingTitleEligible,
+      isMajorTitle: getCanonicalFinishFlags(entry.canonicalResult.roundReached,entry.result).isTitle && majorTitleEligible,
+      isWorldTitle: getCanonicalFinishFlags(entry.canonicalResult.roundReached,entry.result).isTitle && worldTitleEligible,
     }
   }
 
@@ -2541,14 +2541,14 @@ function getSeasonReportCanonicalResult(
     matchesPlayed: isNonCompetitiveTournamentResult(entry.result) ? 0 : entry.matchesPlayed,
     wins: isNonCompetitiveTournamentResult(entry.result) ? 0 : entry.wins,
     losses: isNonCompetitiveTournamentResult(entry.result) ? 0 : entry.losses,
-    isTitle: /winner|champion/i.test(entry.result),
+    isTitle: /^(winner|champion)$/i.test(entry.result.trim()),
     isFinal: /winner|champion|final/i.test(entry.result),
     isSemiFinal: /winner|champion|final|semi/i.test(entry.result),
     isQuarterFinal: /winner|champion|final|semi|quarter/i.test(entry.result),
     isDeepRun: /winner|champion|final|semi|quarter/i.test(entry.result),
-    isRankingTitle: /winner|champion/i.test(entry.result) && rankingTitleEligible,
-    isMajorTitle: /winner|champion/i.test(entry.result) && majorTitleEligible,
-    isWorldTitle: /winner|champion/i.test(entry.result) && worldTitleEligible,
+    isRankingTitle: /^(winner|champion)$/i.test(entry.result.trim()) && rankingTitleEligible,
+    isMajorTitle: /^(winner|champion)$/i.test(entry.result.trim()) && majorTitleEligible,
+    isWorldTitle: /^(winner|champion)$/i.test(entry.result.trim()) && worldTitleEligible,
     prizeMoney: isNonCompetitiveTournamentResult(entry.result) ? 0 : entry.prizeMoney,
     rankingPoints: isNonCompetitiveTournamentResult(entry.result) ? 0 : entry.rankingPoints,
     levelBucket,
@@ -4267,8 +4267,15 @@ function shouldEnterQSchoolCampaign(state: GameState, tournament: Tournament) {
   return true
 }
 
+const managerPolicy = process.argv.find(arg => arg.startsWith('--manager-policy='))?.split('=')[1] ?? 'balanced';
+if (!['balanced','aggressive','training','recovery','frugal'].includes(managerPolicy)) throw new Error('Unknown manager policy.');
 function chooseTournament(state: GameState, profile: ManagedSupportProfile = 'middle') {
-  return buildTournamentSelectionAnalysis(state, profile).selectedTournament
+  const analysis = buildTournamentSelectionAnalysis(state, profile);
+  if (managerPolicy === 'training' && state.week % 4 !== 0) return null;
+  if (managerPolicy === 'recovery' && state.player.fatigue > 35) return null;
+  if (managerPolicy === 'aggressive') return [...analysis.affordableAvailable].sort((a,b)=>a.tournament.startDate.localeCompare(b.tournament.startDate))[0]?.tournament ?? null;
+  if (managerPolicy === 'frugal') return [...analysis.affordableAvailable].sort((a,b)=>a.budgetCost-b.budgetCost || a.tournament.startDate.localeCompare(b.tournament.startDate))[0]?.tournament ?? null;
+  return analysis.selectedTournament;
 }
 
 function buildSeasonReport(
@@ -4315,7 +4322,7 @@ function buildSeasonReport(
       const countedInRankingFinalRecord = countedInRankingMainDrawRecord && canonicalResult.isFinal
       const countedInTotalTitleRecord = titleAwarded && classification != null && countsAsTotalTitle(classification, levelBucket)
       const countedInRankingTitleRecord = titleAwarded && classification != null && countsAsRankingTitle(classification)
-      const countedInMajorTitleRecord = titleAwarded && classification != null && countsAsMajorTitle(classification)
+      const countedInMajorTitleRecord = titleAwarded && entry.eventType === 'Major' && !classification?.isQualifyingEvent
       const countedInWorldTitleRecord = titleAwarded && Boolean(classification?.isWorldMainDraw)
 
       return {
@@ -6277,7 +6284,7 @@ function buildSupportMetrics(
   const totalEquipmentSpend = Math.abs(seasons.reduce((sum, season) => sum + season.finance.breakdown.equipmentMaintenance, 0))
   const totalSponsorIncome = seasons.reduce((sum, season) => sum + season.finance.breakdown.sponsorIncome, 0)
   const worldChampionshipEvents = allTournaments.filter((tournament) => isWorldChampionshipTournament(tournament) && !/not entered/i.test(tournament.result))
-  const majorEvents = allTournaments.filter((tournament) => isMajorStyleTournament(tournament) && !/not entered/i.test(tournament.result))
+  const majorEvents = allTournaments.filter((tournament) => tournament.type === 'Major' && !/qualif/i.test(tournament.name) && !/not entered/i.test(tournament.result))
   const finalsRecord = buildTournamentSubsetRecord('Finals', allTournaments, (tournament) => getSimulationTournamentResultTier(tournament) >= 4)
   const semiFinalRecord = buildTournamentSubsetRecord('Semi Finals', allTournaments, (tournament) => getSimulationTournamentResultTier(tournament) >= 3)
   const quarterFinalPlusRecord = buildTournamentSubsetRecord('Quarter Final Plus', allTournaments, (tournament) => getSimulationTournamentResultTier(tournament) >= 2)
@@ -6333,9 +6340,9 @@ function buildSupportMetrics(
     averageFatigue: accumulator.weeksObserved > 0 && Number.isFinite(accumulator.fatigueSum / accumulator.weeksObserved) ? accumulator.fatigueSum / accumulator.weeksObserved : 0,
     averageConfidence: accumulator.weeksObserved > 0 && Number.isFinite(accumulator.confidenceSum / accumulator.weeksObserved) ? accumulator.confidenceSum / accumulator.weeksObserved : 0,
     averageEffectiveMatchStrength: accumulator.weeksObserved > 0 && Number.isFinite(accumulator.strengthSum / accumulator.weeksObserved) ? accumulator.strengthSum / accumulator.weeksObserved : 0,
-    deciderWins: accumulator.deciderWins,
-    deciderMatches: accumulator.deciderMatches,
-    deciderWinPercentage: accumulator.deciderMatches > 0 ? (accumulator.deciderWins / accumulator.deciderMatches) * 100 : 0,
+    deciderWins: finalState.history.legacy?.decidersWon ?? accumulator.deciderWins,
+    deciderMatches: finalState.history.legacy?.deciders ?? accumulator.deciderMatches,
+    deciderWinPercentage: (finalState.history.legacy?.deciders ?? accumulator.deciderMatches) > 0 ? ((finalState.history.legacy?.decidersWon ?? accumulator.deciderWins) / (finalState.history.legacy?.deciders ?? accumulator.deciderMatches)) * 100 : 0,
     averageDeciderPressure: accumulator.deciderMatches > 0 ? accumulator.deciderPressureSum / accumulator.deciderMatches : 0,
     bestTournamentResult: getBestTournamentResult(allTournaments),
     worldChampionshipEntries: worldChampionshipEvents.length,
@@ -6584,7 +6591,7 @@ function hasInSeasonTourCardRouteBeforeMainTourEntry(season: SeasonReport) {
   }
 
   const firstNormalMainTourEntry = season.tournaments
-    .filter((tournament) => isNormalMainTourTournament(tournament) && hasTournamentParticipation(tournament))
+    .filter((tournament) => isNormalMainTourTournament(tournament) && tournament.type !== 'Invitational' && hasTournamentParticipation(tournament))
     .sort((left, right) => left.startDate.localeCompare(right.startDate))[0]
   if (!firstNormalMainTourEntry) {
     return false
@@ -6599,7 +6606,7 @@ function hasInSeasonTourCardRouteBeforeMainTourEntry(season: SeasonReport) {
   return Boolean(latestCardRouteEvent && latestCardRouteEvent.startDate < firstNormalMainTourEntry.startDate)
 }
 
-function buildBalanceWarnings(report: SimulationReport, finalState: GameState) {
+export function buildBalanceWarnings(report: SimulationReport, finalState: GameState) {
   const warnings: string[] = []
   const metrics = report.supportMetrics
   if (!metrics) {
@@ -6646,7 +6653,7 @@ function buildBalanceWarnings(report: SimulationReport, finalState: GameState) {
     const openingWorldRank = season.pathway.seasonOpen.worldRank ?? 999
     const offTourAtSeasonOpen = !season.pathway.seasonOpen.hasTourCard && openingWorldRank > 64
     return offTourAtSeasonOpen
-      && season.tournaments.some((tournament) => isNormalMainTourTournament(tournament) && hasTournamentParticipation(tournament))
+      && season.tournaments.some((tournament) => isNormalMainTourTournament(tournament) && tournament.type !== 'Invitational' && hasTournamentParticipation(tournament))
       && !hasInSeasonTourCardRouteBeforeMainTourEntry(season)
   })
   const rank65To128SkippedAllQualifiers = report.seasons.filter((season) => {
@@ -6702,7 +6709,7 @@ function buildBalanceWarnings(report: SimulationReport, finalState: GameState) {
     return noTourAllSeason
       && season.tournaments.some(
         (tournament) => hasTournamentParticipation(tournament)
-          && isProfessionalEventType(tournament.type)
+          && tournament.isRankingEvent
           && tournament.prizeMoney > 0,
       )
   })
@@ -6903,7 +6910,7 @@ function buildBalanceWarnings(report: SimulationReport, finalState: GameState) {
     warnings.push(`Player has ${metrics.wins} total wins but only ${proRecord.wins} professional wins; overall headline is being driven by non-pro levels.`)
   }
 
-  if (pathwayRecord.winPercentage >= 60 && proRecord.winPercentage < 35) {
+  if (proRecord.matches >= 10 && pathwayRecord.winPercentage >= 60 && proRecord.winPercentage < 35) {
     warnings.push(`Strong pathway record (${pathwayRecord.winPercentage.toFixed(1)}%) but weak professional transition (${proRecord.winPercentage.toFixed(1)}%).`)
   }
 
@@ -7309,10 +7316,10 @@ function runManagedWeeklyCare(state: GameState, financeBreakdown: FinanceBreakdo
   }
 
   if (nextState.trainingAppliedWeek !== nextState.week && nextState.player.fatigue < 82) {
-    const rotating = process.argv.includes('--rotate-training');
+    const rotating = process.argv.includes('--rotate-training') || managerPolicy === 'training' || managerPolicy === 'recovery';
     const entered = nextState.tournaments.filter(t=>t.status==='Entered');
     const focuses = ['potting','safety','mental','fitness'] as const;
-    const plan = rotating ? buildFocusedTrainingPlan(nextState.player.fatigue>=65?'recovery':focuses[Math.floor((nextState.week-1)/4)%focuses.length],plusDays(depthOf(nextState).nextSettlementDate,-7),nextState.player.fatigue,entered.map(t=>({name:t.name,location:t.location,startDate:t.startDate})),entered.some(t=>Boolean(nextState.travel.bookings[t.id]))) : undefined;
+    const plan = rotating ? buildFocusedTrainingPlan(nextState.player.fatigue >= (managerPolicy === 'recovery' ? 20 : 65) ? 'recovery':focuses[Math.floor((nextState.week-1)/4)%focuses.length],plusDays(depthOf(nextState).nextSettlementDate,-7),nextState.player.fatigue,entered.map(t=>({name:t.name,location:t.location,startDate:t.startDate})),entered.some(t=>Boolean(nextState.travel.bookings[t.id]))) : undefined;
     nextState = applyTrainingPlanState(nextState,plan)
   }
 
@@ -7829,7 +7836,7 @@ function main() {
               ? `${seasonsRequested}-season-start-age-${customStartAge ?? 'default'}-${customStartingLevelId ?? 'validated'}-${getSupportProfileDisplayName(managedSupportProfile)}-support-simulation`
               : `${seasonsRequested}-season-simulation`
   const calibrationAdjustments = process.argv.includes('--calibration-adjustments')
-  const reportBaseName = (seedArg ? `${reportBaseNameRoot}-seed-${requestedSeed}` : reportBaseNameRoot) + (calibrationAdjustments ? '-calibration' : '-gameplay') + (process.argv.includes('--rotate-training') ? '-rotating' : '') + '-entry-v2'
+  const reportBaseName = (seedArg ? `${reportBaseNameRoot}-seed-${requestedSeed}` : reportBaseNameRoot) + (calibrationAdjustments ? '-calibration' : '-gameplay') + (process.argv.includes('--rotate-training') ? '-rotating' : '') + (managerPolicy === 'balanced' ? '' : '-policy-' + managerPolicy) + '-entry-v2' + (process.argv.find(arg=>arg.startsWith('--audit-label='))?.slice(14).replace(/[^a-z0-9_-]/gi,'-') ? '-' + process.argv.find(arg=>arg.startsWith('--audit-label='))!.slice(14).replace(/[^a-z0-9_-]/gi,'-') : '')
   let state = (managedYouthScenario
     ? createNewCareerState({
         fullName: createPlayerIdentitySeed.name,
@@ -7911,6 +7918,7 @@ function main() {
       state = runManagedWeeklyCare(state, currentSeasonFinance, managedSupportProfile)
     }
 
+    if (process.argv.includes('--season-life')) state = manageSeasonLife(state)
     let selectedTournament: Tournament | null = null
     const hasEnteredTournament = state.tournaments.some((tournament) => tournament.status === 'Entered')
     if (!hasEnteredTournament) {
@@ -7985,7 +7993,7 @@ function main() {
       }
 
       const preMatchState = eventResolvedState
-      const simulatedState = simulateTournamentMatchState(eventResolvedState, activeEnteredTournament.id)
+      const simulatedState = process.argv.includes('--live-match-audit') ? playCenturyMatch(eventResolvedState,activeEnteredTournament.id) : simulateTournamentMatchState(eventResolvedState, activeEnteredTournament.id)
       if (JSON.stringify(preMatchState.attributes) !== JSON.stringify(simulatedState.attributes)) seasonIssues.add(`${archivedSeason}: a match changed permanent attributes outside training.`)
       const matchWasAdded = simulatedState.matches[0]?.id !== preMatchState.matches[0]?.id
       if (!matchWasAdded) {
@@ -8062,6 +8070,13 @@ function main() {
       if (process.argv.includes('--world-audit')) recordWorldAudit(path.join(reportsDir, reportBaseName + '-world'), openingState, eventResolvedState, advancedState)
       development.push(developmentSnapshot(advancedState))
       seasons.push(seasonReport)
+      if (process.argv.includes('--century-audit')) {
+        recordCenturyAudit(path.join(reportsDir,reportBaseName+'-life-audit'),openingState,eventResolvedState,advancedState)
+        if (seasons.length % 25 === 0) {
+          fs.writeFileSync(path.join(reportsDir,reportBaseName+'-checkpoint-'+seasons.length+'.json'),JSON.stringify(advancedState))
+          fs.writeFileSync(path.join(reportsDir,reportBaseName+'-checkpoint-'+seasons.length+'-rng.json'),JSON.stringify({randomState,seasonsCompleted:seasons.length}))
+        }
+      }
       if (process.argv.includes('--progress')) process.stderr.write(`Season ${seasons.length}/${seasonsRequested}: age ${advancedState.player.age}, OVR ${snapshotPlayer(advancedState).overall}, cash ${Math.round(advancedState.player.cash)}, card ${advancedState.careerSystems.pro.hasTourCard}\n`)
       finalizeWorldAccessDebugSeason(worldAccessDebugStore, reportBaseName, seasonReport)
       if (managedYouthScenario && managedSupportProfile === 'best') {
@@ -8148,7 +8163,7 @@ function main() {
 
   if (confidenceSamples > 20 && saturatedConfidenceWeeks / confidenceSamples > 0.25) issues.push('Confidence saturation: at least 25% of settled weeks remained at 98% or higher.')
   const report: SimulationReport = {
-    longCareerAudit: {eligibilityPolicy:'Game entry access rules; no ranking-row membership gate',trainingPolicy:process.argv.includes('--rotate-training')?'rotating focuses':'default auto plan',calibrationAdjustments,recovery:recoveryAudit.summary(),development,cardChanges},
+    longCareerAudit: {managerPolicy,eligibilityPolicy:'Game entry access rules; no ranking-row membership gate',trainingPolicy:process.argv.includes('--rotate-training') || managerPolicy === 'training' || managerPolicy === 'recovery' ? 'rotating focuses' : 'default auto plan',calibrationAdjustments,recovery:recoveryAudit.summary(),development,cardChanges},
     generatedAt: new Date().toISOString(),
     scenario,
     seasonsRequested,
@@ -8177,7 +8192,11 @@ function main() {
   report.statusIntegrityAudit = buildStatusIntegrityAudit(report, state)
   report.balanceWarnings = buildBalanceWarnings(report, state)
 
-  if (process.argv.includes('--export-final-save')) fs.writeFileSync(path.join(reportsDir, reportBaseName + '-save.json'), JSON.stringify(state))
+  if (process.argv.includes('--season-life')) fs.writeFileSync(path.join(reportsDir, reportBaseName + '-season-life.json'), JSON.stringify(state.careerDepth?.seasonLife,null,2))
+  if (process.argv.includes('--export-final-save')) {
+    fs.writeFileSync(path.join(reportsDir, reportBaseName + '-save.json'), JSON.stringify(state))
+    fs.writeFileSync(path.join(reportsDir, reportBaseName + '-final-rng.json'), JSON.stringify({ randomState, seasonsCompleted: seasons.length }))
+  }
   writeSimulationArtifacts(reportsDir, reportBaseName, report, buildMarkdown(report))
   if (!skipSharedAudits) {
     writeAiPlayerProgressionAudit(report, seasonAuditSummaries)
@@ -8207,4 +8226,4 @@ function main() {
   }, null, 2))
 }
 
-main()
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) main()

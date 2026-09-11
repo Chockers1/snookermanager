@@ -26,7 +26,7 @@ function readSeeds() {
 
 async function runScenario(level: (typeof createPlayerStartingLevelCatalog)[number], seed: number, seasons: number): Promise<MatrixRow> {
   const executable = process.execPath
-  const args = [path.resolve('node_modules', 'tsx', 'dist', 'cli.mjs'), 'scripts/simulateFiveSeasons.ts', `--seasons=${seasons}`, `--seed=${seed}`, `--starting-level-id=${level.id}`, `--start-age=${level.minAge}`, `--scenario-label=matrix-${level.id}-${seed}`, '--skip-player-snapshots', '--skip-shared-audits', ...(process.argv.includes('--export-final-save') ? ['--export-final-save'] : []), ...(process.argv.includes('--progress') ? ['--progress'] : []), ...(process.argv.includes('--calibration-adjustments') ? ['--calibration-adjustments'] : [])]
+  const args = [path.resolve('node_modules', 'tsx', 'dist', 'cli.mjs'), 'scripts/simulateFiveSeasons.ts', `--seasons=${seasons}`, `--seed=${seed}`, `--starting-level-id=${level.id}`, `--start-age=${level.minAge}`, `--scenario-label=matrix-${level.id}-${seed}`, '--skip-player-snapshots', '--skip-shared-audits', ...process.argv.filter(arg => arg.startsWith('--manager-policy=') || arg.startsWith('--support-profile=') || arg.startsWith('--audit-label=') || arg === '--season-life'), ...(process.argv.includes('--export-final-save') ? ['--export-final-save'] : []), ...(process.argv.includes('--progress') ? ['--progress'] : []), ...(process.argv.includes('--calibration-adjustments') ? ['--calibration-adjustments'] : [])]
 
   return new Promise((resolve) => {
     const child = spawn(executable, args, { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'pipe'] })

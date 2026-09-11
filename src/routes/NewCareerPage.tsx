@@ -169,7 +169,7 @@ export function NewCareerPage() {
     // Give the browser a chance to paint feedback before building the world.
     await new Promise(resolve => setTimeout(resolve, 0))
     try {
-      resetCareer({
+      const saved = await resetCareer({
       fullName: form.fullName,
       nationality: form.nationality,
       age: normalizedAge,
@@ -182,7 +182,7 @@ export function NewCareerPage() {
       backgroundId: selectedBackground.id,
       startingLevelId: selectedStartingLevel.id,
     })
-      navigate('/')
+      if (saved) navigate('/')
     } catch (error) {
       setCreationError(error instanceof Error ? error.message : 'Career creation failed. Your player setup is still here; please try again.')
     } finally {

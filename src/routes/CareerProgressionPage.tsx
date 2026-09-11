@@ -195,6 +195,8 @@ export function CareerProgressionPage() {
           <p className="text-[10px] font-semibold uppercase text-gray-500">Career</p>
           <h1 className="mt-1 text-2xl font-bold text-white">Career Pathway</h1>
           <p className="mt-1 text-sm text-gray-400">Fourteen-stage pathway from junior clubs to senior legends, driven by live save state.</p>
+          {gameState.careerSystems.lateCareer.retirementPending && <p role="status" className="mt-2 text-sm text-amber-300">Retirement follows your booked competitions. Finish your existing entries; new entries are closed.</p>}
+          {gameState.careerSystems.lateCareer.retired && <p role="status" className="mt-2 text-sm text-gray-300">Retired from competition. Your career records remain available, and you can advance the calendar to follow the tour.</p>}
         </div>
         <div className="card card-body min-w-44 text-center">
           <p className="text-[10px] uppercase text-gray-500">Career Progression</p>

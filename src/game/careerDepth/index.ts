@@ -1,3 +1,4 @@
+import { initializeSeasonLife, reconcileSeasonLife, seasonLifeAction, lifeBoundary } from '../seasonLife';
 import { getTournamentEntryAccess } from '../../hooks/useGameState';
 import { entryReminderDates, reconcileEntryReminders } from '../tournamentEntry';
 import { setPriority, reserveSeasonBlock, removeSeasonBlock } from '../seasonBoard';
@@ -15,16 +16,18 @@ import { partnerCandidates, recordEncounter, reviewCoachPlan } from './relations
 
 export function initializeCareerDepth(state: GameState): GameState {
   if (state.careerDepth?.version === 1) {
+    state = initializeSeasonLife(state);
     const story = pendingStory(state);
     return story ? careerMessage(state, story.id, story.title, story.evidence) : state;
   }
   let next: GameState = { ...state, careerDepth: createCareerDepth(state), matches: state.matches.map(m => ({ ...m, opponentId: m.opponentId ?? uniqueOpponentId(state, m.opponentName) })) };
   // Reconstruct reliable H2H only. Never replay historical money or stories.
   for (const match of [...next.matches].reverse()) next = recordEncounter(next, match);
-  return next;
+  return initializeSeasonLife(next);
 }
 export function reconcileCareerDepth(state: GameState): GameState {
   let next = evolveTourSkills(reconcileAchievements(reconcileStories(settleCommitments(initializeCareerDepth(state)))));
+  next = reconcileSeasonLife(next);
   next = reconcileEntryReminders(next, t => getTournamentEntryAccess(next,t).allowed);
   const d = depthOf(next);
   const partner = next.worldPlayers.find(p => p.id === d.partnerId);
@@ -38,6 +41,7 @@ export function reconcileCareerDepth(state: GameState): GameState {
 }
 export function careerDepthAction(state: GameState, action: CareerDepthAction): GameState {
   state = initializeCareerDepth(state);
+  if (action.type.startsWith('life-')) return seasonLifeAction(state, action as import('../seasonLife/types').SeasonLifeAction);
   const d = depthOf(state);
   switch (action.type) {
     case 'priority-event': return setPriority(state,action.id);
@@ -64,11 +68,12 @@ export function careerDepthAction(state: GameState, action: CareerDepthAction): 
     case 'approve-schedule': return approveSchedule(state, action.eventIds, action.cap, action.reserve);
     case 'pause-schedule': return { ...state, careerDepth: { ...d, schedule: d.schedule ? { ...d.schedule, enabled: false, pauseReason: 'Paused by player.' } : null }, lastAction: 'Schedule assistance paused.' };
     case 'run-assistance': return runScheduleAssistance(state, true);
+    default: return state;
   }
 }
 export function nextCareerBoundary(state: GameState) {
   const d = depthOf(state);
-  const dates = [d.nextSettlementDate, ...entryReminderDates(state, t=>getTournamentEntryAccess(state,t).allowed)];
+  const dates = [...lifeBoundary(state), d.nextSettlementDate, ...entryReminderDates(state, t=>getTournamentEntryAccess(state,t).allowed)];
   const realismDate = realismBoundary(state);
   if (realismDate) dates.push(realismDate);
   for (const c of d.commitments.filter(c => c.status === 'scheduled')) dates.push(c.startDate, plusDays(c.endDate, 1));

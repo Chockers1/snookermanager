@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { detailedTournamentCatalog } from '../data/pathwayCalendarData';
 import { resolveTournamentFormat } from '../data/tournamentFormats';
 import { createStarterState, buildTournamentDraw, resolveTournamentDrawRound, getTournamentEntryAccess, getTournamentEntryCashRequirement, enterTournamentState, repairGameState, evolveWorldPlayersForNextSeason, processRankingCalendar } from '../hooks/useGameState';
-import { pathwayAgeLimit, pathwayEntryReason, pathwayStandings, qTourQualification, seniorQualification, pathwayCardAwards, pathwayPlacementPrize, nationRegion, matchesPathwayList, pathwayListStatus } from './pathwayRules';
+import { pathwayAgeLimit, pathwayEntryReason, pathwayStandings, qTourQualification, seniorQualification, pathwayCardAwards, pathwayPlacementPrize, nationRegion, matchesPathwayList, pathwayListStatus, securedPathwayCards } from './pathwayRules';
 import { recordRankingEvent, qualifiedNames } from './rollingRankings';
 import type { BracketRound } from '../types/game';
 const event = (id: string) => detailedTournamentCatalog.find(t => t.id === id)!;
@@ -18,6 +18,30 @@ function complete(state: ReturnType<typeof createStarterState>, id: string) {
 }
 function final(a: string,b: string, score=4): BracketRound[] { return [{label:'Final',matches:[{id:a+b,top:{name:a,nation:'ENG',rank:1,score},bottom:{name:b,nation:'ENG',rank:2,score:0}}]}]; }
 describe('other tour eligibility and qualification',()=>{
+  it('locks the automatic European card before a later EBSA win and passes the EBSA place to the runner-up',()=>{
+    let state=amateur(20);
+    const lastEuropean=state.tournaments.find(t=>t.name==='Europe - Event 7')!;
+    state=recordRankingEvent(state,lastEuropean,final('European leader','European rival'),()=>({prizeMoney:0}));
+    expect(securedPathwayCards(state,lastEuropean.startDate).has('European leader')).toBe(false);
+    state=recordRankingEvent(state,event('pc-100'),final('European leader','EBSA runner'),()=>({prizeMoney:0}));
+    expect(pathwayCardAwards(state).get('European leader')).toBe('Q Tour');
+    expect(pathwayCardAwards(state).get('EBSA runner')).toBe('Federation Route');
+    expect(securedPathwayCards(state,event('pc-48').startDate).has('EBSA runner')).toBe(true);
+  });
+
+  it('excludes an EBSA runner-up who inherited an already-qualified champion’s card from later Q School',()=>{
+    let state=amateur(20);
+    state=recordRankingEvent(state,event('pc-96'),final('Already qualified','WSF runner'),()=>({prizeMoney:0}));
+    state=recordRankingEvent(state,event('pc-100'),final('Already qualified','EBSA runner'),()=>({prizeMoney:0}));
+    const cutoff=event('pc-48').startDate;
+    expect(pathwayCardAwards(state).get('EBSA runner')).toBe('Federation Route');
+    expect(securedPathwayCards(state,cutoff).has('EBSA runner')).toBe(true);
+    expect(securedPathwayCards(state,event('pc-100').startDate).has('EBSA runner')).toBe(false);
+    state.player.fullName='EBSA runner';
+    expect(getTournamentEntryAccess(state,event('pc-48'))).toMatchObject({allowed:false});
+    expect(getTournamentEntryAccess(state,event('pc-48')).reason).toContain('already been secured');
+  });
+
   it('fills playoff withdrawals from the next earned places without moving the automatic card',()=>{
     let {state} = complete(amateur(), 'pc-31');
     const initial=qTourQualification(state,'2027-03-16');

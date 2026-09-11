@@ -97,7 +97,7 @@ test('international travel and conditions show costs, dates and the booking stat
   await page.getByRole('button', { name: /Conditions & scouting/ }).click();
   const conditions = page.getByRole('dialog', { name: 'Conditions and scouting evidence' });
   await expect(conditions).toContainText('Cloth speed');
-  await expect(conditions).toContainText('estimated OVR');
+  await expect(conditions).toContainText('Overall and potential ratings are public.');
   await expect(conditions).toContainText('Small sample');
 });
 test('qualification races are reachable and describe provisional and protected places', async ({ page }) => {

@@ -94,6 +94,7 @@ export function SeasonReviewPage() {
     return (
       <div className="space-y-4 pb-24">
         <CareerSeasonSummary />
+        {record.openingSnapshotPartial && <p className="text-xs text-amber-200">Opening comparison uses the earliest retained snapshot ({record.startedOn}); the exact season-start ranking was not saved.</p>}
         <header className="flex flex-col gap-3 rounded-xl border border-border bg-surface/85 p-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">Season complete</p>

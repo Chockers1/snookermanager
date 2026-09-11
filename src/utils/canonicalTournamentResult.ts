@@ -79,7 +79,7 @@ function getCanonicalRoundReached(tournament: TournamentFormatLookup, resultLabe
 
 export function getCanonicalFinishFlags(roundReached: string, resultLabel: string) {
   const normalizedRound = normalizeTournamentRoundLabel(roundReached)
-  const isTitle = /winner|champion/i.test(resultLabel)
+  const isTitle = /^(winner|champion)$/i.test(resultLabel.trim())
   const isFinal = isTitle || normalizedRound === 'final'
   const isSemiFinal = isFinal || normalizedRound === 'semi final'
   const isQuarterFinal = isSemiFinal || normalizedRound === 'quarter final'

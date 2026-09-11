@@ -11,8 +11,8 @@ export function SaveManagerPage() {
   const [message, setMessage] = useState('Each career autosaves independently. Loading a slot makes it the active career.')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  function createSlot() {
-    const slot = saveToSlot(slotName)
+  async function createSlot() {
+    const slot = await saveToSlot(slotName)
     if (!slot) return
     setMessage(`Created and switched to “${slot.name}”.`)
   }
@@ -29,14 +29,14 @@ export function SaveManagerPage() {
 
   async function importFile(file: File | undefined) {
     if (!file) return
-    const imported = importCareer(await file.text())
+    const imported = await importCareer(await file.text())
     setMessage(imported ? 'Career imported and upgraded successfully.' : 'That file is not a valid Snooker Career Manager save.')
     if (imported) setSlotName('Imported career')
   }
 
-  function removeSlot(slot: SaveSlotSummary) {
+  async function removeSlot(slot: SaveSlotSummary) {
     if (!window.confirm(`Delete the save slot “${slot.name}”? This cannot be undone.`)) return
-    deleteSaveSlot(slot.id)
+    if (!await deleteSaveSlot(slot.id)) return
     setMessage(`Deleted “${slot.name}”.`)
   }
 
@@ -62,7 +62,7 @@ export function SaveManagerPage() {
             {slots.length === 0 ? <p className="rounded-lg bg-surface-light/50 p-4 text-sm text-gray-400">No named saves yet.</p> : slots.map((slot) => (
               <div key={slot.id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-light/40 p-3">
                 <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate font-medium text-white">{slot.name}</p>{slot.id === activeSaveSlotId ? <span className="rounded bg-green-600/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-green-400">Active · autosaving</span> : null}</div><p className="mt-0.5 text-xs text-gray-400">{slot.playerName} · {slot.season} · {slot.date}</p></div>
-                <div className="flex shrink-0 gap-2"><button type="button" className="btn-secondary text-xs" disabled={savePending} onClick={() => { if (loadSaveSlot(slot.id)) setMessage(`Loaded “${slot.name}”.`) }}><FolderOpen className="h-3.5 w-3.5" /> Load</button><button type="button" className="btn-secondary text-xs text-red-300" disabled={savePending} onClick={() => removeSlot(slot)} aria-label={`Delete ${slot.name}`}><Trash2 className="h-3.5 w-3.5" /></button></div>
+                <div className="flex shrink-0 gap-2"><button type="button" className="btn-secondary text-xs" disabled={savePending} onClick={async () => { if (await loadSaveSlot(slot.id)) setMessage(`Loaded “${slot.name}”.`) }}><FolderOpen className="h-3.5 w-3.5" /> Load</button><button type="button" className="btn-secondary text-xs text-red-300" disabled={savePending} onClick={() => removeSlot(slot)} aria-label={`Delete ${slot.name}`}><Trash2 className="h-3.5 w-3.5" /></button></div>
               </div>
             ))}
           </div>

@@ -223,6 +223,7 @@ export type Tournament = {
 };
 
 export type Match = {
+  formEvidence?: import("../game/seasonLife/types").FormEvidence;
   televised?: boolean;
   objectives?: import("../game/matchInsights").PersonalMatchObjective[];
   debrief?: import("../game/matchInsights").MatchDebrief;
@@ -630,6 +631,7 @@ export type CoachContractOption = {
 };
 
 export type CoachContract = {
+  endsOn?: string;
   coachId: string;
   slot: string;
   contractLabel: string;

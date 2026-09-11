@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getBestRecordedFinish } from './canonicalTournamentResult'
+import { getBestRecordedFinish, getCanonicalFinishFlags } from './canonicalTournamentResult'
 
 describe('audit finish labels', () => {
   it.each(['Semi Final', 'Quarter Final', 'Final'])('preserves %s without promoting it', (finish) => {
@@ -14,3 +14,5 @@ describe('audit finish labels', () => {
     expect(getBestRecordedFinish([{ result: 'Skipped' }])).toBe('No main draw win')
   })
 })
+
+it.each(['Eliminated in Winners Group','Eliminated in Winners Group Semi Final','Group Winner','Lost in Champion Group'])('does not turn %s into a title',label=>{expect(getCanonicalFinishFlags(label,label).isTitle).toBe(false)});

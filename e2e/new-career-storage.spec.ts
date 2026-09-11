@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { ACTIVE_SAVE_KEY, SAVE_SLOT_PREFIX, decodeCareerSave } from '../src/game/saveStorage';
-import { readCareerSave } from './read-career-save';
+import { readCareerSave, readStoredCareerValue } from './read-career-save';
 
 test('Start Career reclaims space from four legacy saves without deleting them', async ({ page }) => {
   await page.addInitScript(({ prefix }) => {
@@ -22,17 +22,17 @@ test('Start Career reclaims space from four legacy saves without deleting them',
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText('Storage Recovery').first()).toBeVisible();
   expect((await readCareerSave(page)).player.fullName).toBe('Storage Recovery');
-  const oldSaves = await page.evaluate(prefix => Array.from({ length: 4 }, (_, i) => localStorage.getItem(`${prefix}legacy-${i}`)), SAVE_SLOT_PREFIX);
+  const oldSaves = await Promise.all(Array.from({length:4},(_,i)=>readStoredCareerValue(page,`${SAVE_SLOT_PREFIX}legacy-${i}`)));
   for (const [index, raw] of oldSaves.entries()) expect(JSON.parse(decodeCareerSave(raw!)).player.fullName).toBe(`Legacy ${index}`);
 });
 
 test('a blocked write shows an error and preserves the entered player for retry', async ({ page }) => {
   await page.addInitScript(({ prefix }) => {
     localStorage.clear();
-    const setItem = Storage.prototype.setItem;
-    Storage.prototype.setItem = function(key, value) {
-      if (this === localStorage && key.startsWith(prefix) && !sessionStorage.getItem('allow-test-save')) throw new DOMException('Storage disabled', 'SecurityError');
-      setItem.call(this, key, value);
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function(value, key) {
+      if (typeof key === 'string' && key.startsWith(prefix) && !sessionStorage.getItem('allow-test-save')) throw new DOMException('Storage disabled', 'SecurityError');
+      return put.call(this, value, key);
     };
   }, { prefix: SAVE_SLOT_PREFIX });
   await page.goto('/');
@@ -40,10 +40,10 @@ test('a blocked write shows an error and preserves the entered player for retry'
   await page.locator('input').first().fill('Retry Player');
   for (let step = 0; step < 3; step++) await page.getByRole('button', { name: /Continue/ }).click();
   await page.getByRole('button', { name: 'Start Career', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('browser could not save your career');
+  await expect(page.getByRole('alert')).toContainText('career could not be saved');
   await expect(page).toHaveURL(/\/new-career/);
   await expect(page.getByRole('button', { name: 'Start Career', exact: true })).toBeEnabled();
-  expect(await page.evaluate(key => localStorage.getItem(key), ACTIVE_SAVE_KEY)).toBeNull();
+  expect(await readStoredCareerValue(page, ACTIVE_SAVE_KEY)).toBeNull();
   await page.evaluate(() => sessionStorage.setItem('allow-test-save', 'yes'));
   await page.getByRole('button', { name: 'Start Career', exact: true }).click();
   await expect(page).toHaveURL(/\/$/);

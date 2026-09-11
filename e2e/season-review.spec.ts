@@ -25,6 +25,7 @@ for (const viewport of [{width:1280,height:720},{width:390,height:844},{width:32
   expect(await dialog.evaluate(e => e.scrollWidth <= e.clientWidth + 1)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await page.keyboard.press('Escape'); await expect(dialog).not.toBeVisible();
+  await readCareerSave(page);
   await page.reload(); await page.getByRole('button',{name:/Continue Career/}).click(); await expect(dialog).not.toBeVisible();
   await page.evaluate(() => { history.pushState({}, '', '/season-review'); dispatchEvent(new PopStateEvent('popstate')); });
   // Reload retains the pending review and its dismissal, with the full report still actionable.

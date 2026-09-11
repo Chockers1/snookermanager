@@ -1,3 +1,4 @@
+import type { PlayerAttributes } from '../types/game';
 import type { GameState } from '../hooks/useGameState';
 
 export type DeclineProfile = { startAge: number; rate: number };
@@ -17,7 +18,12 @@ export function annualDecline(age: number, profile: DeclineProfile) {
 }
 export function ageAttributeLoss(age:number,profile:DeclineProfile) {
   const loss=annualDecline(age,profile),years=Math.max(0,age-profile.startAge);
-  return {physical:-loss*1.5,technical:-loss*.6,mental:-loss*.2*Math.min(1,Math.max(0,years-5)/10)};
+  const mentalRamp=Math.min(1,Math.max(0,years-5)/10);
+  // Match the CPU overall decline using the same 46/34/20 rating weights.
+  // Within each group, preserve slower loss of positional and learned mental skills.
+  const weightedLoss=.46*.6*((3+2*.55)/5)+.2*1.5*((3+2*.65)/5)+.34*.2*mentalRamp*((2+2*.4)/5);
+  const scale=1/weightedLoss;
+  return {physical:-loss*1.5*scale,technical:-loss*.6*scale,mental:-loss*.2*mentalRamp*scale};
 }
 export function ensurePlayerDeclines(state:GameState):GameState {
   const human=playerDecline({id:'human',declineProfile:state.player.declineProfile},state.worldSeed);
@@ -28,4 +34,19 @@ export function ensurePlayerDeclines(state:GameState):GameState {
     changed=true;return {...p,declineProfile:profile};
   });
   return changed?{...state,player:{...state.player,declineProfile:human},worldPlayers}:state;
+}
+
+/** Future annual changes only; save migration never reapplies missed ageing. */
+export function applySeasonalAgeRegression(attributes: PlayerAttributes, age: number, decline: DeclineProfile): PlayerAttributes {
+  const loss=ageAttributeLoss(age,decline);
+  const next={technical:{...attributes.technical},mental:{...attributes.mental},physical:{...attributes.physical}};
+  const groups=[
+    {group:next.physical, labels:['Stamina','Recovery Rate','Shoulder Health','Hand Steadiness','Balance'], delta:loss.physical, eased:.65, full:3},
+    {group:next.technical, labels:['Long Potting','Cue Ball Control','Break Building','Safety Play','Consistency'], delta:loss.technical, eased:.55, full:3},
+    {group:next.mental, labels:['Focus','Composure','Resilience','Big Match Nerve'], delta:loss.mental, eased:.4, full:2},
+  ];
+  for(const {group,labels,delta,eased,full} of groups) labels.forEach((label,index)=>{
+    if(label in group)group[label]=Math.max(1,Math.min(100,group[label]+delta*(index>=full?eased:1)));
+  });
+  return next;
 }

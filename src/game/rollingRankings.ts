@@ -58,6 +58,35 @@ export function recordedMajorQualifiers(state: Pick<GameState, 'rollingRankings'
   const event = Object.values(state.rollingRankings?.events ?? {}).filter(e => (!state.season || e.season === state.season) && e.completedOn <= t.startDate && pattern.test(e.name)).sort((a, b) => b.completedOn.localeCompare(a.completedOn))[0];
   return event ? qualifiedNames(event.bracket) : null;
 }
+/** Qualifying and its main draw must use one snapshot before qualifying begins. */
+export function majorSelectionCalendar(tournaments: Tournament[]): Tournament[] {
+  const cutoffs = new Map<string,string>();
+  for (const [qualifierId,mainId] of [['worldChampionshipQualifying','worldChampionshipMain'],['ukMajorQualifying','ukMajor']]) {
+    const qualifier=tournaments.find(t=>resolveTournamentFormat(t).id===qualifierId);
+    const main=tournaments.find(t=>resolveTournamentFormat(t).id===mainId);
+    if(!qualifier||!main) continue;
+    const cutoff=[rankingCutoffDate(qualifier),rankingCutoffDate(main),plusDays(qualifier.startDate,-1)].sort()[0];
+    cutoffs.set(qualifier.id,cutoff);cutoffs.set(main.id,cutoff);
+  }
+  return tournaments.map(t=>cutoffs.has(t.id)&&t.seedingCutoffDate!==cutoffs.get(t.id)?{...t,seedingCutoffDate:cutoffs.get(t.id)}:t);
+}
+export function alignMajorSelection(state: GameState): GameState {
+  const tournaments=majorSelectionCalendar(state.tournaments);
+  const changed=tournaments.some((t,i)=>t!==state.tournaments[i]);
+  let seedings=state.rollingRankings?.seedings;
+  for(const t of tournaments) {
+    if(!['worldChampionshipMain','ukMajor'].includes(resolveTournamentFormat(t).id)||!seedings) continue;
+    const cutoff=rankingCutoffDate(t),key=rankingEventKey(t),saved=seedings[key];
+    if(!saved || saved.date===cutoff) continue;
+    const qualifierId=resolveTournamentFormat(t).id==='worldChampionshipMain'?'worldChampionshipQualifying':'ukMajorQualifying';
+    const qualifier=tournaments.find(q=>resolveTournamentFormat(q).id===qualifierId);
+    const qualifyingSnapshot=qualifier ? seedings[rankingEventKey(qualifier)] : undefined;
+    const shared=(qualifyingSnapshot?.date===cutoff ? qualifyingSnapshot : undefined)
+      ?? [...(state.rollingRankings?.revisions??[])].sort((a,b)=>b.date.localeCompare(a.date)).find(r=>r.date<=cutoff);
+    if(shared) seedings={...seedings,[key]:{...shared,date:cutoff}};
+  }
+  return changed||seedings!==state.rollingRankings?.seedings ? {...state,tournaments,...(state.rollingRankings?{rollingRankings:{...state.rollingRankings,seedings:seedings!}}:{})} : state;
+}
 export function rankingCutoffDate(t: Tournament) {
   // Authored game cut-offs can override the default one-week draw lock.
   return t.seedingCutoffDate ?? plusDays(t.startDate, -7);
@@ -161,7 +190,7 @@ export function rebuildRollingRankings(state: GameState, date: string, revision 
     }
     return 0;
   };
-  const rank = (rows: CompetitionTableRow[], totals: Map<string, number>, key: 'world' | 'oneYear', movements: Record<string, number>) => uniqueRankingRows(rows).map(r => ({ ...r, points: totals.get(r.playerName) ?? 0 })).sort((a, b) => b.points - a.points || countback(a.playerName, b.playerName, key) || (previous?.[key][a.playerName] ?? a.ranking) - (previous?.[key][b.playerName] ?? b.ranking) || a.playerName.localeCompare(b.playerName)).map((r, i) => ({ ...r, ranking: i + 1, movement: revision ? (previous?.[key][r.playerName] ?? r.ranking) - i - 1 : movements[r.playerName] ?? 0 }));
+  const rank = (rows: CompetitionTableRow[], totals: Map<string, number>, key: 'world' | 'oneYear', movements: Record<string, number>) => uniqueRankingRows(rows).map(r => ({ ...r, points: totals.get(r.playerName) ?? 0 })).sort((a, b) => b.points - a.points || countback(a.playerName, b.playerName, key) || (a.points === 0 && b.points === 0 ? 0 : (previous?.[key][a.playerName] ?? a.ranking) - (previous?.[key][b.playerName] ?? b.ranking)) || a.playerName.localeCompare(b.playerName)).map((r, i) => ({ ...r, ranking: i + 1, movement: revision ? (previous?.[key][r.playerName] ?? r.ranking) - i - 1 + (previous?.date === date ? movements[r.playerName] ?? 0 : 0) : movements[r.playerName] ?? 0 }));
   const tables = { ...state.competitionTables, world: rank(state.competitionTables.world, world, 'world', ledger.movementWorld), oneYear: rank(state.competitionTables.oneYear, season, 'oneYear', ledger.movementOneYear) };
   const next = { ...state, competitionTables: tables };
   const revisions = revision ? [...ledger.revisions.filter(r => r.date !== date), snapshot(next, date)] : ledger.revisions;
@@ -212,7 +241,7 @@ export function compactRankingLedger(state: GameState): GameState {
 }
 
 export function lockTournamentSeedings(state: GameState, through: string): GameState {
-  state = initializeRollingRankings(state);
+  state = alignMajorSelection(initializeRollingRankings(state));
   const ledger = state.rollingRankings!;
   const seedings = { ...ledger.seedings };
   for (const t of state.tournaments) {

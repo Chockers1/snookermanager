@@ -1,3 +1,13 @@
+import { championInvitations } from '../game/championInvitations';
+import { alignMajorSelection, majorSelectionCalendar } from '../game/rollingRankings';
+import {ensureCoachContractDates} from '../game/coachContractDates';
+import { mediaBehaviourNote } from '../game/seasonLife/media';
+import { formLiveAdjustment, emptyEvidence } from '../game/seasonLife/form';
+import { prepareTeamVisit, completeTeamFrame, finishTeamVisit } from '../game/seasonLife/live';
+import { member as teamMember, settleTeamMatch } from '../game/seasonLife/teams';
+import { staffUnavailable } from '../game/seasonLife/staff';
+import { lifeOf } from '../game/seasonLife/shared';
+import type { TeamEvent } from '../game/seasonLife/types';
 import { encodeCareerSaveAsync } from '../game/asyncSave';
 import { rememberSaveMetadata } from '../game/saveMetadata';
 import { readRecoveryMetadata } from '../game/recoverySaves';
@@ -20,7 +30,7 @@ import { reconcileSponsorMarket, seasonalSponsorBlocker } from '../game/sponsorM
 import { createSeasonStartReport, preserveSeasonStartEmails } from '../game/seasonStartReport';
 import { createSeasonEndReport, preserveSeasonEmails } from '../game/seasonEndReport';
 import { ensureSeasonClock, seasonPosition, seasonWeekLabel, rolloverSeasonClock, type SeasonClock } from '../game/seasonClock';
-import { playerDecline, ageAttributeLoss, type DeclineProfile } from '../game/playerAgeing';
+import { playerDecline, applySeasonalAgeRegression, type DeclineProfile } from '../game/playerAgeing';
 import { reconcileCareerBudget } from '../game/careerBudget';
 import { repairCpuHistoricalRecords, ensureWorldPopulation, cpuSeasonEvidence, annualCpuDevelopment, uniqueRankingRows } from '../game/worldIntegrity';
 import { recordedSeasonWinners } from '../game/seasonReview';
@@ -37,7 +47,7 @@ import { stepShootOut, stepBallShootOut, attemptGoldenBall, handicapAllowance } 
 import { isChampionshipLeague, isGroupDraw, nextGroupFixture, groupFrameOrder } from '../game/championshipLeague';
 import { createGroupCompetition, resolveGroupCompetitionStage, applyGroupCompetitionResult, groupCompetitionAward, groupCompetitionChampion } from '../game/groupCompetition';
 import { useEffect, useMemo, useRef, useState } from "react";
-import { queueProtectedSave, storeRecoverySave, listRecoverySaves, validatedRecoveryPayload } from '../game/recoverySaves';
+import { queueProtectedSave, storeRecoverySave, getRecoverySave, validatedRecoveryPayload } from '../game/recoverySaves';
 import type { CareerDepthState, CareerDepthAction } from "../game/careerDepth/types";
 import { initializeCareerDepth, reconcileCareerDepth, careerDepthAction, nextCareerBoundary } from "../game/careerDepth";
 import { depthOf, pendingStory, plusDays, uniqueOpponentId } from "../game/careerDepth/shared";
@@ -165,15 +175,14 @@ import {
   readActiveSaveSlotId,
   readSaveSlotIndex,
   SAVE_SLOT_PREFIX,
-  encodeCareerSave,
-  decodeCareerSave,
+  consumeCareerSaveJson,
   writeCareerStorage,
-  writeCareerStorageBatch,
+  commitCareerStorage,
+  readCareerStorage,
+  readSavedCareer,
   SAVE_SLOT_INDEX_KEY,
   ACTIVE_SAVE_SLOT_KEY,
   type SaveSlotSummary,
-  writeActiveSaveSlotId,
-  writeSaveSlotIndex,
 } from "../game/saveStorage";
 import {
   getProTourAccessBand as getRankAccessBandFromWorldRank,
@@ -474,6 +483,7 @@ type LiveMatchOpponentAdjustment = {
 };
 
 type LiveVisitLogEntry = {
+  participantId?: string;
   id: string;
   frameLabel: string;
   visit: number;
@@ -555,6 +565,13 @@ type LiveVisitSkillProfile = {
 };
 
 export type LiveMatchState = {
+  visitSequence?: number;
+  teamContext?: import('../game/seasonLife/types').TeamContext;
+  formEvidence?: import('../game/seasonLife/types').FormEvidence;
+  formIssue?: import('../game/seasonLife/types').FormIssue;
+  formLeadFrame?: number;
+  formProjectProtected?: boolean;
+
   atmosphere?: import('../game/tournamentAtmosphere').MatchAtmosphere;
   careerBestAtStart?: number;
   objectives?: import("../game/matchInsights").PersonalMatchObjective[];
@@ -725,6 +742,7 @@ type TournamentHistoryEntry = {
 type CareerSeasonRecord = {
   season: string;
   startedOn: string;
+  openingSnapshotPartial?: boolean;
   endedOn: string;
   openingRanking: number;
   openingRankingLabel: string;
@@ -751,6 +769,7 @@ type CareerSeasonRecord = {
 type CareerHistoryState = {
   legacy?: CareerLegacy;
   snapshots: CareerSnapshot[];
+  seasonOpenings?: Record<string, {snapshot:CareerSnapshot; partial:boolean}>;
   matchLog: CareerMatchLogEntry[];
   tournamentHistory: TournamentHistoryEntry[];
   seasonRecords: CareerSeasonRecord[];
@@ -944,6 +963,7 @@ type ProCareerSystemState = {
 };
 
 type LateCareerSystemState = {
+  retirementPending?: boolean;
   veteranActive: boolean;
   seniorEligible: boolean;
   seniorActive: boolean;
@@ -1197,7 +1217,6 @@ const FEEDER_NATIONS = [
   "POL",
   "AUS",
 ];
-const SEASON_RECORD_LIMIT = 12;
 const COMPETITION_TABLE_KEYS: CompetitionTableKey[] = [
   "world",
   "oneYear",
@@ -3281,6 +3300,7 @@ function buildTournamentDrawField(
 ): BracketPlayer[] {
   let liveRows = getCompetitionRowsForTournament(state, tournament);
   let selectedPathwayNames: string[] | undefined;
+  if (/^champion of champions$/i.test(tournament.name)) selectedPathwayNames = championInvitations(state,tournament,includePlayer).names;
   if (tournament.type === 'Q Tour' && /play.off/i.test(tournament.name)) selectedPathwayNames = qTourQualification(state, tournament.startDate, name => name === state.player.fullName ? includePlayer : state.worldPlayers.some(p => p.playerName === name && !p.retired && !p.hasTourCard)).playoff;
   if (tournament.type === 'Senior') {
     const selection = seniorQualification(state, tournament.startDate);
@@ -3654,7 +3674,7 @@ function completeRemainingTournamentDraw(
 /** Complete the world calendar in date order, independently of human entry.
  * This function never advances training, cash settlement or the player's match. */
 export function processRankingCalendar(input: GameState): GameState {
-  let state = ensureSeasonClock(ensureWorldPopulation(scheduleRankingExpiries(initializeRollingRankings(input))));
+  let state = alignMajorSelection(ensureSeasonClock(ensureWorldPopulation(scheduleRankingExpiries(initializeRollingRankings(input)))));
   state = { ...state, tournaments: state.tournaments.map(t => isChampionshipLeague(t) && t.status !== 'Completed' ? { ...t, format: 'Groups: up to 4 frames, draws allowed · final best of 5', prizeMoney: 328000, winnerPrize: 33000, runnerUpPrize: 23000 } : t) };
   const through = state.currentDate;
   const ledger = state.rollingRankings!;
@@ -4870,7 +4890,7 @@ function normalizeTournamentStatusForSeason() {
 function buildTournamentScheduleForSeason(
   seasonStartYear: number,
 ): Tournament[] {
-  return tournamentCatalog.map((tournament) => {
+  return majorSelectionCalendar(tournamentCatalog.map((tournament) => {
     const yearOffset =
       seasonStartYear - getSeasonStartYearForDate(tournament.startDate);
     return {
@@ -4881,7 +4901,7 @@ function buildTournamentScheduleForSeason(
         : undefined,
       status: normalizeTournamentStatusForSeason() as Tournament["status"],
     };
-  });
+  }));
 }
 
 function getTournamentHistoryId(season: string, tournamentId: string) {
@@ -5398,7 +5418,7 @@ function appendSeasonRecord(
   const withoutExisting = records.filter(
     (item) => item.season !== record.season,
   );
-  return [record, ...withoutExisting].slice(0, SEASON_RECORD_LIMIT);
+  return [record, ...withoutExisting];
 }
 
 function seedPathwayFallbackRow(
@@ -5585,7 +5605,7 @@ function createSeasonRecord(
   const qSchoolEvents = activeSeasonEvents.filter(
     (entry) => entry.eventType === "Q School",
   );
-  const openingSnapshot = seasonSnapshots[0];
+  const openingSnapshot = state.history.seasonOpenings?.[season]?.snapshot ?? seasonSnapshots[0];
   const closingSnapshot = seasonSnapshots.at(-1);
   const currentRankingDisplay = getDisplayedRanking(state);
   const matchesPlayed = activeSeasonEvents.reduce(
@@ -5624,6 +5644,7 @@ function createSeasonRecord(
   return {
     season,
     startedOn: openingSnapshot?.date ?? state.currentDate,
+    openingSnapshotPartial: state.history.seasonOpenings?.[season]?.partial ?? true,
     endedOn: closingSnapshot?.date ?? state.currentDate,
     openingRanking: openingSnapshot?.ranking ?? currentRankingDisplay.ranking,
     openingRankingLabel:
@@ -5687,12 +5708,13 @@ function applySeasonRollover(state: GameState) {
   const currentWorldRank = rawCurrentWorldRank;
   const currentHasTourCard =
     state.careerSystems.pro.hasTourCard || currentWorldRank <= 64;
+  const publishedCardSource = pathwayCardAwards(archivedState).get(state.player.fullName);
   const qTourPromotionEligible = state.history.tournamentHistory.some(e => e.season === state.season && e.eventType === 'Q Tour' && /tour card/i.test(e.reward ?? ''));
   const qTourRankingCardEligible = qTourQualification(archivedState).automatic === state.player.fullName;
   const awardedQTourCard =
-    !currentHasTourCard && (qTourPromotionEligible || qTourRankingCardEligible);
+    !currentHasTourCard && (qTourPromotionEligible || qTourRankingCardEligible || publishedCardSource === 'Q Tour');
   const awardedQSchoolCard =
-    !currentHasTourCard && seasonRecord.qSchoolCardsWon > 0;
+    !currentHasTourCard && (seasonRecord.qSchoolCardsWon > 0 || publishedCardSource === 'Q School');
   const federationCardEvent = state.history.tournamentHistory.find(
     (entry) =>
       entry.season === state.season &&
@@ -5917,6 +5939,7 @@ function applySeasonRollover(state: GameState) {
   );
   const rebuiltCompetitionTables = rebuildRollingRankings({ ...state, season: formatSeasonLabel(nextSeasonStartYear), competitionTables: ageEligibleCompetitionTables }, state.currentDate, false).competitionTables;
   const syncedCareerSystems = syncCareerSystems({
+    ...state,
     competitionTables: rebuiltCompetitionTables,
     player: playerForNextSeason,
     careerSystems: careerSystemsSeed,
@@ -6107,7 +6130,7 @@ function applySeasonRollover(state: GameState) {
       ...state.inbox,
     ].slice(0, 18),
   };
-  const populatedState = ensureWorldPopulation(rolledState);
+  const populatedState = withHistorySnapshot(ensureWorldPopulation(rolledState), "Season Opening");
   return { ...populatedState, tourChangesReport: createSeasonTourChanges(populatedState, archivedState) };
 }
 
@@ -6218,7 +6241,7 @@ function advanceWholeWeekState(previousState: GameState): GameState {
     previousState.trainingAppliedWeek === previousState.week
       ? previousState
       : applyTrainingPlanState(previousState);
-  const protectedState = ensureLockedWorldChampionshipEntry(trainedState);
+  const protectedState = ensureCoachContractDates(ensureLockedWorldChampionshipEntry(trainedState));
   const normalizedActiveSponsors = normalizeSponsors(protectedState.sponsors);
   const sponsorObligationFatigue = clamp(
     normalizedActiveSponsors.reduce(
@@ -6390,14 +6413,14 @@ function advanceWholeWeekState(previousState: GameState): GameState {
     },
   );
   const expiringCoachContracts = protectedState.coachContracts.filter(
-    (contract) => contract.weeksRemaining <= 1,
+    (contract) => contract.endsOn! <= depthOf(protectedState).nextSettlementDate,
   );
   const activeCoachContracts = protectedState.coachContracts
     .map((contract) => ({
       ...contract,
-      weeksRemaining: contract.weeksRemaining - 1,
+      weeksRemaining: Math.max(1,Math.ceil((Date.parse(contract.endsOn!)-Date.parse(depthOf(protectedState).nextSettlementDate))/604800000)),
     }))
-    .filter((contract) => contract.weeksRemaining > 0);
+    .filter((contract) => contract.endsOn! > depthOf(protectedState).nextSettlementDate);
   const sponsorExpiryMessages = expiringSponsors.map((sponsor) =>
     createInboxMessage(
       {
@@ -6954,6 +6977,7 @@ function normalizeCoachContracts(contracts: CoachContract[], coaches: Coach[]) {
 
       return {
         coachId: contract.coachId,
+        endsOn: contract.endsOn,
         slot:
           contract.slot ||
           COACH_SLOT_NAMES[index] ||
@@ -8193,6 +8217,10 @@ function withHistorySnapshot(state: GameState, label: string) {
     ...state,
     history: {
       ...state.history,
+      seasonOpenings: state.history.seasonOpenings?.[state.season] ? state.history.seasonOpenings : {
+        ...state.history.seasonOpenings,
+        [state.season]: {snapshot: state.history.snapshots.find(x=>x.season===state.season) ?? createCareerSnapshot(state,label), partial: (state.history.snapshots.find(x=>x.season===state.season)?.date ?? state.currentDate) > state.season.slice(0,4)+'-06-30'},
+      },
       snapshots: appendSnapshot(
         state.history.snapshots,
         createCareerSnapshot(state, label),
@@ -8220,56 +8248,6 @@ function improveAttribute(
       return;
     }
   }
-}
-
-function adjustAttribute(
-  group: Record<string, number>,
-  label: string,
-  delta: number,
-) {
-  if (!(label in group) || delta === 0) return;
-  group[label] = clamp(group[label] + delta, 1, 100);
-}
-
-function applySeasonalAgeRegression(
-  attributes: PlayerAttributes,
-  age: number,
-  decline: DeclineProfile,
-): PlayerAttributes {
-  const profile = ageAttributeLoss(age,decline);
-  const nextAttributes = deepCloneAttributes(attributes);
-  const physicalLabels = [
-    "Stamina",
-    "Recovery Rate",
-    "Shoulder Health",
-    "Hand Steadiness",
-    "Balance",
-  ];
-  const technicalLabels = [
-    "Long Potting",
-    "Cue Ball Control",
-    "Break Building",
-    "Safety Play",
-    "Consistency",
-  ];
-  const mentalLabels = ["Focus", "Composure", "Resilience", "Big Match Nerve"];
-
-  physicalLabels.forEach((label, index) => {
-    const easedDelta =
-      index >= 3 ? profile.physical * .65 : profile.physical;
-    adjustAttribute(nextAttributes.physical, label, easedDelta);
-  });
-  technicalLabels.forEach((label, index) => {
-    const easedDelta =
-      index >= 3 ? profile.technical * .55 : profile.technical;
-    adjustAttribute(nextAttributes.technical, label, easedDelta);
-  });
-  mentalLabels.forEach((label, index) => {
-    const easedDelta = index >= 2 ? profile.mental * .4 : profile.mental;
-    adjustAttribute(nextAttributes.mental, label, easedDelta);
-  });
-
-  return nextAttributes;
 }
 
 function getAttributeTrainingInterval(
@@ -8668,14 +8646,19 @@ export function getTournamentEntryAccess(
   }
   const accessBand = profile.accessBand;
   const seededProtection = getSeededProtectionForBand(accessBand);
-  const hasMajorWin = state.history.tournamentHistory.some(
-    (entry) =>
-      /major|world championship|masters|tour championship/i.test(
-        entry.tournamentName,
-      ) && entry.result === "Winner",
-  );
   const tournamentClass = getTournamentCircuitClass(tournament);
 
+  // Entry rules select a field; ranking changes during that same event must not
+  // disqualify an established entrant. Date, travel and equipment still gate play.
+  if (tournament.status === "Entered" && state.history.tournamentHistory.some(entry =>
+    entry.tournamentId === tournament.id && entry.startDate === tournament.startDate && entry.matchesPlayed > 0)) {
+    return { allowed: true, accessBand, seededProtection, reason: null };
+  }
+
+  if (state.careerSystems.lateCareer.retirementPending && tournament.status !== "Entered") {
+    return { allowed: false, accessBand, seededProtection,
+      reason: "Retirement follows your booked competitions. Finish your existing entry; new entries are closed." };
+  }
   if (state.careerSystems.lateCareer.retired) {
     return {
       allowed: false,
@@ -8683,13 +8666,6 @@ export function getTournamentEntryAccess(
       seededProtection,
       reason: "This player is retired from competitive events.",
     };
-  }
-
-  // Entry rules select a field; ranking changes during that same event must not
-  // disqualify an established entrant. Date, travel and equipment still gate play.
-  if (tournament.status === "Entered" && state.history.tournamentHistory.some(entry =>
-    entry.tournamentId === tournament.id && entry.startDate === tournament.startDate && entry.matchesPlayed > 0)) {
-    return { allowed: true, accessBand, seededProtection, reason: null };
   }
 
   const pathwayReason = pathwayEntryReason(tournament, {
@@ -8860,15 +8836,15 @@ export function getTournamentEntryAccess(
       }
 
       if (/champion of champions/i.test(tournament.name)) {
-        const allowed =
-          profile.isTop16 || hasMajorWin || profile.isWorldChampion;
+        const selection = championInvitations(state,tournament);
+        const allowed = selection.names.includes(state.player.fullName);
         return {
           allowed,
           accessBand,
           seededProtection,
           reason: allowed
             ? null
-            : "Champion-style invitationals require Top 16 status or a title-winning route.",
+            : `Requires a qualifying singles title from ${selection.from} to ${selection.cutoff}, or an available ranking fallback place. Lifetime titles do not secure entry.`,
         };
       }
 
@@ -9169,6 +9145,7 @@ function repairLegacyWorldEntry(state: GameState): GameState {
 }
 
 export function repairGameState(state: GameState): GameState {
+  state = alignMajorSelection(state);
   state = recoverTournamentArchive(state);
   state = repairSeasonTitleRecords(preserveSeasonEmails(state));
   state = repairTournamentPayouts(initializeRollingRankings(state), getTournamentPlacementAwards);
@@ -9241,6 +9218,7 @@ export function repairGameState(state: GameState): GameState {
     activeProgressTournament?.status === "Entered",
   );
   const keepLiveMatch =
+    Boolean(state.liveMatch?.teamContext && state.careerDepth?.seasonLife?.teams.some(e=>e.id===state.liveMatch!.teamContext!.eventId && e.status==='accepted')) ||
     Boolean(
       state.liveMatch &&
       state.liveMatch.status === "Completed" &&
@@ -9388,6 +9366,7 @@ function shouldPlayerBeInWorldTable(
     "player" | "careerSystems" | "competitionTables" | "tournaments"
   >,
 ) {
+  if (state.careerSystems.lateCareer.retired) return false;
   return (
     state.careerSystems.pro.hasTourCard ||
     (state.careerSystems.pro.worldRank ?? 999) <= TOP_64_RANK_CUTOFF
@@ -11840,7 +11819,7 @@ export function evolveWorldPlayersForNextSeason(
     const isHumanPlayer = record.playerName === nextPlayer.fullName;
     const nextAge = isHumanPlayer ? nextPlayer.age : record.age + 1;
     const retired =
-      !isHumanPlayer && !earnedCards?.has(record.playerName) && shouldRetireCpuPlayer(record, tables, nextAge);
+      isHumanPlayer ? record.retired : !earnedCards?.has(record.playerName) && shouldRetireCpuPlayer(record, tables, nextAge);
     const worldRank =
       getCompetitionRowForPlayer(tables, "world", record.playerName)?.ranking ??
       999;
@@ -12707,7 +12686,7 @@ function archiveWorldPlayersForSeason(
 
 function syncCareerSystems(
   state: Pick<GameState, "competitionTables" | "player" | "careerSystems"> &
-    Partial<Pick<GameState, "history">>,
+    Partial<Pick<GameState, "history" | "tournaments" | "liveMatch" | "careerDepth">>,
 ): CareerSystemsState {
   const qTourRow = state.competitionTables.qTour.find(
     (row) => row.playerName === state.player.fullName,
@@ -12796,14 +12775,20 @@ function syncCareerSystems(
     currentTier = "Junior Amateur Circuit";
   }
 
-  const retired =
+  const activeCompetition = state.tournaments?.some(t => t.status === "Entered") ||
+    state.liveMatch?.status === "In Progress" ||
+    state.careerDepth?.seasonLife?.teams.some(t => t.status === "accepted");
+  // Retirement is permanent, but new retirement waits for booked events to finish.
+  const retirementDue = state.careerSystems.lateCareer.retirementPending || (
     state.player.age >= 78 &&
     !proBase.hasTourCard &&
     worldRank > TOP_64_RANK_CUTOFF &&
     ((seniorRow?.eventsPlayed ?? 0) > 0 ||
       (seniorRow?.ranking ?? 999) <= 24 ||
-      state.player.rankingLabel === "Senior Ranking");
+      state.player.rankingLabel === "Senior Ranking"));
+  const retired = state.careerSystems.lateCareer.retired || (Boolean(retirementDue) && !activeCompetition);
   const lateCareer: LateCareerSystemState = {
+    retirementPending: !retired && Boolean(retirementDue),
     veteranActive:
       state.player.age >= 40 &&
       (worldRank <= MAIN_TOUR_POOL_SIZE ||
@@ -13380,6 +13365,7 @@ function getWorldPlayerTournamentSnapshot(
 
 function getTournamentFieldRows(state: GameState, tournament: Tournament) {
   const baseRows = getCompetitionRowsForTournament(state, tournament);
+  if (/^champion of champions$/i.test(tournament.name)) { const selection=championInvitations(state,tournament); return baseRows.filter(r=>selection.names.includes(r.playerName)); }
   const tournamentClass = getTournamentCircuitClass(tournament);
   const proAmAllowed = /pro-am/i.test(
     `${tournament.name} ${tournament.format} ${tournament.progressionImpact ?? ""}`,
@@ -14176,6 +14162,9 @@ function createLiveMatchState(
   const handicap = rules.includes('handicap') ? handicapAllowance(getCompetitionRowsForTournament(state, tournament).find(r => r.playerName === state.player.fullName)?.ranking ?? 1, setup.opponent.ranking) : { playerHandicap: 0, opponentHandicap: 0 };
   const openingPlayer = rules.includes('shootOut') && Math.random() < .5 ? setup.opponent.playerName : state.player.fullName;
   return {
+    formEvidence: emptyEvidence(),
+    formIssue: state.careerDepth?.seasonLife?.form,
+    formProjectProtected: state.careerDepth?.project?.kind === 'cue-action' && state.careerDepth.project.status === 'active',
     tournamentId: tournament.id,
     round: setup.currentRound,
     atmosphere: eventAtmosphere(state, tournament),
@@ -14653,7 +14642,7 @@ export function simulateSyntheticLiveVisitMatch(
   });
 }
 
-export function resolveCompletedLiveFrame(
+function resolveCompletedLiveFrameCore(
   liveMatch: LiveMatchState,
   mode: "Played" | "Simmed",
   concededBy?: "Player" | "Opponent",
@@ -14857,7 +14846,19 @@ export function resolveCompletedLiveFrame(
   };
 }
 
-export function advanceLiveVisit(
+export function resolveCompletedLiveFrame(live:LiveMatchState, mode:"Played"|"Simmed", concededBy?:"Player"|"Opponent"):LiveMatchState {
+ const next=resolveCompletedLiveFrameCore(live,mode,concededBy);
+ const evidence=live.formEvidence;
+ return completeTeamFrame(live,{...next,formLeadFrame:undefined,formEvidence:evidence?{...evidence,strongLeads:evidence.strongLeads+Number(live.formLeadFrame===live.currentFrame),leadsLost:evidence.leadsLost+Number(live.formLeadFrame===live.currentFrame&&next.opponentFrames>live.opponentFrames)}:undefined});
+}
+export function advanceLiveVisit(live:LiveMatchState, decision?:LiveVisitDecision, mode:LiveMatchResolutionMode="manual", granularity:"visit"|"shot"="visit"):LiveMatchState {
+ const prepared=prepareTeamVisit(formLiveAdjustment(live));
+ const next=advanceLiveVisitCore(prepared,decision,mode,granularity);
+ if(next===prepared)return live;
+ const finished=finishTeamVisit(prepared,next);
+ return live.teamContext?finished:{...finished,playerVisitProfile:live.playerVisitProfile,tacticalPlan:live.tacticalPlan};
+}
+function advanceLiveVisitCore(
   liveMatch: LiveMatchState,
   decision?: LiveVisitDecision,
   mode: LiveMatchResolutionMode = "manual",
@@ -15196,7 +15197,7 @@ export function advanceLiveVisit(
             ? "Scored and stayed in"
             : "Scored but left a chance";
   const visitLogEntry: LiveVisitLogEntry = {
-    id: `visit-${Date.now()}`,
+    id: `visit-${liveMatch.sessionId ?? liveMatch.tournamentId}-${(liveMatch.visitSequence ?? 0)+1}`,
     frameLabel,
     visit: liveMatch.currentVisit,
     actor,
@@ -15311,6 +15312,11 @@ export function advanceLiveVisit(
 
   const progressedLiveMatch: LiveMatchState = {
     ...liveMatch,
+    visitSequence: (liveMatch.visitSequence ?? 0)+1,
+    formLeadFrame: nextPlayerPoints-nextOpponentPoints>=25 && nextRemainingTablePoints<=75 ? liveMatch.currentFrame : liveMatch.formLeadFrame,
+    formEvidence: liveMatch.formEvidence ? {...liveMatch.formEvidence,
+      openings:liveMatch.formEvidence.openings+Number(actorIsPlayer && resolvedDecision==='Pot Attempt'),
+      openingsMade:liveMatch.formEvidence.openingsMade+Number(actorIsPlayer && resolvedDecision==='Pot Attempt' && success && !foulOccurred)} : undefined,
     playerPoints: nextPlayerPoints,
     opponentPoints: nextOpponentPoints,
     currentVisit: liveMatch.currentVisit + (retainedTable ? 0 : 1),
@@ -15473,7 +15479,7 @@ function resolveCareerSimulationLiveMatch(
   tournament: Tournament,
 ): LiveMatchState {
   let liveMatch = createLiveMatchState(state, tournament);
-  if (liveMatch.special?.rules.length) {
+  if (liveMatch.special?.rules.length || liveMatch.formIssue) {
     for (let visits = 0; visits < 20000 && liveMatch.status !== 'Completed'; visits++) {
       if (pendingMatchBreak(liveMatch)) liveMatch = resolveSessionBreak(liveMatch, 'recover');
       else liveMatch = advanceLiveVisit(liveMatch, undefined, 'manual');
@@ -15481,6 +15487,9 @@ function resolveCareerSimulationLiveMatch(
     if (liveMatch.status !== 'Completed') throw new Error('Special-format match did not finish');
     return liveMatch;
   }
+  // Aggregate Quick Sim has no modelled visits. Do not turn its estimates into
+  // zero-attempt evidence or dilute the player's recorded Match Centre baseline.
+  liveMatch = { ...liveMatch, formEvidence: undefined };
   const frameWinChance = convertMatchWinProbabilityToFrameWinProbability(
     liveMatch.plannedMatchWinChance,
     liveMatch.bestOf === 4 ? 5 : liveMatch.bestOf,
@@ -15606,6 +15615,7 @@ export function finalizeLiveMatch(
   state: GameState,
   liveMatch: LiveMatchState,
 ): GameState {
+  if(liveMatch.teamContext) return settleTeamMatch(state, liveMatch);
   const sourceMatchId = liveMatch.sessionId ?? `${state.season}:${liveMatch.tournamentId}:${liveMatch.round}:${liveMatch.opponentName}`;
   if (state.matches.some(m => m.sourceMatchId === sourceMatchId)) return state;
   if (liveMatch.status !== 'Completed') return state;
@@ -15706,6 +15716,7 @@ export function finalizeLiveMatch(
   const tournamentClass = getTournamentCircuitClass(tournament);
   const equipmentProfile = getEquipmentPerformanceProfile(state.equipment);
   const latestMatch: Match = {
+    formEvidence: liveMatch.formEvidence,
     televised: tournament.televisedRounds?.includes(liveMatch.round) ?? false,
     sourceMatchId,
     season: state.season,
@@ -15819,6 +15830,7 @@ export function finalizeLiveMatch(
   });
   const commercialRanking = sponsorRanking(state);
   const sponsorReviews = sponsorsWithBonuses.map(sponsor => reviewSponsorPerformance(sponsor, {
+    mediaNote: mediaBehaviourNote(state),
     matchId: sourceMatchId, result: drawn ? "Drawn" : won ? "Won" : "Lost", rank: commercialRanking.rank, rankingLabel: commercialRanking.label,
     playerMatchRank: latestMatch.playerRanking, opponentRank: liveMatch.opponentRanking, bestOf: liveMatch.bestOf,
     competitive: !/exhibition|pro.am/i.test(tournament.name) && tournament.type !== 'Exhibition',
@@ -16079,6 +16091,7 @@ export function finalizeLiveMatch(
     },
   };
   const careerSystems = syncCareerSystems({
+    ...state,
     competitionTables,
     player: playerAfterMatch,
     careerSystems: careerSystemsSeed,
@@ -16378,7 +16391,7 @@ function recalculateState(
   const coachContracts = normalizeCoachContracts(
     state.coachContracts,
     state.coaches,
-  ).filter((contract) => contract.weeksRemaining > 0);
+  ).filter((contract) => contract.endsOn ? contract.endsOn > state.currentDate : contract.weeksRemaining > 0);
   const coachCost = getCoachCost(coachContracts);
   const sponsorWeeklyIncome = getSponsorWeeklyIncome(state.sponsors);
   const activeFacility = state.equipment.currentTableId
@@ -16430,11 +16443,17 @@ function recalculateState(
   );
   competitionTables = rebuildDevelopmentRankings(rebuildRollingRankings({ ...state, competitionTables }, state.currentDate, false)).competitionTables;
   const careerSystems = syncCareerSystems({
+    ...state,
     competitionTables,
     player: state.player,
     careerSystems: state.careerSystems,
     history: state.history,
   });
+  if (careerSystems.lateCareer.retired) {
+    competitionTables = Object.fromEntries(COMPETITION_TABLE_KEYS.map(key => [key,
+      competitionTables[key].filter(row => row.playerName !== state.player.fullName).map((row,index) => ({...row,ranking:index+1})),
+    ])) as CompetitionTablesState;
+  }
   const primaryCompetitionKey = getPrimaryCompetitionKey({
     player: state.player,
     careerSystems,
@@ -16500,6 +16519,10 @@ function recalculateState(
   return announceSeasonTourChanges(reconcileSponsorMarket({
     ...state,
     inbox: normalizedInbox,
+    worldPlayers: state.worldPlayers.map(record => record.playerName === player.fullName && record.retired !== retired
+      ? { ...record, retired, retiredSeason: retired ? (record.retiredSeason ?? state.season) : null,
+          ...(retired ? { hasTourCard: false, yearsRemaining: 0, cardSource: null, currentYear: 0, expiresAfterSeason: null, retainedViaRanking: false } : {}) }
+      : record),
     season: getSeasonLabelForTournaments(state.tournaments),
     finance: {
       ...state.finance,
@@ -16820,16 +16843,17 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
   );
 }
 
-function loadStoredState(input?: string): GameState {
+function loadStoredState(input?: string, strict = false): GameState {
   if (typeof window === "undefined") return createStarterState();
 
-  const saved = input ?? window.localStorage.getItem(STORAGE_KEY);
+  const saved = input ?? readCareerStorage(STORAGE_KEY);
   if (!saved) return createStarterState();
 
   try {
-    const parsed = JSON.parse(decodeCareerSave(saved)) as Partial<GameState> & {
+    const parsed = JSON.parse(consumeCareerSaveJson(saved)) as Partial<GameState> & {
       tournamentProgress?: TournamentProgressState;
     };
+    if (!parsed?.player || typeof parsed.player.fullName !== 'string' || !Array.isArray(parsed.tournaments) || typeof parsed.currentDate !== 'string') throw new Error('Invalid career save.');
     rememberSaveMetadata(saved, parsed);
     const fallbackState = createStarterState();
     const parsedPlayer = parsed.player
@@ -16971,6 +16995,7 @@ function loadStoredState(input?: string): GameState {
       history: parsed.history
         ? {
             legacy: parsed.history.legacy,
+            seasonOpenings: parsed.history.seasonOpenings,
             snapshots: (
               parsed.history.snapshots ?? fallbackState.history.snapshots
             ).map((snapshot) => ({
@@ -17034,7 +17059,7 @@ function loadStoredState(input?: string): GameState {
     const repairedState = repairGameState(readState);
     return recalculateState(repairedState, repairedState.lastAction);
   } catch (error) {
-    if (input !== undefined) throw error;
+    if (input !== undefined || strict) throw error;
     return createStarterState();
   }
 }
@@ -17102,6 +17127,8 @@ export function hireCoachState(
     );
   }
 
+  const employed = staffUnavailable(previousState, coach.id);
+  if (employed) return {...previousState,lastAction:employed};
   const availability = getCoachAvailabilityStatus(previousState, coach);
   if (!availability.available) {
     return recalculateState(previousState, availability.reason);
@@ -17169,6 +17196,7 @@ export function hireCoachState(
           totalCost: contractOption.totalCost,
           weeksRemaining: parseCoachContractWeeks(contractOption.label),
           startedWeek: previousState.week,
+          endsOn: plusDays(previousState.currentDate,parseCoachContractWeeks(contractOption.label)*7),
         },
       ],
       player: {
@@ -18319,7 +18347,7 @@ function getUniqueSaveSlotName(baseName: string, excludedId?: string) {
   return `${trimmedName} (${suffix})`;
 }
 
-function persistCareerSlot(
+async function persistCareerSlot(
   state: GameState,
   options: { id?: string; name?: string; serialized?: string } = {},
 ) {
@@ -18336,13 +18364,10 @@ function persistCareerSlot(
     date: state.currentDate,
     updatedAt: new Date().toISOString(),
   };
-  writeCareerStorage(
-    `${SAVE_SLOT_PREFIX}${id}`,
-    options.serialized ?? encodeCareerSave({ ...state, schemaVersion: SAVE_SCHEMA_VERSION }),
-  );
-  writeSaveSlotIndex([
-    summary,
-    ...readSaveSlotIndex().filter((slot) => slot.id !== id),
+  const payload=options.serialized ?? await encodeCareerSaveAsync({ ...state, schemaVersion: SAVE_SCHEMA_VERSION });
+  await commitCareerStorage([
+    [`${SAVE_SLOT_PREFIX}${id}`,payload], [STORAGE_KEY,payload], [ACTIVE_SAVE_SLOT_KEY,id],
+    [SAVE_SLOT_INDEX_KEY,JSON.stringify([summary,...readSaveSlotIndex().filter(slot=>slot.id!==id)])],
   ]);
   return summary;
 }
@@ -18354,29 +18379,34 @@ export function useGameState() {
   const saveRevision = useRef(0);
   const previousAutosaveState = useRef<GameState | null>(null);
   const lastAutosaveSnapshot = useRef<{slotId: string | null; serialized: string; state: GameState} | null>(null);
-  const [gameState, setGameState] = useState<GameState>(() =>
-    loadStoredState(),
-  );
+  const [initialLoad, setInitialLoad] = useState<{payload:string|null;overlay:string|null;state:GameState|null;error:string}>(() => {
+    const payload = typeof window === 'undefined' ? null : readCareerStorage(STORAGE_KEY);
+    const overlay = typeof window === 'undefined' ? null : window.localStorage.getItem(inboxReadStorageKey(readActiveSaveSlotId()));
+    try { return { payload, overlay, state: loadStoredState(undefined, true), error: '' }; }
+    catch { return { payload, overlay, state: createStarterState(), error: 'Your active save could not be opened. The original is preserved. Restore an automatic backup or load another named career.' }; }
+  });
+  const [gameState, setGameState] = useState<GameState>(initialLoad.state!);
   const [careerSessionMode, setCareerSessionMode] =
     useState<CareerSessionMode>("launcher");
   const [hasActiveCareer, setHasActiveCareer] = useState(
     () =>
       typeof window !== "undefined" &&
-      Boolean(window.localStorage.getItem(STORAGE_KEY)),
+      Boolean(readCareerStorage(STORAGE_KEY)),
   );
   const [activeSaveSlotId, setActiveSaveSlotId] = useState<string | null>(() => {
     const existingId = readActiveSaveSlotId();
-    if (existingId || !hasActiveCareer || typeof window === "undefined") {
+    if (existingId || !hasActiveCareer || initialLoad.error || typeof window === "undefined") {
       return existingId;
     }
-    const slot = persistCareerSlot(gameState, {
-      id: "migrated-active-career",
-      serialized: window.localStorage.getItem(STORAGE_KEY) ?? undefined,
-      name: `${gameState.player.fullName} · ${gameState.season}`,
-    });
-    writeActiveSaveSlotId(slot.id);
-    return slot.id;
+    return null;
   });
+
+  useEffect(() => {
+    if (careerSessionMode === 'active' && initialLoad.state) {
+      // The startup cache must not retain an entire old career after play resumes.
+      queueMicrotask(() => setInitialLoad({payload:null,overlay:null,state:null,error:''}));
+    }
+  }, [careerSessionMode, initialLoad.state]);
 
   useEffect(() => {
     if (typeof window === "undefined" || careerSessionMode !== "active") return;
@@ -18386,7 +18416,7 @@ export function useGameState() {
     if (previousState && lastAutosaveSnapshot.current?.state === previousState && isInboxReadOnlyChange(previousState, gameState)
       && lastAutosaveSnapshot.current?.slotId === activeSaveSlotId
       && readActiveSaveSlotId() === activeSaveSlotId) {
-      const base = window.localStorage.getItem(STORAGE_KEY);
+      const base = readCareerStorage(STORAGE_KEY);
       // A protected rollover/correction must finish before taking the fast path.
       if (base && base === lastAutosaveSnapshot.current.serialized) {
         try {
@@ -18407,15 +18437,19 @@ export function useGameState() {
     if (readActiveSaveSlotId() !== activeSaveSlotId || (saveRevision.current !== revision && samePhaseAsLatest())) return;
     const serialized = await encodeCareerSaveAsync(gameState);
     if (readActiveSaveSlotId() !== activeSaveSlotId || (saveRevision.current !== revision && samePhaseAsLatest())) return;
-    const publish = () => {
-      writeCareerStorage(STORAGE_KEY, serialized);
-      if (activeSaveSlotId) persistCareerSlot(gameState, { id: activeSaveSlotId, serialized });
+    const publish = async () => {
+      if (activeSaveSlotId) await persistCareerSlot(gameState, { id: activeSaveSlotId, serialized });
+      else await commitCareerStorage([[STORAGE_KEY,serialized]]);
+      lastAutosaveSnapshot.current = { slotId: activeSaveSlotId, serialized, state: gameState };
       window.localStorage.removeItem(inboxReadStorageKey(activeSaveSlotId));
     };
-    const previous = window.localStorage.getItem(STORAGE_KEY);
+    const previous = readCareerStorage(STORAGE_KEY);
     const rendered = lastAutosaveSnapshot.current?.slotId === activeSaveSlotId ? lastAutosaveSnapshot.current.serialized : null;
-    lastAutosaveSnapshot.current = { slotId: activeSaveSlotId, serialized, state: gameState };
-    const rolloverPayloads = [...new Set([previous, rendered].filter((payload): payload is string => {
+    // Preserve the completed in-memory season even when its last autosave failed.
+    const phaseBoundary = previousState && previousState.player.id === gameState.player.id &&
+      (previousState.season !== gameState.season || Boolean(previousState.seasonReview?.pending && !gameState.seasonReview?.pending))
+      ? await encodeCareerSaveAsync(previousState) : null;
+    const rolloverPayloads = [...new Set([previous, rendered, phaseBoundary].filter((payload): payload is string => {
       if (!payload) return false;
       try {
         const old = readRecoveryMetadata(payload);
@@ -18427,14 +18461,14 @@ export function useGameState() {
     })());
     if (typeof indexedDB === 'undefined') {
       if(prizeCorrection) {reportSaveWarning('Prize correction is not saved: backup storage is unavailable. Your original save is preserved. Enable browser storage and reload to retry.');return;}
-      try { if (saveRevision.current === revision) publish(); reportSaveWarning('Automatic backups unavailable. Export a portable backup in Save Manager.'); }
+      try { if (saveRevision.current === revision) await publish(); reportSaveWarning('Automatic backups unavailable. Export a portable backup in Save Manager.'); }
       catch (error) { reportSaveWarning(error instanceof Error ? error.message : 'Autosave failed.'); }
       return;
     }
     const rollover = rolloverPayloads.length > 0 || prizeCorrection;
     const careerId = activeSaveSlotId ?? gameState.player.id;
     if (!rollover && saveRevision.current === revision) {
-      try { publish(); }
+      try { await publish(); }
       catch (error) { reportSaveWarning(error instanceof Error ? error.message : 'Autosave failed.'); return; }
     }
     await (async () => {
@@ -18444,7 +18478,7 @@ export function useGameState() {
         for (const payload of rolloverPayloads) await storeRecoverySave(careerId, payload, 'Before season rollover');
         if (prizeCorrection && previous) await storeRecoverySave(careerId, previous, 'Before prize correction');
         if (readActiveSaveSlotId() !== activeSaveSlotId || saveRevision.current !== revision) return;
-        publish();
+        await publish();
       }
       await storeRecoverySave(careerId, serialized, 'Automatic');
       if (readActiveSaveSlotId() === activeSaveSlotId) reportSaveWarning('');
@@ -18483,79 +18517,116 @@ export function useGameState() {
         if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return; }
         setCareerSessionMode("creating");
       },
-      continueActiveCareer() {
+      async continueActiveCareer() {
+        if (savePendingRef.current) { setSaveWarning('Please wait for the current save to finish.'); return false; }
+        savePendingRef.current=true; setSavePending(true);
+        try {
         if (
           typeof window === "undefined" ||
-          !window.localStorage.getItem(STORAGE_KEY)
+          !readCareerStorage(STORAGE_KEY)
         )
           return false;
-        const storedState = loadStoredState();
-        let slotId = readActiveSaveSlotId();
-        if (!slotId) {
-          const slot = persistCareerSlot(storedState, {
-            name: `${storedState.player.fullName} · ${storedState.season}`,
-          });
-          slotId = slot.id;
-          writeActiveSaveSlotId(slotId);
+        try {
+          const payload = readCareerStorage(STORAGE_KEY);
+          const overlay = window.localStorage.getItem(inboxReadStorageKey(readActiveSaveSlotId()));
+          // Reuse the launcher's repaired snapshot only while the persisted save is unchanged.
+          if (initialLoad.error && payload === initialLoad.payload) throw new Error(initialLoad.error);
+          const storedState = careerSessionMode === 'launcher' && initialLoad.state && !initialLoad.error && payload === initialLoad.payload && overlay === initialLoad.overlay
+            ? initialLoad.state : loadStoredState(undefined, true);
+          let slotId = readActiveSaveSlotId();
+          if (!slotId) {
+            const slot = await persistCareerSlot(storedState, { name: `${storedState.player.fullName} · ${storedState.season}`, serialized: payload! });
+            slotId = slot.id;
+
+          }
+          setActiveSaveSlotId(slotId);
+          setGameState(storedState);
+          setCareerSessionMode("active");
+          setSaveWarning('');
+          return true;
+        } catch {
+          setSaveWarning('Your active save could not be opened. The original is preserved. Restore an automatic backup or load another named career.');
+          return false;
         }
-        setActiveSaveSlotId(slotId);
-        setGameState(storedState);
-        setCareerSessionMode("active");
-        return true;
+        } catch(error) { setSaveWarning(error instanceof Error ? error.message : 'The save could not be written. Your previous career is preserved.'); return false; }
+        finally { savePendingRef.current=false; setSavePending(false); }
       },
-      startDemoCareer() {
+      async startDemoCareer() {
         if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return; }
+        savePendingRef.current=true; setSavePending(true);
+        try {
         const demoState = createStarterState();
-        const slot = persistCareerSlot(demoState, { name: "Demo Career" });
-        window.localStorage.setItem(STORAGE_KEY, encodeCareerSave(demoState));
-        writeActiveSaveSlotId(slot.id);
+        const slot = await persistCareerSlot(demoState, { name: "Demo Career" });
+
+
         setActiveSaveSlotId(slot.id);
         setGameState(demoState);
         setCareerSessionMode("active");
         setHasActiveCareer(true);
+        return true;
+        } catch(error) { setSaveWarning(error instanceof Error ? error.message : 'The save could not be written. Your previous career is preserved.'); return false; }
+        finally { savePendingRef.current=false; setSavePending(false); }
       },
       listSaveSlots() {
         return readSaveSlotIndex();
       },
-      saveToSlot(name: string) {
+      async saveToSlot(name: string) {
         if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return null; }
+        savePendingRef.current=true; setSavePending(true);
+        try {
         if (typeof window === "undefined") return null;
         const normalizedName =
           name.trim() || `${gameState.player.fullName} · ${gameState.season}`;
-        const summary = persistCareerSlot(gameState, { name: normalizedName });
-        window.localStorage.setItem(STORAGE_KEY, encodeCareerSave(gameState));
-        writeActiveSaveSlotId(summary.id);
+        const summary = await persistCareerSlot(gameState, { name: normalizedName });
+
+
         setActiveSaveSlotId(summary.id);
         return summary;
+        } catch(error) { setSaveWarning(error instanceof Error ? error.message : 'The save could not be written. Your previous career is preserved.'); return null; }
+        finally { savePendingRef.current=false; setSavePending(false); }
       },
-      loadSaveSlot(id: string) {
+      async loadSaveSlot(id: string) {
         if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return false; }
+        savePendingRef.current=true; setSavePending(true);
+        try {
         if (typeof window === "undefined") return false;
-        const saved = window.localStorage.getItem(`${SAVE_SLOT_PREFIX}${id}`);
+        const saved = await readSavedCareer(`${SAVE_SLOT_PREFIX}${id}`);
         if (!saved) return false;
-        window.localStorage.setItem(STORAGE_KEY, saved);
-        writeActiveSaveSlotId(id);
-        setActiveSaveSlotId(id);
-        setGameState(loadStoredState());
-        setCareerSessionMode("active");
-        setHasActiveCareer(true);
-        return true;
+        try {
+          const loaded = applyInboxReadOverlay(loadStoredState(saved), saved, window.localStorage.getItem(inboxReadStorageKey(id)));
+          await commitCareerStorage([[STORAGE_KEY, saved], [ACTIVE_SAVE_SLOT_KEY, id]]);
+          setActiveSaveSlotId(id);
+          setGameState(loaded);
+          setCareerSessionMode("active");
+          setHasActiveCareer(true);
+          setSaveWarning('');
+          return true;
+        } catch {
+          setSaveWarning('That named save could not be opened. Your current career is preserved. Choose another save or restore an automatic backup.');
+          return false;
+        }
+        } catch(error) { setSaveWarning(error instanceof Error ? error.message : 'The save could not be written. Your previous career is preserved.'); return false; }
+        finally { savePendingRef.current=false; setSavePending(false); }
       },
-      deleteSaveSlot(id: string) {
+      async deleteSaveSlot(id: string) {
         if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return; }
+        savePendingRef.current=true; setSavePending(true);
+        try {
         if (typeof window === "undefined") return;
-        window.localStorage.removeItem(`${SAVE_SLOT_PREFIX}${id}`);
+        await commitCareerStorage([
+          [`${SAVE_SLOT_PREFIX}${id}`,null],
+          [SAVE_SLOT_INDEX_KEY,JSON.stringify(readSaveSlotIndex().filter(slot=>slot.id!==id))],
+          ...(id===activeSaveSlotId ? [[STORAGE_KEY,null],[ACTIVE_SAVE_SLOT_KEY,null]] as Array<[string,string|null]> : []),
+        ]);
         window.localStorage.removeItem(inboxReadStorageKey(id));
-        writeSaveSlotIndex(
-          readSaveSlotIndex().filter((slot) => slot.id !== id),
-        );
         if (id === activeSaveSlotId) {
-          window.localStorage.removeItem(STORAGE_KEY);
-          writeActiveSaveSlotId(null);
           setActiveSaveSlotId(null);
           setHasActiveCareer(false);
           setCareerSessionMode("launcher");
         }
+        return true;
+        } catch(error) { setSaveWarning(error instanceof Error ? error.message : 'The save could not be written. Your previous career is preserved.'); return false; }
+        finally { savePendingRef.current=false; setSavePending(false); }
       },
       exportCareer() {
         return JSON.stringify(
@@ -18565,17 +18636,19 @@ export function useGameState() {
         );
       },
       async restoreRecoverySave(id: string) {
+        if (savePendingRef.current) return { success: false, message: "Please wait for the current save to finish." };
+        savePendingRef.current=true; setSavePending(true);
         try {
           await queueProtectedSave(async () => undefined);
-          const record = (await listRecoverySaves()).find(item => item.id === id);
+          const record = await getRecoverySave(id);
           if (!record) throw new Error('That backup is no longer available. Refresh the list.');
           const restored = loadStoredState(validatedRecoveryPayload(record));
           if (careerSessionMode === 'active') {
-            await storeRecoverySave(activeSaveSlotId ?? gameState.player.id, encodeCareerSave(gameState), 'Before restore');
+            await storeRecoverySave(activeSaveSlotId ?? gameState.player.id, await encodeCareerSaveAsync(gameState), 'Before restore');
           }
           const slot: SaveSlotSummary = { id: createSaveSlotId(), name: getUniqueSaveSlotName(record.player + ' · Recovered'), playerName: restored.player.fullName, season: restored.season, date: restored.currentDate, updatedAt: new Date().toISOString() };
-          const payload = encodeCareerSave(restored);
-          writeCareerStorageBatch([
+          const payload = await encodeCareerSaveAsync(restored);
+          await commitCareerStorage([
             [SAVE_SLOT_PREFIX + slot.id, payload],
             [SAVE_SLOT_INDEX_KEY, JSON.stringify([slot, ...readSaveSlotIndex()])],
             [STORAGE_KEY, payload], [ACTIVE_SAVE_SLOT_KEY, slot.id],
@@ -18583,6 +18656,7 @@ export function useGameState() {
           setActiveSaveSlotId(slot.id); setGameState(restored); setCareerSessionMode('active'); setHasActiveCareer(true); setSaveWarning('');
           return { success: true, message: 'Backup restored as a new career copy. Your previous named save is retained.' };
         } catch (error) { return { success: false, message: error instanceof Error ? error.message : 'Could not restore this backup.' }; }
+        finally { savePendingRef.current=false; setSavePending(false); }
       },
       recoverAttributeHistory(serializedState: string) {
         try {
@@ -18593,8 +18667,10 @@ export function useGameState() {
           return { success: false, message: error instanceof Error ? error.message : 'Could not read attribute history.' };
         }
       },
-      importCareer(serializedState: string) {
+      async importCareer(serializedState: string) {
         if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return false; }
+        savePendingRef.current=true; setSavePending(true);
+        try {
         if (typeof window === "undefined") return false;
         try {
           const parsed = JSON.parse(serializedState) as Partial<GameState>;
@@ -18604,20 +18680,26 @@ export function useGameState() {
             !parsed.currentDate
           )
             return false;
-          window.localStorage.setItem(STORAGE_KEY, encodeCareerSave(parsed));
-          const importedState = loadStoredState();
-          const slot = persistCareerSlot(importedState, {
-            name: `${importedState.player.fullName} · Imported`,
-          });
-          writeActiveSaveSlotId(slot.id);
+          const importedState = loadStoredState(serializedState);
+          const slot: SaveSlotSummary = { id: createSaveSlotId(), name: getUniqueSaveSlotName(`${importedState.player.fullName} · Imported`), playerName: importedState.player.fullName, season: importedState.season, date: importedState.currentDate, updatedAt: new Date().toISOString() };
+          const payload = await encodeCareerSaveAsync(importedState);
+          await commitCareerStorage([
+            [SAVE_SLOT_PREFIX + slot.id, payload],
+            [SAVE_SLOT_INDEX_KEY, JSON.stringify([slot, ...readSaveSlotIndex()])],
+            [STORAGE_KEY, payload], [ACTIVE_SAVE_SLOT_KEY, slot.id],
+          ]);
+          setSaveWarning('');
           setActiveSaveSlotId(slot.id);
           setGameState(importedState);
           setCareerSessionMode("active");
           setHasActiveCareer(true);
           return true;
         } catch {
+          setSaveWarning('Import failed. Your current career is preserved. Check the file and available browser storage, or restore an automatic backup.');
           return false;
         }
+        } catch(error) { setSaveWarning(error instanceof Error ? error.message : 'The save could not be written. Your previous career is preserved.'); return false; }
+        finally { savePendingRef.current=false; setSavePending(false); }
       },
       markInboxMessageRead(messageId: string, read = true) {
         setGameState(previousState => updateInboxReadState(previousState, messageId, read));
@@ -18644,8 +18726,10 @@ export function useGameState() {
           ),
         );
       },
-      resetCareer(config?: NewCareerConfig) {
+      async resetCareer(config?: NewCareerConfig) {
         if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return; }
+        savePendingRef.current=true; setSavePending(true);
+        try {
         const newCareer = createNewCareerState(config);
         const slot: SaveSlotSummary = {
           id: createSaveSlotId(),
@@ -18655,8 +18739,8 @@ export function useGameState() {
           date: newCareer.currentDate,
           updatedAt: new Date().toISOString(),
         };
-        const serialized = encodeCareerSave(newCareer);
-        writeCareerStorageBatch([
+        const serialized = await encodeCareerSaveAsync(newCareer);
+        await commitCareerStorage([
           [`${SAVE_SLOT_PREFIX}${slot.id}`, serialized],
           [SAVE_SLOT_INDEX_KEY, JSON.stringify([slot, ...readSaveSlotIndex()])],
           [STORAGE_KEY, serialized],
@@ -18666,6 +18750,9 @@ export function useGameState() {
         setGameState(newCareer);
         setCareerSessionMode("active");
         setHasActiveCareer(true);
+        return true;
+        } catch(error) { setSaveWarning(error instanceof Error ? error.message : 'The save could not be written. Your previous career is preserved.'); throw error; }
+        finally { savePendingRef.current=false; setSavePending(false); }
       },
       continueWeek() {
         setGameState((previousState) => advanceWeekState(previousState));
@@ -19937,7 +20024,7 @@ export function useGameState() {
         });
       },
     }),
-    [activeSaveSlotId, careerSessionMode, gameState],
+    [activeSaveSlotId, careerSessionMode, gameState, initialLoad],
   );
 
   return useMemo(
@@ -19946,10 +20033,32 @@ export function useGameState() {
       careerSessionMode,
       hasActiveCareer,
       activeSaveSlotId,
-      saveWarning,
+      saveWarning: saveWarning || (careerSessionMode === 'launcher' ? initialLoad.error : ''),
       savePending,
       ...actions,
     }),
-    [actions, activeSaveSlotId, careerSessionMode, gameState, hasActiveCareer, saveWarning, savePending],
+    [actions, activeSaveSlotId, careerSessionMode, gameState, hasActiveCareer, saveWarning, savePending, initialLoad.error],
   );
+}
+
+export function createTeamLiveMatch(s:GameState,e:TeamEvent,tieIndex:number,rubber:number):LiveMatchState {
+ const tie=e.ties[tieIndex],home=e.teams[tie.home],away=e.teams[tie.away];
+ const members=[...home.members,...away.members].map(p=>{
+  const current=teamMember(s,p.id),played=e.ties.some(t=>t.results.some(r=>r.home.includes(p.id)||r.away.includes(p.id)));
+  return {...(played?p:current),profile:current.profile,visits:0,pots:0,fouls:0,points:0,highestBreak:0};
+ });
+ const base=createLiveMatchState(s,s.tournaments[0]??{id:e.id,name:e.name,type:'Exhibition',location:'Host club',startDate:e.start,endDate:e.end,entryFee:0,travelCost:0,hotelCost:0,prizeMoney:0,rankingValue:0,rankingType:'None',format:'Knockout, best of 3',status:'Entered',fatigueRisk:'Low'});
+ const order=rubber===2?[0,2,1,3]:rubber===1?[1,3]:[0,2];
+ const player=members[order[0]],opponent=members[order[1]];
+ const partner=home.members.find(p=>p.id!==s.player.id),familiarity=partner?lifeOf(s).partnerships[partner.id]?.familiarity??0:0;
+ return {...base,tournamentId:e.id,round:tieIndex===2?'Final':'Semi Final',sessionId:e.id+':'+tieIndex+':'+rubber,
+  atmosphere:undefined,careerBestAtStart:undefined,sessions:undefined,special:undefined,venue:undefined,conditionEffect:0,objectives:undefined,
+  formEvidence:undefined,formIssue:undefined,formProjectProtected:undefined,
+  bestOf:3,framesNeeded:2,opponentRanking:s.competitionTables.world.find(p=>p.playerName===opponent.name)?.ranking??0,playerName:rubber===2?home.name:player.name,opponentName:rubber===2?away.name:opponent.name,
+  playerAtTable:rubber===2?home.name:player.name,frameStarterName:rubber===2?home.name:player.name,
+  playerPoints:0,opponentPoints:0,playerConfidence:player.confidence,opponentConfidence:opponent.confidence,playerFatigue:player.fatigue,opponentFatigue:opponent.fatigue,
+  playerVisitProfile:player.profile,opponentVisitProfile:opponent.profile,plannedWinChance:50,plannedMatchWinChance:50,plannedPlayerStrength:player.profile.breakBuilding,plannedOpponentStrength:opponent.profile.breakBuilding,
+  intervalText:'Team tie · two singles, deciding doubles at 1–1. Best of three frames.',conditions:'Fictional local host event',framesRemainingText:'2 frames needed to win',
+  feed:[{id:e.id+':start',time:'00:00',actor:'System',tone:'blue',text:e.name+' · '+(rubber===2?'Doubles: fixed order '+order.map(i=>members[i].name).join(' → ')+'. Partners alternate visits, retaining the table for the whole break.':'Singles: '+player.name+' vs '+opponent.name)}],
+  teamContext:{eventId:e.id,tie:tieIndex,rubber,kind:rubber===2?'doubles':'singles',members,order,turn:0,coordination:rubber===2?Math.min(1.5,familiarity/100*1.5):0}};
 }

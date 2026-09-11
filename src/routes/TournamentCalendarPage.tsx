@@ -95,7 +95,7 @@ export function TournamentCalendarPage() {
   const [circuitFilter, setCircuitFilter] = useState('All circuits')
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [levelFilter, setLevelFilter] = useState<CalendarLevelFilter>('All Tours')
-  const [selectedTournamentId, setSelectedTournamentId] = useState(linkedTournament?.id ?? getNextEligibleTournament(gameState)?.id ?? gameState.tournaments[0]?.id ?? '')
+  const [selectedTournamentId, setSelectedTournamentId] = useState(() => linkedTournament?.id ?? getNextEligibleTournament(gameState)?.id ?? gameState.tournaments[0]?.id ?? '')
   const activeMonth = { year: Math.floor(monthIndex / 12), month: ((monthIndex % 12) + 12) % 12, label: monthLongLabels[((monthIndex % 12) + 12) % 12] + ' ' + Math.floor(monthIndex / 12) }
   const circuits = [...new Set(calendarData.events.filter(event => levelFilter === 'All Tours' || getTournamentLevel(event) === levelFilter).map(event => event.tourCircuit))].sort()
   const visibleEvents = calendarData.events.filter((event) => eventOverlapsMonth(event, activeMonth.month, activeMonth.year) && (levelFilter === 'All Tours' || getTournamentLevel(event) === levelFilter) && (circuitFilter === 'All circuits' || event.tourCircuit === circuitFilter))
@@ -182,7 +182,7 @@ export function TournamentCalendarPage() {
     <div className={view === 'month' ? 'flex h-full min-h-0 flex-col gap-3' : 'space-y-6'}>
       <div className="flex shrink-0 flex-col items-start justify-between gap-3 sm:flex-row">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-white">Tournament Calendar</h1>
+          <h1 className="text-2xl font-bold text-white">Tournament Calendar</h1><a className="text-sm text-green-400" href="/career/teams">Club & national pairs · invitations and results</a>{gameState.careerDepth?.seasonLife?.teams.filter(e=>e.status==='accepted').map(e=><p key={e.id} className="text-xs text-gray-300">{e.start}–{e.end} · {e.name} · accepted team booking</p>)}
           <p className="mt-1 text-sm text-gray-400">Season pathway schedule - {activeMonth.label}</p>
           <div className="mt-2 flex gap-1" role="group" aria-label="Calendar display">
             <button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')} className={view === 'list' ? 'btn-primary px-3 py-1 text-xs' : 'btn-secondary px-3 py-1 text-xs'}><List className="h-3.5 w-3.5" /> List view</button>

@@ -147,3 +147,12 @@ it('shows recorded credit as pending until publication without crediting it twic
  expect(rebuildRollingRankings(published,'2026-09-10').competitionTables.world).toEqual(published.competitionTables.world);
  expect(published.player.cash).toBe(state.player.cash);
 });
+
+it('orders zero-point ties consistently regardless of previous rank or row order', () => {
+ const {state}=fixture();
+ const a=rebuildRollingRankings(state,state.currentDate);
+ const reversed={...a,competitionTables:{...a.competitionTables,oneYear:[...a.competitionTables.oneYear].reverse().map((r,i)=>({...r,ranking:i+1}))}};
+ const b=rebuildRollingRankings(reversed,state.currentDate);
+ expect(b.competitionTables.oneYear.map(r=>[r.playerName,r.ranking])).toEqual(a.competitionTables.oneYear.map(r=>[r.playerName,r.ranking]));
+ expect(rebuildRollingRankings(b,b.currentDate).competitionTables.oneYear).toEqual(b.competitionTables.oneYear);
+});

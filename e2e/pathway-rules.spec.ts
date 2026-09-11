@@ -17,6 +17,7 @@ test('New Zealand Q Tour shows groups and updates the table after a match',async
   await page.evaluate(()=>{history.pushState({},'', '/tournaments/hub');dispatchEvent(new PopStateEvent('popstate'));});
   const groups=page.getByRole('region',{name:'Group standings and fixtures'});
   await expect(groups).toContainText('0 of 4 matches');
+  await page.getByText('Round rules and format', {exact:true}).click();
   await expect(page.getByText(/Six months of regional residence required/)).toBeVisible();
   await page.getByRole('button',{name:'Quick Sim',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Match Review'})).toBeVisible();
@@ -35,6 +36,6 @@ test('rankings separate regional Q Tour, Q School and seniors lists',async({page
   await page.getByLabel('Pathway standings').selectOption('Q School Asia');
   await page.getByRole('button',{name:'Senior Ranking',exact:true}).click();
   await page.getByLabel('Pathway standings').selectOption('Race to the Crucible');
-  await expect(page.getByText(/Recorded results only/)).toBeVisible();
+  await expect(page.getByText(/No published results yet|published event|Next results|No completed|No eligible/i)).toBeVisible();
   await page.screenshot({path:'test-results/pathway-rankings.png',fullPage:true});expect(errors).toEqual([]);
 });

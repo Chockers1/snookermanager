@@ -46,7 +46,7 @@ export function recommendSeason(state: GameState, tour: PlannerTour | 'All tours
     .filter(t => tour === 'All tours' || plannerEventTour(t) === tour)
     .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.id.localeCompare(b.id)).map(event => {
       const access = getTournamentEntryAccess(state, event);
-      const qualifier = !access.allowed ? pendingQualifier(state, event) : undefined;
+      const qualifier = !access.allowed && !state.careerSystems.lateCareer.retired && !state.careerSystems.lateCareer.retirementPending ? pendingQualifier(state, event) : undefined;
       const accessReason = qualifier ? `Qualification required: progress through ${qualifier.name} (${qualifier.startDate}) to reach this main draw.` : access.reason;
       const entry = event.status === 'Entered' ? 0 : event.entryFee;
       const travel = state.travel.bookings[event.id] ? 0 : getTravelPackageCost(state, undefined, undefined, event.id);

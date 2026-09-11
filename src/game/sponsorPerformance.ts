@@ -29,13 +29,13 @@ export function sponsorPerformance(sponsor: SponsorDeal, rank: number | null, ra
 export function sponsorMood(score: number) {
   return score >= 85 ? 'Delighted' : score >= 70 ? 'Happy' : score >= 50 ? 'Content' : score >= 40 ? 'Concerned' : score >= 25 ? 'Unhappy' : 'At risk';
 }
-export type SponsorReviewContext = { matchId: string; result: 'Won' | 'Lost' | 'Drawn'; rank: number | null; rankingLabel: string; playerMatchRank: number; opponentRank: number; bestOf: number; competitive: boolean };
+export type SponsorReviewContext = { mediaNote?: string; matchId: string; result: 'Won' | 'Lost' | 'Drawn'; rank: number | null; rankingLabel: string; playerMatchRank: number; opponentRank: number; bestOf: number; competitive: boolean };
 export function reviewSponsorPerformance(sponsor: SponsorDeal, context: SponsorReviewContext): { sponsor: SponsorDeal; notice: 'concern' | 'warning' | 'recovered' | 'terminated' | null } {
   const previous = sponsorPerformance(sponsor, context.rank, context.rankingLabel);
   if (!context.competitive || previous.lastMatchId === context.matchId) return { sponsor: { ...sponsor, performance: previous }, notice: null };
   const tougherOpponent = context.opponentRank > 0 && context.playerMatchRank > 0 && context.opponentRank < context.playerMatchRank * .75;
   const easierOpponent = context.opponentRank > context.playerMatchRank * 1.5 && context.playerMatchRank > 0;
-  const expected = clamp(previous.expectedWinRate + (tougherOpponent ? -10 : easierOpponent ? 5 : 0), 25, 75);
+  const expected = clamp(previous.expectedWinRate + (context.mediaNote ? 2 : 0) + (tougherOpponent ? -10 : easierOpponent ? 5 : 0), 25, 75);
   const outcome = context.result === 'Won' ? 100 : context.result === 'Drawn' ? 50 : 0;
   const rankingSlip = previous.rankingLabel === context.rankingLabel && previous.rankingTarget !== null && context.rank !== null && context.rank > previous.rankingTarget;
   const change = clamp(((outcome - expected) / 15 + (context.result === 'Won' ? .5 : 0) - (rankingSlip ? 1 : 0)) * (context.bestOf === 1 ? .5 : 1), -5, 5);
@@ -47,7 +47,7 @@ export function reviewSponsorPerformance(sponsor: SponsorDeal, context: SponsorR
   else if (satisfaction >= 50 && warningAtMatch !== null) { warningAtMatch = null; notice = 'recovered'; }
   else if (satisfaction < 50 && previous.satisfaction >= 50) notice = 'concern';
   if (warningAtMatch !== null && matchesReviewed - warningAtMatch >= 6 && satisfaction < 25) notice = 'terminated';
-  const lastReason = `${context.result === 'Won' ? 'Match win' : context.result === 'Drawn' ? 'Drawn match' : 'Match defeat'}${tougherOpponent ? ' against a higher-ranked opponent' : ''}${rankingSlip ? '; below the agreed ranking target' : ''}${context.bestOf === 1 ? '; single-frame result has half weight' : ''}.`;
+  const lastReason = `${context.result === 'Won' ? 'Match win' : context.result === 'Drawn' ? 'Drawn match' : 'Match defeat'}${tougherOpponent ? ' against a higher-ranked opponent' : ''}${rankingSlip ? '; below the agreed ranking target' : ''}${context.bestOf === 1 ? '; single-frame result has half weight' : ''}. ${context.mediaNote ?? ''}`;
   return { sponsor: { ...sponsor, performance: { ...previous, satisfaction, matchesReviewed, warningAtMatch, lastMatchId: context.matchId, lastChange: Math.round((satisfaction - previous.satisfaction) * 10) / 10, lastReason },
     ...(satisfaction < 50 && sponsor.renewalStatus === 'Offered' ? { renewalStatus: 'None', renewalOfferValue: undefined } : {}),
   }, notice };

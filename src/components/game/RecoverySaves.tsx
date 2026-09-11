@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../../context/useGame';
-import { listRecoverySaves, type RecoverySave } from '../../game/recoverySaves';
+import { listRecoverySummaries, type RecoverySummary } from '../../game/recoverySaves';
 export function RecoverySaves() {
  const { restoreRecoverySave, saveWarning } = useGame(); const navigate = useNavigate();
- const [records,setRecords]=useState<RecoverySave[]>([]); const [message,setMessage]=useState('Loading recovery saves…');
+ const [records,setRecords]=useState<RecoverySummary[]>([]); const [message,setMessage]=useState('Loading recovery saves…');
  const [busy,setBusy]=useState(false); const [career,setCareer]=useState('all');
- async function refresh(){try { const saves=await listRecoverySaves(); setRecords(saves);setMessage(saves.length?'Choose a snapshot to restore as a new career copy.':'No backups yet. Automatic snapshots begin when you continue a career.');}catch(error){setMessage(error instanceof Error?error.message:'Could not load backups.')}}
- useEffect(()=>{let alive=true;void listRecoverySaves().then(saves=>{if(alive){setRecords(saves);setMessage(saves.length?'Choose a snapshot to restore as a new career copy.':'No backups yet. Automatic snapshots begin when you continue a career.');}}).catch(error=>{if(alive)setMessage(error instanceof Error?error.message:'Could not load backups.');});return()=>{alive=false}},[]);
+ async function refresh(){try { const saves=await listRecoverySummaries(); setRecords(saves);setMessage(saves.length?'Choose a snapshot to restore as a new career copy.':'No backups yet. Automatic snapshots begin when you continue a career.');}catch(error){setMessage(error instanceof Error?error.message:'Could not load backups.')}}
+ useEffect(()=>{let alive=true;void listRecoverySummaries().then(saves=>{if(alive){setRecords(saves);setMessage(saves.length?'Choose a snapshot to restore as a new career copy.':'No backups yet. Automatic snapshots begin when you continue a career.');}}).catch(error=>{if(alive)setMessage(error instanceof Error?error.message:'Could not load backups.');});return()=>{alive=false}},[]);
  async function restore(id:string){setBusy(true);try{const result=await restoreRecoverySave(id);setMessage(result.message);if(result.success)navigate('/saves');}finally{setBusy(false)}}
  const careers=[...new Map(records.map(r=>[r.careerId,r])).values()];
  return <section className="card p-4" aria-label="Save recovery"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold text-white">Automatic backups & recovery</h2><button className="btn-secondary text-xs" disabled={busy} onClick={()=>void refresh()}>Refresh backups</button></div>

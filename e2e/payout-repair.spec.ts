@@ -1,7 +1,7 @@
 import {expect,test,type Page} from '@playwright/test';
 import {payoutRepairFixture} from '../test-support/payoutRepairFixture';
 import {ACTIVE_SAVE_KEY,encodeCareerSave} from '../src/game/saveStorage';
-import {readCareerSave} from './read-career-save';
+import {readCareerSave,readStoredCareerValue} from './read-career-save';
 const records=(page:Page)=>page.evaluate(async()=>{const path='/src/game/recoverySaves.ts';return (await import(path)).listRecoverySaves()});
 test('backs up original awards before publishing the repair and does not repay on reload',async({page})=>{
  test.setTimeout(120000);const {state}=payoutRepairFixture(), original=encodeCareerSave(state);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
@@ -23,6 +23,6 @@ test('failed correction backup leaves the original active save intact',async({pa
  await page.addInitScript(({key,value})=>{localStorage.setItem(key,value);const put=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(value,key){if(value?.reason==='Before prize correction')throw new DOMException('Full','QuotaExceededError');return put.call(this,value,key)}},{key:ACTIVE_SAVE_KEY,value:original});
  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
  await expect(page.getByText(/Check Save Manager before closing/)).toBeAttached();
- expect(await page.evaluate(key=>localStorage.getItem(key),ACTIVE_SAVE_KEY)).toBe(original);
+ expect(await readStoredCareerValue(page,ACTIVE_SAVE_KEY)).toBe(original);
  expect((await records(page)).filter((r:{reason:string})=>r.reason==='Before prize correction')).toHaveLength(0);
 });

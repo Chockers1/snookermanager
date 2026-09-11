@@ -97,10 +97,11 @@ export function retainTournamentArchive(entries: TournamentArchiveEntry[]) {
  */
 export function recoverTournamentArchive(state: GameState): GameState {
   const recovered: TournamentArchiveEntry[] = [];
+  const archived = new Set(state.history.tournamentHistory.map(e=>JSON.stringify([e.tournamentId,e.season,e.startDate])));
   for(const ledger of Object.values(state.rollingRankings?.events ?? {})) {
     if(!ledger.applied || ledger.season >= state.season || ledger.completedOn > state.currentDate) continue;
     const startDate = /:(\d{4}-\d{2}-\d{2})$/.exec(ledger.key)?.[1];
-    if(!startDate || state.history.tournamentHistory.some(e=>e.tournamentId===ledger.tournamentId && e.season===ledger.season && e.startDate===startDate)) continue;
+    if(!startDate || archived.has(JSON.stringify([ledger.tournamentId,ledger.season,startDate]))) continue;
     const rounds: NonNullable<TournamentArchiveEntry['roundResults']> = ledger.bracket.flatMap(round=>round.matches.flatMap(match=>{
       const player = match.top.name===state.player.fullName ? match.top : match.bottom.name===state.player.fullName ? match.bottom : null;
       if(!player || !player.highlighted || match.placeholder) return [];

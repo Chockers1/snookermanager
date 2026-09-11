@@ -24,6 +24,7 @@ for (const eventId of ['pc-69', 'pc-67']) test(`audited rules and fixtures ${eve
     await expect(page.getByRole('heading', { name: 'Match Review' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Group standings and fixtures' })).toContainText('1 of 6 matches');
   } else {
+    await page.getByText('Round rules and format', {exact:true}).click();
     await expect(page.getByText(/10-minute frame; 15-second shot clock/)).toBeVisible();
     await page.getByRole('button', { name: 'Quick Sim', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Match Review' })).toBeVisible();

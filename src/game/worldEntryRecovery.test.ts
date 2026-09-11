@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createStarterState, enterTournamentState, getNextEligibleTournament, getTournamentEntryAccess, repairGameState } from '../hooks/useGameState';
-import { rankingEventKey } from './rollingRankings';
+import { rankingEventKey, rankingCutoffDate } from './rollingRankings';
 import { buildTournamentDrawData } from '../utils/liveRouteData';
 
 function legacyReservation() {
@@ -21,7 +21,7 @@ function legacyReservation() {
   state.currentDate = qualifier.endDate!;
   state.tournaments = state.tournaments.map(t => ({ ...t, legacyEntryHonoured: undefined, seasonOpenAccessLock: 'worldMainDraw', status: t.id === world.id ? 'Available' : 'Skipped' }));
   state.tournamentProgress = createStarterState().tournamentProgress;
-  for (const event of state.tournaments) state.rollingRankings!.seedings[rankingEventKey(event)] = { date: state.currentDate, world: { [state.player.fullName]: 18 }, oneYear: {} };
+  for (const event of state.tournaments) state.rollingRankings!.seedings[rankingEventKey(event)] = { date: rankingCutoffDate(event), world: { [state.player.fullName]: 18 }, oneYear: {} };
   return state;
 }
 

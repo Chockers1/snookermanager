@@ -1,3 +1,5 @@
+import { staffUnavailable } from '../game/seasonLife/staff';
+import { StaffMovementPanel } from '../components/career/SeasonLifePanels';
 import { useState } from "react";
 import { CoachRelationshipsPanel } from "../components/career/CareerDepthPanels";
 import { Check, Search, SlidersHorizontal, Users, X } from "lucide-react";
@@ -102,6 +104,7 @@ export function CoachMarketPage() {
     ...Array.from(new Set(gameState.coaches.map((coach) => coach.type))),
   ];
   const visibleCoaches = gameState.coaches
+    .filter(coach => !staffUnavailable(gameState, coach.id))
     .filter((coach) => typeFilter === "All" || coach.type === typeFilter)
     .filter(
       (coach) =>
@@ -197,6 +200,7 @@ export function CoachMarketPage() {
   return (
     <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
       <CoachRelationshipsPanel />
+      <StaffMovementPanel />
       <section className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-surface/85 px-4 py-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">

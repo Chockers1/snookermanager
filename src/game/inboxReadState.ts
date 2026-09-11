@@ -29,10 +29,14 @@ export function isInboxReadOnlyChange(previous: GameState, next: GameState) {
 
 // Bind the small read-state overlay to one exact base payload. It must not be
 // replayed over a restored/imported career or a later full save in the same slot.
+let lastFingerprint: {payload:string; value:string} | undefined;
 function fingerprint(payload: string) {
+  if(lastFingerprint?.payload===payload) return lastFingerprint.value;
   let hash = 2166136261;
   for (let i = 0; i < payload.length; i++) hash = Math.imul(hash ^ payload.charCodeAt(i), 16777619);
-  return payload.length + ':' + (hash >>> 0);
+  const value=payload.length + ':' + (hash >>> 0);
+  lastFingerprint={payload,value};
+  return value;
 }
 export function encodeInboxReadOverlay(state: GameState, base: string) {
   return JSON.stringify({ version: 1, base: fingerprint(base), playerId: state.player.id,

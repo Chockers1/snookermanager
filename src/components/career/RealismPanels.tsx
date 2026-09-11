@@ -16,9 +16,12 @@ const input = 'min-h-10 max-w-full rounded border border-border bg-background px
 const button = 'btn-secondary min-h-10 text-xs';
 
 export function QualificationRacesPanel() {
+  return <CareerDisclosure title="Qualification and tour survival" summary="Qualification races · defending earnings · tour survival"><QualificationRacesContent /></CareerDisclosure>;
+}
+function QualificationRacesContent() {
   const { gameState } = useGame();
   const races = qualificationRaces(gameState), survival = survivalRace(gameState);
-  return <CareerDisclosure title="Qualification and tour survival" summary="Qualification races · defending earnings · tour survival">
+  return <>
     <div className={body}>
       <p className="text-gray-400">Counting earnings, not match win percentage, determine these races. Projections remove scheduled expiries but never invent future winnings. Dates are the game’s configured cut-offs.</p>
       {races.length === 0 && <p>No upcoming ranking-cut-off events on this calendar.</p>}
@@ -31,7 +34,7 @@ export function QualificationRacesPanel() {
       </section>)}
       <section className="rounded-lg border border-border p-3"><h3 className="font-bold">Tour survival · top 64</h3><p className="my-2">{survival.confirmed ? 'Season-end table' : 'Provisional, expiry-adjusted position'}: {survival.position ? `#${survival.position}` : 'not on world ladder'} · defending {money(survival.defending)} · gap {money(survival.gap)}</p><p className="text-green-400">{survival.protectedCard ? 'You have a protected second year on your card.' : 'Ranking and alternative qualification routes remain separate.'}</p><p className="mt-2 text-gray-400">Current one-year rescue places, excluding projected top 64 and protected cards: {survival.oneYearRescue.join(', ') || 'No eligible players yet'}. This is an outlook, not a new card award.</p></section>
     </div>
-  </CareerDisclosure>;
+  </>;
 }
 
 export function TrainingBasePanel() {

@@ -1,3 +1,4 @@
+import { FormRecoveryPanel } from '../components/career/SeasonLifePanels';
 import { formatPercent } from '../utils/formatters';
 import { seasonWeekLabel } from "../game/seasonClock";
 import { CoachAdvicePanel } from "../components/career/MatchInsightPanels";
@@ -183,6 +184,7 @@ function TrainingPlannerContent() {
       data-testid="training-planner"
     >
       <DevelopmentPanel />
+      <FormRecoveryPanel />
       <CoachAdvicePanel />
       <TrainingBasePanel />
       <header className="flex shrink-0 flex-col gap-2 rounded-xl border border-border bg-surface/85 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">

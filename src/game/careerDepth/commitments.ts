@@ -15,6 +15,8 @@ export function conflictingTournamentCommitment(state: GameState, tournament: To
   return depthOf(state).commitments.find(c => c.status === 'scheduled' && overlaps(plusDays(tournament.startDate, -1), tournament.endDate ?? tournament.startDate, c.startDate, c.endDate));
 }
 export function tournamentCommitmentConflict(state: GameState, tournament: Tournament): string | null {
+  const team=state.careerDepth?.seasonLife?.teams.find(e=>e.status==='accepted'&&overlaps(plusDays(tournament.startDate,-1),tournament.endDate??tournament.startDate,e.start,e.end));
+  if(team)return `Conflicts with accepted ${team.name} (${team.start}–${team.end}). Withdraw the optional team entry in Club & national pairs to free these dates.`;
   const conflict = conflictingTournamentCommitment(state, tournament);
   if (!conflict) {
     const block = depthOf(state).board?.blocks.find(b => overlaps(plusDays(tournament.startDate,-1),tournament.endDate ?? tournament.startDate,b.start,b.end));
@@ -38,6 +40,7 @@ export function commitmentConflict(state: GameState, start: string, end: string)
   if (state.tournaments.some(t => t.status === 'Entered' && overlaps(start, end, plusDays(t.startDate, -1), t.endDate ?? t.startDate))) return 'Conflicts with an entered tournament or protected travel.';
   if (peakPreparationWindows(state).some(w => overlaps(start, end, w.startDate, w.endDate))) return 'Conflicts with the three-day preparation block protected by your approved major-event plan.';
   if (depthOf(state).board?.blocks.some(b=>overlaps(start,end,b.start,b.end))) return 'Conflicts with a protected season planning block.';
+  if(state.careerDepth?.seasonLife?.teams.some(e=>e.status==='accepted'&&overlaps(start,end,e.start,e.end)))return 'Conflicts with an accepted team event.';
   if (depthOf(state).commitments.some(c => c.status === 'scheduled' && overlaps(start, end, c.startDate, c.endDate))) return 'Conflicts with another commitment.';
   return null;
 }
@@ -62,6 +65,8 @@ export function protectCommitmentSessions(state: GameState, plan: TrainingPlanne
   const anchor = plusDays(depthOf(state).nextSettlementDate, -7);
   return plan.map((day, i) => {
     const date = plusDays(anchor, i);
+    const team=state.careerDepth?.seasonLife?.teams.find(e=>e.status==='accepted'&&date>=e.start&&date<=e.end);
+    if(team){const cell={...buildTrainingCell('rest'),subtitle:team.name};return {...day,morning:cell,afternoon:cell,evening:cell,competitionName:team.name,load:0,loadLabel:'Reserved'};}
     const peak = peakPreparationWindows(state).find(w => date >= w.startDate && date <= w.endDate);
     if (peak && !day.competitionName) return { ...day, morning: buildTrainingCell('match-prep'), afternoon: buildTrainingCell('review'), evening: buildTrainingCell('rest'), competitionName: `Protected preparation: ${peak.name}` };
     const commitment = depthOf(state).commitments.find(c => c.status !== 'cancelled' && overlaps(date, date, c.startDate, c.endDate));

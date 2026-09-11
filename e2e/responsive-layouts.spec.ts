@@ -268,7 +268,7 @@ test("major tournament hub uses a championship identity", async ({ page }) => {
     page.getByText("Saudi Arabia Masters", { exact: true }).first(),
   ).toBeVisible();
   await expect(page.getByText("Major Event")).toBeVisible();
-  await expect(page.getByText(/season-defining tournament/i)).toBeVisible();
+  await expect(page.getByText('Prestige', { exact: true })).toBeVisible();
   await expect(page.getByText("Championship Draw")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });

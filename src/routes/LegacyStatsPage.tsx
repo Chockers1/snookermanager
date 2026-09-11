@@ -1,3 +1,4 @@
+import { SeasonLifeHistoryPanel } from '../components/career/SeasonLifePanels';
 import { ActionBlockerNotice } from '../components/game/ActionBlockerNotice';
 import { advancementBlocker } from '../hooks/useGameState';
 import { useEffect } from 'react';
@@ -83,6 +84,7 @@ export function LegacyStatsPage() {
 
   return (
     <div className="space-y-6 pb-10">
+      <SeasonLifeHistoryPanel />
       <ActionBlockerNotice blocker={advanceBlocker} />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>

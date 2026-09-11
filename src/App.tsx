@@ -1,3 +1,4 @@
+import { TeamEventsPage } from './components/career/SeasonLifePanels';
 import { DiagnosticRuntime } from './components/game/DiagnosticRuntime';
 import { AccessibilityRuntime } from './components/game/AccessibilityRuntime';
 import { Suspense, lazy } from "react";
@@ -235,6 +236,7 @@ export function AppRoutes() {
           <Route path="/equipment/cases" element={<CueShopPage />} />
           <Route path="/equipment/maintenance" element={<CueShopPage />} />
           <Route path="/equipment/table-setup" element={<CueShopPage />} />
+          <Route path="/career/teams" element={<TeamEventsPage />} />
           <Route path="/calendar" element={<TournamentCalendarPage />} />
           <Route path="/travel" element={<TravelPlannerPage />} />
           <Route

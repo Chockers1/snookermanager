@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/useGame'
 
 export function CareerLauncherPage() {
-  const { hasActiveCareer, listSaveSlots, continueActiveCareer, beginNewCareer, loadSaveSlot, importCareer, startDemoCareer } = useGame()
+  const { saveWarning, hasActiveCareer, listSaveSlots, continueActiveCareer, beginNewCareer, loadSaveSlot, importCareer, startDemoCareer } = useGame()
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [showSaves, setShowSaves] = useState(false)
@@ -17,13 +17,13 @@ export function CareerLauncherPage() {
     navigate('/new-career')
   }
 
-  function continueCareer() {
-    if (continueActiveCareer()) navigate('/')
+  async function continueCareer() {
+    if (await continueActiveCareer()) navigate('/')
   }
 
   async function importSave(file: File | undefined) {
     if (!file) return
-    if (importCareer(await file.text())) {
+    if (await importCareer(await file.text())) {
       navigate('/')
       return
     }
@@ -40,6 +40,7 @@ export function CareerLauncherPage() {
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-gray-400 sm:text-base">Continue your tour, create a new player, or restore another career. The dashboard opens only after you choose a save.</p>
         </header>
 
+        {saveWarning && <p role="alert" className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">{saveWarning}</p>}
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <button type="button" disabled={!hasActiveCareer} onClick={continueCareer} className="group min-h-36 rounded-xl border border-green-500/40 bg-green-600/15 p-5 text-left transition hover:border-green-400 hover:bg-green-600/20 disabled:cursor-not-allowed disabled:border-border disabled:bg-surface/60 disabled:opacity-45 sm:min-h-44">
             <PlayCircle className="h-6 w-6 text-green-400" />
@@ -66,7 +67,7 @@ export function CareerLauncherPage() {
             <div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Named careers</h2><button type="button" className="min-h-10 px-2 text-sm text-gray-400 hover:text-white" onClick={() => setShowSaves(false)}>Close</button></div>
             <div className="mt-3 grid gap-2 md:grid-cols-2">
               {slots.length === 0 ? <p className="rounded-lg bg-surface-light/50 p-4 text-sm text-gray-400">No named saves yet. Create a new career or import a backup.</p> : slots.map((slot) => (
-                <button key={slot.id} type="button" className="flex min-h-16 items-center justify-between gap-3 rounded-lg border border-border bg-surface-light/40 p-3 text-left hover:border-green-500/40" onClick={() => { if (loadSaveSlot(slot.id)) navigate('/') }}>
+                <button key={slot.id} type="button" className="flex min-h-16 items-center justify-between gap-3 rounded-lg border border-border bg-surface-light/40 p-3 text-left hover:border-green-500/40" onClick={async () => { if (await loadSaveSlot(slot.id)) navigate('/') }}>
                   <span className="min-w-0"><strong className="block truncate text-sm">{slot.name}</strong><span className="mt-1 block truncate text-xs text-gray-400">{slot.playerName} · {slot.season} · {slot.date}</span></span><FolderOpen className="h-4 w-4 shrink-0 text-green-400" />
                 </button>
               ))}
@@ -77,7 +78,7 @@ export function CareerLauncherPage() {
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <button type="button" className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-border bg-surface/80 px-4 py-3 text-sm font-semibold hover:border-green-500/40" onClick={() => fileInputRef.current?.click()}><Upload className="h-4 w-4" /> Import Save</button>
           <input ref={fileInputRef} className="hidden" type="file" accept="application/json,.json" onChange={(event) => void importSave(event.target.files?.[0])} />
-          <button type="button" className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-border bg-surface/80 px-4 py-3 text-sm font-semibold text-gray-300 hover:border-amber-500/40 hover:text-white" onClick={() => { startDemoCareer(); navigate('/') }}><PlayCircle className="h-4 w-4 text-amber-400" /> Demo Career</button>
+          <button type="button" className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-border bg-surface/80 px-4 py-3 text-sm font-semibold text-gray-300 hover:border-amber-500/40 hover:text-white" onClick={async () => { if (await startDemoCareer()) navigate('/') }}><PlayCircle className="h-4 w-4 text-amber-400" /> Demo Career</button>
         </div>
         <details className="mt-4"><summary className="cursor-pointer rounded-lg border border-border bg-surface p-4 text-sm font-semibold">Restore automatic backup</summary><div className="mt-2"><RecoverySaves /></div></details>
         <a href="/settings" className="mt-4 text-center text-sm text-green-300 underline">Settings, accessibility &amp; bug reports</a>

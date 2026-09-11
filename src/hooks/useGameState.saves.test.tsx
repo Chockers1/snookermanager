@@ -14,7 +14,7 @@ import {
   readSaveSlotIndex,
   SAVE_SLOT_PREFIX,
 } from "../game/saveStorage";
-import { type NewCareerConfig, useGameState } from "./useGameState";
+import { type NewCareerConfig, createStarterState, useGameState } from "./useGameState";
 
 function buildCareerConfig(fullName: string): NewCareerConfig {
   return {
@@ -62,7 +62,7 @@ describe("career save slots", () => {
     );
 
     await act(async () => {
-      expect(result.current.loadSaveSlot(firstSlot.id)).toBe(true);
+      expect(await result.current.loadSaveSlot(firstSlot.id)).toBe(true);
     });
     await waitFor(() => expect(result.current.savePending).toBe(false));
     expect(result.current.gameState.player.fullName).toBe("Alice Breaker");
@@ -79,10 +79,54 @@ describe("career save slots", () => {
       if (key === ACTIVE_SAVE_SLOT_KEY && value !== previousSlot.id) throw new DOMException('Blocked', 'SecurityError');
       originalSetItem.call(window.localStorage, key, value);
     });
-    act(() => expect(() => result.current.resetCareer(buildCareerConfig('Unfinished Career'))).toThrow('browser could not save'));
+    await act(async () => { await expect(result.current.resetCareer(buildCareerConfig('Unfinished Career'))).rejects.toThrow('browser could not save'); });
     expect(result.current.gameState.player.fullName).toBe('Existing Career');
     expect(readSaveSlotIndex()).toEqual([previousSlot]);
     expect(window.localStorage.getItem(ACTIVE_SAVE_KEY)).toBe(previousSave);
     expect(Object.keys(window.localStorage).filter(key => key.startsWith(SAVE_SLOT_PREFIX))).toHaveLength(1);
+  }, 30000);
+});
+
+
+describe('failed career loading preserves durable saves', () => {
+  it.each(['not-json', '{}'])('rejects corrupt active payload %s without creating a replacement career', async payload => {
+    localStorage.setItem(ACTIVE_SAVE_KEY, payload);
+    const { result, unmount } = renderHook(() => useGameState());
+    expect(result.current.saveWarning).toContain('original is preserved');
+    await act(async () => expect(await result.current.continueActiveCareer()).toBe(false));
+    expect(result.current.careerSessionMode).toBe('launcher');
+    expect(localStorage.getItem(ACTIVE_SAVE_KEY)).toBe(payload);
+    expect(readSaveSlotIndex()).toHaveLength(0);
+    unmount();
+  });
+  it('validates named saves before replacing the active career', async () => {
+    const { result, unmount } = renderHook(() => useGameState());
+    await act(async () => result.current.resetCareer(buildCareerConfig('Kept Career')));
+    await waitFor(() => expect(result.current.savePending).toBe(false));
+    const previous = localStorage.getItem(ACTIVE_SAVE_KEY), slot = localStorage.getItem(ACTIVE_SAVE_SLOT_KEY);
+    localStorage.setItem(SAVE_SLOT_PREFIX + 'damaged', 'damaged-json');
+    await act(async () => expect(await result.current.loadSaveSlot('damaged')).toBe(false));
+    expect(localStorage.getItem(ACTIVE_SAVE_KEY)).toBe(previous);
+    expect(localStorage.getItem(ACTIVE_SAVE_SLOT_KEY)).toBe(slot);
+    expect(result.current.gameState.player.fullName).toBe('Kept Career');
+    unmount();
+  }, 30000);
+  it('rolls back import writes when activation fails after writing its slot and index', async () => {
+    const { result, unmount } = renderHook(() => useGameState());
+    await act(async () => result.current.resetCareer(buildCareerConfig('Kept Career')));
+    await waitFor(() => expect(result.current.savePending).toBe(false));
+    const previous = localStorage.getItem(ACTIVE_SAVE_KEY), slot = localStorage.getItem(ACTIVE_SAVE_SLOT_KEY), index = readSaveSlotIndex();
+    const original = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function(key,value) {
+      if (key === ACTIVE_SAVE_SLOT_KEY && value !== slot) throw new DOMException('Full', 'QuotaExceededError');
+      original.call(localStorage,key,value);
+    });
+    const incoming = createStarterState(); incoming.player.fullName = 'Incoming Career';
+    await act(async () => expect(await result.current.importCareer(JSON.stringify(incoming))).toBe(false));
+    expect(localStorage.getItem(ACTIVE_SAVE_KEY)).toBe(previous);
+    expect(localStorage.getItem(ACTIVE_SAVE_SLOT_KEY)).toBe(slot);
+    expect(readSaveSlotIndex()).toEqual(index);
+    expect(result.current.gameState.player.fullName).toBe('Kept Career');
+    unmount();
   }, 30000);
 });

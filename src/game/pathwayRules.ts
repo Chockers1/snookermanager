@@ -1,3 +1,4 @@
+import { indexedEvents } from './resultIndex';
 import type { GameState } from '../hooks/useGameState';
 import type { Tournament } from '../types/game';
 import { qualifiedNames } from './rollingRankings';
@@ -41,20 +42,9 @@ export function residenceRegion(home: string): PathwayRegion {
   return 'Europe';
 }
 export type PathwayEntrant = { name: string; nation: string; age: number; dateOfBirth?: string; hasTourCard: boolean; retired?: boolean; residence?: PathwayRegion; residentSince?: string };
-type AccessState = Partial<Pick<GameState, 'rollingRankings' | 'season' | 'history'>> & { securedCards?: ReadonlySet<string> };
+type AccessState = Partial<Pick<GameState, 'rollingRankings' | 'season' | 'history' | 'tournaments'>> & { securedCards?: ReadonlySet<string> };
 export function securedPathwayCards(state: AccessState, before: string, includeAutomatic = true) {
-  const names = new Set<string>();
-  for (const e of Object.values(state.rollingRankings?.events ?? {})) {
-    if (e.completedOn > before || (state.season && e.season !== state.season)) continue;
-    if (/q school/i.test(e.name) && !/review/i.test(e.name) || /q tour.*play.off/i.test(e.name) || /wsf.*championship|ebsa.*(u21|amateur)|federation.*(route|qualifier)/i.test(e.name)) {
-      qualifiedNames(e.bracket).forEach(n => names.add(n));
-    }
-  }
-  if (includeAutomatic && state.season && Object.values(state.rollingRankings?.events ?? {}).some(e => e.season === state.season && e.completedOn <= before && /^Europe - Event 7$/i.test(e.name))) {
-    const leader = pathwayStandings({ rollingRankings: state.rollingRankings, season: state.season }, 'Europe', before).find(r => !names.has(r.name));
-    if (leader) names.add(leader.name);
-  }
-  return names;
+  return new Set(recordedCardAwards(state, before, includeAutomatic).keys());
 }
 export function pathwayEntryReason(t: Tournament, p: PathwayEntrant, state: AccessState = {}): string | null {
   if (p.retired) return 'This player is retired.';
@@ -95,15 +85,21 @@ export function pathwayPlacementPrize(t: Tournament, round: string, champion: bo
 }
 
 export const Q_TOUR_POINTS: Record<string, number> = { Winner: 10000, Final: 7000, 'Semi Final': 4900, 'Quarter Final': 3430, 'Last 16': 2400, 'Last 32': 1680, 'Last 64': 1175, 'Last 128': 825, 'Preliminary Rounds': 575 };
-export function pathwayCardAwards(state: Pick<GameState, 'rollingRankings' | 'season' | 'tournaments'>) {
+/** Use the same dated awards for eligibility and rollover, including EBSA runner-up places. */
+function recordedCardAwards(state: AccessState, before: string, includeAutomatic = false) {
   const awards = new Map<string, 'Q School' | 'Q Tour' | 'Federation Route'>();
-  const events = Object.values(state.rollingRankings?.events ?? {}).filter(e => e.season === state.season).sort((a,b) => a.completedOn.localeCompare(b.completedOn));
+  const events = indexedEvents(state.rollingRankings, state.season).filter(e => e.completedOn <= before);
+  const automaticDate = includeAutomatic && state.season ? events.find(e => /^Europe - Event 7$/i.test(e.name))?.completedOn : undefined;
+  // Qualification reads explicit awards only, preventing recursion through the automatic place.
+  const automatic = automaticDate && state.season ? qTourQualification({...state,season:state.season},automaticDate).automatic : undefined;
+  const awardAutomatic = () => { if (automatic && !awards.has(automatic)) awards.set(automatic, 'Q Tour'); };
   for (const e of events) {
-    const event = state.tournaments.find(t => t.id === e.tournamentId);
-    const source = /q school/i.test(e.name) && !/review/i.test(e.name) ? 'Q School' : /q tour.*play.off/i.test(e.name) ? 'Q Tour' : event?.type === 'Amateur' && /tour card/i.test(event.reward ?? '') ? 'Federation Route' : undefined;
+    if (automaticDate && e.completedOn > automaticDate) awardAutomatic();
+    const event = state.tournaments?.find(t => t.id === e.tournamentId);
+    const amateurCard = event ? event.type === 'Amateur' && /tour card/i.test(event.reward ?? '') : /wsf.*championship|ebsa.*(u21|amateur)|federation.*(route|qualifier)/i.test(e.name);
+    const source = /q school/i.test(e.name) && !/review/i.test(e.name) ? 'Q School' : /q tour.*play.off/i.test(e.name) ? 'Q Tour' : amateurCard ? 'Federation Route' : undefined;
     if (!source) continue;
-    const winners = qualifiedNames(e.bracket);
-    for (const winner of winners) {
+    for (const winner of qualifiedNames(e.bracket)) {
       if (!awards.has(winner)) awards.set(winner, source);
       else if (source === 'Federation Route' && /ebsa/i.test(e.name)) {
         const final = e.bracket.at(-1)?.matches[0];
@@ -112,9 +108,11 @@ export function pathwayCardAwards(state: Pick<GameState, 'rollingRankings' | 'se
       }
     }
   }
-  const automatic = qTourQualification(state).automatic;
-  if (automatic && !awards.has(automatic)) awards.set(automatic, 'Q Tour');
+  awardAutomatic();
   return awards;
+}
+export function pathwayCardAwards(state: Pick<GameState, 'rollingRankings' | 'season' | 'tournaments'>) {
+  return recordedCardAwards(state, '9999-12-31', true);
 }
 export type PathwayList = PathwayRegion | 'Senior' | 'Q School UK' | 'Q School Asia';
 export function matchesPathwayList(event: {name:string;eventType?:Tournament['type'];tourCircuit?:string}, region:PathwayList) {
@@ -126,14 +124,19 @@ export function pathwayListStatus(state: Pick<GameState,'rollingRankings'|'seaso
  const cutoff=new Date(state.currentDate+'T12:00:00Z');cutoff.setUTCFullYear(cutoff.getUTCFullYear()-2);
  const completed=Object.values(state.rollingRankings?.events??{}).filter(e=>matchesPathwayList(e,region)&&e.completedOn<=state.currentDate&&(twoYear?e.completedOn>=cutoff.toISOString().slice(0,10):e.season===state.season));
  const next=state.tournaments.filter(t=>matchesPathwayList({name:t.name,eventType:t.type,tourCircuit:t.tourCircuit},region)&&(t.endDate??t.startDate)>state.currentDate).sort((a,b)=>(a.endDate??a.startDate).localeCompare(b.endDate??b.startDate))[0];
- return {completed:completed.length,next,empty:completed.length?'Completed events found, but no scored results are recorded for this list.':next?`No completed events in ${state.season} yet. First results due ${(next.endDate??next.startDate)} · ${next.name}.`:`No completed events in ${state.season}; no further event is scheduled for this list.`};
+ return {completed:completed.length,next,empty:completed.length?'Completed events found, but no scored results are recorded for this list.':next?`No completed events in ${state.season} yet. First results due ${(next.endDate??next.startDate)} Â· ${next.name}.`:`No completed events in ${state.season}; no further event is scheduled for this list.`};
 }
 export type PathwayStanding = { name: string; points: number; events: number; titles: number; finishes: number[] };
 type ResultsState = Pick<GameState, 'rollingRankings' | 'season'>;
+const standingsCache = new WeakMap<object, Map<string, PathwayStanding[]>>();
 export function pathwayStandings(state: ResultsState, region: PathwayList, before = '9999-12-31', twoYear = false): PathwayStanding[] {
+  const events = state.rollingRankings?.events;
+  const key = JSON.stringify([state.season,region,before,twoYear]);
+  const cache = events ? standingsCache.get(events) ?? new Map<string,PathwayStanding[]>() : undefined;
+  if (cache?.has(key)) return cache.get(key)!;
   const rows = new Map<string, PathwayStanding>();
   const cutoff = new Date(before === '9999-12-31' ? '2100-01-01' : before); cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 2);
-  for (const e of Object.values(state.rollingRankings?.events ?? {}).sort((a,b) => a.completedOn.localeCompare(b.completedOn))) {
+  for (const e of indexedEvents(state.rollingRankings, twoYear ? undefined : state.season)) {
     if (e.completedOn > before || (twoYear ? e.completedOn < cutoff.toISOString().slice(0,10) : e.season !== state.season)) continue;
     const frames = region === 'Senior' || region.startsWith('Q School');
     if (!matchesPathwayList(e,region)) continue;
@@ -156,7 +159,9 @@ export function pathwayStandings(state: ResultsState, region: PathwayList, befor
       row.points += points; row.events++; row.titles += !region.startsWith('Q School') && champions.includes(name) ? 1 : 0; row.finishes.unshift(points); rows.set(name, row);
     }
   }
-  return [...rows.values()].sort((a,b) => b.points - a.points || a.finishes.reduce((difference, score, i) => difference || (b.finishes[i] ?? 0) - score, 0) || a.name.localeCompare(b.name));
+  const result = [...rows.values()].sort((a,b) => b.points - a.points || a.finishes.reduce((difference, score, i) => difference || (b.finishes[i] ?? 0) - score, 0) || a.name.localeCompare(b.name));
+  if (events && cache) { cache.set(key,result); if(cache.size>128) cache.delete(cache.keys().next().value!); standingsCache.set(events,cache); }
+  return result;
 }
 export function qTourQualification(state: ResultsState, before = '9999-12-31', canEnter: (name: string) => boolean = () => true) {
   const secured = securedPathwayCards(state, before, false);
@@ -175,8 +180,16 @@ export function qTourQualification(state: ResultsState, before = '9999-12-31', c
   for (const r of eligible) { if (selected.size >= 24) break; selected.add(r.name); }
   return { automatic, playoff: [...selected].slice(0,24) };
 }
+type SeniorResult = { ranking:string[]; goldenField:string[]; championship:string[]; british:string[] };
+const seniorCache = new WeakMap<object, Map<string, {world:GameState['worldPlayers']; tables:GameState['competitionTables']; result:SeniorResult}>>();
 export function seniorQualification(state: Pick<GameState, 'rollingRankings' | 'season' | 'competitionTables' | 'worldPlayers' | 'player'>, before: string) {
-  const eligible = (name: string) => name === state.player.fullName ? ageAtDate(state.player.age, state.player.dateOfBirth, before) >= 40 : state.worldPlayers.some(p => p.playerName === name && p.age >= 40 && !p.retired);
+  const events=state.rollingRankings?.events;
+  const key=JSON.stringify([state.season,before,state.player.fullName,state.player.age,state.player.dateOfBirth]);
+  const cache=events ? seniorCache.get(events) ?? new Map() : undefined;
+  const saved=cache?.get(key);
+  if(saved?.world===state.worldPlayers && saved?.tables===state.competitionTables) return saved.result as SeniorResult;
+  const eligibleNames=new Set(state.worldPlayers.filter(p=>p.age>=40&&!p.retired).map(p=>p.playerName));
+  const eligible = (name:string) => name===state.player.fullName ? ageAtDate(state.player.age,state.player.dateOfBirth,before)>=40 : eligibleNames.has(name);
   const official = pathwayStandings(state, 'Senior', before, true).filter(r => eligible(r.name));
   const race = pathwayStandings(state, 'Senior', before).filter(r => eligible(r.name));
   const ranking = new Set(official.slice(0,2).map(r => r.name));
@@ -189,7 +202,9 @@ export function seniorQualification(state: Pick<GameState, 'rollingRankings' | '
   const championship = [...new Set([...base, ...golden])];
   // Remaining invitations use the seniors list in this generated player world.
   for (const row of state.competitionTables.senior) { if (championship.length >= 24) break; if (eligible(row.playerName) && !championship.includes(row.playerName)) championship.push(row.playerName); }
-  return { ranking: [...ranking], goldenField, championship: championship.slice(0,24), british: [...new Set([...invites, ...official.map(r => r.name)])].slice(0,8) };
+  const result = { ranking: [...ranking], goldenField, championship: championship.slice(0,24), british: [...new Set([...invites, ...official.map(r => r.name)])].slice(0,8) };
+  if(events && cache) {cache.set(key,{world:state.worldPlayers,tables:state.competitionTables,result});if(cache.size>32)cache.delete(cache.keys().next().value!);seniorCache.set(events,cache);}
+  return result;
 }
 
 export function pathwayRuleSummary(t: Tournament): string[] {

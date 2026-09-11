@@ -1,3 +1,4 @@
+import { FormRecoveryPanel } from '../components/career/SeasonLifePanels';
 import { VictoryCelebration } from '../components/game/VictoryCelebration';
 import { victoryCelebration } from '../game/victoryCelebration';
 import { BetweenMatchPanel } from '../components/tournaments/BetweenMatchPanel';
@@ -221,6 +222,7 @@ export function MatchResultPage() {
     <div className="space-y-3 pb-8">
       {victory && <VictoryCelebration key={victory.key} victory={victory} />}
       <CareerDecisionNotice />
+      <FormRecoveryPanel />
       <RivalryContext opponent={latestMatch.opponentName} />
       {tournamentContinues && <BetweenMatchPanel tournamentId={latestMatch.tournamentId} />}
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">

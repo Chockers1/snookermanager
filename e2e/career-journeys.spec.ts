@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { readCareerSave } from './read-career-save';
+import { readCareerSave, readStoredCareerValue } from './read-career-save';
 import { inboxReadStorageKey } from '../src/game/inboxReadState';
 import {
   chalkCatalog,
@@ -151,11 +151,11 @@ test("inbox uses selected-message actions and persists read state", async ({
   await expect(page).toHaveURL(/\/travel/);
 
   await page.getByRole("navigation").getByRole("link", { name: /^Inbox/ }).click();
-  const baseBeforeRead = await page.evaluate(key => localStorage.getItem(key), ACTIVE_SAVE_KEY);
-  const slotId = await page.evaluate(key => localStorage.getItem(key), ACTIVE_SAVE_SLOT_KEY);
+  const baseBeforeRead = await readStoredCareerValue(page, ACTIVE_SAVE_KEY);
+  const slotId = await readStoredCareerValue(page, ACTIVE_SAVE_SLOT_KEY);
   await page.getByRole("button", { name: /Mark All Read/ }).click();
   await expect.poll(() => page.evaluate(key => localStorage.getItem(key), inboxReadStorageKey(slotId))).not.toBeNull();
-  expect(await page.evaluate(key => localStorage.getItem(key), ACTIVE_SAVE_KEY)).toBe(baseBeforeRead);
+  expect(await readStoredCareerValue(page, ACTIVE_SAVE_KEY)).toBe(baseBeforeRead);
   await expect(page.getByText("0 unread")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Open inbox (0 unread messages)" }),
@@ -170,7 +170,7 @@ test("inbox uses selected-message actions and persists read state", async ({
   await expect(page.getByText("0 unread")).toBeVisible();
   // Continuing the loaded career folds the overlay into a full save.
   await expect.poll(() => page.evaluate(key => localStorage.getItem(key), inboxReadStorageKey(slotId))).toBeNull();
-  const published = await page.evaluate(key => localStorage.getItem(key), ACTIVE_SAVE_KEY);
+  const published = await readStoredCareerValue(page, ACTIVE_SAVE_KEY);
   expect(JSON.parse(decodeCareerSave(published!)).inbox.every((message: {read: boolean}) => message.read)).toBe(true);
 });
 

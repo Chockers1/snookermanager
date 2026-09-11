@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {playerDecline,annualDecline,ageAttributeLoss,ensurePlayerDeclines} from './playerAgeing';
+import {playerDecline,annualDecline,ageAttributeLoss,ensurePlayerDeclines,applySeasonalAgeRegression} from './playerAgeing';
 import {annualCpuDevelopment,ensureWorldPopulation} from './worldIntegrity';
 import {createStarterState,repairGameState,evolveWorldPlayersForNextSeason} from '../hooks/useGameState';
 import {evolveTourSkills} from './tourDevelopment';
@@ -50,5 +50,29 @@ describe('individual player ageing',()=>{
   for(const p of next){expect(p.declineProfile).toBeDefined();if(old.has(p.id))expect(p.declineProfile).toEqual(old.get(p.id));}
   const expanded=ensureWorldPopulation({...s,season:'2027/28',worldPlayers:next});
   for(const p of expanded.worldPlayers)expect(p.declineProfile).toBeDefined();
+ });
+});
+
+describe('human and CPU ageing calibration',()=>{
+ const attrs={technical:{'Long Potting':94,'Break Building':94,'Cue Ball Control':94,'Safety Play':94,Consistency:94},mental:{Composure:94,Focus:94,Resilience:94,Professionalism:94,'Big Match Nerve':94},physical:{Stamina:94,Balance:94,'Shoulder Health':94,'Hand Steadiness':94,'Recovery Rate':94}};
+ const rating=(a:typeof attrs)=>Object.values(a.technical).reduce((n,v)=>n+v,0)/5*.46+Object.values(a.mental).reduce((n,v)=>n+v,0)/5*.34+Object.values(a.physical).reduce((n,v)=>n+v,0)/5*.2;
+ it('applies the same annual underlying rating loss for 120 seeded human and CPU profiles',()=>{
+  for(let seed=0;seed<120;seed++){
+   const p=playerDecline({id:'human'},seed);
+   for(const age of [34,35,40,45,50,60]){
+    const next=applySeasonalAgeRegression(attrs,age,p);
+    expect(rating(attrs)-rating(next as typeof attrs)).toBeCloseTo(annualDecline(age,p),8);
+    if(age<p.startAge)expect(next).toEqual(attrs);
+   }
+  }
+ });
+ it('retains individual variation over 30 years without a universal age cliff',()=>{
+  const endings=[];
+  for(let seed=0;seed<120;seed++){
+   const p=playerDecline({id:'human'},seed);let a=structuredClone(attrs);
+   for(let age=30;age<60;age++)a=applySeasonalAgeRegression(a,age,p) as typeof attrs;
+   endings.push(rating(a));expect(rating(a)).toBeLessThan(94);for(const group of Object.values(a))for(const value of Object.values(group))expect(value).toBeGreaterThanOrEqual(1);
+  }
+  expect(Math.max(...endings)-Math.min(...endings)).toBeGreaterThan(10);
  });
 });

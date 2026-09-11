@@ -1,3 +1,4 @@
+import { seasonLifeTraining } from '../seasonLife';
 import type { GameState } from '../../hooks/useGameState';
 import type { PlayerAttributes, TrainingPlannerDay } from '../../types/game';
 import { bounded, careerMessage, depthOf, plusDays } from './shared';
@@ -51,6 +52,7 @@ export function protectPartnerSessions(state: GameState, plan: TrainingPlannerDa
   });
 }
 export function progressDevelopment(state: GameState, plan: TrainingPlannerDay[]): GameState {
+  state = seasonLifeTraining(state, plan);
   const d = depthOf(state);
   const key = `${state.season}:${state.week}`;
   const p = d.project;
