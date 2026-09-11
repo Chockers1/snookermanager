@@ -150,6 +150,7 @@ export const CAREER_DATABASE = 'snooker-career-saves-v1';
 const startupKeys = [ACTIVE_SAVE_KEY, ACTIVE_SAVE_SLOT_KEY, SAVE_SLOT_INDEX_KEY];
 const careerCache = new Map<string, string | null>();
 let databaseReady = false;
+export function hasCareerDatabase() { return databaseReady; }
 function openCareerDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(CAREER_DATABASE, 1);

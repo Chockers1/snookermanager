@@ -1,3 +1,5 @@
+import { backgroundWeeklySupport } from '../game/careerDifficulty';
+import { sponsorWeeklyPayment } from '../game/sponsorEconomy';
 import { needsHealthRecovery } from '../game/healthSystem';
 import { seasonPosition, snapshotWeekLabel } from "../game/seasonClock";
 import { getBestOfForRound } from '../data/tournamentFormats';
@@ -721,73 +723,29 @@ export function buildFinanceData(state: GameState) {
     (sum, sponsor) => sum + sponsor.monthlyValue,
     0,
   );
-  const prizeIncome = getCanonicalHistoryTotals(state).prizeMoney;
-  const coachCost = state.coachContracts.reduce(
-    (sum, contract) => sum + contract.weeklyCost,
-    0,
-  );
-  const travelCost = Object.values(state.travel.bookings).reduce(
-    (sum, booking) => sum + booking.totalCost,
-    0,
-  );
-  const equipmentCost = state.maintenance.history.reduce(
-    (sum, item) => sum + item.cost,
-    0,
-  );
-  const recordedExpenseCost = state.finance.ledger.reduce(
-    (sum, item) => sum + (item.type === "Expense" ? Math.abs(item.amount) : 0),
-    0,
-  );
+  const coachCost = state.coachContracts.reduce((sum, contract) => sum + contract.weeklyCost, 0);
+  const travelCost = activeTournament ? activeTournament.travelCost + activeTournament.hotelCost : 0;
+  const equipmentCost = 0; // Future purchases are chosen separately, not inferred from old receipts.
+  const support = backgroundWeeklySupport(state);
+  const recurringOther = Math.max(0, support + sponsorWeeklyPayment(state.sponsors) - coachCost - state.finance.cashFlow);
+  const monthlyWeeks = 52 / 12;
   const financeChart = trend.map((point, index) => {
-    const previousCash =
-      index > 0 ? trend[index - 1].cash : point.cash - state.finance.cashFlow;
-    const delta = point.cash - previousCash;
-    return {
-      label: point.label,
-      income: Math.max(0, delta) + Math.round(sponsorIncome / 4),
-      expenses:
-        Math.max(0, -delta) + coachCost + Math.max(0, -state.finance.cashFlow),
-    };
+    const delta = index > 0 ? point.cash - trend[index - 1].cash : 0;
+    return { label: point.label, income: Math.max(0, delta), expenses: Math.max(0, -delta) };
   });
-  const totalIncomeValue =
-    sponsorIncome + prizeIncome + Math.max(0, state.finance.cashFlow * 4);
-  const totalExpenseValue =
-    coachCost * 4 +
-    travelCost +
-    equipmentCost +
-    recordedExpenseCost +
-    Math.max(0, -state.finance.cashFlow * 4);
   const incomeBreakdownRaw = [
     { label: "Sponsors", value: sponsorIncome },
-    { label: "Prize Money", value: prizeIncome },
-    { label: "Weekly Surplus", value: Math.max(0, state.finance.cashFlow * 4) },
-  ].filter((item) => item.value > 0);
+    { label: "Background support", value: Math.max(0, support) * monthlyWeeks },
+  ].filter(item => item.value > 0);
   const expenseBreakdownRaw = [
-    { label: "Coach Costs", value: coachCost * 4 },
-    { label: "Travel", value: travelCost },
-    { label: "Maintenance", value: equipmentCost },
-    { label: "Recorded Expenses", value: recordedExpenseCost },
-    {
-      label: "Operating Cost",
-      value: Math.max(0, -state.finance.cashFlow * 4),
-    },
-  ].filter((item) => item.value > 0);
-  const incomeBreakdown = incomeBreakdownRaw.map((item, index) => ({
-    ...item,
-    share:
-      totalIncomeValue > 0
-        ? Math.round((item.value / totalIncomeValue) * 100)
-        : 0,
-    delta: 8 - index * 3,
-  }));
-  const expenseBreakdown = expenseBreakdownRaw.map((item, index) => ({
-    ...item,
-    share:
-      totalExpenseValue > 0
-        ? Math.round((item.value / totalExpenseValue) * 100)
-        : 0,
-    delta: index === 0 ? 4 : -2 * index,
-  }));
+    { label: "Coaching", value: coachCost * monthlyWeeks },
+    { label: "Facilities & overseas stay", value: recurringOther * monthlyWeeks },
+    { label: "Background costs", value: Math.max(0, -support) * monthlyWeeks },
+  ].filter(item => item.value > 0);
+  const totalIncomeValue = incomeBreakdownRaw.reduce((n, item) => n + item.value, 0);
+  const totalExpenseValue = expenseBreakdownRaw.reduce((n, item) => n + item.value, 0);
+  const incomeBreakdown = incomeBreakdownRaw.map(item => ({...item, share: totalIncomeValue > 0 ? Math.round(item.value / totalIncomeValue * 100) : 0}));
+  const expenseBreakdown = expenseBreakdownRaw.map(item => ({...item, share: totalExpenseValue > 0 ? Math.round(item.value / totalExpenseValue * 100) : 0}));
   const totalBudget = Math.max(1, totalExpenseValue || state.player.cash);
   const budgetAllocation = [
     {
@@ -795,7 +753,7 @@ export function buildFinanceData(state: GameState) {
       amount: travelCost + (activeTournament?.entryFee ?? 0),
       max: 60,
     },
-    { label: "Coaching", amount: coachCost * 4, max: 50 },
+    { label: "Coaching", amount: coachCost * monthlyWeeks, max: 50 },
     { label: "Equipment", amount: equipmentCost, max: 35 },
     {
       label: "Reserve",
@@ -833,7 +791,7 @@ export function buildFinanceData(state: GameState) {
   const forecastCards = [1, 2, 3].map((month) => {
     const projectedBalance =
       state.player.cash +
-      month * (sponsorIncome - coachCost * 4 + state.finance.cashFlow * 4);
+      month * state.finance.cashFlow * (52 / 12);
     return {
       label: `Month ${month}`,
       projectedBalance,
@@ -1192,7 +1150,7 @@ export function buildMatchPreviewData(state: GameState) {
       (sum, match) => sum + (match.playerFrames - match.opponentFrames),
       0,
     ),
-    scoutNotes: `${nextOpponent?.playerName ?? "The next opponent"} sits near your current ranking band. Travel planning is ${travelBooking ? "booked" : "not yet booked"}, and your readiness profile is shaped by ${hotelOption.name.toLowerCase()} plus ${travelOption.name.toLowerCase()}.`,
+    scoutNotes: `${nextOpponent?.playerName ?? "The next opponent"} is assessed using public ability ratings; positions from different circuits are not directly comparable. Detailed attribute comparisons are scouting estimates, not measured shot records. Travel planning is ${travelBooking ? "booked" : "not yet booked"}, and your readiness profile is shaped by ${hotelOption.name.toLowerCase()} plus ${travelOption.name.toLowerCase()}.`,
     scoutConfidence: scoutingReport(state, nextOpponent?.playerName ?? '').confidence,
     tacticalPlan,
     strengths,

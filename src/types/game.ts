@@ -338,6 +338,7 @@ export type SponsorDeal = {
   fulfilledObligations?: number;
   renewalStatus?: "None" | "Offered" | "Accepted" | "Declined";
   renewalOfferValue?: number;
+  renewalCountered?: boolean;
   lastLifecycleEvent?: string;
 };
 
@@ -417,6 +418,7 @@ export type HealthIssue = {
 };
 
 export type HealthState = {
+  treatmentReviewOn?: string;
   activeIssue: HealthIssue | null;
   history: InjuryHistoryRow[];
 };

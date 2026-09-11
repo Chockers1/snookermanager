@@ -12,7 +12,7 @@ import { overseasWeeklyCost } from '../realism';
 export const STRATEGIES: Record<Strategy, string> = { ranking: 'Chase ranking points', majors: 'Peak for majors', development: 'Development season', survival: 'Financial survival' };
 export function recurringCost(state: GameState) {
   const facility = tableSetupCatalog.find(f => f.id === state.equipment.currentTableId);
-  return state.coachContracts.reduce((sum, c) => sum + c.weeklyCost, 0) + Math.max(0, -state.finance.baseCashFlow) + Math.round((facility?.monthlyRental ?? 0) / 4) + trainingBaseCost(state) + overseasWeeklyCost(state);
+  return state.coachContracts.reduce((sum, c) => sum + c.weeklyCost, 0) + Math.max(0, -state.finance.baseCashFlow) + Math.round((facility?.monthlyRental ?? 0) * 12 / 52 * 100) / 100 + trainingBaseCost(state) + overseasWeeklyCost(state);
 }
 export const PLANNER_TOURS = ['Main tour', 'Youth', 'Amateur', 'Q Tour', 'Q School', 'Seniors', 'Exhibitions'] as const;
 export type PlannerTour = typeof PLANNER_TOURS[number];

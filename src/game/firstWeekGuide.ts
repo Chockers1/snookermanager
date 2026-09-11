@@ -8,8 +8,8 @@ export const guideSteps = [
  {id:'match',title:'Play your first match',route:'/tournaments/hub',action:'Open Tournament Hub',explanation:'Use Play Next Match for live play or Quick Sim. You can use Tab and Enter on match controls. After the match, review the result and training advice.'},
 ] as const;
 export type GuideStep = typeof guideSteps[number]['id'];
-export type FirstWeekGuideState = {startedOn:string;dismissed:boolean;completed:GuideStep[];skipped:GuideStep[];equipmentReviewed?:boolean};
-export function freshGuide(state:Pick<GameState,'currentDate'>):FirstWeekGuideState {return {startedOn:state.currentDate,dismissed:false,completed:[],skipped:[]}}
+export type FirstWeekGuideState = {startedOn:string;dismissed:boolean;minimized?:boolean;completed:GuideStep[];skipped:GuideStep[];equipmentReviewed?:boolean};
+export function freshGuide(state:Pick<GameState,'currentDate'>):FirstWeekGuideState {return {startedOn:state.currentDate,dismissed:false,minimized:false,completed:[],skipped:[]}}
 export function reconcileFirstWeekGuide(state:GameState):GameState {
  const guide=state.firstWeekGuide;if(!guide)return state;
  const done=new Set(guide.completed);const played=state.matches.some(m=>m.result!=='In Progress')||state.history.matchLog.length>0;

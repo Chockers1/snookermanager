@@ -27,3 +27,7 @@ export function getRatingColour(value: number): 'green' | 'amber' | 'red' {
   if (value >= 55) return 'amber'
   return 'red'
 }
+/** Attribute precision is retained in the save; only visible values are rounded. */
+export function formatAttribute(value: number): string {
+  return Number.isFinite(value) ? value.toFixed(2) : '—'
+}

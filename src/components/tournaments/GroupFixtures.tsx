@@ -1,9 +1,13 @@
+import { useGame } from '../../context/useGame';
+import { leagueFixtureSchedule } from '../../game/leagueSchedule';
 import { PlayerLink } from '../game/PlayerLink';
 import { useState } from 'react';
-import type { BracketRound } from '../../types/game';
+import type { BracketRound, Tournament } from '../../types/game';
 import { fixtureComplete, groupsInRound, groupTable } from '../../game/championshipLeague';
 
-export function GroupFixtures({ rounds, playerName, currentRound, selectedStage, onStageChange }: { rounds: BracketRound[]; playerName: string; currentRound?: string | null; selectedStage?: string; onStageChange?: (stage: string) => void }) {
+export function GroupFixtures({ rounds, playerName, currentRound, selectedStage, onStageChange, tournament }: { rounds: BracketRound[]; playerName: string; currentRound?: string | null; selectedStage?: string; onStageChange?: (stage: string) => void; tournament?: Tournament | null }) {
+  const { gameState } = useGame();
+  const event = tournament === undefined ? gameState.tournaments.find(t => t.id === gameState.tournamentProgress.tournamentId) : tournament;
   const initial = rounds.find(r=>r.label===currentRound) ?? [...rounds].reverse().find(r=>r.matches.some(m=>m.group && (m.top.name===playerName||m.bottom.name===playerName))) ?? rounds[0];
   const [stage, setStage] = useState(initial?.label ?? 'Stage One Groups');
   const [chosenGroup, setChosenGroup] = useState('');
@@ -24,11 +28,12 @@ export function GroupFixtures({ rounds, playerName, currentRound, selectedStage,
     </div>
     {group ? <>
       <p role="status" className="rounded bg-green-600/10 p-2 text-green-300">{position>=0 ? `You are ${position+1} of ${table.length} · ${table[position].points} ${table[position].points === 1 ? 'point' : 'points'} from ${table[position].played} of ${scheduled} matches. ` : ''}{complete ? round?.groupRule === 'league' ? `${table[0].name} wins the league.` : `${table.slice(0, advancing).map(p => p.name).join(', ')} advance.` : `Provisional table · ${round?.groupRule === 'league' ? 'first place wins the league' : `top ${advancing} advance`}.`}</p>
+      {event && round?.groupRule === 'league' && <p className="rounded border border-border p-2 text-gray-300">{table.length} players · {scheduled} matches each · {event.startDate} to {event.endDate ?? event.startDate}. Fixtures are spread across the event dates; several matches can share a day. {upcoming && `Your next match: ${leagueFixtureSchedule(event, round, upcoming)?.date}.`} Dates are estimated; session times are not assigned.</p>}
       <div className="overflow-x-auto"><table className="w-full whitespace-nowrap text-right" aria-label="Group table"><thead className="text-gray-400"><tr>{['Pos','Player','P','W','D','L','FF','FA','FD','Pts','HB'].map(label=><th key={label} className="px-2 py-2">{label}</th>)}</tr></thead><tbody>{table.map((p,i)=><tr key={p.name} className={p.name===playerName?'bg-green-600/15 font-semibold text-green-300':'border-t border-border text-gray-200'}><td className="p-2">{i+1}</td><td className="p-2 text-left"><PlayerLink name={p.name}/></td>{[p.played,p.won,p.drawn,p.lost,p.framesFor,p.framesAgainst,p.difference,p.points,p.breaks[0]??'–'].map((n,j)=><td key={j} className="p-2">{n}</td>)}</tr>)}</tbody></table></div>
       <p className="text-[10px] text-gray-400">{ranking ? 'Win 3 points · draw 1 · loss 0. Up to four frames: 3–0, 3–1 or 2–2. Ties: points, frame difference, head-to-head/mini-table, recorded breaks.' : `Win 1 point · no draws · best of ${round?.bestOf}. Ties: ${round?.groupRule === 'winsFrames' ? 'wins, frames won, fewest frames lost, highest break' : 'wins, frame difference, head-to-head'}.`} {round?.groupRule === 'amateur' ? 'Unresolved ties use best-of-five re-spotted-black play-offs.' : 'Exact ties use the saved draw order.'}</p>
       {round?.groupTieMatches?.filter(m => m.group === group.name).map((m, i) => <p key={i} className="text-amber-200">Black-ball tie-break: {m.top} {m.topFrames}–{m.bottomFrames} {m.bottom}</p>)}
       <h3 className="font-semibold">{group.name} fixtures and results</h3>
-      <div className="divide-y divide-border">{group.matches.map((m,i)=><div key={m.id} className={`flex items-center justify-between gap-3 px-2 py-2 ${m.id===upcoming?.id?'rounded bg-amber-500/10 text-amber-200':''}`}><span className="text-gray-500">{i+1}</span><span className="flex-1"><PlayerLink name={m.top.name}/></span><b className="shrink-0">{fixtureComplete(m)?`${m.top.score}–${m.bottom.score}`:'vs'}</b><span className="flex-1 text-right"><PlayerLink name={m.bottom.name}/></span><span className="w-16 text-right text-[10px]">{fixtureComplete(m)?'Played':m.id===upcoming?.id?'Next match':'Scheduled'}</span></div>)}</div>
+      <div className="divide-y divide-border">{group.matches.map((m,i)=><div key={m.id} className={`flex items-center justify-between gap-3 px-2 py-2 ${m.id===upcoming?.id?'rounded bg-amber-500/10 text-amber-200':''}`}><span className="shrink-0 text-[10px] text-gray-400">{event && round?.groupRule === 'league' ? <>{leagueFixtureSchedule(event, round, m)?.date}<br/>Round {leagueFixtureSchedule(event, round, m)?.matchday}</> : i+1}</span><span className="flex-1"><PlayerLink name={m.top.name}/></span><b className="shrink-0">{fixtureComplete(m)?`${m.top.score}–${m.bottom.score}`:'vs'}</b><span className="flex-1 text-right"><PlayerLink name={m.bottom.name}/></span><span className="w-16 text-right text-[10px]">{fixtureComplete(m)?'Played':m.id===upcoming?.id?'Next match':'Scheduled'}</span></div>)}</div>
     </> : round?.matches.length ? <section aria-label={`${round.label} fixtures`} className="space-y-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-semibold text-white">{round.label}</h3>

@@ -2,7 +2,7 @@ import { attributeComparison, attributePeriods, type AttributePeriod } from '../
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Activity, ChevronRight, HeartPulse, Shield, Sparkles, Star } from 'lucide-react'
-import { formatPercent } from '../utils/formatters'
+import { formatPercent, formatAttribute } from '../utils/formatters'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { useGame } from '../context/useGame'
 import type { PlayerAttributes } from '../types/game'
@@ -31,8 +31,8 @@ function conditionLabel(value: number, inverted = false) {
 
 function formatDelta(value: number | null) {
   if (value === null) return '—'
-  value = Math.round(value * 10) / 10
-  return value > 0 ? `+${value}` : value < 0 ? `${value}` : '–'
+  const displayed = Number(value.toFixed(2))
+  return displayed > 0 ? `+${formatAttribute(displayed)}` : displayed < 0 ? formatAttribute(displayed) : '–'
 }
 
 function attributeGroupsFrom(attributes: PlayerAttributes): Array<[AttributeGroup, Record<string, number>]> {
@@ -79,8 +79,8 @@ export function PlayerAttributesPage() {
     Object.entries(attributes).map(([label, value]) => value - (baseline?.attributes[group][label] ?? value)),
   )
   const improvedCount = deltas.filter(delta => delta > 0).length
-  const totalGained = Math.round(deltas.reduce((sum, delta) => sum + Math.max(0, delta), 0) * 10) / 10
-  const totalLost = Math.round(deltas.reduce((sum, delta) => sum + Math.max(0, -delta), 0) * 10) / 10
+  const totalGained = deltas.reduce((sum, delta) => sum + Math.max(0, delta), 0)
+  const totalLost = deltas.reduce((sum, delta) => sum + Math.max(0, -delta), 0)
   const topStrengths = allAttributes.slice().sort((left, right) => right[1] - left[1]).slice(0, 5)
   const topWeaknesses = allAttributes.slice().sort((left, right) => left[1] - right[1]).slice(0, 5)
   const attributeGroups = attributeGroupsFrom(gameState.attributes)
@@ -92,8 +92,8 @@ export function PlayerAttributesPage() {
       <div key={label} data-testid={`attribute-${label}`} className="flex items-center gap-2">
         <span className="w-32 shrink-0 truncate text-[11px] text-gray-300">{label}</span>
         <div className="min-w-0 flex-1"><ProgressBar value={value} tone={ratingTone(value)} compact /></div>
-        <span className="w-7 shrink-0 text-right text-xs font-medium text-white">{value}</span>
-        <span className={`w-8 shrink-0 text-right text-[10px] font-semibold tabular-nums ${delta !== null && delta > 0 ? 'text-green-400' : delta !== null && delta < 0 ? 'text-red-400' : 'text-gray-600'}`}>
+        <span className="w-12 shrink-0 text-right text-xs font-medium tabular-nums text-white">{formatAttribute(value)}</span>
+        <span className={`w-12 shrink-0 text-right text-[10px] font-semibold tabular-nums ${delta !== null && delta > 0 ? 'text-green-400' : delta !== null && delta < 0 ? 'text-red-400' : 'text-gray-600'}`}>
           {formatDelta(delta)}
         </span>
       </div>
@@ -108,7 +108,7 @@ export function PlayerAttributesPage() {
           <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <h1 className="truncate text-2xl font-bold text-white">Player Attributes - {gameState.player.fullName}</h1>
             <span className="border-l border-border pl-4 text-xs font-medium text-green-400/80">
-              {periodLabel} · +{totalGained} gained{totalLost > 0 ? ` · −${totalLost} lost` : ''} · {improvedCount} improved
+              {periodLabel} · +{formatAttribute(totalGained)} gained{totalLost > 0 ? ` · −${formatAttribute(totalLost)} lost` : ''} · {improvedCount} improved
             </span>
           </div>
           <p className="mt-1 text-sm text-gray-400">{gameState.player.careerStage} - Age {gameState.player.age} - {gameState.player.handedness} - {gameState.player.playingStyle}</p>
@@ -161,7 +161,7 @@ export function PlayerAttributesPage() {
       </div>
 
       {view === 'grouped' ? (
-        <div className="grid gap-3 lg:grid-cols-3 lg:gap-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 xl:gap-4">
           {attributeGroups.map(([group, attributes]) => (
             <div key={group} className="card">
               <div className="card-header">
@@ -177,7 +177,7 @@ export function PlayerAttributesPage() {
       ) : (
         <div className="card">
           <div className="card-header"><h3 className="text-sm font-semibold text-white">All Attributes</h3><span className="text-[10px] text-gray-400">{periodLabel} Δ · Strongest to weakest</span></div>
-          <div className="card-body grid gap-y-2.5 sm:grid-cols-3 sm:gap-x-6">
+          <div className="card-body grid gap-y-2.5 md:grid-cols-2 xl:grid-cols-3 md:gap-x-6">
             {allAttributes.slice().sort((left, right) => right[1] - left[1]).map(([label, value]) => {
               const group = attributeGroups.find(([, attributes]) => label in attributes)?.[0] ?? 'technical'
               return renderAttributeRow(group, label, value)
@@ -190,13 +190,13 @@ export function PlayerAttributesPage() {
         <div className="card card-body lg:col-span-4">
           <h3 className="mb-3 text-xs font-semibold text-white">Strengths</h3>
           <div className="space-y-2">
-            {topStrengths.map(([label, value]) => <div key={label} className="flex items-center justify-between rounded bg-surface-light/50 px-3 py-2 text-xs"><span className="text-gray-300">{label}</span><span className="font-semibold text-green-400">{value}</span></div>)}
+            {topStrengths.map(([label, value]) => <div key={label} className="flex items-center justify-between rounded bg-surface-light/50 px-3 py-2 text-xs"><span className="text-gray-300">{label}</span><span className="font-semibold text-green-400 tabular-nums">{formatAttribute(value)}</span></div>)}
           </div>
         </div>
         <div className="card card-body lg:col-span-4">
           <h3 className="mb-3 text-xs font-semibold text-white">Development Gaps</h3>
           <div className="space-y-2">
-            {topWeaknesses.map(([label, value]) => <div key={label} className="flex items-center justify-between rounded bg-surface-light/50 px-3 py-2 text-xs"><span className="text-gray-300">{label}</span><span className="font-semibold text-amber-400">{value}</span></div>)}
+            {topWeaknesses.map(([label, value]) => <div key={label} className="flex items-center justify-between rounded bg-surface-light/50 px-3 py-2 text-xs"><span className="text-gray-300">{label}</span><span className="font-semibold text-amber-400 tabular-nums">{formatAttribute(value)}</span></div>)}
           </div>
         </div>
         <div className="card card-body lg:col-span-4">

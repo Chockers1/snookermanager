@@ -45,8 +45,18 @@ export function applySeasonalAgeRegression(attributes: PlayerAttributes, age: nu
     {group:next.technical, labels:['Long Potting','Cue Ball Control','Break Building','Safety Play','Consistency'], delta:loss.technical, eased:.55, full:3},
     {group:next.mental, labels:['Focus','Composure','Resilience','Big Match Nerve'], delta:loss.mental, eased:.4, full:2},
   ];
-  for(const {group,labels,delta,eased,full} of groups) labels.forEach((label,index)=>{
-    if(label in group)group[label]=Math.max(1,Math.min(100,group[label]+delta*(index>=full?eased:1)));
-  });
+  // Distribute the same overall loss as CPU ageing. Decline eases as an
+  // individual skill falls, rather than exhausting physical attributes first
+  // while leaving learned skills untouched. No attributes are raised here.
+  const weights=[.2/5,.46/5,.34/5];
+  const cells=groups.flatMap(({group,labels,delta,eased,full},groupIndex)=>labels.filter(label=>label in group).map((label,index)=>({group,label,weight:weights[groupIndex],pace:-delta*(index>=full?eased:1)*Math.pow(group[label]/100,2)})));
+  let budget=annualDecline(age,decline);
+  let available=cells.filter(c=>c.pace>0&&c.group[c.label]>1);
+  for(let pass=0;pass<cells.length&&budget>1e-10&&available.length;pass++){
+    const weightedPace=available.reduce((n,c)=>n+c.pace*c.weight,0);
+    let spent=0;
+    for(const c of available){const loss=Math.min(c.group[c.label]-1,budget*c.pace/weightedPace);c.group[c.label]-=loss;spent+=loss*c.weight;}
+    budget-=spent;available=available.filter(c=>c.group[c.label]>1+1e-10);
+  }
   return next;
 }

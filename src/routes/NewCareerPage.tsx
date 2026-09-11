@@ -1,3 +1,4 @@
+import { careerDifficulties, type CareerDifficulty } from '../game/careerDifficulty';
 import { useMemo, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Dice5, ShieldCheck, UserRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -91,6 +92,7 @@ function difficultyClass(difficulty: string) {
 export function NewCareerPage() {
   const { resetCareer } = useGame()
   const navigate = useNavigate()
+  const [difficulty,setDifficulty]=useState<CareerDifficulty>('standard')
   const [currentStep, setCurrentStep] = useState(0)
   const [isCreating, setIsCreating] = useState(false)
   const [creationError, setCreationError] = useState<string | null>(null)
@@ -180,6 +182,7 @@ export function NewCareerPage() {
       personalityArchetype: selectedBackground.personality,
       sliders: form.sliders,
       backgroundId: selectedBackground.id,
+      difficulty,
       startingLevelId: selectedStartingLevel.id,
     })
       if (saved) navigate('/')
@@ -299,7 +302,7 @@ export function NewCareerPage() {
 
           {currentStep === 3 ? (
             <div className="card min-h-0 flex h-full flex-col overflow-hidden">
-              <div className="card-header px-3 py-2"><h2 className="text-sm font-semibold uppercase tracking-wider text-white">4. Confirm</h2><span className="text-[10px] text-gray-500">Ready to start</span></div>
+              <div className="card-header px-3 py-2"><h2 className="text-sm font-semibold uppercase tracking-wider text-white">4. Confirm</h2><span className="text-[10px] text-gray-500">Ready to start</span></div><fieldset className="m-3 rounded border border-border p-3"><legend className="px-1 text-sm text-white">Career difficulty</legend><div className="flex flex-wrap gap-3">{Object.entries(careerDifficulties).map(([key,mode])=><label key={key} className="flex items-center gap-2 text-xs text-gray-200"><input type="radio" name="career-difficulty" checked={difficulty===key} onChange={()=>setDifficulty(key as CareerDifficulty)}/>{mode.label}</label>)}</div><p className="mt-2 text-xs text-gray-300">{careerDifficulties[difficulty].description}</p><p className="mt-2 text-xs text-gray-400">All modes use identical match rules, opponent abilities, training and prize money. Support stops at retirement. You can change mode in Settings for future weeks.</p></fieldset>
               <div className="card-body min-h-0 flex-1 overflow-auto px-3 py-3 scrollbar-thin">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   {[['Name', form.fullName], ['Nationality', form.nationality], ['Date of Birth', form.dateOfBirth], ['Starting Age', String(normalizedAge)], ['Handedness', form.handedness], ['Background', selectedBackground.name], ['Starting Level', selectedStartingLevel.name], ['Starting Overall', `${startingRating} / 100`], ['Potential', `${startingPotential} / 100`], ['Starting Funds', formatMoney(selectedBackground.funds)]].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-surface-light/35 px-3 py-2"><span className="text-gray-400">{label}</span><span className="text-right text-white">{value}</span></div>)}

@@ -1,4 +1,4 @@
-import { indexedEvents } from './resultIndex';
+import { indexedEvents, eventsBetween } from './resultIndex';
 import type { GameState } from '../hooks/useGameState';
 import type { Tournament } from '../types/game';
 import { qualifiedNames } from './rollingRankings';
@@ -136,8 +136,9 @@ export function pathwayStandings(state: ResultsState, region: PathwayList, befor
   if (cache?.has(key)) return cache.get(key)!;
   const rows = new Map<string, PathwayStanding>();
   const cutoff = new Date(before === '9999-12-31' ? '2100-01-01' : before); cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 2);
-  for (const e of indexedEvents(state.rollingRankings, twoYear ? undefined : state.season)) {
-    if (e.completedOn > before || (twoYear ? e.completedOn < cutoff.toISOString().slice(0,10) : e.season !== state.season)) continue;
+  const candidates=twoYear?eventsBetween(state.rollingRankings,cutoff.toISOString().slice(0,10),before):indexedEvents(state.rollingRankings,state.season);
+  for (const e of candidates) {
+    if (e.completedOn > before) continue;
     const frames = region === 'Senior' || region.startsWith('Q School');
     if (!matchesPathwayList(e,region)) continue;
     const scores = new Map<string, number>();
@@ -166,7 +167,7 @@ export function pathwayStandings(state: ResultsState, region: PathwayList, befor
 export function qTourQualification(state: ResultsState, before = '9999-12-31', canEnter: (name: string) => boolean = () => true) {
   const secured = securedPathwayCards(state, before, false);
   const europe = pathwayStandings(state, 'Europe', before);
-  const lastEuropean = Object.values(state.rollingRankings?.events ?? {}).filter(e => e.season === state.season && e.completedOn <= before && matchesPathwayList(e, 'Europe')).sort((a,b) => b.completedOn.localeCompare(a.completedOn))[0];
+  const lastEuropean = indexedEvents(state.rollingRankings,state.season).filter(e => e.completedOn <= before && matchesPathwayList(e, 'Europe')).sort((a,b) => b.completedOn.localeCompare(a.completedOn))[0];
   const securedAtEuropeEnd = securedPathwayCards(state, lastEuropean?.completedOn ?? before, false);
   const automatic = europe.find(r => !securedAtEuropeEnd.has(r.name))?.name;
   const eligible = europe.filter(r => r.name !== automatic && !secured.has(r.name) && canEnter(r.name));
@@ -195,10 +196,10 @@ export function seniorQualification(state: Pick<GameState, 'rollingRankings' | '
   const ranking = new Set(official.slice(0,2).map(r => r.name));
   race.filter(r => !ranking.has(r.name)).slice(0,2).forEach(r => ranking.add(r.name));
   const invites = state.competitionTables.world.filter(r => eligible(r.playerName) && (r.ranking <= 32 || r.titles > 0)).slice(0,12).map(r => r.playerName);
-  const winners = Object.values(state.rollingRankings?.events ?? {}).filter(e => e.completedOn < before && /world seniors championship|british seniors open/i.test(e.name)).flatMap(e => qualifiedNames(e.bracket)).filter(eligible);
+  const winners = indexedEvents(state.rollingRankings).filter(e => e.completedOn < before && /world seniors championship|british seniors open/i.test(e.name)).flatMap(e => e.archivedQualifiers??qualifiedNames(e.bracket)).filter(eligible);
   const base = new Set([...ranking, ...invites, ...winners]);
   const goldenField = official.filter(r => !base.has(r.name)).slice(0,16).map(r => r.name);
-  const golden = Object.values(state.rollingRankings?.events ?? {}).filter(e => e.season === state.season && e.completedOn < before && /golden ticket/i.test(e.name)).flatMap(e => qualifiedNames(e.bracket));
+  const golden = indexedEvents(state.rollingRankings,state.season).filter(e => e.completedOn < before && /golden ticket/i.test(e.name)).flatMap(e => qualifiedNames(e.bracket));
   const championship = [...new Set([...base, ...golden])];
   // Remaining invitations use the seniors list in this generated player world.
   for (const row of state.competitionTables.senior) { if (championship.length >= 24) break; if (eligible(row.playerName) && !championship.includes(row.playerName)) championship.push(row.playerName); }

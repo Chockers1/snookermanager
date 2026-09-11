@@ -12,3 +12,10 @@ export function indexedEvents(ledger: Pick<RollingRankingsState, 'events'> | und
   }
   return season === undefined ? index.all : index.seasons.get(season) ?? [];
 }
+
+/** Inclusive date window without walking decades of archived event headers. */
+export function eventsBetween(ledger: Pick<RollingRankingsState,'events'>|undefined, from:string, to:string) {
+  const all=indexedEvents(ledger);
+  const bound=(date:string,inclusive:boolean)=>{let low=0,high=all.length;while(low<high){const middle=(low+high)>>>1;if(all[middle].completedOn<date || inclusive&&all[middle].completedOn===date)low=middle+1;else high=middle;}return low;};
+  return all.slice(bound(from,false),bound(to,true));
+}

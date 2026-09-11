@@ -74,31 +74,6 @@ export function FinancePage() {
     () => ({ ...gameState.finance.budgetTargets }),
   );
 
-  const sponsorMonthlyIncome = gameState.sponsors.reduce(
-    (sum, sponsor) => sum + sponsor.monthlyValue,
-    0,
-  );
-  const sponsorWeeklyIncome = Math.round(sponsorMonthlyIncome / 4);
-  const coachWeeklyCost = gameState.coachContracts.reduce(
-    (sum, contract) => sum + contract.weeklyCost,
-    0,
-  );
-  const travelSpend = Object.values(gameState.travel.bookings).reduce(
-    (sum, booking) => sum + booking.totalCost,
-    0,
-  );
-  const equipmentSpend = gameState.maintenance.history.reduce(
-    (sum, item) => sum + item.cost,
-    0,
-  );
-  const recordedExpenseSpend = gameState.finance.ledger.reduce(
-    (sum, item) => sum + (item.type === "Expense" ? Math.abs(item.amount) : 0),
-    0,
-  );
-  const prizeIncome = gameState.matches.reduce(
-    (sum, match) => sum + match.prizeMoneyEarned,
-    0,
-  );
   const currentMonthIncome = incomeBreakdown.reduce(
     (sum, item) => sum + item.value,
     0,
@@ -116,18 +91,10 @@ export function FinancePage() {
     budgetAllocation.reduce((sum, item) => sum + item.amount, 0),
     1,
   );
-  const weeksElapsed = Math.max(1, gameState.week);
-  const ytdIncome =
-    prizeIncome +
-    sponsorWeeklyIncome * weeksElapsed +
-    Math.max(0, gameState.finance.baseCashFlow) * weeksElapsed;
-  const ytdExpenses =
-    coachWeeklyCost * weeksElapsed +
-    travelSpend +
-    equipmentSpend +
-    recordedExpenseSpend +
-    Math.max(0, -gameState.finance.baseCashFlow) * weeksElapsed;
-  const ytdNet = ytdIncome - ytdExpenses;
+  const opening = gameState.history.seasonOpenings?.[gameState.season];
+  const seasonCashChange = opening ? gameState.player.cash - opening.snapshot.cash : null;
+  const seasonPrize = gameState.history.matchLog.filter(m => m.season === gameState.season).reduce((sum, m) => sum + m.prizeMoney, 0);
+
 
   const monthlyComparisonData = [
     { label: "Income", value: currentMonthIncome, fill: "#22c55e" },
@@ -156,15 +123,6 @@ export function FinancePage() {
           status: "Completed",
         };
       }),
-    ...gameState.sponsors.map((sponsor) => ({
-      id: `sponsor-${sponsor.id}`,
-      date: gameState.currentDate,
-      description: sponsor.name,
-      category: "Sponsorship",
-      type: "Income",
-      amount: sponsor.monthlyValue,
-      status: "Active",
-    })),
     ...Object.entries(gameState.travel.bookings).map(
       ([tournamentId, booking]) => {
         const tournament = gameState.tournaments.find(
@@ -315,7 +273,7 @@ export function FinancePage() {
           <div className="flex items-center gap-2">
             <Coins className="h-4 w-4 text-green-400" />
             <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-              Monthly Cash Flow
+              Monthly Cash Flow Estimate
             </p>
           </div>
           <p
@@ -324,14 +282,14 @@ export function FinancePage() {
             {formatSignedMoney(currentMonthNet)}
           </p>
           <p className="mt-1 text-[11px] text-gray-400">
-            Income less recorded expenses
+            Current recurring income less costs
           </p>
         </div>
         <div className="card min-h-0 p-3">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-green-400" />
             <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-              Projected Month End
+              One-month Projection
             </p>
           </div>
           <p
@@ -341,14 +299,14 @@ export function FinancePage() {
             {formatMoney(Math.abs(projectedMonthEnd))}
           </p>
           <p className="mt-1 text-[11px] text-gray-400">
-            Based on current trend
+            Current terms held constant
           </p>
         </div>
         <div className="card min-h-0 p-3">
           <div className="flex items-center gap-2">
             <Receipt className="h-4 w-4 text-green-400" />
             <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-              Pending Expenses
+              Upcoming Event Estimates
             </p>
           </div>
           <p
@@ -358,17 +316,18 @@ export function FinancePage() {
           </p>
           <p className="mt-1 text-[11px] text-gray-400">
             {pendingExpensesTotal > 0
-              ? `${upcomingExpenses.length} scheduled cost items`
-              : "No pending expenses"}
+              ? `${upcomingExpenses.length} possible event costs`
+              : "No eligible events to estimate"}
           </p>
         </div>
       </div>
 
       <div className="space-y-3">
+        <p className="text-xs text-gray-400">Monthly estimates use current contracts and support over 52 weeks / 12 months. Future prizes, new bookings, purchases and contract changes are excluded.</p>
         <div className="card flex h-56 min-h-0 flex-col overflow-hidden sm:h-64">
           <div className="card-header">
             <h3 className="text-sm font-semibold text-white">
-              Income vs Expenses (This Month)
+              Recurring Monthly Estimate
             </h3>
             <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px]">
               <span className="text-green-400">
@@ -432,13 +391,13 @@ export function FinancePage() {
         <div className="grid min-h-0 grid-cols-1 gap-3 md:grid-cols-2">
           {[
             {
-              title: "Income Breakdown (This Month)",
+              title: "Recurring Monthly Income",
               items: incomeBreakdown,
               total: currentMonthIncome,
               colors: incomeColors,
             },
             {
-              title: "Expense Breakdown (This Month)",
+              title: "Recurring Monthly Expenses",
               items: expenseBreakdown,
               total: currentMonthExpenses,
               colors: expenseColors,
@@ -705,32 +664,32 @@ export function FinancePage() {
 
         <div className="grid min-h-0 grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="card min-h-32 p-4">
-            <p className="metric-label">Year To Date Income</p>
+            <p className="metric-label">Season opening cash</p>
             <p className="mt-2 truncate text-2xl font-bold text-white">
-              {formatMoney(ytdIncome)}
+              {opening ? formatMoney(opening.snapshot.cash) : 'Not recorded'}
             </p>
             <p className="mt-1 text-[11px] text-green-400">
-              Prize money plus sponsor flow
+              {opening ? `${opening.snapshot.date}${opening.partial ? ' · earliest surviving snapshot' : ''}` : 'No opening balance survives'}
             </p>
           </div>
           <div className="card min-h-32 p-4">
-            <p className="metric-label">Year To Date Expenses</p>
+            <p className="metric-label">Prize money this season</p>
             <p className="mt-2 truncate text-2xl font-bold text-white">
-              {formatMoney(ytdExpenses)}
+              {formatMoney(seasonPrize)}
             </p>
             <p className="mt-1 text-[11px] text-red-400">
-              Coaching, travel, and equipment
+              Recorded singles prize awards
             </p>
           </div>
           <div className="card min-h-32 p-4">
-            <p className="metric-label">Net Profit (YTD)</p>
+            <p className="metric-label">Cash change this season</p>
             <p
-              className={`mt-2 truncate text-2xl font-bold ${ytdNet >= 0 ? "text-green-400" : "text-red-400"}`}
+              className={`mt-2 truncate text-2xl font-bold ${(seasonCashChange ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`}
             >
-              {formatSignedMoney(ytdNet)}
+              {seasonCashChange === null ? 'Not recorded' : formatSignedMoney(seasonCashChange)}
             </p>
             <p className="mt-1 text-[11px] text-gray-400">
-              Current season position
+              All cash movements since the saved opening balance
             </p>
           </div>
         </div>

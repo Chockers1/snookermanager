@@ -1,3 +1,4 @@
+import { leagueFixtureSchedule } from './leagueSchedule';
 import type { GameState } from '../hooks/useGameState';
 import type { Tournament } from '../types/game';
 import { hotelRoundDate } from './realism/accommodation';
@@ -22,10 +23,12 @@ export function betweenMatchInfo(state: GameState, tournament?: Tournament) {
   const fixture = round?.matches.find(m => (m.top.name === state.player.fullName || m.bottom.name === state.player.fullName) && (m.top.score === undefined || m.bottom.score === undefined));
   if (!fixture) return null;
   const previous = progress.completedRounds.at(-1)!;
-  // Use the same estimated event schedule as accommodation. Group fixtures on
-  // the same stage date get a short turnaround, never a full overnight reset.
-  const previousDate = hotelRoundDate(event, previous.round);
-  const nextDate = hotelRoundDate(event, progress.currentRound);
+  // League matchdays have individual dates; other group stages retain their
+  // stage schedule. Same-day fixtures get short recovery rather than overnight rest.
+  const previousRound = progress.draw.find(r => r.label === previous.round);
+  const previousFixture = previousRound?.matches.find(m => (m.top.name === state.player.fullName && m.bottom.name === previous.opponentName) || (m.bottom.name === state.player.fullName && m.top.name === previous.opponentName));
+  const previousDate = previousRound && previousFixture ? leagueFixtureSchedule(event, previousRound, previousFixture)?.date ?? hotelRoundDate(event, previous.round) : hotelRoundDate(event, previous.round);
+  const nextDate = leagueFixtureSchedule(event, round!, fixture)?.date ?? hotelRoundDate(event, progress.currentRound);
   const days = Math.max(0, dayNumber(nextDate) - dayNumber(previousDate));
   const key = `${event.startDate}:${progress.completedRounds.length}:${progress.currentRound}:${fixture.id}`;
   const saved = state.travel.bookings[event.id]?.betweenMatches;

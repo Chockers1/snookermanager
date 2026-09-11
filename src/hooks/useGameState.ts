@@ -1,3 +1,9 @@
+import { blockForRequiredDecision, gateCareerActions, requiredDecisionBlocker, REQUIRED_DECISION_EVENT } from '../game/requiredDecision';
+import { nextLeagueFixture } from '../game/leagueSchedule';
+import { announceTourBriefing } from '../game/tourBriefing';
+import { careerDifficulty, backgroundWeeklySupport, type CareerDifficulty } from '../game/careerDifficulty';
+import { sponsorRenewalQuote, sponsorRenewalCeiling, sponsorWeeklyPayment } from '../game/sponsorEconomy';
+import { archiveCareerHistory, materializeCareerHistory, type CareerArchive } from '../game/careerArchive';
 import { championInvitations } from '../game/championInvitations';
 import { alignMajorSelection, majorSelectionCalendar } from '../game/rollingRankings';
 import {ensureCoachContractDates} from '../game/coachContractDates';
@@ -412,6 +418,7 @@ export type ConstructedLiveVisitProfile = {
 };
 
 export type NewCareerConfig = {
+  difficulty?: CareerDifficulty;
   fullName: string;
   nationality: string;
   age: number;
@@ -874,6 +881,7 @@ type WorldPlayerSeasonRecord = {
 };
 
 type WorldPlayerRecord = {
+  archivedSelectionSeasons?: Array<Pick<WorldPlayerSeasonRecord,'season'|'worldRank'|'mainTourEvents'>>;
   declineProfile?: DeclineProfile;
   centuries?: number;
   breakRecordsMatches?: number;
@@ -979,6 +987,10 @@ type CareerSystemsState = {
 };
 
 export type GameState = {
+  recoveryPlanAvailableOn?: string;
+  difficulty?: CareerDifficulty;
+  historyArchive?: CareerArchive;
+  tourBriefing?: import('../game/tourBriefing').TourBriefingState;
   firstWeekGuide?: import('../game/firstWeekGuide').FirstWeekGuideState;
   seasonClock?: SeasonClock;
   worldPopulationSeason?: string;
@@ -1605,6 +1617,16 @@ function getOpponentArchetypeNote(
   return "tempo disruptor who tries to make frames awkward and scrappy";
 }
 
+/** Cautious play still takes occasional openings. Fatigue must not trap a
+ * player in endless safeties once the opponent switches to a tight approach. */
+function protectedOpening(live: LiveMatchState, profile: LiveVisitSkillProfile, confidence: number) {
+  const previous = live.visitHistory[0];
+  const actor = live.playerAtTable === live.playerName ? 'Player' : 'Opponent';
+  if (previous?.actor === actor && previous.decision === 'Safety Exchange' && previous.success) return true;
+  const readiness = profile.longPotting * .35 + profile.cueBallControl * .25 + profile.composure * .2 + confidence * .2 - Math.max(0, live.pressureValue - 55) * .15;
+  return getRemainingTablePoints(live) > 0 && live.currentVisit % (readiness >= 45 ? 3 : 5) === 0;
+}
+
 function getAutoOpponentVisitDecision(
   liveMatch: LiveMatchState,
 ): LiveVisitDecision {
@@ -1620,12 +1642,13 @@ function getAutoOpponentVisitDecision(
   }
   if (liveMatch.currentBreak > 0) return "Break Build";
   if (liveMatch.opponentApproach === "Pressing") return "Break Build";
-  if (liveMatch.opponentApproach === "Tight") return "Safety Exchange";
-  if (
-    liveMatch.opponentArchetype === "Tempo Disruptor" &&
-    liveMatch.tableState.redsRemaining === 0
-  )
-    return "Safety Exchange";
+  const cautious = liveMatch.opponentApproach === "Tight" || (liveMatch.opponentArchetype === "Tempo Disruptor" && liveMatch.tableState.redsRemaining === 0);
+  if (cautious) {
+    const profile = liveMatch.opponentVisitProfile;
+    const protectLead = liveMatch.opponentPoints - liveMatch.playerPoints >= 20 && getRemainingTablePoints(liveMatch) <= 60;
+    const safetySpecialist = profile.safetyPlay >= profile.longPotting + 8;
+    if ((protectLead || safetySpecialist) && !protectedOpening(liveMatch, profile, liveMatch.opponentConfidence)) return "Safety Exchange";
+  }
   return "Pot Attempt";
 }
 
@@ -1645,19 +1668,7 @@ function getDefaultManualVisitDecision(
   if (liveMatch.currentBreak > 0) return "Break Build";
   if (liveMatch.tacticalPlan === "Attack") return "Break Build";
   if (liveMatch.tacticalPlan === "Safety") {
-    const attackingReadiness =
-      liveMatch.playerVisitProfile.longPotting * 0.35 +
-      liveMatch.playerVisitProfile.cueBallControl * 0.25 +
-      liveMatch.playerVisitProfile.composure * 0.2 +
-      liveMatch.playerConfidence * 0.2 -
-      Math.max(0, liveMatch.pressureValue - 55) * 0.15;
-    const isClearAttackingChance =
-      liveMatch.tableState.redsRemaining > 0 &&
-      attackingReadiness >= 45 &&
-      liveMatch.currentVisit % 3 === 0;
-
-    if (liveMatch.currentBreak > 0) return "Break Build";
-    if (isClearAttackingChance) return "Pot Attempt";
+    if (protectedOpening(liveMatch, liveMatch.playerVisitProfile, liveMatch.playerConfidence)) return "Pot Attempt";
     return "Safety Exchange";
   }
   return "Pot Attempt";
@@ -6136,6 +6147,8 @@ function applySeasonRollover(state: GameState) {
 
 /** Finish free weeks through the existing settlement clock; never skip an entry or decision. */
 export function finishSeasonState(previousState: GameState): GameState {
+  const decisionBlocked = blockForRequiredDecision(previousState);
+  if (decisionBlocked) return decisionBlocked;
   let state = initializeCareerDepth(previousState);
   if (state.seasonReview?.pending) return { ...state, seasonReview: { ...state.seasonReview, popupDismissed: false } };
   // More than enough for every daily boundary in a July-to-June season.
@@ -6153,6 +6166,8 @@ export function finishSeasonState(previousState: GameState): GameState {
 }
 
 export function startNextSeasonState(previousState: GameState): GameState {
+  const decisionBlocked = blockForRequiredDecision(previousState);
+  if (decisionBlocked) return decisionBlocked;
   previousState = preserveSeasonEmails(previousState);
   if (!previousState.seasonReview?.pending) {
     return finalizeState(
@@ -6203,6 +6218,8 @@ export function startNextSeasonState(previousState: GameState): GameState {
 }
 
 export function advanceWeekState(previousState: GameState): GameState {
+  const decisionBlocked = blockForRequiredDecision(previousState);
+  if (decisionBlocked) return decisionBlocked;
   previousState = processRankingCalendar(previousState);
   previousState = reconcileCareerDepth(previousState);
   if (depthOf(previousState).nextSettlementDate <= previousState.currentDate) {
@@ -6308,27 +6325,21 @@ function advanceWholeWeekState(previousState: GameState): GameState {
           protectedState.health.activeIssue.severity === "Serious",
         ));
     const nextCompliance = clamp(
-      (sponsor.compliance ?? 100) + (obligationDue ? (missed ? -18 : 2) : 0),
+      (sponsor.compliance ?? 100) + (obligationDue ? (missed ? -careerDifficulty(protectedState).missedCompliance : 2) : 0),
       0,
       100,
     );
     const nextMissed = (sponsor.missedObligations ?? 0) + (missed ? 1 : 0);
-    const breached = nextCompliance < 40 || nextMissed >= 3;
+    const breached = nextCompliance < 40 || nextMissed >= careerDifficulty(protectedState).missedLimit;
     const renewalOffered =
+      sponsorRenewalCeiling(protectedState) > 0 &&
       sponsor.weeksRemaining <= 5 &&
       sponsor.weeksRemaining > 1 &&
       (sponsor.renewalStatus ?? "None") === "None" &&
       nextCompliance >= 65 &&
       (sponsor.performance?.satisfaction ?? 75) >= 50;
     const renewalOfferValue = renewalOffered
-      ? Math.round(
-          sponsor.monthlyValue *
-            clamp(
-              0.92 + sponsor.brandFit / 500 + nextCompliance / 1000,
-              0.95,
-              1.18,
-            ),
-        )
+      ? sponsorRenewalQuote(protectedState, sponsor, nextCompliance)
       : sponsor.renewalOfferValue;
 
     return {
@@ -6344,6 +6355,7 @@ function advanceWholeWeekState(previousState: GameState): GameState {
           ? ("Offered" as const)
           : sponsor.renewalStatus,
         renewalOfferValue,
+        renewalCountered: renewalOffered ? false : sponsor.renewalCountered,
         lastLifecycleEvent: breached
           ? "Contract terminated for breach"
           : missed
@@ -6670,6 +6682,8 @@ function advanceWholeWeekState(previousState: GameState): GameState {
 export type ActionBlocker = { reason: string; label: string; route: string };
 
 export function tournamentEntryBlocker(state: GameState, event: Tournament): ActionBlocker | null {
+  const blocker = requiredDecisionBlocker(state);
+  if (blocker) return blocker;
   if (event.status === 'Entered') return null;
   if (!ENTERABLE_TOURNAMENT_STATUSES.has(event.status) || (event.endDate ?? event.startDate) < state.currentDate)
     return { reason: `${event.name} can no longer be entered.`, label: 'Find another event', route: '/calendar' };
@@ -6690,9 +6704,9 @@ export function tournamentEntryBlocker(state: GameState, event: Tournament): Act
 }
 
 export function advancementBlocker(state: GameState): ActionBlocker | null {
+  const blocker = requiredDecisionBlocker(state);
+  if (blocker) return blocker;
   if (state.seasonReview?.pending) return { reason: 'Complete your season review before advancing.', label: 'Review season', route: '/season-review' };
-  const decision = pendingStory(state);
-  if (decision) return { reason: `Choose a response to “${decision.title}” before advancing.`, label: 'Resolve inbox decision', route: `/inbox?message=${encodeURIComponent(decision.id)}` };
   const entered = state.tournaments.find(t => t.status === 'Entered');
   if (!entered) return null;
   if (state.currentDate >= entered.startDate && state.currentDate <= (entered.endDate ?? entered.startDate))
@@ -6708,6 +6722,8 @@ export function enterTournamentState(
   previousState: GameState,
   tournamentId: string,
 ): GameState {
+  const decisionBlocked = blockForRequiredDecision(previousState);
+  if (decisionBlocked) return decisionBlocked;
   previousState = lockTournamentSeedings(processRankingCalendar(previousState), previousState.currentDate);
   const tournament = previousState.tournaments.find(
     (item) => item.id === tournamentId,
@@ -6806,6 +6822,8 @@ export function skipTournamentState(
   previousState: GameState,
   tournamentId: string,
 ): GameState {
+  const decisionBlocked = blockForRequiredDecision(previousState);
+  if (decisionBlocked) return decisionBlocked;
   const tournament = previousState.tournaments.find(
     (item) => item.id === tournamentId,
   );
@@ -7610,6 +7628,7 @@ function normalizeSponsor(sponsor: SponsorDeal, index: number): SponsorDeal {
     fulfilledObligations: sponsor.fulfilledObligations ?? 0,
     renewalStatus: sponsor.renewalStatus ?? "None",
     renewalOfferValue: sponsor.renewalOfferValue,
+    renewalCountered: sponsor.renewalCountered,
     lastLifecycleEvent: sponsor.lastLifecycleEvent ?? "Contract active",
   };
 }
@@ -7620,6 +7639,8 @@ export function bookTravelState(
   travelOptionId?: string,
   hotelOptionId?: string,
 ) {
+  const decisionBlocked = blockForRequiredDecision(previousState);
+  if (decisionBlocked) return decisionBlocked;
   const tournament =
     previousState.tournaments.find((item) => item.id === tournamentId) ??
     previousState.tournaments.find((item) => item.status === "Entered");
@@ -7738,6 +7759,8 @@ export function confirmTournamentPreparationState(
   allocations: PreparationAllocations,
   supportIds: PreparationSupportId[],
 ) {
+  const decisionBlocked = blockForRequiredDecision(previousState);
+  if (decisionBlocked) return decisionBlocked;
   const tournament = previousState.tournaments.find(
     (item) => item.id === tournamentId,
   );
@@ -7921,7 +7944,7 @@ function getSponsorSlotLimit(state: GameState) {
 
 function parseContractWeeks(contractLength?: string) {
   const months = Number(contractLength?.match(/(\d+)/)?.[1] ?? 24);
-  return Math.max(4, months * 4);
+  return Math.max(4, Math.round(months * 52 / 12));
 }
 
 function normalizeSponsors(sponsors: SponsorDeal[]) {
@@ -8314,9 +8337,7 @@ function getScaledTrainingGain(
 }
 
 function getSponsorWeeklyIncome(sponsors: SponsorDeal[]) {
-  return Math.round(
-    sponsors.reduce((sum, sponsor) => sum + sponsor.monthlyValue, 0) / 4,
-  );
+  return sponsorWeeklyPayment(sponsors);
 }
 
 function getCoachCost(coachContracts: CoachContract[]) {
@@ -8465,7 +8486,7 @@ function isPlayersSeriesTournament(
   );
 }
 
-function getPlayersSeriesOneYearCutoff(tournament: Pick<Tournament, "name">) {
+export function getPlayersSeriesOneYearCutoff(tournament: Pick<Tournament, "name">) {
   if (/tour championship/i.test(tournament.name)) return 12;
   if (/players championship/i.test(tournament.name)) return 16;
   return 32;
@@ -8490,7 +8511,7 @@ function isOpenOffTourQSchoolPlayer(
   );
 }
 
-function getTournamentCircuitClass(
+export function getTournamentCircuitClass(
   tournament: Tournament,
 ): TournamentCircuitClass {
   if (
@@ -8820,6 +8841,10 @@ export function getTournamentEntryAccess(
       };
     }
     case "eliteInvitational": {
+      if (/^masters$/i.test(tournament.name)) {
+        const allowed = profile.hasMainTourStatus && profile.isTop16;
+        return { allowed, accessBand, seededProtection, reason: allowed ? null : 'The Masters requires main-tour status and a top-16 World Ranking at the selection cutoff.' };
+      }
       if (/masters-style|elite season opener/i.test(tournament.name)) {
         const allowed =
           profile.isTop16 ||
@@ -8990,6 +9015,8 @@ export function withdrawTournamentState(
   previousState: GameState,
   tournamentId: string,
 ): GameState {
+  const decisionBlocked = blockForRequiredDecision(previousState);
+  if (decisionBlocked) return decisionBlocked;
   const tournament = previousState.tournaments.find(
     (item) => item.id === tournamentId,
   );
@@ -9094,11 +9121,9 @@ export function getTournamentPlayability(
   state: GameState,
   tournament: Tournament,
 ): TournamentPlayability {
-  return evaluateTournamentPlayability(
-    state,
-    tournament,
-    getTournamentEntryAccess,
-  );
+  const result = evaluateTournamentPlayability(state, tournament, getTournamentEntryAccess);
+  const blocker = requiredDecisionBlocker(state);
+  return blocker ? { ...result, canPlay: false, reason: blocker.reason } : result;
 }
 
 function isDateInsideTournament(
@@ -10680,7 +10705,7 @@ function getWorldSeedScore(
   const weightedMainTourEvents =
     getWeightedRecentSeasonValue(record, (season) => season.mainTourEvents) +
     latestMainTourEvents * 0.25;
-  const repeatedHighRankLowVolumeSeasons = record.seasons.slice(0, 12).filter(
+  const repeatedHighRankLowVolumeSeasons = [...record.seasons,...(record.archivedSelectionSeasons??[])].slice(0, 12).filter(
     (season) =>
       (season.worldRank ?? 999) <= TOP_16_RANK_CUTOFF &&
       season.mainTourEvents < 6,
@@ -14258,6 +14283,8 @@ export function startLiveMatchState(
   previousState: GameState,
   tournamentId?: string,
 ) {
+  const decisionBlocked = blockForRequiredDecision(previousState);
+  if (decisionBlocked) return decisionBlocked;
   const tournament =
     previousState.tournaments.find((item) => item.id === tournamentId) ??
     previousState.tournaments.find((item) => item.status === "Entered");
@@ -14292,7 +14319,9 @@ export function startLiveMatchState(
   );
   if (equipmentMessage) return finalizeState(previousState, equipmentMessage);
 
-  previousState = prepareBetweenMatchesState(previousState, 'rest', tournament.id);
+  previousState = prepareScheduledMatchState(previousState, 'rest', tournament.id);
+  const preparationBlocked = blockForRequiredDecision(previousState);
+  if (preparationBlocked) return preparationBlocked;
   return finalizeState(
     {
       ...previousState,
@@ -16400,10 +16429,10 @@ function recalculateState(
       ) ?? null)
     : null;
   const facilityWeeklyRental = activeFacility
-    ? Math.round(activeFacility.monthlyRental / 4)
+    ? Math.round(activeFacility.monthlyRental * 12 / 52 * 100) / 100
     : 0;
   const weeklyCashFlow =
-    state.finance.baseCashFlow +
+    backgroundWeeklySupport(state) +
     sponsorWeeklyIncome -
     coachCost -
     facilityWeeklyRental - trainingBaseCost(state) - overseasWeeklyCost(state);
@@ -16516,7 +16545,7 @@ function recalculateState(
     notificationCount: unreadCount,
   };
 
-  return announceSeasonTourChanges(reconcileSponsorMarket({
+  return announceTourBriefing(announceSeasonTourChanges(reconcileSponsorMarket({
     ...state,
     inbox: normalizedInbox,
     worldPlayers: state.worldPlayers.map(record => record.playerName === player.fullName && record.retired !== retired
@@ -16540,7 +16569,7 @@ function recalculateState(
       (sponsor) => sponsor.weeksRemaining > 0,
     ).map(sponsor => ({ ...sponsor, performance: sponsorPerformance(sponsor, sponsorRanking({ player, rankings: activeRankings }).rank, player.rankingLabel) })),
     lastAction,
-  }));
+  })));
 }
 
 export function createStarterState(): GameState {
@@ -16571,6 +16600,7 @@ export function createStarterState(): GameState {
   const baseState: GameState = {
     schemaVersion: SAVE_SCHEMA_VERSION,
     worldSeed,
+    difficulty: 'standard',
     currentDate: "2026-05-11",
     season: "2026/27",
     week: 19,
@@ -16781,6 +16811,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
   const baseState: GameState = {
     schemaVersion: SAVE_SCHEMA_VERSION,
     worldSeed,
+    difficulty: careerConfig.difficulty ?? 'standard',
     currentDate: "2026-05-11",
     season: "2026/27",
     week: 1,
@@ -16833,6 +16864,8 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
     lastAction: `Created a new ${selectedBackground.name} career for ${careerConfig.fullName}.`,
   };
 
+  baseState.tourBriefing = undefined;
+  baseState.inbox = baseState.inbox.filter(message => !message.id.startsWith("tour-briefing:"));
   baseState.firstWeekGuide = freshGuide(baseState);
   baseState.attributeHistory = initialAttributeHistory(baseState);
   baseState.trainingPlan = buildAutoTrainingPlanFromState(baseState);
@@ -16869,6 +16902,7 @@ function loadStoredState(input?: string, strict = false): GameState {
     const hydratedState: GameState = {
       ...fallbackState,
       ...parsed,
+      tourBriefing: parsed.tourBriefing,
       rollingRankings: parsed.rollingRankings,
       payoutRepair: parsed.payoutRepair,
       sponsorMarket: parsed.sponsorMarket,
@@ -17047,6 +17081,7 @@ function loadStoredState(input?: string, strict = false): GameState {
         ),
       },
       health: {
+        treatmentReviewOn: parsed.health?.treatmentReviewOn,
         activeIssue: parsed.health?.activeIssue ?? null,
         history: Array.isArray(parsed.health?.history)
           ? parsed.health.history
@@ -17082,10 +17117,34 @@ function runMatchSimulation(
   );
 }
 
+/** League fixtures have their own dates; keep weekly settlements on their existing clock. */
+export function prepareScheduledMatchState(state: GameState, choice: BetweenMatchChoice, tournamentId?: string): GameState {
+  const decisionBlocked = blockForRequiredDecision(state);
+  if (decisionBlocked) return decisionBlocked;
+  if (state.liveMatch?.status === 'In Progress') return state;
+  const event = state.tournaments.find(t => t.id === (tournamentId ?? state.tournamentProgress.tournamentId));
+  if (tournamentId && !event) return state;
+  const next = nextLeagueFixture(state, event);
+  if (next && state.currentDate >= next.event.startDate && state.travel.bookings[next.event.id]?.preparation && next.date > state.currentDate) {
+    // Never retroactively settle a week on an older imported save.
+    while (depthOf(state).nextSettlementDate > state.currentDate && depthOf(state).nextSettlementDate <= next.date) {
+      const advanced = advanceWholeWeekState(state);
+      if (advanced.currentDate <= state.currentDate) break;
+      state = advanced;
+      const blocked = blockForRequiredDecision(state);
+      if (blocked) return blocked;
+    }
+    if (state.currentDate < next.date) state = finalizeState({ ...state, currentDate: next.date }, `Reached league matchday ${next.matchday} on ${next.date}.`);
+  }
+  return prepareBetweenMatchesState(state, choice, tournamentId);
+}
+
 export function simulateTournamentMatchState(
   previousState: GameState,
   tournamentId?: string,
 ) {
+  const decisionBlocked = blockForRequiredDecision(previousState);
+  if (decisionBlocked) return decisionBlocked;
   const tournament =
     previousState.tournaments.find((item) => item.id === tournamentId) ??
     previousState.tournaments.find((item) => item.status === "Entered");
@@ -17104,7 +17163,8 @@ export function simulateTournamentMatchState(
     previousState.equipment,
   );
   if (equipmentMessage) return finalizeState(previousState, equipmentMessage);
-  return runMatchSimulation(prepareBetweenMatchesState(previousState, 'rest', tournament.id), tournament);
+  const prepared = prepareScheduledMatchState(previousState, 'rest', tournament.id);
+  return blockForRequiredDecision(prepared) ?? runMatchSimulation(prepared, tournament);
 }
 
 export function hireCoachState(
@@ -17525,6 +17585,8 @@ export function applyTrainingPlanState(
   previousState: GameState,
   nextWeek?: TrainingPlannerDay[],
 ) {
+  const decisionBlocked = blockForRequiredDecision(previousState);
+  if (decisionBlocked) return decisionBlocked;
   if (previousState.trainingAppliedWeek === previousState.week) {
     return finalizeState(
       previousState,
@@ -17981,7 +18043,8 @@ export function acceptSponsorState(
 }
 
 export function renewSponsorState(previousState: GameState, sponsorId: string) {
-  const sponsor = previousState.sponsors.find((item) => item.id === sponsorId);
+  const original = previousState.sponsors.find((item) => item.id === sponsorId);
+  const sponsor = original ? {...original, renewalOfferValue: Math.min(original.renewalOfferValue ?? 0, sponsorRenewalCeiling(previousState))} : undefined;
   if (
     !sponsor ||
     sponsor.renewalStatus !== "Offered" ||
@@ -18003,7 +18066,8 @@ export function renewSponsorState(previousState: GameState, sponsorId: string) {
               ...item,
               monthlyValue: sponsor.renewalOfferValue!,
               contractLength: "12 months",
-              weeksRemaining: 48,
+              weeksRemaining: 52,
+              renewalCountered: false,
               renewalStatus: "Accepted",
               renewalOfferValue: undefined,
               compliance: clamp((item.compliance ?? 100) + 5, 0, 100),
@@ -18065,7 +18129,8 @@ export function renegotiateSponsorState(
   previousState: GameState,
   sponsorId: string,
 ) {
-  const sponsor = previousState.sponsors.find((item) => item.id === sponsorId);
+  const original = previousState.sponsors.find((item) => item.id === sponsorId);
+  const sponsor = original ? {...original, renewalOfferValue: Math.min(original.renewalOfferValue ?? 0, sponsorRenewalCeiling(previousState))} : undefined;
   if (
     !sponsor ||
     sponsor.renewalStatus !== "Offered" ||
@@ -18082,11 +18147,12 @@ export function renegotiateSponsorState(
     sponsor.brandFit +
     Math.round(previousState.player.reputation / 2);
   const accepted = leverage >= 170;
+  if(sponsor.renewalCountered) return finalizeState(previousState, "This renewal has already been negotiated. Accept or decline the quoted terms.");
   const counterValue = accepted
-    ? Math.round(
+    ? Math.min(sponsorRenewalCeiling(previousState), Math.round(
         sponsor.renewalOfferValue *
           clamp(1.03 + previousState.player.reputation / 1000, 1.03, 1.12),
-      )
+      ))
     : sponsor.renewalOfferValue;
 
   return finalizeState(
@@ -18097,6 +18163,7 @@ export function renegotiateSponsorState(
           ? {
               ...item,
               renewalOfferValue: counterValue,
+              renewalCountered: true,
               compliance: clamp(
                 (item.compliance ?? 100) - (accepted ? 1 : 5),
                 0,
@@ -18139,6 +18206,7 @@ export function scheduleTreatmentState(
   optionId?: string,
 ) {
   const treatmentChoice = getTreatmentEffect(optionId);
+  if(previousState.health.treatmentReviewOn && previousState.currentDate < previousState.health.treatmentReviewOn) return {...previousState,lastAction: `Treatment is already underway. Review recovery on ${previousState.health.treatmentReviewOn}; no extra charge.`};
   if (!needsHealthRecovery(previousState)) {
     return { ...previousState, lastAction: 'No treatment needed: no active injury, fatigue, strain or burnout. No money spent.' };
   }
@@ -18155,8 +18223,7 @@ export function scheduleTreatmentState(
   }
 
   const nextAttributes = deepCloneAttributes(previousState.attributes);
-  improveAttribute(nextAttributes, "Shoulder Health", 3);
-  improveAttribute(nextAttributes, "Recovery Rate", 2);
+  // Treatment clears temporary health effects; it is not permanent skill training.
   const previousIssue = previousState.health.activeIssue;
   const remainingIssueWeeks = Math.max(
     0,
@@ -18185,6 +18252,7 @@ export function scheduleTreatmentState(
         injuryWeeks: remainingIssueWeeks,
       },
       health: {
+        treatmentReviewOn: plusDays(previousState.currentDate, treatmentChoice.id==='treat-5'?1:treatmentChoice.id==='treat-4'?5:3),
         activeIssue:
           previousIssue && !issueResolved
             ? {
@@ -18386,6 +18454,8 @@ export function useGameState() {
     catch { return { payload, overlay, state: createStarterState(), error: 'Your active save could not be opened. The original is preserved. Restore an automatic backup or load another named career.' }; }
   });
   const [gameState, setGameState] = useState<GameState>(initialLoad.state!);
+  const latestGameState = useRef(gameState);
+  useEffect(() => { latestGameState.current = gameState; }, [gameState]);
   const [careerSessionMode, setCareerSessionMode] =
     useState<CareerSessionMode>("launcher");
   const [hasActiveCareer, setHasActiveCareer] = useState(
@@ -18435,12 +18505,14 @@ export function useGameState() {
     };
     void queueProtectedSave(async () => {
     if (readActiveSaveSlotId() !== activeSaveSlotId || (saveRevision.current !== revision && samePhaseAsLatest())) return;
-    const serialized = await encodeCareerSaveAsync(gameState);
+    const storageState = await archiveCareerHistory(gameState);
+    const serialized = await encodeCareerSaveAsync(storageState);
     if (readActiveSaveSlotId() !== activeSaveSlotId || (saveRevision.current !== revision && samePhaseAsLatest())) return;
     const publish = async () => {
       if (activeSaveSlotId) await persistCareerSlot(gameState, { id: activeSaveSlotId, serialized });
       else await commitCareerStorage([[STORAGE_KEY,serialized]]);
-      lastAutosaveSnapshot.current = { slotId: activeSaveSlotId, serialized, state: gameState };
+      lastAutosaveSnapshot.current = { slotId: activeSaveSlotId, serialized, state: storageState };
+      if(storageState !== gameState) setGameState(current=>current===gameState?storageState:current);
       window.localStorage.removeItem(inboxReadStorageKey(activeSaveSlotId));
     };
     const previous = readCareerStorage(STORAGE_KEY);
@@ -18495,10 +18567,14 @@ export function useGameState() {
 
   const actions = useMemo(
     () => ({
-      updateFirstWeekGuide(action:'dismiss'|'resume'|'skip'|'equipment',step?:GuideStep) {
+      setCareerDifficulty(difficulty: CareerDifficulty) {
+        if(!['relaxed','standard','demanding'].includes(difficulty))return;
+        setGameState(previous=>finalizeState({...previous,difficulty}, 'Career difficulty changed. Support and future missed obligations use the selected rules. No cash granted or past penalties changed.'));
+      },
+      updateFirstWeekGuide(action:'dismiss'|'resume'|'skip'|'equipment'|'minimize'|'expand',step?:GuideStep) {
         setGameState(previous=>{
           const guide=previous.firstWeekGuide??freshGuide(previous);
-          return reconcileFirstWeekGuide({...previous,firstWeekGuide:{...guide,dismissed:action==='dismiss'?true:action==='resume'?false:guide.dismissed,skipped:action==='resume'?[]:action==='skip'&&step?[...new Set([...guide.skipped,step])]:guide.skipped,equipmentReviewed:action==='equipment'&&getMissingTournamentEquipment(previous.equipment).length===0||guide.equipmentReviewed}});
+          return reconcileFirstWeekGuide({...previous,firstWeekGuide:{...guide,minimized:action==='minimize'?true:action==='expand'||action==='resume'?false:guide.minimized,dismissed:action==='dismiss'?true:action==='resume'?false:guide.dismissed,skipped:action==='resume'?[]:action==='skip'&&step?[...new Set([...guide.skipped,step])]:guide.skipped,equipmentReviewed:action==='equipment'&&getMissingTournamentEquipment(previous.equipment).length===0||guide.equipmentReviewed}});
         });
       },
       actOnRealism(action: RealismAction) {
@@ -18628,9 +18704,9 @@ export function useGameState() {
         } catch(error) { setSaveWarning(error instanceof Error ? error.message : 'The save could not be written. Your previous career is preserved.'); return false; }
         finally { savePendingRef.current=false; setSavePending(false); }
       },
-      exportCareer() {
+      async exportCareer() {
         return JSON.stringify(
-          { ...gameState, schemaVersion: SAVE_SCHEMA_VERSION },
+          { ...await materializeCareerHistory(gameState), schemaVersion: SAVE_SCHEMA_VERSION },
           null,
           2,
         );
@@ -18643,6 +18719,7 @@ export function useGameState() {
           const record = await getRecoverySave(id);
           if (!record) throw new Error('That backup is no longer available. Refresh the list.');
           const restored = loadStoredState(validatedRecoveryPayload(record));
+          if (restored.historyArchive) await materializeCareerHistory(restored);
           if (careerSessionMode === 'active') {
             await storeRecoverySave(activeSaveSlotId ?? gameState.player.id, await encodeCareerSaveAsync(gameState), 'Before restore');
           }
@@ -18680,7 +18757,8 @@ export function useGameState() {
             !parsed.currentDate
           )
             return false;
-          const importedState = loadStoredState(serializedState);
+          let importedState = loadStoredState(serializedState);
+          if (importedState.historyArchive) importedState = await materializeCareerHistory(importedState);
           const slot: SaveSlotSummary = { id: createSaveSlotId(), name: getUniqueSaveSlotName(`${importedState.player.fullName} · Imported`), playerName: importedState.player.fullName, season: importedState.season, date: importedState.currentDate, updatedAt: new Date().toISOString() };
           const payload = await encodeCareerSaveAsync(importedState);
           await commitCareerStorage([
@@ -18694,8 +18772,8 @@ export function useGameState() {
           setCareerSessionMode("active");
           setHasActiveCareer(true);
           return true;
-        } catch {
-          setSaveWarning('Import failed. Your current career is preserved. Check the file and available browser storage, or restore an automatic backup.');
+        } catch (error) {
+          setSaveWarning(`Import failed. Your current career is preserved. ${error instanceof Error ? error.message : 'Check the file and available browser storage, or restore an automatic backup.'}`);
           return false;
         }
         } catch(error) { setSaveWarning(error instanceof Error ? error.message : 'The save could not be written. Your previous career is preserved.'); return false; }
@@ -19117,7 +19195,7 @@ export function useGameState() {
         );
       },
       prepareBetweenMatches(choice: BetweenMatchChoice, tournamentId?: string) {
-        setGameState(previousState => prepareBetweenMatchesState(previousState, choice, tournamentId));
+        setGameState(previousState => prepareScheduledMatchState(previousState, choice, tournamentId));
       },
       simulateMatch(tournamentId?: string) {
         setGameState((previousState) =>
@@ -19989,14 +20067,13 @@ export function useGameState() {
       },
       applyRecoveryPlan(actionTitle?: string) {
         setGameState((previousState) => {
-          const nextAttributes = deepCloneAttributes(previousState.attributes);
-          improveAttribute(nextAttributes, "Focus", 2);
-          improveAttribute(nextAttributes, "Composure", 1);
+          if(previousState.recoveryPlanAvailableOn && previousState.currentDate<previousState.recoveryPlanAvailableOn) return {...previousState,lastAction:`Recovery plan already applied. Review on ${previousState.recoveryPlanAvailableOn}.`};
+          if(previousState.liveMatch?.status==='In Progress')return {...previousState,lastAction:'Use the match interval options while a match is in progress.'};
 
           return finalizeState(
             {
               ...previousState,
-              attributes: nextAttributes,
+              recoveryPlanAvailableOn: plusDays(previousState.currentDate,7),
               player: {
                 ...previousState.player,
                 confidence: supportedConfidence(previousState.player.confidence, 6),
@@ -20008,7 +20085,7 @@ export function useGameState() {
                   {
                     sender: "Sports Psychologist",
                     subject: "Recovery plan applied",
-                    preview: `${actionTitle ?? "The recovery block"} improved confidence, reduced fatigue, and steadied focus ahead of the next match.`,
+                    preview: `${actionTitle ?? "The recovery block"} supported confidence and reduced fatigue. Review in seven days. Permanent attributes are developed through training.`,
                     priority: "Medium",
                     actionLabel: "Open Mental State",
                     actionRoute: "/mental",
@@ -20027,6 +20104,16 @@ export function useGameState() {
     [activeSaveSlotId, careerSessionMode, gameState, initialLoad],
   );
 
+  // The factory stores this getter; it reads the ref only when a user action or timer invokes it.
+  /* eslint-disable react-hooks/refs */
+  const guardedActions = useMemo(() => gateCareerActions(actions,
+    () => latestGameState.current,
+    blocker => {
+      // Let the initiating handler finish so its navigation cannot hide the decision.
+      queueMicrotask(() => window.dispatchEvent(new CustomEvent(REQUIRED_DECISION_EVENT, { detail: blocker.route })));
+    }), [actions]);
+  /* eslint-enable react-hooks/refs */
+
   return useMemo(
     () => ({
       gameState,
@@ -20035,9 +20122,9 @@ export function useGameState() {
       activeSaveSlotId,
       saveWarning: saveWarning || (careerSessionMode === 'launcher' ? initialLoad.error : ''),
       savePending,
-      ...actions,
+      ...guardedActions,
     }),
-    [actions, activeSaveSlotId, careerSessionMode, gameState, hasActiveCareer, saveWarning, savePending, initialLoad.error],
+    [guardedActions, activeSaveSlotId, careerSessionMode, gameState, hasActiveCareer, saveWarning, savePending, initialLoad.error],
   );
 }
 

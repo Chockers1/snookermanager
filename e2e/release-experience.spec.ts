@@ -10,7 +10,7 @@ for(const [startingLevelId,age] of [['start-club-junior',12],['start-rookie-pro'
  await page.addInitScript(({key,value})=>{if(!localStorage.getItem(key))localStorage.setItem(key,value)},{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
  const guide=page.getByRole('region',{name:'First week guide'});
- await guide.getByRole('link',{name:'Open training',exact:true}).click();await page.getByRole('button',{name:'Apply Plan',exact:true}).click();
+ await guide.getByRole('link',{name:'Open training',exact:true}).click();await page.getByRole('button',{name:'Apply Plan',exact:true}).click();await page.getByRole('button',{name:'Open first-week guide',exact:true}).click();
  await guide.getByRole('link',{name:'Check equipment',exact:true}).click();
  const cue=[...cueMarketplaceCatalog].sort((a,b)=>a.price-b.price)[0];
  await page.getByRole('button').filter({has:page.getByRole('heading',{name:cue.name,exact:true})}).click();
@@ -19,14 +19,14 @@ for(const [startingLevelId,age] of [['start-club-junior',12],['start-rookie-pro'
  const chalk=[...chalkCatalog].sort((a,b)=>a.cost-b.cost)[0];await page.getByRole('button').filter({has:page.getByRole('heading',{name:chalk.name,exact:true})}).click();await page.getByRole('button',{name:/Buy chalk pack/}).click();
  await page.getByRole('tablist',{name:'Equipment categories'}).getByRole('tab',{name:'Tips',exact:true}).click();
  const tip=[...tipCatalog].sort((a,b)=>a.cost-b.cost)[0];await page.getByRole('button').filter({has:page.getByRole('heading',{name:tip.name,exact:true})}).click();await page.getByRole('button',{name:'Buy Tip',exact:true}).click();
- await guide.getByRole('button',{name:'Equipment checked'}).click();
+ await page.getByRole('button',{name:'Open first-week guide',exact:true}).click();await guide.getByRole('button',{name:'Equipment checked'}).click();
  await expect(guide).toContainText('Choose and enter an event');
  const equipped=await readCareerSave(page);const event=getNextEligibleTournament(equipped)!;expect(event).toBeTruthy();
  await guide.getByRole('link',{name:'Open calendar',exact:true}).click();await navigate(page,'/calendar?tournament='+event.id);
  await page.getByRole('button',{name:'Enter Tournament',exact:true}).click();
- await expect(guide).toContainText('Arrange travel and accommodation');await guide.getByRole('link',{name:'Open travel',exact:true}).click();
+ await page.getByRole('button',{name:'Open first-week guide',exact:true}).click();await expect(guide).toContainText('Arrange travel and accommodation');await guide.getByRole('link',{name:'Open travel',exact:true}).click();
  await page.getByRole('button',{name:'Confirm Travel',exact:true}).click();await page.getByRole('button',{name:'Confirm plan',exact:true}).click();
- await guide.getByRole('link',{name:'Open Tournament Hub',exact:true}).click();
+ await page.getByRole('button',{name:'Open first-week guide',exact:true}).click();await guide.getByRole('link',{name:'Open Tournament Hub',exact:true}).click();
  await expect(page).toHaveURL('/tournaments/hub');await expect(page.getByText('Next Match ·',{exact:false}).first()).toBeVisible();
  const advance=page.getByRole('button',{name:'Advance to Tournament',exact:true});if(await advance.isVisible())await advance.click();
  await page.getByRole('button',{name:'Quick Sim',exact:true}).click();await expect(page.getByRole('heading',{name:'Match Review',exact:true})).toBeVisible();

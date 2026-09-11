@@ -1,3 +1,4 @@
+import { resolveTestDecisions } from '../../test-support/resolveTestDecisions';
 import { describe, expect, it } from 'vitest';
 import { createChampionshipDraw, groupsInRound, groupTable, applyGroupResult, nextGroupFixture, resolveChampionshipStage, championshipEarnings, fixtureComplete, groupFrameOrder } from './championshipLeague';
 import { createStarterState, enterTournamentState, bookTravelState, confirmTournamentPreparationState, startLiveMatchState, finalizeLiveMatch, repairGameState, simulateTournamentMatchState, processRankingCalendar, advanceLiveVisit } from '../hooks/useGameState';
@@ -73,6 +74,7 @@ describe('Championship League groups',()=>{
   it('lets a player win all nine group games and the final with one title and correct earnings',()=>{
     const fixture=leagueFixture(); const event=fixture.event; let state=fixture.state;
     for(let i=0;i<10;i++) {
+      state=resolveTestDecisions(state);
       state=startLiveMatchState(state,event.id);
       expect(state.liveMatch?.status).toBe('In Progress');
       state=finalizeLiveMatch(state,{...state.liveMatch!,playerFrames:3,opponentFrames:0,status:'Completed'});
@@ -102,6 +104,7 @@ describe('Championship League groups',()=>{
   it('finishing with a win does not qualify a player who lost their first two group games',()=>{
     const fixture=leagueFixture(), event=fixture.event; let state=fixture.state;
     for(let i=0;i<3;i++) {
+      state=resolveTestDecisions(state);
       state=startLiveMatchState(state,event.id);
       state=finalizeLiveMatch(state,{...state.liveMatch!,playerFrames:i===2?3:0,opponentFrames:i===2?0:3,status:'Completed'});
     }

@@ -37,6 +37,7 @@ export function sponsorMarketProfile(state: GameState) {
 }
 
 export function seasonalSponsorBlocker(state: GameState, offer: SponsorOfferCard): string | null {
+  if(state.careerSystems.lateCareer.retired) return 'Retired players cannot sign new playing sponsorships. Existing signed terms continue until expiry.';
   if(!offer.seasonal) return null;
   if(offer.seasonal.season!==state.season) return 'This offer expired at the end of '+offer.seasonal.season+'. Review the current season’s approaches.';
   if(sponsorMarketProfile(state).tier<offer.seasonal.requiredTier) return 'This company requires '+tierNames[offer.seasonal.requiredTier].toLowerCase()+' exposure. Your current tour, ranking or reputation no longer meets its offer requirements.';

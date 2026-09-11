@@ -12,7 +12,7 @@ import { GroupFixtures } from '../components/tournaments/GroupFixtures';
 import { isGroupDraw } from '../game/championshipLeague';
 import { useNavigate } from "react-router-dom";
 import { tournamentCommitmentConflict } from "../game/careerDepth/commitments";
-import { CareerDecisionNotice, RivalryContext } from "../components/career/CareerDepthPanels";
+import { RivalryContext } from "../components/career/CareerDepthPanels";
 import { VenueScoutingPanel } from '../components/career/RealismPanels';
 import {
   Crown,
@@ -167,8 +167,7 @@ export function TournamentHubPage() {
   const nextMatchStageLabel = tournamentEntered
     ? (activeRound ?? "Awaiting Draw")
     : "Awaiting Draw";
-  const advancementDecision = tournamentEntered && equipmentReady && playability?.travelBooked && playability.preparationConfirmed && playability.daysUntilStart > 0
-    ? pendingStory(gameState) : undefined;
+  const advancementDecision = pendingStory(gameState);
   const primaryActionLabel = entryBlocker ? entryBlocker.label : advancementDecision
     ? "Resolve Inbox Decision"
     : entryConflict
@@ -249,7 +248,7 @@ export function TournamentHubPage() {
     ).sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
     return (
       <div className="space-y-4">
-        <CareerDecisionNotice />
+
         <section className="rounded-xl border border-border bg-surface p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-green-400">Tournament Hub</p>
           <h1 className="mt-3 text-2xl font-bold text-white">No eligible tournament</h1>
@@ -270,7 +269,7 @@ export function TournamentHubPage() {
 
   return (
     <div className="relative flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-auto xl:p-1.5">
-      <CareerDecisionNotice />
+
       {activeTournament.legacyEntryHonoured && <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">Your previously accepted entry has been restored after a save rules update. This exception applies to this event only; future World Championship entries use the ranking cutoff and qualifying results.</p>}
       {isMajorEvent ? (
         <div
@@ -504,7 +503,7 @@ export function TournamentHubPage() {
               </button>
             </div>
             <div className="min-h-0 flex-1 p-2.5">
-              <>{groupCompetition ? <GroupFixtures key={activeRound} rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={activeRound} /> : <TournamentBracket
+              <>{groupCompetition ? <GroupFixtures tournament={activeTournament ?? null} key={activeRound} rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={activeRound} /> : <TournamentBracket
                 rounds={drawData.bracket}
                 playerName={gameState.player.fullName}
                 currentRound={activeRound}

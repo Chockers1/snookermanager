@@ -1,3 +1,4 @@
+import { resolveTestDecisions } from '../../test-support/resolveTestDecisions';
 import { describe, expect, it } from 'vitest';
 import { detailedTournamentCatalog } from '../data/pathwayCalendarData';
 import { createGroupCompetition, applyGroupCompetitionResult, resolveGroupCompetitionStage, groupCompetitionChampion, roundRobin, settleAmateurGroupTies } from './groupCompetition';
@@ -68,7 +69,8 @@ describe('all group competition routes', () => {
     state = confirmTournamentPreparationState(state, event.id, 'balanced', getDefaultPreparationAllocations(), []);
     state = reconcileRealism({ ...state, currentDate: event.startDate });
     for (let i = 0; i < 16; i++) {
-      state = startLiveMatchState(state, event.id);
+      state = resolveTestDecisions(state);
+    state = startLiveMatchState(state, event.id);
       expect(state.liveMatch?.bestOf, state.tournamentProgress.currentRound ?? 'finished').toBe(5);
       state = finalizeLiveMatch(state, { ...state.liveMatch!, playerFrames: 3, opponentFrames: 0, status: 'Completed' });
     }

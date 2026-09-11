@@ -11,6 +11,7 @@ state.seasonReview=null;
 const player=[...state.worldPlayers].sort((a,b)=>b.seasons.length-a.seasons.length)[0];
 const out=path.resolve('artifacts/release-readiness',label);fs.mkdirSync(out,{recursive:true});
 const payload=encodeCareerSave(state);
+const archiveEntries: Array<[string,string]> = process.env.PERFORMANCE_ARCHIVE_BUNDLE ? JSON.parse(fs.readFileSync(process.env.PERFORMANCE_ARCHIVE_BUNDLE,'utf8')).entries : [];
 let browser:Awaited<ReturnType<typeof chromium.launch>>|undefined;const samples:{rate:number;pass:number;action:string;ms:number}[]=[];const errors:string[]=[];
 const clickTime=async(locator:Locator)=>locator.evaluate(el=>new Promise<number>(resolve=>{const start=performance.now();(el as HTMLElement).click();requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(performance.now()-start)));}));
 async function route(page:Page,url:string,heading:string){const start=Date.now();await page.evaluate(url=>{history.pushState({},'',url);dispatchEvent(new PopStateEvent('popstate'));},url);if(heading==='Inbox')await page.getByLabel('Inbox messages').waitFor();else await page.getByRole('heading',{name:heading,exact:true}).first().waitFor();await page.evaluate(()=>new Promise<void>(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r()))));return Date.now()-start;}
@@ -22,11 +23,11 @@ for(const rate of (process.env.PERFORMANCE_RATES??'1,4').split(',').map(Number))
  const cdp=await context.newCDPSession(page);await cdp.send('Emulation.setCPUThrottlingRate',{rate});
  await page.route('**/performance-storage.html',r=>r.fulfill({contentType:'text/html',body:'<title>Isolated performance storage</title>'}));
  await page.goto(base+'/performance-storage.html');
- await page.evaluate(async payload=>{
+ await page.evaluate(async ({payload,archiveEntries})=>{
   const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open('snooker-career-saves-v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('entries');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
-  await new Promise<void>((resolve,reject)=>{const tx=db.transaction('entries','readwrite');tx.objectStore('entries').put(payload,'snooker-career-manager-state-v1');tx.oncomplete=()=>resolve();tx.onabort=()=>reject(tx.error)});db.close();
- },payload);
- const record=(action:string,ms:number)=>{samples.push({rate,pass,action,ms:Math.round(ms)});fs.writeFileSync(path.join(out,'samples.json'),JSON.stringify({samples,errors},null,2));console.log(label,rate,pass,action,Math.round(ms));};
+  await new Promise<void>((resolve,reject)=>{const tx=db.transaction('entries','readwrite');tx.objectStore('entries').put(payload,'snooker-career-manager-state-v1');for(const [key,value] of archiveEntries)tx.objectStore('entries').put(value,key);tx.oncomplete=()=>resolve();tx.onabort=()=>reject(tx.error)});db.close();
+ },{payload,archiveEntries});
+ const record=(action:string,ms:number)=>{samples.push({rate,pass,action,ms:Math.round(ms)});console.log(label,rate,pass,action,Math.round(ms));};
  if(process.env.PERFORMANCE_PROFILE==='1'){await cdp.send('Profiler.enable');await cdp.send('Profiler.start');}
  const cold=Date.now();await page.goto(base);await page.getByRole('button',{name:/Continue Career/}).waitFor();record('Cold launcher ready',Date.now()-cold);const launch=Date.now();await page.getByRole('button',{name:/Continue Career/}).click();await page.locator('#main-content').waitFor();await page.getByText('Your career starts here.',{exact:true}).waitFor({state:'hidden'});await page.getByText('Upcoming & Recent Results',{exact:true}).waitFor();await page.evaluate(()=>new Promise<void>(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r()))));record('Continue saved career',Date.now()-launch);record('Cold navigation to career ready',Date.now()-cold);
  if(process.env.PERFORMANCE_PROFILE==='1'){const {profile}=await cdp.send('Profiler.stop');fs.writeFileSync(path.join(out,`cold-${rate}-${pass}.cpuprofile`),JSON.stringify(profile));}
@@ -50,9 +51,9 @@ for(const rate of (process.env.PERFORMANCE_RATES??'1,4').split(',').map(Number))
  for(const name of ['One-Year Ranking','Youth Ranking','Amateur Ranking','Q Tour Ranking','Q School OOM','Senior Ranking','World Ranking'])record(name+' tab',await clickTime(page.getByRole('button',{name,exact:true})));
  record('Open qualification races',await clickTime(page.getByRole('button',{name:/Qualification races · defending earnings/})));
  await page.getByRole('dialog',{name:'Qualification and tour survival'}).waitFor();await page.getByRole('button',{name:'Close editor',exact:true}).click();
- record('Open player history',await route(page,'/players/'+encodeURIComponent(player.id),player.playerName));
+ const profileStart=Date.now();await route(page,'/players/'+encodeURIComponent(player.id),player.playerName);await page.getByText('Loading saved history…',{exact:false}).waitFor({state:'hidden'});record('Open player history',Date.now()-profileStart);
  const select=page.getByLabel('Player history season');const values=await select.locator('option').evaluateAll(options=>options.map(o=>(o as HTMLOptionElement).value));
- if(values.length>1){const start=Date.now();await select.selectOption(values.at(-1)!);await page.evaluate(()=>new Promise<void>(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r()))));record('Select oldest player season',Date.now()-start);}
+ if(values.length>1){const start=Date.now();await select.selectOption(values.at(-1)!);await page.getByText('Loading saved history…',{exact:false}).waitFor({state:'hidden'});await page.evaluate(()=>new Promise<void>(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r()))));record('Select oldest player season',Date.now()-start);}
  if(rate===1&&pass===1)await page.screenshot({path:path.join(out,'player-history.png'),fullPage:true});
  if(process.env.PERFORMANCE_LIFE_PANELS==='1'){
   record('Open team records',await route(page,'/career/teams','Club & national pairs'));

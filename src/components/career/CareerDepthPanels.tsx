@@ -37,7 +37,7 @@ export function CareerDisclosure({ summary, title, children, onOpenChange }: { s
 export function CareerDecisionNotice() {
   const { gameState } = useGame();
   const story = pendingStory(gameState);
-  return story ? <Link to={`/inbox?message=${encodeURIComponent(story.id)}`} className="block shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">Decision waiting: {story.title} · Open Inbox</Link> : null;
+  return story ? <Link to={`/inbox?message=${encodeURIComponent(story.id)}`} className="block shrink-0 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">Decision required: {story.title} · Career actions paused · Open Inbox</Link> : null;
 }
 
 export function StoryDecisionPanel({ messageId }: { messageId: string }) {

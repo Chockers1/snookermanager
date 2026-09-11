@@ -17,14 +17,17 @@ export function SaveManagerPage() {
     setMessage(`Created and switched to “${slot.name}”.`)
   }
 
-  function downloadSave() {
-    const url = URL.createObjectURL(new Blob([exportCareer()], { type: 'application/json' }))
+  async function downloadSave() {
+    setMessage('Preparing a complete backup, including historical seasons…');
+    try {
+    const url = URL.createObjectURL(new Blob([await exportCareer()], { type: 'application/json' }))
     const link = document.createElement('a')
     link.href = url
     link.download = `snooker-career-${gameState.player.fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.json`
     link.click()
     URL.revokeObjectURL(url)
-    setMessage('Downloaded a portable career save.')
+    setMessage('Downloaded a portable career save including all archived history.')
+    } catch(error) { setMessage(error instanceof Error ? error.message : 'Export failed. Your save is unchanged.') }
   }
 
   async function importFile(file: File | undefined) {

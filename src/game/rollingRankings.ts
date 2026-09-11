@@ -1,3 +1,4 @@
+import { indexedEvents } from './resultIndex';
 import { groupCompetitionAward } from './groupCompetition';
 import { withCpuBreakRecords, uniqueRankingRows } from './worldIntegrity';
 import { isChampionshipLeague, championshipEarnings } from './championshipLeague';
@@ -11,6 +12,8 @@ export type RankingEarning = {
 };
 export type RankingRevision = { date: string; world: Record<string, number>; oneYear: Record<string, number> };
 export type RankedEvent = {
+  archived?: boolean;
+  archivedQualifiers?: string[];
   key: string; tournamentId: string; name: string; season: string; completedOn: string;
   ranking: boolean; bracket: BracketRound[]; applied: boolean;
   eventType?: Tournament['type'];
@@ -55,7 +58,7 @@ export function recordedMajorQualifiers(state: Pick<GameState, 'rollingRankings'
   const id = resolveTournamentFormat(t).id;
   const pattern = id === 'ukMajor' ? /uk (championship|major).*qualif/i : id === 'worldChampionshipMain' ? /world championship.*qualif/i : id === 'internationalChampionship' ? /international championship.*qualif/i : id === 'worldOpen' ? /world open.*qualif/i : id === 'homeNationsMain' ? new RegExp(t.name + '.*qualif', 'i') : null;
   if (!pattern) return null;
-  const event = Object.values(state.rollingRankings?.events ?? {}).filter(e => (!state.season || e.season === state.season) && e.completedOn <= t.startDate && pattern.test(e.name)).sort((a, b) => b.completedOn.localeCompare(a.completedOn))[0];
+  const event = indexedEvents(state.rollingRankings,state.season).filter(e => (!state.season || e.season === state.season) && e.completedOn <= t.startDate && pattern.test(e.name)).sort((a, b) => b.completedOn.localeCompare(a.completedOn))[0];
   return event ? qualifiedNames(event.bracket) : null;
 }
 /** Qualifying and its main draw must use one snapshot before qualifying begins. */
@@ -194,7 +197,7 @@ export function rebuildRollingRankings(state: GameState, date: string, revision 
   const tables = { ...state.competitionTables, world: rank(state.competitionTables.world, world, 'world', ledger.movementWorld), oneYear: rank(state.competitionTables.oneYear, season, 'oneYear', ledger.movementOneYear) };
   const next = { ...state, competitionTables: tables };
   const revisions = revision ? [...ledger.revisions.filter(r => r.date !== date), snapshot(next, date)] : ledger.revisions;
-  return { ...next, rollingRankings: { ...ledger, revisions, movementWorld: Object.fromEntries(tables.world.map(r => [r.playerName, r.movement])), movementOneYear: Object.fromEntries(tables.oneYear.map(r => [r.playerName, r.movement])), events: Object.fromEntries(Object.entries(ledger.events).map(([k, e]) => [k, e.completedOn <= date ? { ...e, applied: true } : e])) } };
+  return { ...next, rollingRankings: { ...ledger, revisions, movementWorld: Object.fromEntries(tables.world.map(r => [r.playerName, r.movement])), movementOneYear: Object.fromEntries(tables.oneYear.map(r => [r.playerName, r.movement])), events: Object.values(ledger.events).some(e=>e.completedOn<=date&&!e.applied)?Object.fromEntries(Object.entries(ledger.events).map(([k, e]) => [k, e.completedOn <= date && !e.applied ? { ...e, applied: true } : e])):ledger.events } };
 }
 
 /** Bind expiry to the corresponding event in the newly authored calendar, when
@@ -225,8 +228,8 @@ export function compactEventOutcomes(bracket: BracketRound[]) {
   }
   return [...outcomes.values()];
 }
-/** Keep deduplication receipts indefinitely, but not decades of full CPU brackets.
- * Human tournament history is archived separately by the career system. */
+/** Expired ranking calculations may be trimmed, but full event records remain
+ * until the asynchronous archive has durably committed them. */
 export function compactRankingLedger(state: GameState): GameState {
   const ledger = state.rollingRankings;
   if (!ledger) return state;
@@ -234,7 +237,7 @@ export function compactRankingLedger(state: GameState): GameState {
   const currentKeys = new Set(state.tournaments.map(rankingEventKey));
   return { ...state, rollingRankings: { ...ledger,
     earnings: ledger.earnings.filter(e => e.expiresOn > state.currentDate),
-    events: Object.fromEntries(Object.entries(ledger.events).map(([key, e]) => [key, e.completedOn < oldest ? { ...e, outcomes: e.outcomes ?? compactEventOutcomes(e.bracket), bracket: [] } : e])),
+    events: ledger.events,
     revisions: ledger.revisions.filter((r, i) => i === 0 || r.date >= oldest),
     seedings: Object.fromEntries(Object.entries(ledger.seedings).filter(([key]) => currentKeys.has(key))),
   } };

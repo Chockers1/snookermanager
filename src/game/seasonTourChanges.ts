@@ -42,7 +42,7 @@ export function createSeasonTourChanges(after: GameState, before?: GameState): S
     const newcomer=before ? !knownNames.has(p.playerName) : p.id.startsWith('recruit-'+after.season.slice(0,4)+'-');
     const qSchoolRenewal=p.cardSource==='Q School' && p.currentYear===1 && old?.hasTourCard && (old.cardSource!=='Q School' || old.expiresAfterSeason!==p.expiresAfterSeason);
     if(p.hasTourCard && (qSchoolRenewal || (old ? !old.hasTourCard : before && newcomer))) {
-      const returning=p.seasons.some(s=>s.season<previousSeason && s.hasTourCard);
+      const returning=after.historyArchive?.formerProfessionals.includes(p.id) || p.seasons.some(s=>s.season<previousSeason && s.hasTourCard);
       add(p.cardSource==='Q School'?'qSchool':'promotions',p,(qSchoolRenewal?'Requalifies via ':returning?'Returns via ':'Tour card via ')+(p.cardSource??'recorded qualification'));
     }
     if(newcomer && !p.hasTourCard) {

@@ -1,3 +1,4 @@
+import {currentPublishedRanking} from '../../game/rankingPresentation';
 import { tournamentEntryBlocker, advancementBlocker } from '../../hooks/useGameState';
 import { PlayerLink } from '../game/PlayerLink';
 import {
@@ -43,11 +44,8 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
   const [careerMenuOpen, setCareerMenuOpen] = useState(false);
   const [eventMenuOpen, setEventMenuOpen] = useState(false);
   const isDashboard = location.pathname === "/";
-  const playerRankingRow = gameState.rankings.find(
-    (row) => row.playerName === player.fullName,
-  );
-  const currentRanking =
-    playerRankingRow?.ranking ?? player.worldRanking ?? player.amateurRanking;
+  const playerRankingRow = currentPublishedRanking(gameState);
+  const currentRanking = playerRankingRow?.ranking;
   const rankingMovement = playerRankingRow?.movement ?? 0;
   const reviewPending = Boolean(gameState.seasonReview?.pending);
   const nextEvent = reviewPending ? undefined : getNextEligibleTournament(gameState);
@@ -208,7 +206,7 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
           {player.rankingLabel}
         </span>
         <span className="text-base font-bold text-white">
-          {currentRanking ?? "-"}
+          {currentRanking ?? "Unranked"}
         </span>
         {rankingMovement > 0 ? (
           <span className="flex items-center text-[10px] text-green-400">

@@ -1,8 +1,10 @@
+import { CareerDecisionNotice } from '../career/CareerDepthPanels';
+import { REQUIRED_DECISION_EVENT } from '../../game/requiredDecision';
 import { FirstWeekGuide } from '../game/FirstWeekGuide';
 import { seasonWeekLabel } from "../../game/seasonClock";
 import { SeasonReviewPopup } from '../game/SeasonReviewPopup';
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { useGame } from "../../context/useGame";
 import { Sidebar } from "./Sidebar";
@@ -15,6 +17,12 @@ type AppShellProps = {
 export function AppShell({ children }: AppShellProps) {
   const { gameState, saveWarning, savePending } = useGame();
   const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const showDecision = (event: Event) => navigate((event as CustomEvent<string>).detail);
+    window.addEventListener(REQUIRED_DECISION_EVENT, showDecision);
+    return () => window.removeEventListener(REQUIRED_DECISION_EVENT, showDecision);
+  }, [navigate]);
   const immersiveRoute = location.pathname === "/match/live";
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [desktopNavigation, setDesktopNavigation] = useState(() => window.matchMedia('(min-width: 1280px)').matches);
@@ -36,6 +44,7 @@ export function AppShell({ children }: AppShellProps) {
   if (immersiveRoute) {
     return (
       <div className="h-screen min-w-0 overflow-auto bg-background text-white">
+        <CareerDecisionNotice />
         {children}
       </div>
     );
@@ -95,13 +104,14 @@ export function AppShell({ children }: AppShellProps) {
           <Menu className="h-5 w-5" />
         </button>
         <TopStatusBar player={gameState.player} />
+        <FirstWeekGuide />
+        <CareerDecisionNotice />
         {saveWarning && <Link to="/saves" role="alert" className="shrink-0 bg-amber-950 px-4 py-2 text-xs text-amber-200">{saveWarning} Open Save Manager →</Link>}
         <main
           id="main-content"
           tabIndex={-1}
           className="scrollbar-thin min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-2.5 sm:p-4 xl:p-6"
         >
-          <FirstWeekGuide />
           {children}
         </main>
         <div

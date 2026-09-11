@@ -7,7 +7,7 @@ import { MatchReviewPanel } from "../components/career/MatchInsightPanels";
 import { GroupFixtures } from '../components/tournaments/GroupFixtures';
 import { isGroupDraw } from '../game/championshipLeague';
 import { useNavigate } from "react-router-dom";
-import { RivalryContext, CareerDecisionNotice } from "../components/career/CareerDepthPanels";
+import { RivalryContext } from "../components/career/CareerDepthPanels";
 import {
   Award,
   ChevronRight,
@@ -221,7 +221,7 @@ export function MatchResultPage() {
   return (
     <div className="space-y-3 pb-8">
       {victory && <VictoryCelebration key={victory.key} victory={victory} />}
-      <CareerDecisionNotice />
+
       <FormRecoveryPanel />
       <RivalryContext opponent={latestMatch.opponentName} />
       {tournamentContinues && <BetweenMatchPanel tournamentId={latestMatch.tournamentId} />}
@@ -247,7 +247,7 @@ export function MatchResultPage() {
         </button>
       </div>
 
-      {groupCompetition && <div className="card max-h-[34rem] overflow-y-auto p-3"><GroupFixtures key={latestMatch.id} rounds={gameState.tournamentProgress.draw} playerName={playerName} currentRound={latestMatch.round} /></div>}
+      {groupCompetition && <div className="card max-h-[34rem] overflow-y-auto p-3"><GroupFixtures tournament={latestTournament ?? null} key={latestMatch.id} rounds={gameState.tournamentProgress.draw} playerName={playerName} currentRound={latestMatch.round} /></div>}
       <section
         className={`grid overflow-hidden rounded-xl border bg-surface md:grid-cols-[1fr_190px_1fr] ${drawn ? "border-amber-500/30" : playerWon ? "border-green-600/30" : "border-red-600/30"}`}
       >

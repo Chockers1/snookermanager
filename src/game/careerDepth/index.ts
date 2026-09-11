@@ -1,3 +1,4 @@
+import { blockForRequiredDecision } from '../requiredDecision';
 import { initializeSeasonLife, reconcileSeasonLife, seasonLifeAction, lifeBoundary } from '../seasonLife';
 import { getTournamentEntryAccess } from '../../hooks/useGameState';
 import { entryReminderDates, reconcileEntryReminders } from '../tournamentEntry';
@@ -40,6 +41,8 @@ export function reconcileCareerDepth(state: GameState): GameState {
   return next;
 }
 export function careerDepthAction(state: GameState, action: CareerDepthAction): GameState {
+  const blocked = blockForRequiredDecision(state);
+  if (blocked && action.type !== 'decision') return blocked;
   state = initializeCareerDepth(state);
   if (action.type.startsWith('life-')) return seasonLifeAction(state, action as import('../seasonLife/types').SeasonLifeAction);
   const d = depthOf(state);

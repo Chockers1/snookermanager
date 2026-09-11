@@ -1,0 +1,28 @@
+import {expect,test} from '@playwright/test';
+import {createNewCareerState} from '../src/hooks/useGameState';
+import {ACTIVE_SAVE_KEY,encodeCareerSave} from '../src/game/saveStorage';
+import {readCareerSave} from './read-career-save';
+for(const width of [1366,390])test('guide docks, reopens, saves progress and stays within the screen at '+width,async({page})=>{
+ const state=createNewCareerState();delete state.firstWeekGuide!.minimized;
+ await page.setViewportSize({width,height:844});
+ await page.addInitScript(({key,value})=>{if(!sessionStorage.getItem('popup-fixture')){localStorage.setItem(key,value);sessionStorage.setItem('popup-fixture','1')}},{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
+ await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+ const panel=page.getByRole('region',{name:'First week guide'}),launcher=page.getByRole('button',{name:'Open first-week guide',exact:true});
+ await expect(panel).toHaveCount(0);await expect(launcher).toBeVisible();
+ const start=(await page.locator('#main-content').boundingBox())!;
+ await launcher.focus();await page.keyboard.press('Enter');await expect(panel).toBeVisible();
+ expect(await page.locator('#main-content').boundingBox()).toEqual(start);
+ await expect(panel.getByRole('list',{name:'Six first-week steps'}).getByRole('button')).toHaveCount(6);
+ await panel.getByRole('button',{name:/Arrange travel and accommodation To do/}).click();await expect(panel.getByRole('heading',{name:'Arrange travel and accommodation'})).toBeVisible();
+ await page.keyboard.press('Escape');await expect(panel).toHaveCount(0);await expect(launcher).toBeFocused();
+ await readCareerSave(page);await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();await expect(panel).toHaveCount(0);await launcher.click();
+ await panel.getByRole('button',{name:'Skip this explanation'}).click();await expect(panel.getByRole('heading',{name:'Check your match equipment'})).toBeVisible();
+ await panel.getByRole('link',{name:'Check equipment',exact:true}).click();await expect(panel).toHaveCount(0);await expect(launcher).toBeVisible();
+ expect((await readCareerSave(page)).firstWeekGuide?.skipped).toContain('training');
+ await page.evaluate(()=>{history.pushState({},'','/settings');dispatchEvent(new PopStateEvent('popstate'))});await page.getByLabel('Text size',{exact:true}).selectOption('130');await launcher.click();
+ const box=(await panel.boundingBox())!;expect(box.x).toBeGreaterThanOrEqual(0);expect(box.y).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);expect(box.y+box.height).toBeLessThanOrEqual(844);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await page.screenshot({path:`artifacts/career-v012/guide-popup-${width}.png`,fullPage:true});
+ await panel.getByRole('button',{name:'Dismiss guide'}).click();await expect(panel).toHaveCount(0);await expect(launcher).toHaveCount(0);
+ await page.getByRole('button',{name:'Show first-week guide',exact:true}).click();await expect(panel).toBeVisible();
+});

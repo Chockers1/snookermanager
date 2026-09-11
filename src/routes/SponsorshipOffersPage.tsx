@@ -1,3 +1,4 @@
+import { sponsorRenewalCeiling } from '../game/sponsorEconomy';
 import { seasonalSponsorBlocker, sponsorMarketProfile } from '../game/sponsorMarket'
 import type { SponsorOfferCard } from '../types/game'
 import { SponsorPerformancePanel } from '../components/game/SponsorPerformancePanel'
@@ -108,8 +109,8 @@ export function SponsorshipOffersPage() {
               <div className="mt-1 flex justify-between text-xs"><span className="text-gray-400">Slots Used</span><span className="text-white">{gameState.sponsors.length} / {sponsorCapacity}</span></div>
               {gameState.sponsors.filter((sponsor) => sponsor.renewalStatus === 'Offered').map((sponsor) => (
                 <div key={sponsor.id} className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[10px]">
-                  <p className="font-semibold text-amber-300">{sponsor.name} renewal: {formatMoney(sponsor.renewalOfferValue ?? sponsor.monthlyValue)}/mo</p>
-                  <div className="mt-2 flex flex-wrap gap-2"><button type="button" className="btn-primary px-2 py-1 text-[10px]" onClick={() => renewSponsor(sponsor.id)}>Renew 12 months</button><button type="button" className="btn-secondary px-2 py-1 text-[10px]" onClick={() => renegotiateSponsor(sponsor.id)}>Renegotiate</button><button type="button" className="btn-secondary px-2 py-1 text-[10px]" onClick={() => declineSponsorRenewal(sponsor.id)}>Decline</button></div>
+                  <p className="font-semibold text-amber-300">{sponsor.name} renewal: {formatMoney(Math.min(sponsor.renewalOfferValue ?? sponsor.monthlyValue,sponsorRenewalCeiling(gameState)))}/mo</p>
+                  <p className="mt-1 text-gray-300">Current exposure limits new terms to {formatMoney(sponsorRenewalCeiling(gameState))}/month. Existing payments continue to expiry. One counter-offer per renewal; retired players receive no new contract.</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" className="btn-primary px-2 py-1 text-[10px]" disabled={sponsorRenewalCeiling(gameState)===0} onClick={() => renewSponsor(sponsor.id)}>Renew 12 months</button><button type="button" className="btn-secondary px-2 py-1 text-[10px]" disabled={sponsor.renewalCountered || sponsorRenewalCeiling(gameState)===0} onClick={() => renegotiateSponsor(sponsor.id)}>Renegotiate</button><button type="button" className="btn-secondary px-2 py-1 text-[10px]" onClick={() => declineSponsorRenewal(sponsor.id)}>Decline</button></div>
                 </div>
               ))}
             </div>

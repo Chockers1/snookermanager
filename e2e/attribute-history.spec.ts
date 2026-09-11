@@ -35,3 +35,36 @@ test('recover year-one attributes from an older save without restoring old gamep
   const after=await readCareerSave(page);
   expect({...after,attributeHistory:undefined}).toEqual({...before,attributeHistory:undefined});
 });
+
+
+for (const width of [1366,390]) test('fractional attributes stay at two decimals in every view at '+width+'px',async({page})=>{
+ const state=createStarterState();state.attributes.technical['Long Potting']=47;state.attributes.technical['Safety Play']=34;state.attributes.physical['Shoulder Health']=99.98;state.attributes.mental.Focus=90;
+ state.attributeHistory=initialAttributeHistory(state);
+ state.attributes.technical['Long Potting']=47.11653333333334;state.attributes.technical['Safety Play']=34.03986666666667;state.attributes.physical['Shoulder Health']=100;state.attributes.mental.Focus=90.0828;
+ await page.setViewportSize({width,height:900});
+ await page.addInitScript(({key,value})=>{if(!sessionStorage.getItem('fraction-fixture')){localStorage.setItem(key,value);sessionStorage.setItem('fraction-fixture','1')}},{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
+ await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await page.evaluate(()=>{history.pushState({},'','/player/attributes');dispatchEvent(new PopStateEvent('popstate'))});
+ for(const view of ['Grouped','All']){
+  await page.getByRole('button',{name:view,exact:true}).click();
+  await expect(page.getByTestId('attribute-Long Potting').getByText('47.12',{exact:true})).toBeVisible();
+  await expect(page.getByTestId('attribute-Long Potting').getByText('+0.12',{exact:true})).toBeVisible();
+  await expect(page.getByTestId('attribute-Safety Play').getByText('+0.04',{exact:true})).toBeVisible();
+  await expect(page.getByText(/\+0.26 gained/)).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Strengths',exact:true}).locator('..').getByText('100.00',{exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Development Gaps',exact:true}).locator('..').getByText('34.04',{exact:true})).toBeVisible();
+  expect(await page.locator('#main-content').innerText()).not.toMatch(/\d+\.\d{3,}/);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ }
+ const saved=await readCareerSave(page);expect(saved.attributes.technical['Long Potting']).toBe(47.11653333333334);
+ await page.screenshot({path:`artifacts/career-v012/attributes-decimals-${width}.png`,fullPage:true});
+ await page.evaluate(()=>{history.pushState({},'','/');dispatchEvent(new PopStateEvent('popstate'))});
+ const training=page.getByRole('button',{name:/Training Week Overview/});
+ const summary=page.getByRole('button',{name:/Attributes Summary/});
+ await expect(training.getByText('47.12',{exact:true})).toBeVisible();
+ await expect(summary.getByText('90.08',{exact:true})).toBeVisible();
+ expect(await training.innerText()).not.toMatch(/\d+\.\d{3,}/);
+ expect(await summary.innerText()).not.toMatch(/\d+\.\d{3,}/);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await page.screenshot({path:`artifacts/career-v012/dashboard-decimals-${width}.png`,fullPage:true});
+
+});

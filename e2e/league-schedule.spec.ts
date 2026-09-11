@@ -1,0 +1,25 @@
+import { resolveTestDecisions } from '../test-support/resolveTestDecisions';
+import { expect,test } from '@playwright/test';
+import { leagueFixture } from '../test-support/leagueFixture';
+import { simulateTournamentMatchState } from '../src/hooks/useGameState';
+import { ACTIVE_SAVE_KEY,encodeCareerSave } from '../src/game/saveStorage';
+import { plusDays } from '../src/game/careerDepth/shared';
+import { readCareerSave } from './read-career-save';
+for(const width of [1366,390])test('league dates and overnight transition survive reload at '+width,async({page})=>{
+ const {state: initial,event}=leagueFixture();let state=initial;state.firstWeekGuide!.dismissed=true;
+ for(let i=0;i<3;i++)state=resolveTestDecisions(simulateTournamentMatchState(state,event.id));
+ await page.setViewportSize({width,height:900});
+ await page.addInitScript(({key,value})=>{if(!sessionStorage.getItem('league-dates')){localStorage.setItem(key,value);sessionStorage.setItem('league-dates','1')}},{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
+ await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.locator('#main-content')).toBeVisible();
+ await page.evaluate(()=>{history.pushState({},'', '/tournaments/hub');dispatchEvent(new PopStateEvent('popstate'))});
+ const group=page.getByRole('region',{name:'Group standings and fixtures'});
+ await expect(group).toContainText('15 matches each');await expect(group).toContainText('Your next match: '+plusDays(event.startDate,1));
+ await expect(page.getByText(/1-day gap/)).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await page.screenshot({path:`artifacts/career-v012/league-schedule-${width}.png`,fullPage:true});
+ await page.getByRole('button',{name:'Quick Sim',exact:true}).click();
+ await expect.poll(async()=> (await readCareerSave(page)).currentDate).toBe(plusDays(event.startDate,1));
+ const after=await readCareerSave(page);expect(after.matches[0].playedOn).toBe(plusDays(event.startDate,1));
+ await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();
+ const reload=await readCareerSave(page);expect(reload.currentDate).toBe(after.currentDate);expect(reload.player.cash).toBe(after.player.cash);expect(reload.matches.map(m=>m.id)).toEqual(after.matches.map(m=>m.id));
+});

@@ -1,3 +1,7 @@
+import { EntryCriteriaPanel } from '../components/game/EntryCriteriaPanel'
+import { currentPublishedRanking } from '../game/rankingPresentation'
+import { pathwayAgeLimit } from '../game/pathwayRules'
+import { previewDifficulty } from '../game/matchPreviewPresentation'
 import { TournamentAtmosphere } from '../components/game/TournamentAtmosphere';
 import { PlayerLink } from '../components/game/PlayerLink';
 import { ObjectivesPanel, CoachAdvicePanel } from '../components/career/MatchInsightPanels'
@@ -27,7 +31,7 @@ import { ProgressBar } from '../components/ui/ProgressBar'
 import { useGame } from '../context/useGame'
 import { getTournamentPlayability } from '../hooks/useGameState'
 import { buildMatchPreviewData } from '../utils/liveRouteData'
-import { formatMoney, formatPercent } from '../utils/formatters'
+import { formatMoney, formatPercent, formatAttribute } from '../utils/formatters'
 
 const FRAME_PLANS = ['Attack', 'Balanced', 'Safety'] as const
 const MENTAL_FOCUS_OPTIONS = ['Composed', 'Confident', 'Counter'] as const
@@ -37,10 +41,6 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))
 }
 
-function getRankValue(rank: number | null | undefined) {
-  return rank ?? '-'
-}
-
 function getInitials(name: string) {
   return name
     .split(' ')
@@ -48,14 +48,6 @@ function getInitials(name: string) {
     .join('')
     .slice(0, 2)
     .toUpperCase()
-}
-
-function getDifficultyLabel(playerRank: number | null | undefined, opponentRank: number | undefined) {
-  if (!opponentRank || !playerRank) return 'Unknown test'
-  const edge = opponentRank - playerRank
-  if (edge >= 8) return 'Favourite'
-  if (edge >= -7) return 'Even match'
-  return 'Underdog test'
 }
 
 function getReadinessScore(confidence: number, fatigue: number, cueFamiliarity: number, pressureLevel: number) {
@@ -78,8 +70,8 @@ function getEdgeTone(edge: number | null) {
 
 function formatEdgeLabel(edge: number | null) {
   if (edge == null) return 'Scout estimate pending'
-  if (edge > 0) return `You +${edge}`
-  if (edge < 0) return `Opponent +${Math.abs(edge)}`
+  if (edge > 0) return `You +${formatAttribute(edge)}`
+  if (edge < 0) return `Opponent +${formatAttribute(Math.abs(edge))}`
   return 'Even matchup'
 }
 
@@ -121,15 +113,16 @@ export function MatchPreviewPage() {
     matchInfo,
     pressureLevel,
   } = buildMatchPreviewData(gameState)
-  const playerRank = gameState.player.amateurRanking ?? gameState.player.worldRanking
+  const playerRank = currentPublishedRanking(gameState)?.ranking
   const activeLiveMatch = gameState.liveMatch?.status === 'In Progress' ? gameState.liveMatch : null
   const playability = activeTournament ? getTournamentPlayability(gameState, activeTournament) : null
   const opponentName = nextOpponent?.playerName ?? 'Opponent TBD'
   const scouting = scoutingReport(gameState, opponentName)
   const estimateRange = (value: number | null | undefined) => value == null ? 'Unknown' : `${Math.max(1, Math.round(value / 5) * 5 - scouting.uncertainty)}–${Math.min(99, Math.round(value / 5) * 5 + scouting.uncertainty)}`
-  const opponentRank = nextOpponent?.ranking
+  const opponentProfile = gameState.worldPlayers.find(player => player.playerName === opponentName)
+  const ageLimit = activeTournament ? pathwayAgeLimit(activeTournament) : undefined
   const readinessScore = getReadinessScore(gameState.player.confidence, gameState.player.fatigue, cueFamiliarity, pressureLevel)
-  const difficultyLabel = getDifficultyLabel(playerRank, opponentRank)
+  const difficultyLabel = previewDifficulty(playerOverall, opponentProfile?.overallRating)
   const equipmentRows = [
     { label: 'Cue', name: currentCue?.name ?? 'No cue selected', condition: currentCueState?.condition ?? currentCue?.condition ?? 0 },
     { label: 'Chalk', name: currentChalk?.name ?? 'Standard chalk', condition: clamp(70 + (currentChalk?.consistency ?? 0) / 2, 0, 100) },
@@ -186,8 +179,8 @@ export function MatchPreviewPage() {
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <div className="card flex h-10 w-[96px] flex-col items-center justify-center text-center">
-            <p className="text-[9px] font-semibold uppercase text-gray-500">Difficulty</p>
-            <p className="text-xs font-bold text-green-400">{difficultyLabel}</p>
+            <p className="text-[9px] font-semibold uppercase text-gray-500">Ability comparison</p>
+            <p className="text-xs font-bold text-white">{difficultyLabel}</p>
           </div>
           <div className="card flex h-10 w-[82px] flex-col items-center justify-center text-center">
             <p className="text-[9px] font-semibold uppercase text-gray-500">Readiness</p>
@@ -235,7 +228,7 @@ export function MatchPreviewPage() {
               <h2 className="truncate text-lg font-bold text-white">{gameState.player.fullName}</h2>
               <p className="truncate text-[11px] text-gray-400">{gameState.player.careerStage} - {gameState.player.playingStyle}</p>
               <p className="mt-1.5 text-[11px] text-gray-400">
-                {gameState.player.rankingLabel} <span className="font-bold text-white">#{getRankValue(playerRank)}</span>
+                {gameState.player.rankingLabel} <span className="font-bold text-white">{playerRank == null ? 'Unranked' : `#${playerRank}`}</span>
                 <span className="mx-2 text-border">|</span>
                 Cash <span className="font-bold text-green-400">{formatMoney(gameState.player.cash)}</span>
               </p>
@@ -263,16 +256,16 @@ export function MatchPreviewPage() {
             </div>
             <div className="min-w-0">
               <h2 className="truncate text-lg font-bold text-white"><PlayerLink name={opponentName}/></h2>
-              <p className="truncate text-[11px] text-gray-400">Ranking band scout - {difficultyLabel}</p>
+              <p className="truncate text-[11px] text-gray-400">{opponentProfile ? `Age ${opponentProfile.age} · ${opponentProfile.hasTourCard ? 'Professional' : 'Off-tour player'}` : 'Player information unavailable'}</p>
               <p className="mt-1.5 text-[11px] text-gray-400">
-                Rank <span className="font-bold text-white">#{getRankValue(opponentRank)}</span>
+                <span className="font-bold text-white">{ageLimit ? `Under-${ageLimit} event · no professional cards` : 'Check event eligibility'}</span>
                 <span className="mx-2 text-border">|</span>
                 Scout <span className={`font-bold ${metricTone(scoutConfidence)}`}>{scoutConfidence}%</span>
               </p>
               <p className="mt-0.5 text-[11px] text-gray-400">
                 OVR <span className="font-bold text-white">{scouting.ability}</span>
                 <span className="mx-2 text-border">|</span>
-                <span className="text-amber-400">Estimated · {scouting.samples} observations</span>
+                <span className="text-amber-400">Public rating · {scouting.samples} observations</span>
               </p>
             </div>
           </div>
@@ -281,6 +274,7 @@ export function MatchPreviewPage() {
             <div className="border-x border-border"><p className="text-[10px] text-gray-400">Fatigue</p><p className={`text-[15px] font-bold ${metricTone(opponentFatigue, true)}`}>{formatPercent(opponentFatigue)}</p></div>
             <div><p className="text-[10px] text-gray-400">Pressure</p><p className={`text-[15px] font-bold ${metricTone(opponentPressure, true)}`}>{formatPercent(opponentPressure)}</p></div>
           </div>
+          {activeTournament && <div className="mt-2"><EntryCriteriaPanel event={activeTournament} compact/></div>}
         </div>
       </div>
 
@@ -312,7 +306,7 @@ export function MatchPreviewPage() {
                     <div key={trait.label} className="flex items-center gap-2">
                       <span className="w-24 shrink-0 truncate text-[11px] font-medium text-white">{trait.label}</span>
                       <div className="min-w-0 flex-1"><ProgressBar value={trait.value} compact /></div>
-                      <span className="w-8 shrink-0 text-right text-[11px] font-bold text-white">{trait.value}</span>
+                      <span className="w-12 shrink-0 text-right text-[11px] font-bold text-white">{formatAttribute(trait.value)}</span>
                     </div>
                   ))}
                 </div>
@@ -324,7 +318,7 @@ export function MatchPreviewPage() {
                     <div key={trait.label} className="flex items-center gap-2">
                       <span className="w-24 shrink-0 truncate text-[11px] font-medium text-white">{trait.label}</span>
                       <div className="min-w-0 flex-1"><ProgressBar value={trait.value} tone="amber" compact /></div>
-                      <span className="w-8 shrink-0 text-right text-[11px] font-bold text-white">{trait.value}</span>
+                      <span className="w-12 shrink-0 text-right text-[11px] font-bold text-white">{formatAttribute(trait.value)}</span>
                     </div>
                   ))}
                 </div>
@@ -407,12 +401,12 @@ export function MatchPreviewPage() {
               <span className="text-[10px] font-semibold text-gray-500">You vs {getInitials(opponentName)}</span>
             </div>
             <div className="card-body flex h-full min-h-0 flex-col gap-2 overflow-auto px-3 py-3 scrollbar-thin">
-              <div className="grid grid-cols-4 gap-1.5 text-center">
+              <div className="grid grid-cols-2 gap-1.5 text-center">
                 {matchAttributeComparison.map((item) => (
                   <div key={item.label} className="rounded-md border border-border bg-surface-light/40 p-1.5">
                     <p className="text-[9px] text-gray-400">{item.label}</p>
                     <p className="text-[15px] font-bold text-white">
-                      <span className="text-green-400">{item.player}</span>
+                      <span className="text-green-400">{formatAttribute(item.player)}</span>
                       <span className="px-1 text-gray-500">/</span>
                       <span className="text-red-400 text-xs">{estimateRange(item.opponent)}</span>
                     </p>
@@ -423,7 +417,7 @@ export function MatchPreviewPage() {
               <div className="space-y-2">
                 {attributeComparison.map((item) => (
                   <div key={item.label} className="flex items-center gap-2">
-                    <span className="w-8 shrink-0 text-right text-[11px] font-bold text-green-400">{item.player}</span>
+                    <span className="w-12 shrink-0 text-right text-[11px] font-bold text-green-400">{formatAttribute(item.player)}</span>
                     <div className="min-w-0 flex-1">
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <span className="truncate text-[11px] font-medium text-white">{item.label}</span>
@@ -454,8 +448,8 @@ export function MatchPreviewPage() {
                 ))}
               </div>
               <div className="border-l border-border pl-3 text-[11px]">
-                <div className="mb-2 flex justify-between gap-2"><span className="text-gray-400">Familiarity</span><span className="font-bold text-green-400">{cueFamiliarity}%</span></div>
-                <div className="flex justify-between gap-2"><span className="text-gray-400">Primary Bonus</span><span className="text-right font-bold text-green-400">+{currentCue?.bonuses['Cue Ball Control'] ?? 0} cue ball</span></div>
+                <div className="mb-2 flex justify-between gap-2"><span className="text-gray-400">Familiarity</span><span className="font-bold text-green-400">{formatPercent(cueFamiliarity)}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-gray-400">Primary Bonus</span><span className="text-right font-bold text-green-400">+{formatAttribute(currentCue?.bonuses['Cue Ball Control'] ?? 0)} cue ball</span></div>
               </div>
             </div>
           </div>

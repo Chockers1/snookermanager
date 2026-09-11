@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createStarterState, enterTournamentState, bookTravelState, confirmTournamentPreparationState, startLiveMatchState, resolveCompletedLiveFrame, finalizeLiveMatch, simulateTournamentMatchState, type GameState } from '../hooks/useGameState';
+import { createStarterState, enterTournamentState, bookTravelState, confirmTournamentPreparationState, startLiveMatchState, advanceLiveVisit, resolveCompletedLiveFrame, finalizeLiveMatch, simulateTournamentMatchState, type GameState } from '../hooks/useGameState';
 import { getDefaultPreparationAllocations } from './tournamentPreparation';
 import { pendingMatchBreak, resolveSessionBreak, sessionPlan } from './realism/sessions';
 import type { BreakChoice } from './realism/types';
@@ -36,6 +36,29 @@ function decider(base: Live, bestOf: number, stamina: number, choice: BreakChoic
 
 afterEach(() => vi.restoreAllMocks());
 describe('match fatigue workload and settlement', () => {
+  it('keeps difficulty out of match attributes, preparation and winning chances',()=>{
+    const {state,event}=fixture();const outputs=[];
+    for(const difficulty of ['relaxed','standard','demanding'] as const){
+      vi.spyOn(Math,'random').mockReturnValue(.3);
+      const match=startLiveMatchState({...state,liveMatch:null,difficulty},event.id).liveMatch!;
+      outputs.push({player:match.playerVisitProfile,opponent:match.opponentVisitProfile,chance:match.plannedMatchWinChance,confidence:match.playerConfidence,fatigue:match.playerFatigue});
+    }
+    expect(outputs[0]).toEqual(outputs[1]);expect(outputs[1]).toEqual(outputs[2]);
+  });
+  it('lets a tired cautious opponent take scoring chances instead of choosing endless safeties',()=>{
+    const {live}=fixture();vi.spyOn(Math,'random').mockReturnValue(.01);
+    const tired:Live={...live,playerAtTable:live.opponentName,opponentApproach:'Tight',opponentFatigue:80,opponentVisitProfile:{...live.opponentVisitProfile,longPotting:90,safetyPlay:90},currentVisit:1};
+    expect(advanceLiveVisit(tired,undefined,'simulated','shot').visitHistory[0].decision).toBe('Pot Attempt');
+    const specialist={...tired,opponentVisitProfile:{...tired.opponentVisitProfile,longPotting:60}};
+    expect(advanceLiveVisit(specialist,undefined,'simulated','shot').visitHistory[0].decision).toBe('Safety Exchange');
+    expect(advanceLiveVisit({...specialist,currentVisit:3},undefined,'simulated','shot').visitHistory[0].decision).toBe('Pot Attempt');
+  });
+  it('allows a safety-first player to pot the remaining colours',()=>{
+    const {live}=fixture();vi.spyOn(Math,'random').mockReturnValue(.01);
+    const cautious:Live={...live,playerAtTable:live.playerName,tacticalPlan:'Safety',currentVisit:3,tableState:{redsRemaining:0,coloursRemaining:['Yellow','Green','Brown','Blue','Pink','Black']}};
+    expect(advanceLiveVisit(cautious,undefined,'simulated','shot').visitHistory[0].decision).toBe('Pot Attempt');
+  });
+
   it('leaves both players tired after a 25-frame decider even at elite stamina', () => {
     const { live } = fixture();
     for (const choice of ['recover', 'reset', 'review'] as const) {

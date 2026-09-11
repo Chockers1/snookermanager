@@ -2,7 +2,7 @@ import { seasonTitleEntries } from '../hooks/useGameState';
 import { seasonTitle, snapshotWeekLabel } from "../game/seasonClock";
 import { SeasonRankings } from '../components/game/SeasonReviewPopup';
 import { useNavigate } from "react-router-dom";
-import { CareerDecisionNotice, CareerSeasonSummary } from "../components/career/CareerDepthPanels";
+import { CareerSeasonSummary } from "../components/career/CareerDepthPanels";
 import { WorldDigestPanel } from '../components/career/RealismPanels';
 import {
   Bar,
@@ -615,7 +615,7 @@ export function SeasonReviewPage() {
         </section>
       </div>
 
-      <CareerDecisionNotice />
+
       <p role="status" className="shrink-0 text-xs text-amber-300">{gameState.lastAction}</p>
       <div className="flex shrink-0 flex-wrap justify-center gap-2 rounded-lg border border-border bg-surface-light/40 px-3 py-2.5">
         <button

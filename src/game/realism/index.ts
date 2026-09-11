@@ -1,3 +1,4 @@
+import { nextLeagueFixture } from '../leagueSchedule';
 import { residenceRegion } from '../pathwayRules';
 import type { GameState } from '../../hooks/useGameState';
 import type { TrainingPlannerDay } from '../../types/game';
@@ -39,7 +40,7 @@ export function reconcileRealism(state: GameState): GameState {
     const journey = next.realism.journeys[key];
     const booking = next.travel.bookings[event.id];
     if (journey?.hotelNightlyRate !== undefined && journey.hotelThrough && booking) {
-      const roundDate = hotelRoundDate(event, progress.currentRound);
+      const roundDate = nextLeagueFixture(next, event)?.date ?? hotelRoundDate(event, progress.currentRound);
       const calendarDate = next.currentDate > (event.endDate ?? event.startDate) ? event.endDate ?? event.startDate : next.currentDate;
       const through = roundDate > calendarDate ? roundDate : calendarDate;
       const nights = Math.max(0, dayNumber(through) - dayNumber(journey.hotelThrough));

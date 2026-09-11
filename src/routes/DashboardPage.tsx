@@ -1,9 +1,8 @@
 import { ActionBlockerNotice } from '../components/game/ActionBlockerNotice';
 import { advancementBlocker } from '../hooks/useGameState';
-import { formatPercent } from '../utils/formatters';
+import { formatPercent, formatAttribute } from '../utils/formatters';
 import { PlayerLink } from '../components/game/PlayerLink';
 import { seasonPosition, seasonWeekLabel, snapshotWeekLabel } from "../game/seasonClock";
-import { CareerDecisionNotice } from '../components/career/CareerDepthPanels';
 import { DashboardCareerSummary, DashboardFinanceSummary } from '../components/game/DashboardSummaryCards';
 import {
   Activity,
@@ -112,7 +111,7 @@ export function DashboardPage() {
 
   return (
     <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-6.25rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
-      <CareerDecisionNotice />
+
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
         <div className="grid min-h-0 gap-3 xl:col-span-4 xl:grid-rows-[1.18fr_0.92fr_0.62fr] xl:gap-2">
           <div className="card min-h-0 flex h-full flex-col overflow-hidden">
@@ -238,8 +237,8 @@ export function DashboardPage() {
                         />
                       </div>
                     </div>
-                    <span className="w-7 shrink-0 text-right text-[9px] text-gray-400">
-                      {value}
+                    <span className="w-12 shrink-0 text-right text-[9px] tabular-nums text-gray-400">
+                      {formatAttribute(value)}
                     </span>
                   </div>
                 ))}
@@ -319,7 +318,7 @@ export function DashboardPage() {
                     <div key={label}>
                       <div className="mb-0.5 flex items-center justify-between gap-2 text-[10px]">
                         <span className="truncate text-gray-300">{label}</span>
-                        <span className="font-medium text-white">{value}</span>
+                        <span className="shrink-0 font-medium tabular-nums text-white">{formatAttribute(value)}</span>
                       </div>
                       <div className="progress-bar h-1.5">
                         <div
@@ -340,7 +339,7 @@ export function DashboardPage() {
                     <div key={label}>
                       <div className="mb-0.5 flex items-center justify-between gap-2 text-[10px]">
                         <span className="truncate text-gray-300">{label}</span>
-                        <span className="font-medium text-white">{value}</span>
+                        <span className="shrink-0 font-medium tabular-nums text-white">{formatAttribute(value)}</span>
                       </div>
                       <div className="progress-bar h-1.5">
                         <div

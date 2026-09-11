@@ -1,3 +1,4 @@
+import {currentRankingTab,rankingRoster} from '../game/rankingPresentation';
 import { FormResult } from '../components/game/FormResult';
 import { PlayerLink } from '../components/game/PlayerLink';
 import { TourDevelopmentPanel } from '../components/career/SeasonExpansionPanels'
@@ -229,15 +230,7 @@ export function RankingsPage() {
   const finalRankingTab = latestMatch?.round === 'Final' && searchParams.get('from') === 'final'
     ? getRankingTabForTournamentType(latestTournament?.rankingType)
     : null
-  const currentPathTab: RankingTabKey = gameState.careerSystems.lateCareer.seniorActive
-    ? 'senior'
-    : gameState.careerSystems.pro.hasTourCard
-      ? 'world'
-      : gameState.careerSystems.qSchool.campaignsEntered > 0
-        ? 'qSchool'
-        : gameState.careerSystems.qTour.playerPoints > 0
-          ? 'qTour'
-          : 'amateur'
+  const currentPathTab: RankingTabKey = currentRankingTab(gameState)
   const defaultTab = finalRankingTab ?? currentPathTab
   const [activeTab, setActiveTab] = useState<RankingTabKey>(defaultTab)
   const activeConfig = rankingTabs.find((tab) => tab.key === activeTab) ?? rankingTabs[0]
@@ -248,7 +241,9 @@ export function RankingsPage() {
   const pathwayStatus = lists.length ? pathwayListStatus(gameState, activeTab === 'senior' ? 'Senior' : selectedList as Parameters<typeof pathwayListStatus>[1], selectedList === 'Two-year seniors') : null
   const developmentRanking = activeTab === 'youth' || activeTab === 'amateur'
   const nextDevelopmentEvent = developmentRanking ? gameState.tournaments.filter(t => t.rankingType !== 'None' && t.rankingValue > 0 && getCompetitionKeysForTournament(t).includes(activeTab) && (t.endDate ?? t.startDate) > gameState.currentDate).sort((a,b) => (a.endDate ?? a.startDate).localeCompare(b.endDate ?? b.startDate))[0] : undefined
-  const activeRows = lists.length ? pathwayRows.map((r, i) => ({ ...(gameState.competitionTables[activeConfig.key].find(p => p.playerName === r.name) ?? { id: r.name, playerName: r.name, nation: gameState.worldPlayers.find(p => p.playerName === r.name)?.nation ?? 'INT', movement: 0, prizeMoney: 0, wins: 0, losses: 0 }), ranking: i + 1, points: r.points, eventsPlayed: r.events, titles: r.titles })) : gameState.competitionTables[activeConfig.key].filter(row => !developmentRanking || row.eventsPlayed > 0)
+  const earnedRows = lists.length ? pathwayRows.map((r, i) => ({ ...(gameState.competitionTables[activeConfig.key].find(p => p.playerName === r.name) ?? { id: r.name, playerName: r.name, nation: gameState.worldPlayers.find(p => p.playerName === r.name)?.nation ?? 'INT', movement: 0, prizeMoney: 0, wins: 0, losses: 0 }), ranking: i + 1, points: r.points, eventsPlayed: r.events, titles: r.titles })) : gameState.competitionTables[activeConfig.key].filter(row => !developmentRanking || row.eventsPlayed > 0)
+  const rosterOnly = earnedRows.length === 0 && activeTab !== 'world' && activeTab !== 'oneYear'
+  const activeRows = rosterOnly ? rankingRoster(gameState,activeTab) : earnedRows
   const qTourPlaces = activeTab === 'qTour' ? qTourQualification(gameState, gameState.currentDate) : null
   const playerOverall = calculateOverallRating({
     attributes: gameState.attributes,
@@ -289,7 +284,7 @@ export function RankingsPage() {
       recentResults: archive?.recentResults,
     }
   })
-  const playerRow = activeRowsWithRatings.find((row) => row.playerName === gameState.player.fullName)
+  const playerRow = rosterOnly ? undefined : activeRowsWithRatings.find((row) => row.playerName === gameState.player.fullName)
   const nextTournament = getNextEligibleTournament(gameState)
   const nextTarget = activeRowsWithRatings.find((row) => row.ranking === Math.max(1, (playerRow?.ranking ?? 2) - 1))
   const moneyRanking = activeTab === 'world' || activeTab === 'oneYear'
@@ -315,14 +310,14 @@ export function RankingsPage() {
     { label: semiFinalRound, round: semiFinalRound, champion: false },
     { label: 'Win Event', round: nextEventRounds.at(-1) ?? 'Final', champion: true },
   ]
-  const rankingScenarios = scenarioDefinitions.map((scenario) => {
+  const rankingScenarios = (eventAffectsActiveTable ? scenarioDefinitions : []).map((scenario) => {
     const points = eventAffectsActiveTable
       ? getProjectedTournamentRankingPoints(nextTournament, scenario.round, scenario.champion)
       : 0
     return {
       label: scenario.label,
       points,
-      projectedRank: projectRankingAfterEvent(
+      projectedRank: !playerRow ? null : projectRankingAfterEvent(
         activeRowsWithRatings,
         gameState.player.fullName,
         eventAffectsActiveTable ? nextTournament : undefined,
@@ -333,12 +328,12 @@ export function RankingsPage() {
   const playerArchive = gameState.worldPlayers.find((player) => player.playerName === gameState.player.fullName)
   const archivedMomentum = (playerArchive?.seasons ?? []).slice(0, 6).reverse().map((season) => ({
     label: season.season,
-    value: season[activeConfig.rankField] ?? playerRow?.ranking ?? 1,
-  }))
-  const liveMomentum = moneyRanking ? (gameState.rollingRankings?.revisions ?? []).slice(-10).map(revision => ({ label: revision.date.slice(5), value: (activeTab === 'oneYear' ? revision.oneYear : revision.world)[gameState.player.fullName] ?? playerRow?.ranking ?? 1 })) : []
+    value: season[activeConfig.rankField],
+  })).filter(row=>row.value!=null)
+  const liveMomentum = moneyRanking ? (gameState.rollingRankings?.revisions ?? []).slice(-10).map(revision => ({ label: revision.date.slice(5), value: (activeTab === 'oneYear' ? revision.oneYear : revision.world)[gameState.player.fullName] })).filter(row=>row.value!=null) : []
   const rankingMomentum = liveMomentum.length > 0 ? liveMomentum : archivedMomentum.length > 0
     ? archivedMomentum
-    : [{ label: gameState.currentDate.slice(5), value: playerRow?.ranking ?? 1 }]
+    : playerRow ? [{ label: gameState.currentDate.slice(5), value: playerRow.ranking }] : []
   const rankingCards = [
     { title: 'Tour Card', body: gameState.careerSystems.pro.hasTourCard ? `${gameState.careerSystems.pro.survivalStatus} - ${gameState.careerSystems.pro.yearsRemaining > 0 ? `${gameState.careerSystems.pro.yearsRemaining} season(s) left` : 'retained on merit'}` : 'No active main-tour card yet.' },
     { title: 'Q Tour', body: gameState.careerSystems.qTour.playerRank ? `Rank ${gameState.careerSystems.qTour.playerRank} - ${gameState.careerSystems.qTour.playerPoints} pts${gameState.careerSystems.qTour.directCardAwarded ? ' - card secured' : ''}` : 'No Q Tour points logged yet.' },
@@ -396,7 +391,8 @@ export function RankingsPage() {
       <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
         <div className="grid min-h-0 min-w-0 gap-3 xl:col-span-8 xl:grid-rows-[minmax(0,1fr)_84px] xl:gap-2">
           <div className="card min-h-0 min-w-0 flex h-[28rem] flex-col overflow-hidden xl:h-full">
-            <div className="card-header px-3 py-2.5"><h3 className="text-sm font-semibold text-white">{activeConfig.label}</h3><span className="text-[10px] text-gray-400">{lists.length ? selectedList : developmentRanking ? 'Current-season points' : activeConfig.seasonLabel}</span></div>
+            <div className="card-header px-3 py-2.5"><h3 className="text-sm font-semibold text-white">{activeConfig.label}</h3><span className="text-[10px] text-gray-400">{rosterOnly ? 'Player roster · awaiting results' : lists.length ? selectedList : developmentRanking ? 'Current-season points' : activeConfig.seasonLabel}</span></div>
+            {rosterOnly && <p className="px-3 py-2 text-xs text-gray-400">No published standings yet. {activeTab === 'youth' ? 'This roster includes eligible under-21 amateurs from other circuits. Existing seeds appear first; inclusion is not a confirmed event entry.' : 'These are the known players on this circuit, in starting seed order.'} Everyone is unranked until results count.{lists.length ? ' This is the circuit-wide roster, not a confirmed regional entry list.' : ''}</p>}
             <div className="min-h-0 flex-1 overflow-auto scrollbar-thin">
               <table className="w-full text-[11px]">
                 <thead className="sticky top-0 z-10 bg-surface-light/95 backdrop-blur">
@@ -419,7 +415,7 @@ export function RankingsPage() {
                   {activeRowsWithRatings.length === 0 && <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-400">{pathwayStatus?.empty ?? (developmentRanking ? 'No published ranking results this season yet. Starting seed positions are not earned rankings.' : 'Complete events in this circuit to start its standings.')}</td></tr>}
                   {activeRowsWithRatings.map((row) => (
                     <tr key={row.id} className={`border-b border-border/40 ${row.highlighted ? 'bg-green-600/12' : 'hover:bg-surface-light/40'}`}>
-                      <td className="px-3 py-2 font-bold text-white">{row.ranking}</td>
+                      <td className="px-3 py-2 font-bold text-white">{rosterOnly ? "—" : row.ranking}</td>
                       <td className="px-2 py-2 text-center"><Movement value={row.movement} /></td>
                       <td className={`px-3 py-2 font-medium ${row.highlighted ? 'text-green-400' : 'text-white'}`}><PlayerLink name={row.playerName} /></td>
                       <td className="px-2 py-2 text-gray-400">{row.nation}</td>
@@ -470,12 +466,12 @@ export function RankingsPage() {
         <div aria-label="Ranking insights" className={"flex min-h-0 min-w-0 flex-col gap-3 xl:col-span-4 xl:gap-2 [&>div]:shrink-0 " + (lists.length ? "" : "scrollbar-thin xl:overflow-y-auto xl:overscroll-contain xl:pr-1")}>
           <div className="card min-w-0 bg-gradient-to-b from-surface-light/80 to-surface/80 px-4 py-3 text-center">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{finalRankingTab ? 'Current Ranking After Final' : `Your ${activeConfig.label}`}</p>
-            <p className="mt-1 text-5xl font-bold text-white">#{playerRow?.ranking ?? '-'}</p>
+            <p className="mt-1 text-3xl font-bold text-white">{playerRow ? `#${playerRow.ranking}` : 'Unranked'}</p>
             <div className={`mt-1 flex items-center justify-center gap-1 text-xs ${playerMovementTone}`}>
               {playerMovement > 0 ? <TrendingUp className="h-3 w-3" /> : playerMovement < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
               <span>{movementLabel} movement</span>
             </div>
-            <p className="mt-1 text-[11px] text-gray-300">OVR <span className="font-semibold text-white">{playerRow?.overall ?? '-'}</span> <span className="mx-1 text-border">|</span> POT <span className="font-semibold text-green-400">{playerRow?.potential ?? '-'}</span></p>
+            <p className="mt-1 text-[11px] text-gray-300">OVR <span className="font-semibold text-white">{playerOverall}</span> <span className="mx-1 text-border">|</span> POT <span className="font-semibold text-green-400">{playerPotential}</span></p>
             <p className="mt-1 text-[10px] text-gray-400">{moneyRanking ? `${formatMoney(playerRow?.points ?? 0)} counting earnings` : `${playerRow?.points ?? 0} points`}</p>
             {activeTab === 'world' && <p className="mt-1 text-[10px] text-amber-300">Next 30 days expiring: {formatMoney(earningsSummary.expiring)}</p>}
           </div>
@@ -483,7 +479,7 @@ export function RankingsPage() {
           <div className="card flex h-32 flex-col overflow-hidden">
             <div className="card-header shrink-0 px-3 py-2"><h3 className="text-sm font-semibold text-white">Ranking Movement</h3></div>
             <div className="min-h-0 flex-1 px-2 py-2">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
+              {rankingMomentum.length===0 ? <p className="p-2 text-xs text-gray-400">No published ranking history yet.</p> : <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
                 <LineChart data={rankingMomentum}>
                   <CartesianGrid stroke="#203449" vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
@@ -491,15 +487,15 @@ export function RankingsPage() {
                   <Tooltip contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 11 }} />
                   <Line type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2} dot={{ fill: '#22c55e', r: 3 }} />
                 </LineChart>
-              </ResponsiveContainer>
+              </ResponsiveContainer>}
             </div>
           </div>
 
           <div className="card min-h-0 px-3 py-2.5 text-center">
             <h3 className="text-xs font-semibold text-white">Next Target</h3>
             <p className="mt-1 text-3xl font-bold text-white">{playerRow ? '#' + (nextTarget?.ranking ?? Math.max(1, playerRow.ranking - 1)) : 'Unranked'}</p>
-            <p className="mt-1 text-xs text-green-400">{!playerRow ? 'Complete a circuit event' : <>Needs {moneyRanking ? formatMoney(Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)) : `${Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)} pts`}</>}</p>
-            <p className="mt-1 truncate text-[10px] text-gray-500">{nextTournament?.name ?? 'Next event'} can shift this race.</p>
+            <p className="mt-1 text-xs text-green-400">{!playerRow ? 'Complete a ranking event' : <>Needs {moneyRanking ? formatMoney(Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)) : `${Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)} pts`}</>}</p>
+            <p className="mt-1 truncate text-[10px] text-gray-500">{eventAffectsActiveTable ? `${nextTournament?.name} can shift this race.` : nextDevelopmentEvent ? `Next ranking event: ${nextDevelopmentEvent.name}.` : 'Only published results for this ranking list count.'}</p>
           </div>
 
           <div className="card flex flex-col px-3 py-2.5">
@@ -517,12 +513,13 @@ export function RankingsPage() {
 
           <div className="card min-h-0 px-3 py-2.5">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold text-white"><Target className="h-3 w-3 text-green-400" /> Event Scenarios</h3>
+            {!eventAffectsActiveTable && <p className="text-xs text-gray-400">{nextTournament ? `${nextTournament.name} awards no points for this ranking list. Your rank will not change from this event.` : 'No upcoming ranking event selected.'}</p>}
             <div className="grid grid-cols-3 gap-2">
               {rankingScenarios.map((scenario) => (
                 <div key={scenario.label} className="flex min-h-0 flex-col items-center justify-center rounded bg-surface-light/70 px-2 py-1.5 text-center">
                   <p className="text-[9px] text-gray-500">{scenario.label}</p>
                   <p className="text-sm font-bold text-green-400">+{moneyRanking ? formatMoney(scenario.points) : scenario.points}</p>
-                  <p className="text-[10px] text-gray-400">Rank {scenario.projectedRank}</p>
+                  <p className="text-[10px] text-gray-400">{scenario.projectedRank==null ? 'Rank available after publication' : `Rank ${scenario.projectedRank}`}</p>
                 </div>
               ))}
             </div>

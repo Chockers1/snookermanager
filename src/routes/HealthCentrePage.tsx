@@ -36,6 +36,7 @@ export function HealthCentrePage() {
   const selectedTreatment =
     treatments.find((option) => option.id === selectedTreatmentId) ??
     treatments[0];
+  const treatmentUnderway = Boolean(gameState.health.treatmentReviewOn && gameState.currentDate < gameState.health.treatmentReviewOn);
   const recoveryNeeded = needsHealthRecovery(gameState);
   const preview = treatmentPreview(gameState, selectedTreatment.id);
   const duringMatch = gameState.liveMatch?.status === "In Progress";
@@ -304,11 +305,11 @@ export function HealthCentrePage() {
           <p className="mt-2 text-[11px] text-gray-300">{recoveryNeeded ? preview.filter(r => r.before !== r.after).map(r => `${r.label} ${Number(r.before.toFixed(2))}${r.unit} → ${Number(r.after.toFixed(2))}${r.unit}`).join(' · ') || 'Clear the recorded issue.' : 'No treatment needed. Fatigue, strain, burnout and injury time are already zero.'}</p>
           <button
             type="button"
-            disabled={!recoveryNeeded || duringMatch || gameState.player.cash < selectedTreatment.cost}
+            disabled={treatmentUnderway || !recoveryNeeded || duringMatch || gameState.player.cash < selectedTreatment.cost}
             className="btn-primary mt-4 min-h-11 w-full justify-center text-xs xl:mt-2 xl:min-h-9"
             onClick={() => scheduleTreatment(selectedTreatment.id)}
           >
-            <BedDouble className="h-4 w-4" /> {recoveryNeeded ? "Apply treatment" : "No treatment needed"}{" "}
+            <BedDouble className="h-4 w-4" /> {treatmentUnderway ? `Review on ${gameState.health.treatmentReviewOn}` : recoveryNeeded ? "Apply treatment" : "No treatment needed"}{" "}
             <ChevronRight className="h-4 w-4" />
           </button>
           <p role="status" className="mt-2 text-[11px] text-amber-300">{duringMatch ? 'Use interval recovery during your match; treatment is available afterwards.' : gameState.player.cash < selectedTreatment.cost && recoveryNeeded ? 'Not enough cash for this treatment.' : gameState.lastAction}</p>

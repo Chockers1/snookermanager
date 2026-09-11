@@ -1,3 +1,4 @@
+import { EntryCriteriaPanel } from '../game/EntryCriteriaPanel';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useGame } from '../../context/useGame';
@@ -15,7 +16,7 @@ import { formatMoney } from '../../utils/formatters';
 const control='min-w-0 rounded border border-border bg-background p-2 text-xs text-white';
 export function EntryTimelinePanel({event}:{event:Tournament}) {
   const {gameState}=useGame(), timeline=entryTimeline(gameState,event);
-  return <section aria-label="Entry dates" className="rounded border border-border p-3 text-xs"><p className="font-semibold text-amber-200">{timeline.label}</p><p className="mt-1 text-gray-400">{timeline.explanation}</p></section>;
+  return <div className="space-y-2"><EntryCriteriaPanel event={event}/><section aria-label="Entry dates" className="rounded border border-border p-3 text-xs"><p className="font-semibold text-amber-200">{timeline.label}</p><p className="mt-1 text-gray-400">{timeline.explanation}</p></section></div>;
 }
 export function SeasonBoardPanel({year,month,onEvent}:{year:number;month:number;onEvent:(id:string)=>void}) {
   const {gameState,actOnCareer}=useGame(),board=boardOf(gameState);

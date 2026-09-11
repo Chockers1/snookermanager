@@ -1,3 +1,4 @@
+import { resolveTestDecisions } from './resolveTestDecisions';
 import { createStarterState, enterTournamentState, bookTravelState, confirmTournamentPreparationState, startLiveMatchState, finalizeLiveMatch } from '../src/hooks/useGameState';
 import { getDefaultPreparationAllocations } from '../src/game/tournamentPreparation';
 
@@ -11,6 +12,7 @@ export function betweenMatchFixture() {
   state = startLiveMatchState({ ...state, currentDate: event.startDate }, event.id);
   if (!state.liveMatch) throw new Error(state.lastAction);
   state = finalizeLiveMatch(state, { ...state.liveMatch, playerFrames: Math.ceil(state.liveMatch.bestOf / 2), opponentFrames: 1, status: 'Completed' });
+  state = resolveTestDecisions(state);
   state.player.fatigue = 60;
   state.player.confidence = 70;
   state.trainingCondition.strain = 10;

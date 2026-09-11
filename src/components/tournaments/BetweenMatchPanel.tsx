@@ -37,7 +37,7 @@ export function BetweenMatchPanel({ tournamentId, compact = false }: { tournamen
         <span className="text-[11px] text-gray-400">Free · one choice per match. Playing or Quick Sim without choosing uses rest automatically.</span>
       </div>
     </>}
-    <p className="mt-2 text-[10px] text-gray-500">Estimated round dates, shared with the hotel schedule; exact session times are not available. Recovery is applied once for this fixture gap.</p>
+    <p className="mt-2 text-[10px] text-gray-500">Estimated fixture dates, shared with the hotel schedule; exact session times are not available. Recovery is applied once for this fixture gap.</p>
   </section>;
   if (!compact) return panel;
   return <details key={info.key} className="card shrink-0 text-xs">

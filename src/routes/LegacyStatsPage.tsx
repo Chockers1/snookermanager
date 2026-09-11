@@ -1,3 +1,4 @@
+import { SeasonArchive } from '../components/career/SeasonArchive';
 import { SeasonLifeHistoryPanel } from '../components/career/SeasonLifePanels';
 import { ActionBlockerNotice } from '../components/game/ActionBlockerNotice';
 import { advancementBlocker } from '../hooks/useGameState';
@@ -112,6 +113,7 @@ export function LegacyStatsPage() {
       <LegacyRecords stats={career} />
       <ExhibitionAchievements />
       <TournamentCareerHistory />
+      <SeasonArchive />
 
       <div className="grid gap-4 xl:grid-cols-12">
         <div className="min-w-0 space-y-4 xl:col-span-3">

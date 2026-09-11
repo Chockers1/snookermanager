@@ -187,7 +187,7 @@ export function TournamentDrawPage() {
               </span>
             </div>
             <div ref={drawRef} className="card-body min-h-[32rem] overflow-hidden">
-              <>{groupCompetition ? <GroupFixtures rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={drawData.currentPosition.currentRound} selectedStage={roundSelection?.label} onStageChange={label => setRoundSelection({ label })} /> : <TournamentBracket
+              <>{groupCompetition ? <GroupFixtures tournament={gameState.tournaments.find(t => t.id === drawData.tournamentId) ?? null} rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={drawData.currentPosition.currentRound} selectedStage={roundSelection?.label} onStageChange={label => setRoundSelection({ label })} /> : <TournamentBracket
                 rounds={visibleBracket}
                 playerName={gameState.player.fullName}
                 currentRound={drawData.currentPosition.currentRound}

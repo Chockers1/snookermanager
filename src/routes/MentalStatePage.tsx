@@ -40,6 +40,8 @@ export function MentalStatePage() {
   const navigate = useNavigate();
   const advanceBlocker = advancementBlocker(gameState);
   const mentalData = buildMentalStateData(gameState);
+  const recoveryUnderway = Boolean(gameState.recoveryPlanAvailableOn && gameState.currentDate < gameState.recoveryPlanAvailableOn);
+  const recoveryLabel = recoveryUnderway ? `Review on ${gameState.recoveryPlanAvailableOn}` : 'Apply selected plan';
   const [selectedPlanTitle, setSelectedPlanTitle] = useState(
     mentalData.actionPlan[0]?.title ?? "",
   );
@@ -67,9 +69,10 @@ export function MentalStatePage() {
         <button
           type="button"
           className="btn-primary min-h-10 shrink-0 justify-center text-xs"
+          disabled={recoveryUnderway || gameState.liveMatch?.status === 'In Progress'}
           onClick={() => applyRecoveryPlan(selectedPlanTitle)}
         >
-          Apply selected plan <ChevronRight className="h-4 w-4" />
+          {recoveryLabel} <ChevronRight className="h-4 w-4" />
         </button>
       </header>
 
@@ -368,7 +371,8 @@ export function MentalStatePage() {
           <button
             type="button"
             className="btn-primary min-h-10 justify-center text-xs"
-            onClick={() => applyRecoveryPlan(selectedPlanTitle)}
+            disabled={recoveryUnderway || gameState.liveMatch?.status === 'In Progress'}
+          onClick={() => applyRecoveryPlan(selectedPlanTitle)}
           >
             Apply plan
           </button>

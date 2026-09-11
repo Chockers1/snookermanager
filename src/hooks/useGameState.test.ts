@@ -1663,7 +1663,7 @@ describe("connected career systems", () => {
     expect(
       treated.trainingCondition.seasonStartAttributes.physical["Shoulder Health"],
     ).toBe(state.attributes.physical["Shoulder Health"]);
-    expect(treated.attributes.physical["Shoulder Health"]).toBeGreaterThan(
+    expect(treated.attributes.physical["Shoulder Health"]).toBe(
       treated.trainingCondition.seasonStartAttributes.physical["Shoulder Health"],
     );
     expect(treated.health.history[0]).toMatchObject({
@@ -1698,7 +1698,7 @@ describe("connected career systems", () => {
     const renewed = renewSponsorState(negotiated, sponsor.id);
     expect(
       renewed.sponsors.find((item) => item.id === sponsor.id),
-    ).toMatchObject({ weeksRemaining: 48, renewalStatus: "Accepted" });
+    ).toMatchObject({ weeksRemaining: 52, renewalStatus: "Accepted" });
   });
 
   it("terminates a sponsor after a third missed obligation", () => {

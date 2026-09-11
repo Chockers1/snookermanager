@@ -1,3 +1,4 @@
+import { resolveTestDecisions } from './resolveTestDecisions';
 import { createStarterState, enterTournamentState, bookTravelState, confirmTournamentPreparationState, startLiveMatchState, finalizeLiveMatch } from '../src/hooks/useGameState';
 import { getDefaultPreparationAllocations } from '../src/game/tournamentPreparation';
 
@@ -10,6 +11,7 @@ export function postEventRankingFixture() {
   state = confirmTournamentPreparationState(state, event.id, 'balanced', getDefaultPreparationAllocations(), []);
   state.currentDate = event.startDate;
   for (let i = 0; i < 10 && state.tournamentProgress.currentRound; i++) {
+    state = resolveTestDecisions(state);
     state = startLiveMatchState(state, event.id);
     if (!state.liveMatch) throw new Error(state.lastAction);
     const semi = state.liveMatch.round === 'Semi Final';
