@@ -29,7 +29,8 @@ import {
 } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { useGame } from '../context/useGame'
-import { getTournamentPlayability } from '../hooks/useGameState'
+import { advancementBlocker, getTournamentPlayability } from '../hooks/useGameState'
+import { requiredDecisionBlocker } from '../game/requiredDecision'
 import { buildMatchPreviewData } from '../utils/liveRouteData'
 import { formatMoney, formatPercent, formatAttribute } from '../utils/formatters'
 
@@ -76,7 +77,7 @@ function formatEdgeLabel(edge: number | null) {
 }
 
 export function MatchPreviewPage() {
-  const { gameState, startLiveMatch, updateLiveMatchTactics } = useGame()
+  const { gameState, startLiveMatch, updateLiveMatchTactics, continueToNextTournament } = useGame()
   const navigate = useNavigate()
   const [plan, setPlan] = useState<(typeof FRAME_PLANS)[number]>('Balanced')
   const [focus, setFocus] = useState<(typeof MENTAL_FOCUS_OPTIONS)[number]>('Composed')
@@ -132,7 +133,29 @@ export function MatchPreviewPage() {
   const riskScoutRows = weaknesses.slice(0, 3)
   const opponentPatternText = recentOpponentResults.map((result) => `${result.result} ${result.score}`).join(' • ') || 'No recent data yet'
 
+  const decisionBlocker = requiredDecisionBlocker(gameState)
+  const daysUntilStart = playability?.daysUntilStart ?? 0
+  const advanceBlocker = daysUntilStart > 0 ? advancementBlocker(gameState) : null
+  const nextAction = decisionBlocker
+    ? { label: decisionBlocker.label, route: decisionBlocker.route }
+    : activeLiveMatch ? { label: 'Resume Match' }
+    : !activeTournament || activeTournament.status !== 'Entered' ? { label: 'Tournament Hub', route: '/tournaments/hub' }
+    : !playability?.travelBooked ? { label: 'Book Travel', route: '/travel' }
+    : !playability?.preparationConfirmed ? { label: 'Prepare', route: '/tournament/preparation' }
+    : advanceBlocker ? { label: advanceBlocker.label, route: advanceBlocker.route }
+    : daysUntilStart > 0 ? { label: 'Advance to Tournament' }
+    : playability?.canPlay ? { label: 'Start Match' }
+    : { label: 'Tournament Hub', route: '/tournaments/hub' }
+
   function handleStartMatch() {
+    if (nextAction.route) {
+      navigate(nextAction.route)
+      return
+    }
+    if (daysUntilStart > 0 && !activeLiveMatch) {
+      continueToNextTournament()
+      return
+    }
     if (activeLiveMatch) {
       navigate('/match/live')
       return
@@ -190,11 +213,18 @@ export function MatchPreviewPage() {
             <button type="button" onClick={() => navigate('/training')} className="btn-secondary h-10 whitespace-nowrap px-3 text-xs">Adjust Training</button>
             <button type="button" onClick={() => navigate('/equipment/chalk-tips')} className="btn-secondary h-10 whitespace-nowrap px-3 text-xs">Change Equipment</button>
             <button type="button" onClick={handleStartMatch} className="btn-primary h-10 whitespace-nowrap px-4 text-xs">
-              {activeLiveMatch ? 'Resume Match' : playability?.canPlay ? 'Start Match' : !playability?.travelBooked ? 'Book Travel' : !playability?.preparationConfirmed ? 'Prepare' : 'Tournament Hub'} <ChevronRight className="h-3.5 w-3.5" />
+              {nextAction.label} <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
       </div>
+
+      {!activeLiveMatch && !playability?.canPlay && (
+        <p role="status" className="px-3 text-xs text-amber-300">
+          {decisionBlocker?.reason ?? advanceBlocker?.reason ?? playability?.reason}
+          {daysUntilStart > 0 && !decisionBlocker && !advanceBlocker && ` Advance to ${activeTournament?.startDate} here, then review your updated condition and start the match.`}
+        </p>
+      )}
 
       <div className="grid grid-cols-6 gap-2">
         {[
