@@ -170,6 +170,7 @@ describe('travel, elapsed costs and training base', () => {
   });
   it('charges a base once during normal weekly settlement', () => {
     const seed = career();
+    seed.player.cash=10000; // Keep support fully funded in this isolated expense test.
     const state = realismAction(seed, { type: 'base', base: 'rented', location: 'Britain' });
     expect(state.player.cash).toBe(seed.player.cash - TRAINING_BASES.rented.joining);
     const baseline = advanceWeekState(seed), charged = advanceWeekState(state);

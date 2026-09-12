@@ -16,3 +16,8 @@ export function sponsorWeeklyPayment(sponsors:SponsorDeal[]) {
   // Twelve monthly payments over a 52-week career year, not thirteen.
   return Math.round(sponsors.reduce((n,s)=>n+s.monthlyValue,0)*12/52*100)/100;
 }
+
+/** Publicity builds recognition, but cannot create elite reputation without results. */
+export function publicityReputationGain(reputation:number,week:number,sponsors:SponsorDeal[]) {
+  return week%4===0 && sponsors.some(s=>s.perk==='Publicity') ? Math.min(1,Math.max(0,60-reputation)) : 0;
+}

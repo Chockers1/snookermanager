@@ -66,6 +66,21 @@ describe('human and CPU ageing calibration',()=>{
    }
   }
  });
+ it('stops future ageing at the CPU floor without healing or exhausting individual skills',()=>{
+  for(let seed=0;seed<120;seed++){
+   let a=structuredClone(attrs);const profile=playerDecline({id:'human'},seed);
+   for(let age=30;age<=90;age++){
+    const next=applySeasonalAgeRegression(a,age,profile) as typeof attrs;
+    expect(rating(next)).toBeGreaterThanOrEqual(35-1e-8);
+    for(const key of ['technical','mental','physical'] as const)for(const [label,value] of Object.entries(next[key]))expect(value).toBeLessThanOrEqual((a[key] as Record<string,number>)[label]);
+    a=next;
+   }
+   expect(rating(a)).toBeCloseTo(35,8);
+   expect(Math.min(...Object.values(a.physical))).toBeGreaterThan(1);
+  }
+  const low=Object.fromEntries(Object.entries(attrs).map(([k,g])=>[k,Object.fromEntries(Object.keys(g).map(label=>[label,10]))])) as typeof attrs;
+  expect(applySeasonalAgeRegression(low,85,{startAge:35,rate:1.45})).toEqual(low);
+ });
  it('retains individual variation over 30 years without a universal age cliff',()=>{
   const endings=[];
   for(let seed=0;seed<120;seed++){

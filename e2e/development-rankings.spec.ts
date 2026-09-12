@@ -11,8 +11,9 @@ test('youth and amateur tables distinguish earned points, seed order and prize m
  await page.getByRole('button',{name:'Youth Ranking',exact:true}).click();
  await expect(page.getByRole('region',{name:'Ranking points explained'})).toContainText('Prize money does not determine rank');
  await expect(page.getByRole('region',{name:'Ranking points explained'})).toContainText('2026-08-23');
- await expect(page.getByRole('table').first()).toContainText('No published ranking results');
- await expect(page.getByRole('table').first().getByRole('link',{name:unplayed.playerName,exact:true})).toHaveCount(0);
+ await expect(page.getByText(/No published standings yet/)).toBeVisible();
+ const unranked=page.getByRole('table').first().getByRole('row').filter({has:page.getByRole('link',{name:unplayed.playerName,exact:true})});
+ await expect(unranked.getByRole('cell').nth(0)).toHaveText('—');await expect(unranked.getByRole('cell').nth(7)).toHaveText('0');
  await page.getByRole('button',{name:'Amateur Ranking',exact:true}).click();
  const table=page.getByRole('table').first();await expect(table.getByRole('columnheader',{name:'Ranking points',exact:true})).toBeVisible();await expect(table.getByRole('columnheader',{name:'Prize earned',exact:true})).toBeVisible();
  const row=table.getByRole('row').nth(1);await expect(row.getByRole('cell').nth(7)).toHaveText('140');await expect(row.getByRole('cell').nth(8)).toHaveText('£2,000');

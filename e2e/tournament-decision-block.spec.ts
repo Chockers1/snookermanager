@@ -24,7 +24,7 @@ for (const missingMessage of [false, true]) test(`hub resolves the blocking deci
   await expect(page.getByRole('button', { name: 'Advance to Tournament' })).toHaveCount(0);
   const action = page.getByRole('button', { name: 'Resolve Inbox Decision' });
   await expect(action).toBeInViewport();
-  await expect(page.getByText(/Time is paused for/)).toBeVisible();
+  await expect(page.getByRole('link',{name:/Decision required:.*Career actions paused/})).toBeVisible();
   await action.click();
   await expect(page.getByRole('heading', { name: story.title, exact: true })).toBeVisible();
   expect((await readCareerSave(page)).currentDate).toBe(state.currentDate);

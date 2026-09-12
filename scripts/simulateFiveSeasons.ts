@@ -1,3 +1,4 @@
+import { reviewLockedAuditEntry } from './auditEntryReview';
 import { repairAuditTournamentFlags } from '../src/utils/auditTournamentFlags';
 export { repairAuditTournamentFlags } from '../src/utils/auditTournamentFlags';
 import { recordCenturyAudit, playCenturyMatch } from './centuryAuditRecorder';
@@ -126,6 +127,7 @@ type FinanceBreakdown = {
   tournamentEntryFees: number
   travelHotelCosts: number
   treatmentRecoveryCosts: number
+  teamAndStoryEvents: number
   other: number
 }
 
@@ -3692,38 +3694,14 @@ function getSeasonRoundsRemaining(entryRound: TournamentRound) {
 }
 
 function getProtectedWorldChampionshipEvent(state: GameState) {
-  const inferredWorldRank = state.careerSystems.pro.worldRank
-    ?? state.competitionTables.world.find((row) => row.playerName === state.player.fullName)?.ranking
-    ?? state.player.worldRanking
-    ?? 999
-  const inferredStatus = `${state.player.competitiveStatus ?? state.player.careerStage}`.toLowerCase()
-  const inferredTier = `${state.careerSystems.pro.currentTier ?? ''}`.toLowerCase()
-  const inferredSurvival = `${state.careerSystems.pro.tourSurvivalStatus ?? ''}`.toLowerCase()
-  const hasMainTourStatus = state.careerSystems.pro.hasTourCard && inferredWorldRank <= 128
-  const inferredMainDrawLock = hasMainTourStatus && (
-    inferredWorldRank <= 16
-    || /top 16|major contender|world champion/.test(inferredStatus)
-    || /top 16/.test(inferredTier)
-    || /top 16/.test(inferredSurvival)
-  )
-  const inferredQualifyingLock = !inferredMainDrawLock && hasMainTourStatus
-
-  const mainDrawTournament = state.tournaments.find(
-    (entry) => isWorldChampionshipTournament(entry)
-      && (entry.seasonOpenAccessLock === 'worldMainDraw' || (entry.seasonOpenAccessLock == null && inferredMainDrawLock))
-      && (entry.status === 'Available' || entry.status === 'High Cost' || entry.status === 'Booked')
-      && entry.startDate >= state.currentDate,
-  )
-  if (mainDrawTournament) return mainDrawTournament
-
-  const qualifyingTournament = state.tournaments.find(
-    (entry) => isWorldChampionshipQualifyingTournament(entry)
-      && (entry.seasonOpenAccessLock === 'worldQualifying' || (entry.seasonOpenAccessLock == null && inferredQualifyingLock))
-      && (entry.status === 'Available' || entry.status === 'High Cost' || entry.status === 'Booked')
-      && entry.startDate >= state.currentDate,
-  )
-
-  return qualifyingTournament ?? null
+  const available = (entry: Tournament) =>
+    ['Available', 'High Cost', 'Booked'].includes(entry.status)
+    && entry.startDate >= state.currentDate
+    && getTournamentEntryAccess(state, entry).allowed
+  // Use the same dated qualification rules as the game, not historical status.
+  return state.tournaments.find(entry => isWorldChampionshipTournament(entry) && available(entry))
+    ?? state.tournaments.find(entry => isWorldChampionshipQualifyingTournament(entry) && available(entry))
+    ?? null
 }
 
 function wouldBlockProtectedWorldChampionship(state: GameState, tournament: Tournament) {
@@ -4090,6 +4068,7 @@ function createEmptyFinanceBreakdown(): FinanceBreakdown {
     tournamentEntryFees: 0,
     travelHotelCosts: 0,
     treatmentRecoveryCosts: 0,
+    teamAndStoryEvents: 0,
     other: 0,
   }
 }
@@ -4125,6 +4104,12 @@ function recordCashDelta(breakdown: FinanceBreakdown, category: keyof FinanceBre
     breakdown.prizeMoney += prize;
     breakdown.other += delta - prize; // Hotel extensions and other concurrent costs are not negative prize money.
   } else breakdown[category] += delta
+}
+
+function trackedCashAction(breakdown: FinanceBreakdown, category: keyof FinanceBreakdown, state: GameState, action: (state: GameState) => GameState) {
+  const next = action(state);
+  recordCashDelta(breakdown, category, state, next);
+  return next;
 }
 
 function recordWeeklyFinanceDelta(breakdown: FinanceBreakdown, previousState: GameState, nextState: GameState) {
@@ -6220,7 +6205,7 @@ function buildMarkdown(report: SimulationReport) {
     lines.push(formatMovementLine('Q Tour', season.circuits.movements.qTour))
     lines.push(formatMovementLine('Q School', season.circuits.movements.qSchool))
     lines.push(formatMovementLine('Senior', season.circuits.movements.senior))
-    lines.push(`- Finance: prize ${formatSignedCurrency(season.finance.breakdown.prizeMoney)} | sponsors ${formatSignedCurrency(season.finance.breakdown.sponsorIncome)} | coaches ${formatSignedCurrency(season.finance.breakdown.coachingStaffCosts)} | facility ${formatSignedCurrency(season.finance.breakdown.facilityCosts)} | equipment ${formatSignedCurrency(season.finance.breakdown.equipmentMaintenance)} | entries ${formatSignedCurrency(season.finance.breakdown.tournamentEntryFees)} | travel ${formatSignedCurrency(season.finance.breakdown.travelHotelCosts)} | treatment ${formatSignedCurrency(season.finance.breakdown.treatmentRecoveryCosts)} | other ${formatSignedCurrency(season.finance.breakdown.other)}`)
+    lines.push(`- Finance: prize ${formatSignedCurrency(season.finance.breakdown.prizeMoney)} | sponsors ${formatSignedCurrency(season.finance.breakdown.sponsorIncome)} | coaches ${formatSignedCurrency(season.finance.breakdown.coachingStaffCosts)} | facility ${formatSignedCurrency(season.finance.breakdown.facilityCosts)} | equipment ${formatSignedCurrency(season.finance.breakdown.equipmentMaintenance)} | entries ${formatSignedCurrency(season.finance.breakdown.tournamentEntryFees)} | travel ${formatSignedCurrency(season.finance.breakdown.travelHotelCosts)} | treatment ${formatSignedCurrency(season.finance.breakdown.treatmentRecoveryCosts)} | team/story actions ${formatSignedCurrency(season.finance.breakdown.teamAndStoryEvents)} | other ${formatSignedCurrency(season.finance.breakdown.other)}`)
   }
 
   lines.push('')
@@ -6873,11 +6858,11 @@ export function buildBalanceWarnings(report: SimulationReport, finalState: GameS
     warnings.push(`Ranking main-draw win rate is title-light: ${formatPercent(rankingMainDrawRecord.winPercentage)} across ${rankingMainDrawRecord.matches} matches produced only ${titleSummary.rankingTitles} ranking titles.`)
   }
 
-  if (majorRecord.matches >= 30 && majorRecord.winPercentage > 60 && titleSummary.majorTitles === 0) {
+  if ((majorRecord.matches >= 30 && majorRecord.winPercentage > 60 || majorRecord.matches >= 100 && majorRecord.winPercentage > 55) && titleSummary.majorTitles === 0) {
     warnings.push(`Major-event win rate ${formatPercent(majorRecord.winPercentage)} produced no major titles.`)
   }
 
-  if (worldMainDrawRecord.matches >= 10 && worldMainDrawRecord.winPercentage > 60 && titleSummary.worldTitles === 0) {
+  if ((worldMainDrawRecord.matches >= 10 && worldMainDrawRecord.winPercentage > 60 || worldMainDrawRecord.matches >= 30 && worldMainDrawRecord.winPercentage > 55) && titleSummary.worldTitles === 0) {
     warnings.push(`World Championship main-draw win rate ${formatPercent(worldMainDrawRecord.winPercentage)} across ${worldMainDrawRecord.matches} matches produced no world title.`)
   }
 
@@ -6890,13 +6875,9 @@ export function buildBalanceWarnings(report: SimulationReport, finalState: GameS
     warnings.push(`Final conversion looks too weak for the underlying win model: finals ${metrics.finalsReached}, final win ${formatPercent(metrics.finalWinPercentage)}, modeled final win ${formatPercent(rankingFinalRecord.averageWinProbability)}.`)
   }
 
-  if (majorRecord.matches >= 100 && majorRecord.winPercentage > 55 && titleSummary.majorTitles === 0) {
-    warnings.push(`Major win rate is ${majorRecord.winPercentage.toFixed(1)}% across ${majorRecord.matches} matches with zero major titles.`)
-  }
 
-  if (worldMainDrawRecord.matches >= 30 && worldMainDrawRecord.winPercentage > 55 && titleSummary.worldTitles === 0) {
-    warnings.push(`World main-draw win rate is ${worldMainDrawRecord.winPercentage.toFixed(1)}% across ${worldMainDrawRecord.matches} matches with zero world titles.`)
-  }
+
+
 
   if (rankingQuarterFinalPlusRecord.eventsEntered >= 24 && rankingFinalRecord.eventsEntered >= 10 && titleSummary.rankingTitles < Math.floor(rankingFinalRecord.eventsEntered * 0.2)) {
     warnings.push(`Deep-run conversion looks low: ${rankingQuarterFinalPlusRecord.eventsEntered} ranking QF+ runs and ${rankingFinalRecord.eventsEntered} ranking finals produced only ${titleSummary.rankingTitles} ranking titles.`)
@@ -7302,12 +7283,11 @@ function runManagedWeeklyCare(state: GameState, financeBreakdown: FinanceBreakdo
   recordCashDelta(financeBreakdown, 'equipmentMaintenance', nextState, updatedState)
   nextState = updatedState
 
-  nextState = acceptBestSponsors(nextState)
-  nextState = manageCoachExposure(nextState)
+  nextState = trackedCashAction(financeBreakdown, 'sponsorIncome', nextState, acceptBestSponsors)
+  nextState = trackedCashAction(financeBreakdown, 'coachingStaffCosts', nextState, manageCoachExposure)
 
-  updatedState = hireAvailableCoaches(nextState, profile)
-  nextState = updatedState
-  nextState = manageCoachExposure(nextState)
+  nextState = trackedCashAction(financeBreakdown, 'coachingStaffCosts', nextState, value => hireAvailableCoaches(value, profile))
+  nextState = trackedCashAction(financeBreakdown, 'coachingStaffCosts', nextState, manageCoachExposure)
 
   if (nextState.player.fatigue >= supportConfig.treatmentThreshold) {
     updatedState = scheduleTreatmentState(nextState, nextState.player.cash >= 180 ? 'treat-2' : 'treat-3')
@@ -7320,7 +7300,7 @@ function runManagedWeeklyCare(state: GameState, financeBreakdown: FinanceBreakdo
     const entered = nextState.tournaments.filter(t=>t.status==='Entered');
     const focuses = ['potting','safety','mental','fitness'] as const;
     const plan = rotating ? buildFocusedTrainingPlan(nextState.player.fatigue >= (managerPolicy === 'recovery' ? 20 : 65) ? 'recovery':focuses[Math.floor((nextState.week-1)/4)%focuses.length],plusDays(depthOf(nextState).nextSettlementDate,-7),nextState.player.fatigue,entered.map(t=>({name:t.name,location:t.location,startDate:t.startDate})),entered.some(t=>Boolean(nextState.travel.bookings[t.id]))) : undefined;
-    nextState = applyTrainingPlanState(nextState,plan)
+    nextState = trackedCashAction(financeBreakdown, 'other', nextState, value => applyTrainingPlanState(value,plan))
   }
 
   return nextState
@@ -7788,6 +7768,9 @@ function main() {
   const seasonsArg = process.argv.find((arg) => arg.startsWith('--seasons='))
   const supportProfileArg = process.argv.find((arg) => arg.startsWith('--support-profile='))
   const stopAfterSeasonArg = process.argv.find((arg) => arg.startsWith('--stop-after-season='))
+  const stopAtAgeArg = process.argv.find((arg) => arg.startsWith('--stop-at-age='))
+  const stopAtAge = stopAtAgeArg ? Number(stopAtAgeArg.split('=')[1]) : null
+  if (stopAtAge !== null && (!Number.isInteger(stopAtAge) || stopAtAge < 12 || stopAtAge > 100)) throw new Error('--stop-at-age must be an integer from 12 to 100.')
   const startAgeArg = process.argv.find((arg) => arg.startsWith('--start-age='))
   const startingLevelArg = process.argv.find((arg) => arg.startsWith('--starting-level-id='))
   const scenarioLabelArg = process.argv.find((arg) => arg.startsWith('--scenario-label='))
@@ -7907,18 +7890,21 @@ function main() {
   let stopAfterSeasonReached = false
   let stalledSteps = 0
 
-  while (seasons.length < seasonsRequested && calendarSteps < maxWeeks) {
+  while (seasons.length < seasonsRequested && calendarSteps < maxWeeks && (stopAtAge === null || state.player.age < stopAtAge)) {
+    const stepOpeningCash = state.player.cash;
+    const stepOpeningFinance = Object.values(currentSeasonFinance).reduce((n,v)=>n+v,0);
     calendarSteps += 1
     if (process.argv.includes('--trace-steps')) process.stderr.write(`Step ${calendarSteps}: ${state.currentDate}, ${state.week}, ${state.lastAction}\n`)
     observeCareer(state)
     const waitingStory = pendingStory(state)
-    if (waitingStory) state = careerDepthAction(state, { type: 'decision', id: waitingStory.id, choice: waitingStory.kind === 'deciders' || waitingStory.kind === 'early-exits' ? 'continue' : 'protect' })
-    if (state.seasonReview?.pending) state = startNextSeasonState(state)
+    if (waitingStory) state = trackedCashAction(currentSeasonFinance, 'teamAndStoryEvents', state, value => careerDepthAction(value, { type: 'decision', id: waitingStory.id, choice: waitingStory.kind === 'deciders' || waitingStory.kind === 'early-exits' ? 'continue' : 'protect' }))
+    if (state.seasonReview?.pending) state = trackedCashAction(currentSeasonFinance, 'other', state, startNextSeasonState)
     if (managedScenario) {
       state = runManagedWeeklyCare(state, currentSeasonFinance, managedSupportProfile)
     }
 
-    if (process.argv.includes('--season-life')) state = manageSeasonLife(state)
+    if (process.argv.includes('--season-life')) state = trackedCashAction(currentSeasonFinance, 'teamAndStoryEvents', state, manageSeasonLife)
+    state = trackedCashAction(currentSeasonFinance, 'tournamentEntryFees', state, reviewLockedAuditEntry)
     let selectedTournament: Tournament | null = null
     const hasEnteredTournament = state.tournaments.some((tournament) => tournament.status === 'Entered')
     if (!hasEnteredTournament) {
@@ -7950,16 +7936,16 @@ function main() {
     if (enteredTournament && !eventResolvedState.travel.bookings[enteredTournament.id]) {
       const booked = bookTravelState(eventResolvedState, enteredTournament.id)
       recordCashDelta(currentSeasonFinance, 'travelHotelCosts', eventResolvedState, booked)
-      eventResolvedState = booked.travel.bookings[enteredTournament.id] ? booked : withdrawTournamentState(booked, enteredTournament.id)
+      eventResolvedState = booked.travel.bookings[enteredTournament.id] ? booked : trackedCashAction(currentSeasonFinance, 'tournamentEntryFees', booked, value => withdrawTournamentState(value, enteredTournament.id))
     }
-    if (enteredTournament && eventResolvedState.travel.bookings[enteredTournament.id] && !eventResolvedState.travel.bookings[enteredTournament.id].preparation) eventResolvedState = confirmTournamentPreparationState(eventResolvedState, enteredTournament.id, 'balanced', getDefaultPreparationAllocations(), [])
+    if (enteredTournament && eventResolvedState.travel.bookings[enteredTournament.id] && !eventResolvedState.travel.bookings[enteredTournament.id].preparation) eventResolvedState = trackedCashAction(currentSeasonFinance, 'other', eventResolvedState, value => confirmTournamentPreparationState(value, enteredTournament.id, 'balanced', getDefaultPreparationAllocations(), []))
     let tournamentRoundGuard = 0
     while (tournamentRoundGuard < 10) {
       const activeEnteredTournament = eventResolvedState.tournaments.find((tournament) => tournament.status === 'Entered')
       if (!activeEnteredTournament || daysUntil(activeEnteredTournament.startDate, eventResolvedState.currentDate) > 0) break
 
       if (daysUntil(activeEnteredTournament.endDate ?? activeEnteredTournament.startDate, eventResolvedState.currentDate) < 0) {
-        eventResolvedState = withdrawTournamentState(eventResolvedState, activeEnteredTournament.id)
+        eventResolvedState = trackedCashAction(currentSeasonFinance, 'tournamentEntryFees', eventResolvedState, value => withdrawTournamentState(value, activeEnteredTournament.id))
         break
       }
 
@@ -7989,9 +7975,13 @@ function main() {
       }
 
       if (!eventResolvedState.travel.bookings[activeEnteredTournament.id]?.preparation) {
-        eventResolvedState = confirmTournamentPreparationState(eventResolvedState, activeEnteredTournament.id, 'balanced', getDefaultPreparationAllocations(), [])
+        eventResolvedState = trackedCashAction(currentSeasonFinance, 'other', eventResolvedState, value => confirmTournamentPreparationState(value, activeEnteredTournament.id, 'balanced', getDefaultPreparationAllocations(), []))
       }
 
+      // Resolve required decisions between fixtures, just as the user must. Waiting
+      // until after the match loop incorrectly advanced a week for an inbox choice.
+      const fixtureDecision = pendingStory(eventResolvedState)
+      if (fixtureDecision) eventResolvedState = trackedCashAction(currentSeasonFinance, 'teamAndStoryEvents', eventResolvedState, value => careerDepthAction(value, { type: 'decision', id: fixtureDecision.id, choice: fixtureDecision.kind === 'deciders' || fixtureDecision.kind === 'early-exits' ? 'continue' : 'protect' }))
       const preMatchState = eventResolvedState
       const simulatedState = process.argv.includes('--live-match-audit') ? playCenturyMatch(eventResolvedState,activeEnteredTournament.id) : simulateTournamentMatchState(eventResolvedState, activeEnteredTournament.id)
       if (JSON.stringify(preMatchState.attributes) !== JSON.stringify(simulatedState.attributes)) seasonIssues.add(`${archivedSeason}: a match changed permanent attributes outside training.`)
@@ -8000,7 +7990,7 @@ function main() {
         if (/equip a|not enough cash/i.test(simulatedState.lastAction)) {
           // The audit agent must make the same explicit withdrawal decision as a player.
           // The game must never silently advance through an unplayable entered event.
-          eventResolvedState = withdrawTournamentState(simulatedState, activeEnteredTournament.id)
+          eventResolvedState = trackedCashAction(currentSeasonFinance, 'tournamentEntryFees', simulatedState, value => withdrawTournamentState(value, activeEnteredTournament.id))
           equipmentWithdrawals += 1
           break
         }
@@ -8015,7 +8005,7 @@ function main() {
     }
 
     const matchStory = pendingStory(eventResolvedState)
-    if (matchStory) eventResolvedState = careerDepthAction(eventResolvedState, { type: 'decision', id: matchStory.id, choice: matchStory.kind === 'deciders' || matchStory.kind === 'early-exits' ? 'continue' : 'protect' })
+    if (matchStory) eventResolvedState = trackedCashAction(currentSeasonFinance, 'teamAndStoryEvents', eventResolvedState, value => careerDepthAction(value, { type: 'decision', id: matchStory.id, choice: matchStory.kind === 'deciders' || matchStory.kind === 'early-exits' ? 'continue' : 'protect' }))
     observeCareer(eventResolvedState)
     const advancedState = advanceWeekState(eventResolvedState)
     stalledSteps = advancedState.currentDate === state.currentDate && advancedState.matches[0]?.id === state.matches[0]?.id && !advancedState.seasonReview?.pending ? stalledSteps + 1 : 0
@@ -8025,6 +8015,8 @@ function main() {
       break
     }
     recordWeeklyFinanceDelta(currentSeasonFinance, eventResolvedState, advancedState)
+    const stepUnaccounted = advancedState.player.cash - stepOpeningCash - (Object.values(currentSeasonFinance).reduce((n,v)=>n+v,0)-stepOpeningFinance);
+    if (Math.abs(stepUnaccounted) > .01) seasonIssues.add(`${archivedSeason}: audit cash categories missed ${stepUnaccounted.toFixed(2)} on ${advancedState.currentDate}.`);
     observeCareer(advancedState)
     const settledWeek = advancedState.week !== eventResolvedState.week
     weeksSimulated += Number(settledWeek)
@@ -8099,7 +8091,8 @@ function main() {
   }
 
   issues.push(...Array.from(seasonIssues))
-  if (!stopAfterSeasonReached && seasons.length < seasonsRequested) {
+  const ageLimitReached = stopAtAge !== null && state.player.age >= stopAtAge
+  if (!stopAfterSeasonReached && !ageLimitReached && seasons.length < seasonsRequested) {
     issues.push(`Simulation stopped after ${weeksSimulated} weeks and only completed ${seasons.length} archived seasons.`)
   }
 
@@ -8163,7 +8156,7 @@ function main() {
 
   if (confidenceSamples > 20 && saturatedConfidenceWeeks / confidenceSamples > 0.25) issues.push('Confidence saturation: at least 25% of settled weeks remained at 98% or higher.')
   const report: SimulationReport = {
-    longCareerAudit: {managerPolicy,eligibilityPolicy:'Game entry access rules; no ranking-row membership gate',trainingPolicy:process.argv.includes('--rotate-training') || managerPolicy === 'training' || managerPolicy === 'recovery' ? 'rotating focuses' : 'default auto plan',calibrationAdjustments,recovery:recoveryAudit.summary(),development,cardChanges},
+    longCareerAudit: {stopAtAge,ageLimitReached,retiredAtStop:state.careerSystems.lateCareer.retired,managerPolicy,eligibilityPolicy:'Game entry access rules; no ranking-row membership gate',trainingPolicy:process.argv.includes('--rotate-training') || managerPolicy === 'training' || managerPolicy === 'recovery' ? 'rotating focuses' : 'default auto plan',calibrationAdjustments,recovery:recoveryAudit.summary(),development,cardChanges},
     generatedAt: new Date().toISOString(),
     scenario,
     seasonsRequested,

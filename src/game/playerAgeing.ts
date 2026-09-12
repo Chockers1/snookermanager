@@ -50,7 +50,12 @@ export function applySeasonalAgeRegression(attributes: PlayerAttributes, age: nu
   // while leaving learned skills untouched. No attributes are raised here.
   const weights=[.2/5,.46/5,.34/5];
   const cells=groups.flatMap(({group,labels,delta,eased,full},groupIndex)=>labels.filter(label=>label in group).map((label,index)=>({group,label,weight:weights[groupIndex],pace:-delta*(index>=full?eased:1)*Math.pow(group[label]/100,2)})));
-  let budget=annualDecline(age,decline);
+  const overall=Object.values(attributes.technical).reduce((n,v)=>n+v,0)*.46/5
+    +Object.values(attributes.mental).reduce((n,v)=>n+v,0)*.34/5
+    +Object.values(attributes.physical).reduce((n,v)=>n+v,0)*.2/5;
+  // CPU ageing stops at 35 overall. Apply the same floor to future human
+  // decline without raising an imported save or flattening individual skills.
+  let budget=Math.min(annualDecline(age,decline),Math.max(0,overall-35));
   let available=cells.filter(c=>c.pace>0&&c.group[c.label]>1);
   for(let pass=0;pass<cells.length&&budget>1e-10&&available.length;pass++){
     const weightedPace=available.reduce((n,c)=>n+c.pace*c.weight,0);

@@ -10,7 +10,7 @@ for(const viewport of [{width:1920,height:920},{width:1280,height:720},{width:39
  state.rollingRankings!.earnings.push({id:key+':human',eventKey:key,playerName:state.player.fullName,amount:16500,earnedOn:due,expiresOn:'2030-01-01',season:state.season});
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.setViewportSize(viewport);
  await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
- await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await page.evaluate(()=>{history.pushState({},'','/rankings');dispatchEvent(new PopStateEvent('popstate'))});
+ await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();const menu=page.getByRole('button',{name:'Open navigation',exact:true});if(await menu.isVisible())await menu.click();await page.getByRole('navigation').getByRole('link',{name:'Rankings',exact:true}).click();
  await page.getByRole('button',{name:'World Ranking',exact:true}).click();
  await expect(page.getByRole('region',{name:'Pending ranking credit'})).toBeVisible();
  const insights=page.getByLabel('Ranking insights');

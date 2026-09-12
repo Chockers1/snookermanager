@@ -1,3 +1,4 @@
+import { repairHumanSeasonRows } from './humanWorldRecord';
 import type { GameState } from '../hooks/useGameState';
 import type { RankedEvent } from './rollingRankings';
 import { compactEventOutcomes, qualifiedNames } from './rollingRankings';
@@ -30,17 +31,17 @@ export function readArchivedSeason(state: GameState, season: string): Promise<Re
 }
 export function readArchivedPlayer(state: GameState, id: string) {
   const keys=state.historyArchive?.players[id]??[];
-  return Promise.all(keys.map(key=>readChunk<PlayerSeasons>(key))).then(rows=>rows.flat().sort((a,b)=>b.season.localeCompare(a.season)));
+  return Promise.all(keys.map(key=>readChunk<PlayerSeasons>(key))).then(rows=>{const merged=rows.flat().sort((a,b)=>b.season.localeCompare(a.season));return state.worldPlayers.some(p=>p.id===id&&p.playerName===state.player.fullName)?repairHumanSeasonRows(state,merged):merged;});
 }
 
-/** Keep two completed event seasons and four active CPU seasons, plus tiny selection summaries. Retired players need only their latest season in live memory.
+/** Keep the previous and current event seasons and four active CPU seasons, plus tiny selection summaries. Retired players need only their latest season in live memory.
  * This runs on a repaired snapshot, before publishing its smaller active payload. */
 export async function archiveCareerHistory(state: GameState): Promise<GameState> {
   if(typeof indexedDB==='undefined'||!hasCareerDatabase()||!state.rollingRankings||!state.payoutRepair) return state;
   const year=Number(state.season.slice(0,4));
   const groups=new Map<string,Record<string,RankedEvent>>();
   for(const e of Object.values(state.rollingRankings.events)) {
-    if(e.archived || !e.applied || Number(e.season.slice(0,4))>=year-2) continue;
+    if(e.archived || !e.applied || Number(e.season.slice(0,4))>=year-1) continue;
     const group=groups.get(e.season)??{};group[e.key]=e;groups.set(e.season,group);
   }
   const liveSeasonCount = (p: GameState['worldPlayers'][number]) => p.retired ? 1 : 4;

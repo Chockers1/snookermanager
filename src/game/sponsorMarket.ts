@@ -20,12 +20,23 @@ export const seasonalSponsorCompanies = companyNames.flatMap((group, tierIndex) 
 })));
 function hash(value: string) { let result=2166136261; for (const c of value) result=Math.imul(result^c.charCodeAt(0),16777619); return result>>>0; }
 
+const recentFinalCache = new WeakMap<GameState['history']['tournamentHistory'], {season:string; found:boolean}>();
+function hasRecentFinal(state: GameState) {
+  const rows=state.history.tournamentHistory, cached=recentFinalCache.get(rows);
+  if(cached?.season===state.season)return cached.found;
+  const year=Number(state.season.slice(0,4));
+  const found=rows.some(e=>Number(e.season.slice(0,4))>=year-1 && Number(e.season.slice(0,4))<=year && e.matchesPlayed>0 && (e.canonicalResult?.isTitle || e.canonicalResult?.isFinal) && !/qualif|q school|play.?off/i.test(e.tournamentName));
+  recentFinalCache.set(rows,{season:state.season,found});return found;
+}
+
 export function sponsorMarketProfile(state: GameState) {
   const rank=state.rankings.find(r=>r.playerName===state.player.fullName)?.ranking ?? null;
   const rep=state.player.reputation;
   let circuit: string, reach: number;
   if(state.careerSystems.lateCareer.retired) { circuit='Retired';reach=0; }
-  else if(state.careerSystems.lateCareer.seniorActive || /senior/i.test(state.player.rankingLabel)) { circuit='Senior tour';reach=rank!==null&&rank<=16?3:2; }
+  else if(state.careerSystems.lateCareer.seniorActive || /senior/i.test(state.player.rankingLabel)) {
+    circuit='Senior tour';reach=rank!==null&&rank<=16&&hasRecentFinal(state)?3:2;
+  }
   else if(state.careerSystems.pro.hasTourCard) { circuit='Main tour';reach=rank!==null&&rank<=16?5:rank!==null&&rank<=32?4:3; }
   else if(/youth|junior/i.test(state.player.rankingLabel+' '+state.player.careerStage)) { circuit='Youth tour';reach=1; }
   else if(/q school/i.test(state.player.rankingLabel)) { circuit='Q School';reach=2; }

@@ -58,7 +58,7 @@ export function SponsorshipOffersPage() {
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Support</p>
             <h1 className="mt-1 text-2xl font-bold leading-tight text-white">Sponsorship</h1>
-            <p className="mt-1 text-xs text-gray-400">{gameState.season} sponsor market · {sponsorMarketProfile(gameState).label}</p><p className="mt-1 text-[10px] text-gray-500">Fresh approaches each season and as your profile grows. Signed contracts retain their agreed terms.</p>
+            <p className="mt-1 text-xs text-gray-400">{gameState.season} sponsor market · {sponsorMarketProfile(gameState).label}</p><p className="mt-1 text-[10px] text-gray-500">Fresh approaches each season and as your profile grows. Signed contracts retain their agreed terms. Publicity builds reputation up to 60; higher reputation must be earned through career results. Senior national offers require a top-16 position and a singles final in this or the previous season.</p>
           </div>
           <div className="flex shrink-0 gap-2">
             <button type="button" className={compareOffers ? 'btn-primary px-3 py-2 text-xs' : 'btn-secondary px-3 py-2 text-xs'} onClick={() => setCompareOffers((current) => !current)}>{compareOffers ? 'Close Comparison' : 'Compare Offers'}</button>

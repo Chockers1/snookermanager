@@ -1,5 +1,6 @@
 import { describe,it,expect } from 'vitest';
 import { createStarterState, processRankingCalendar, advanceWeekState, evolveWorldPlayersForNextSeason } from '../hooks/useGameState';
+import { humanSeasonStats } from './humanWorldRecord';
 import { annualCpuDevelopment, uniqueRankingRows, cpuSeasonEvidence, repairCpuHistoricalRecords } from './worldIntegrity';
 import { pathwayEntryReason, pathwayCardAwards } from './pathwayRules';
 import { careerBudget, nextClubWorkDate, reconcileCareerBudget } from './careerBudget';
@@ -37,6 +38,9 @@ describe('world endurance regressions',()=>{
   expect(rolled.worldPlayers.find(p=>p.id===veteran.id)?.seasons).toHaveLength(14);
   expect(rolled.worldPlayers.find(p=>p.id===veteran.id)?.seasons.at(-1)?.season).toBe('2013/14');
   expect(rolled.season).toBe('2027/28');expect(rolled.currentDate).toBe('2027-06-30');
+  const humanSummary=rolled.history.seasonRecords.find(s=>s.season===closed.season)!;
+  expect(humanSummary).toBeDefined();
+  expect(rolled.worldPlayers.find(p=>p.playerName===closed.player.fullName)?.seasons.find(s=>s.season===closed.season)).toMatchObject(humanSeasonStats(humanSummary));
   for(const p of rolled.worldPlayers){const s=p.seasons.find(s=>s.season===closed.season);if(!s||p.playerName===closed.player.fullName)continue;expect(s.matches).toBe(s.wins+s.losses+(evidence.get(p.playerName)?.draws??0));expect(s.matches).toBe(evidence.get(p.playerName)?.matches??0);expect(p.majorTitles).toBeGreaterThanOrEqual(evidence.get(p.playerName)?.majors??0);}
   for(const name of pathwayCardAwards(closed).keys())expect(rolled.worldPlayers.find(p=>p.playerName===name)?.hasTourCard,name).toBe(true);
   expect(rolled.worldPlayers.filter(p=>p.hasTourCard)).toHaveLength(128);

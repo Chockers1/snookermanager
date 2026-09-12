@@ -323,7 +323,7 @@ export function FinancePage() {
       </div>
 
       <div className="space-y-3">
-        <p className="text-xs text-gray-400">Monthly estimates use current contracts and support over 52 weeks / 12 months. Future prizes, new bookings, purchases and contract changes are excluded.</p>
+        <p className="text-xs text-gray-400">Background support is paid in full below £25,000 cash, tapers to zero at £100,000, and resumes if your balance falls. Monthly estimates use current contracts and support over 52 weeks / 12 months. Future prizes, new bookings, purchases and contract changes are excluded.</p>
         <div className="card flex h-56 min-h-0 flex-col overflow-hidden sm:h-64">
           <div className="card-header">
             <h3 className="text-sm font-semibold text-white">

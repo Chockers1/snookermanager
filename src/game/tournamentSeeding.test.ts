@@ -1,13 +1,56 @@
+import {careerDepthAction} from './careerDepth';
+import {pendingStory} from './careerDepth/shared';
 import { createPlayerIdentitySeed, createPlayerSliderCatalog, createPlayerBackgroundCatalog } from '../data/gameContent';
 import { getDefaultPreparationAllocations } from './tournamentPreparation';
 import { reconcileRealism } from './realism';
 import { describe, expect, it } from 'vitest';
 import { detailedTournamentCatalog } from '../data/pathwayCalendarData';
-import { createNewCareerState, getTournamentPlayability, enterTournamentState, bookTravelState, confirmTournamentPreparationState, startLiveMatchState, finalizeLiveMatch, createStarterState, buildTournamentDraw, resolveTournamentDrawRound, getTournamentEntryAccess, processRankingCalendar } from '../hooks/useGameState';
+import { alignTournamentEntry, getTournamentEntryRound, createNewCareerState, getTournamentPlayability, enterTournamentState, bookTravelState, confirmTournamentPreparationState, startLiveMatchState, finalizeLiveMatch, createStarterState, buildTournamentDraw, resolveTournamentDrawRound, getTournamentEntryAccess, processRankingCalendar } from '../hooks/useGameState';
 import { resolveTournamentFormat } from '../data/tournamentFormats';
 import { recordRankingEvent, qualifiedNames } from './rollingRankings';
 
 describe('seeded paths and attached qualification', () => {
+  it('uses the selected field seed for byes when the wider circuit rank is lower',()=>{
+    let state=createNewCareerState({fullName:'Entry Test',nationality:'ENG',age:23,handedness:'Right-handed',cueStyle:createPlayerIdentitySeed.cueStyle,playingStyle:createPlayerIdentitySeed.playingStyle,personalityArchetype:createPlayerIdentitySeed.personalityArchetype,sliders:createPlayerSliderCatalog.map(s=>({...s})),backgroundId:createPlayerBackgroundCatalog[0].id,startingLevelId:'start-q-tour'});
+    const event=state.tournaments.find(t=>t.name==='Europe - Event 7')!;
+    // Full-table positions can include players who are no longer eligible.
+    state={...state,competitionTables:{...state.competitionTables,qTour:state.competitionTables.qTour.map(r=>r.playerName===state.player.fullName?{...r,ranking:100}:r)}};
+    const exclude=new Set(state.competitionTables.qTour.filter(r=>r.ranking<80&&r.playerName!==state.player.fullName).map(r=>r.playerName));
+    state={...state,worldPlayers:state.worldPlayers.map(p=>exclude.has(p.playerName)?{...p,hasTourCard:true}:p)};
+    const draw=buildTournamentDraw(state,event,'Preliminary Rounds',true,()=>.5);
+    const first=draw.find(r=>r.matches.some(m=>[m.top,m.bottom].some(p=>p.name===state.player.fullName)))!;
+    expect(first.label).toBe('Last 128');
+    expect(getTournamentEntryRound(state,event)).toBe(first.label);
+    state={...state,tournaments:[{...event,status:'Entered'}],tournamentProgress:{...state.tournamentProgress,tournamentId:event.id,currentRound:'Preliminary Rounds',completedRounds:[],draw}};
+    const repaired=alignTournamentEntry(JSON.parse(JSON.stringify(state)));
+    expect(repaired.tournamentProgress.currentRound).toBe('Last 128');
+    expect(repaired.tournamentProgress.draw).toEqual(draw);
+    expect(repaired.player.cash).toBe(state.player.cash);
+    expect(alignTournamentEntry(repaired)).toBe(repaired);
+    const previousMatch = { status: 'Completed' } as NonNullable<typeof state.liveMatch>;
+    expect(alignTournamentEntry({...state,liveMatch:previousMatch}).tournamentProgress.currentRound).toBe('Last 128');
+    const active = {...state,liveMatch:{...previousMatch,status:'In Progress' as const}};
+    expect(alignTournamentEntry(active)).toBe(active);
+    const scored = structuredClone(state);
+    const played = scored.tournamentProgress.draw.flatMap(r=>r.matches).find(m=>m.top.name===state.player.fullName||m.bottom.name===state.player.fullName)!;
+    played.top.score=0;played.bottom.score=3;
+    expect(alignTournamentEntry(scored)).toBe(scored);
+
+    expect(alignTournamentEntry({...state,tournamentProgress:{...state.tournamentProgress,completedRounds:[{round:'Preliminary Rounds',opponentName:'Recorded opponent',result:'Won',playerFrames:3,opponentFrames:0}]}}).tournamentProgress.currentRound).toBe('Preliminary Rounds');
+  });
+  it.each(['World Seniors Championship','Shanghai Masters','Riyadh Season Championship','Tour Championship','Saudi Arabia Masters','Europe - Event 7'])('%s derives entry from the actual field at every seed boundary',name=>{
+    for(const rank of [1,5,8,9,16,17,24,32,48,64,100]){
+      const s=createStarterState();s.player={...s.player,age:55,worldRanking:rank,amateurRanking:rank};
+      s.careerSystems={...s.careerSystems,pro:{...s.careerSystems.pro,hasTourCard:false},lateCareer:{...s.careerSystems.lateCareer,seniorActive:true}};
+      for(const key of Object.keys(s.competitionTables) as (keyof typeof s.competitionTables)[])s.competitionTables[key]=s.competitionTables[key].map(r=>r.playerName===s.player.fullName?{...r,ranking:rank}:r);
+      s.worldPlayers=s.worldPlayers.map(p=>p.playerName===s.player.fullName?{...p,age:55,hasTourCard:false}:p);
+      const event=s.tournaments.find(t=>t.name===name)!;const entry=getTournamentEntryRound(s,event);
+      const draw=buildTournamentDraw(s,event,entry,true,()=>.5);
+      const first=draw.find(r=>r.matches.some(m=>m.top.name===s.player.fullName||m.bottom.name===s.player.fullName));
+      expect(entry,`${name} with circuit position ${rank}`).toBe(first?.label);
+    }
+  });
+
   it.each([['pc-48', 5, 'Quarter Final'], ['pc-50', 6, 'Semi Final']] as const)('awards a card at the last actual match of %s', (id, games, last) => {
     let state = createNewCareerState({ fullName: createPlayerIdentitySeed.name, nationality: 'NZL', age: 18, handedness: 'Right-handed', cueStyle: createPlayerIdentitySeed.cueStyle, playingStyle: createPlayerIdentitySeed.playingStyle, personalityArchetype: createPlayerIdentitySeed.personalityArchetype, sliders: createPlayerSliderCatalog.map(s => ({ ...s })), backgroundId: createPlayerBackgroundCatalog[0].id, startingLevelId: 'start-q-school' });
     state.player.cash = 100000; state.equipment = createStarterState().equipment; const event = state.tournaments.find(t => t.id === id)!; state.tournaments = [event];
@@ -16,7 +59,8 @@ describe('seeded paths and attached qualification', () => {
     state = confirmTournamentPreparationState(state, id, 'balanced', getDefaultPreparationAllocations(), []);
     state = reconcileRealism({ ...state, currentDate: event.startDate });
     for (let i = 0; i < games; i++) {
-      state = startLiveMatchState(state, id); expect(state.liveMatch?.bestOf, JSON.stringify({game:i,round:state.tournamentProgress.currentRound,play:getTournamentPlayability(state,state.tournaments[0])})).toBe(7);
+      const decision=pendingStory(state);if(decision)state=careerDepthAction(state,{type:'decision',id:decision.id,choice:decision.kind==='deciders'||decision.kind==='early-exits'?'continue':'protect'});
+      state = startLiveMatchState(state, id); expect(state.liveMatch?.status,state.lastAction).toBe('In Progress'); expect(state.liveMatch?.bestOf, JSON.stringify({game:i,round:state.tournamentProgress.currentRound,play:getTournamentPlayability(state,state.tournaments[0])})).toBe(7);
       if (i === games - 1) expect(state.liveMatch?.round).toBe(last);
       state = finalizeLiveMatch(state, { ...state.liveMatch!, playerFrames: 4, opponentFrames: 0, status: 'Completed' });
     }

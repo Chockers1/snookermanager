@@ -2740,7 +2740,7 @@ export const mockCreatePlayerStartingLevels: NewCareerStartingLevel[] = [
     competitionTable: "world",
     stage: 7,
     minAge: 18,
-    maxAge: 48,
+    maxAge: 49,
     targetRanking: 118,
     targetPoints: 520,
   },

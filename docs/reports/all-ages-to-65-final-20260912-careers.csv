@@ -1,0 +1,79 @@
+case,startAge,path,requestedPath,validStartingRoute,seed,status,seasons,endAge,retiredAtStop,matches,wins,losses,draws,winPct,titles,majorTitles,endCash,lowestCash,debtEpisodes,recoveredEpisodes,unresolvedDebt,initialOverall,peakOverall,endOverall,cardGains,cardLosses,issues,seconds,firstCardAge,firstCardSource,seasonsStartingWithCard,seasonsWithNoMatches,worldTitles,averageConfidence,confidenceSamples,weeksAt98Confidence,equipmentWithdrawals
+age12-104729,12,start-club-junior,start-club-junior,True,104729,completed,53,65,False,1004,504,480,20,50.2,10,0,1771834.86,-88.2,1,1,False,47,91,51,6,6,0,2130.55,23,Q School,13,0,0,77.2,2766,0,0
+age12-130363,12,start-club-junior,start-club-junior,True,130363,completed,53,65,False,1013,487,499,27,48.08,7,0,2271159.87,0.07,0,0,False,47,91,46,8,8,0,2225.268,23,Federation Route,19,0,0,76.8,2766,0,0
+age15-104729,15,start-national-youth,start-national-youth,True,104729,completed,50,65,False,1084,633,422,29,58.39,18,0,4404978.57,-233.15,1,1,False,63,93,53,4,4,0,2064.573,20,Q School,22,0,0,78.6,2613,0,0
+age15-130363,15,start-national-youth,start-national-youth,True,130363,completed,50,65,False,940,527,388,25,56.06,13,0,2393556.54,-176.5,1,1,False,63,93,48,8,8,0,1979.595,19,Federation Route,20,0,0,78.2,2613,0,0
+age18-104729,18,start-elite-amateur,start-elite-amateur,True,104729,completed,47,65,False,988,547,410,31,55.36,16,1,5669778.05,78,0,0,False,68,93,53,5,5,0,1918.222,19,Federation Route,24,0,0,78.1,2459,0,0
+age18-130363,18,start-elite-amateur,start-elite-amateur,True,130363,completed,47,65,False,925,563,343,19,60.86,18,0,2071496.97,78,0,0,False,68,93,48,5,5,0,1766.479,25,Federation Route,12,0,0,78.2,2457,0,0
+age21-104729,21,start-q-tour,start-q-tour,True,104729,completed,44,65,False,739,412,308,19,55.75,10,0,1864433.76,78,0,0,False,72,92,52,6,6,0,1575.957,22,Q School,13,0,0,77.9,2303,0,0
+age21-130363,21,start-q-tour,start-q-tour,True,130363,completed,44,65,False,807,458,327,22,56.75,14,0,2361616.15,78,0,0,False,72,92,47,8,8,0,1689.829,22,Q School,18,0,0,78,2303,0,0
+age30-104729,30,start-rookie-pro,start-rookie-pro,True,104729,completed,35,65,False,525,226,283,16,43.05,1,0,2272239.25,78,0,0,False,72,89,49,2,3,0,1169.103,30,Seeded Main Tour,15,0,0,75.3,1833,0,0
+age30-130363,30,start-rookie-pro,start-rookie-pro,True,130363,completed,35,65,False,479,227,240,12,47.39,6,0,1264923.14,78,0,0,False,72,89,45,4,5,0,1078.693,30,Seeded Main Tour,10,0,0,76.2,1833,0,0
+age40-104729,40,start-top-64,start-top-64,True,104729,completed,25,65,False,214,49,165,0,22.9,1,0,403048.5,78,0,0,False,74,75,46,0,1,0,671.62,40,Ranking Retained,2,0,0,72.6,1311,0,0
+age40-130363,40,start-top-64,start-top-64,True,130363,completed,25,65,False,213,34,176,3,15.96,0,0,501869.84,78,0,0,False,74,75,40,1,2,0,680.558,40,Ranking Retained,4,0,0,70.8,1311,0,0
+age50-104729,50,start-masters,start-masters,True,104729,completed,15,65,False,107,12,95,0,11.21,0,0,202348.66,78,0,0,False,68,68,42,0,0,0,359.429,,,0,0,0,70.8,789,0,0
+age50-130363,50,start-masters,start-masters,True,130363,completed,15,65,False,104,10,94,0,9.62,0,0,176165.86,78,0,0,False,68,68,38,0,0,0,379.402,,,0,0,0,70.3,789,0,0
+age13-104729,13,start-club-junior,start-club-junior,True,104729,completed,52,65,False,1004,474,508,22,47.21,11,0,2843222.94,0.1,0,0,False,47,90,51,5,5,0,2028.571,24,Q School,19,0,0,76.9,2715,0,0
+age13-130363,13,start-club-junior,start-club-junior,True,130363,completed,52,65,False,1008,478,500,30,47.42,7,2,4127512.79,0.07,0,0,False,47,91,46,4,4,0,2051.717,23,Q School,20,0,0,76.5,2715,0,0
+age14-104729,14,start-club-junior,start-club-junior,True,104729,completed,51,65,False,975,476,473,26,48.82,8,0,2998985.8,0.3,0,0,False,49,91,51,5,5,0,1897.377,23,Q School,16,0,0,76.7,2664,0,0
+age14-130363,14,start-club-junior,start-club-junior,True,130363,completed,51,65,False,927,483,434,10,52.1,9,0,1442376.79,-88.75,2,2,False,49,91,46,4,4,0,1804.483,23,Q School,8,0,0,77.3,2664,0,0
+age16-104729,16,start-national-youth,start-national-youth,True,104729,completed,49,65,False,945,567,368,10,60.0,20,0,1488497.55,-372.2,1,1,False,63,93,52,4,4,0,1651.971,22,Q School,8,0,0,78.8,2560,0,0
+age16-130363,16,start-national-youth,start-national-youth,True,130363,completed,49,65,False,965,562,381,22,58.24,17,0,4322899.9,-176.5,1,1,False,63,93,48,6,6,0,1759.515,22,Q School,17,0,0,78.1,2560,0,0
+age17-104729,17,start-national-youth,start-national-youth,True,104729,completed,48,65,False,914,532,360,22,58.21,16,0,2035890.63,42.65,0,0,False,63,92,52,4,4,0,1617.081,23,Q School,13,0,0,78.6,2508,0,0
+age17-130363,17,start-national-youth,start-national-youth,True,130363,completed,48,65,False,921,522,378,21,56.68,13,0,2859759.37,-279.15,1,1,False,63,92,48,2,2,0,1652.476,23,Q Tour,17,0,0,78.3,2508,0,0
+age19-104729,19,start-elite-amateur,start-elite-amateur,True,104729,completed,46,65,False,889,517,357,15,58.16,13,0,2142023.26,78,0,0,False,68,92,52,5,5,0,1496.118,23,Q School,14,0,0,78.1,2406,0,0
+age19-130363,19,start-elite-amateur,start-elite-amateur,True,130363,completed,46,65,False,1030,567,429,34,55.05,19,0,6276112.74,78,0,0,False,68,92,47,3,3,0,1642.922,22,Q School,22,0,0,77.6,2406,0,0
+age20-104729,20,start-elite-amateur,start-elite-amateur,True,104729,completed,45,65,False,774,417,338,19,53.88,4,0,2441331.55,78,0,0,False,68,92,52,4,4,0,1410.367,23,Federation Route,13,0,0,77.8,2355,0,0
+age20-130363,20,start-elite-amateur,start-elite-amateur,True,130363,completed,45,65,False,900,497,380,23,55.22,9,0,4654093.22,78,0,0,False,68,92,47,4,4,0,1500.212,23,Q School,17,0,0,77.6,2355,0,0
+age22-104729,22,start-q-tour,start-q-tour,True,104729,completed,43,65,False,696,386,289,21,55.46,11,0,1897330.16,78,0,0,False,72,92,52,5,5,0,1316.973,23,Q School,13,0,0,77.9,2250,0,0
+age22-130363,22,start-q-tour,start-q-tour,True,130363,completed,43,65,False,828,444,351,33,53.62,9,0,3768095.7,78,0,0,False,72,92,47,4,4,0,1449.081,23,Q School,21,0,0,77.5,2250,0,0
+age23-104729,23,start-q-tour,start-q-tour,True,104729,completed,42,65,False,888,484,375,29,54.5,12,0,5569151.91,78,0,0,False,72,91,52,6,6,0,1426.101,24,Q School,20,0,0,77.3,2198,0,0
+age23-130363,23,start-q-tour,start-q-tour,True,130363,completed,42,65,False,737,404,307,26,54.82,9,0,2063250.94,78,0,0,False,72,91,46,6,6,0,1330.172,24,Q School,16,0,0,78.1,2198,0,0
+age24-104729,24,start-q-tour,start-q-tour,True,104729,completed,41,65,False,736,401,312,23,54.48,8,0,3348333.16,78,0,0,False,72,91,51,4,4,0,1438.279,25,Q School,17,0,0,77.5,2146,0,0
+age24-130363,24,start-q-tour,start-q-tour,True,130363,completed,41,65,False,635,334,288,13,52.6,5,0,1668720.36,78,0,0,False,72,90,46,4,4,0,1307.41,25,Q School,12,0,0,77.2,2146,0,0
+age25-104729,25,start-rookie-pro,start-rookie-pro,True,104729,completed,40,65,False,649,354,279,16,54.55,10,0,1564903.08,78,0,0,False,72,90,50,5,6,0,1297.478,25,Seeded Main Tour,12,0,0,77.1,2094,0,0
+age25-130363,25,start-rookie-pro,start-rookie-pro,True,130363,completed,40,65,False,661,352,293,16,53.25,7,0,1924537.66,78,0,0,False,72,90,45,5,6,0,1321.605,25,Seeded Main Tour,15,0,0,77.2,2094,0,0
+age26-104729,26,start-rookie-pro,start-rookie-pro,True,104729,completed,39,65,False,587,300,270,17,51.11,5,0,1651927.96,78,0,0,False,72,89,50,3,4,0,1272.968,26,Seeded Main Tour,11,0,0,77,2042,0,0
+age26-130363,26,start-rookie-pro,start-rookie-pro,True,130363,completed,39,65,False,571,304,247,20,53.24,7,1,4045720.32,78,0,0,False,72,89,45,3,4,0,1317.653,26,Seeded Main Tour,13,0,1,77.1,2042,0,0
+age27-104729,27,start-rookie-pro,start-rookie-pro,True,104729,completed,38,65,False,566,297,253,16,52.47,8,0,1539810.36,78,0,0,False,72,89,50,3,4,0,1181.62,27,Seeded Main Tour,10,0,0,77.2,1990,0,0
+age27-130363,27,start-rookie-pro,start-rookie-pro,True,130363,completed,38,65,False,569,286,268,15,50.26,5,0,1657621.93,78,0,0,False,72,89,45,4,5,0,1220.735,27,Seeded Main Tour,11,0,0,76.6,1990,0,0
+age28-104729,28,start-rookie-pro,start-rookie-pro,True,104729,completed,37,65,False,547,281,253,13,51.37,6,0,1984913.88,78,0,0,False,72,89,50,2,3,0,1598.1,28,Seeded Main Tour,10,0,0,76.6,1937,0,0
+age28-130363,28,start-rookie-pro,start-rookie-pro,True,130363,completed,37,65,False,563,285,266,12,50.62,4,0,1505795.66,78,0,0,False,72,89,45,5,6,0,1641.698,28,Seeded Main Tour,12,0,0,76.7,1937,0,0
+age29-104729,29,start-rookie-pro,start-rookie-pro,True,104729,completed,36,65,False,519,245,259,15,47.21,3,0,1279375.42,78,0,0,False,72,89,50,4,5,0,1574.325,29,Seeded Main Tour,12,0,0,76,1885,0,0
+age29-130363,29,start-rookie-pro,start-rookie-pro,True,130363,completed,36,65,False,507,233,263,11,45.96,3,0,1394807.61,78,0,0,False,72,89,45,4,5,0,1586.229,29,Seeded Main Tour,12,0,0,75.9,1885,0,0
+age31-104729,31,start-rookie-pro,start-rookie-pro,True,104729,completed,34,65,False,596,280,294,22,46.98,4,0,4237574.3,78,0,0,False,72,88,50,1,2,0,1627.023,31,Seeded Main Tour,17,0,0,75.6,1781,0,0
+age31-130363,31,start-rookie-pro,start-rookie-pro,True,130363,completed,34,65,False,412,189,218,5,45.87,2,0,928585.5,78,0,0,False,72,88,45,2,3,0,1399.61,31,Seeded Main Tour,6,0,0,76,1781,0,0
+age32-104729,32,start-rookie-pro,start-rookie-pro,True,104729,completed,33,65,False,447,201,236,10,44.97,1,0,1273402.42,78,0,0,False,72,87,49,2,3,0,1423.283,32,Seeded Main Tour,9,0,0,76,1729,0,0
+age32-130363,32,start-rookie-pro,start-rookie-pro,True,130363,completed,33,65,False,390,155,230,5,39.74,2,0,1003324.48,78,0,0,False,72,87,44,3,4,0,1391.965,32,Seeded Main Tour,8,0,0,74.5,1729,0,0
+age33-104729,33,start-rookie-pro,start-rookie-pro,True,104729,completed,32,65,False,393,163,217,13,41.48,3,0,1236855.26,78,0,0,False,72,86,49,2,3,0,1363.656,33,Seeded Main Tour,8,0,0,75.4,1676,0,0
+age33-130363,33,start-rookie-pro,start-rookie-pro,True,130363,completed,32,65,False,362,143,214,5,39.5,2,0,739642.34,78,0,0,False,72,86,43,2,3,0,1302.149,33,Seeded Main Tour,6,0,0,74.9,1676,0,0
+age34-104729,34,start-rookie-pro,start-rookie-pro,True,104729,completed,31,65,False,338,123,212,3,36.39,3,0,822135.32,78,0,0,False,72,83,48,2,3,0,1283.791,34,Seeded Main Tour,6,0,0,74.4,1624,0,0
+age34-130363,34,start-rookie-pro,start-rookie-pro,True,130363,completed,31,65,False,304,100,200,4,32.89,1,0,629164.26,78,0,0,False,72,83,43,1,2,0,1265.561,34,Seeded Main Tour,4,0,0,74,1624,0,0
+age35-104729,35,start-top-64,start-top-64,True,104729,completed,30,65,False,297,107,187,3,36.03,2,0,610429.68,78,0,0,False,74,82,48,1,2,0,1220.75,35,Ranking Retained,4,0,0,74.3,1572,0,0
+age35-130363,35,start-top-64,start-top-64,True,130363,completed,30,65,False,299,108,187,4,36.12,1,0,699008.1,78,0,0,False,74,81,43,1,2,0,1213.522,35,Ranking Retained,4,0,0,74,1572,0,0
+age36-104729,36,start-top-64,start-top-64,True,104729,completed,29,65,False,277,84,190,3,30.32,1,0,625193.34,78,0,0,False,74,81,47,1,2,0,1143.118,36,Ranking Retained,4,0,0,73.5,1520,0,0
+age36-130363,36,start-top-64,start-top-64,True,130363,completed,29,65,False,285,90,191,4,31.58,0,0,619843.78,78,0,0,False,74,80,43,1,2,0,1141.022,36,Ranking Retained,4,0,0,73.2,1520,0,0
+age37-104729,37,start-top-64,start-top-64,True,104729,completed,28,65,False,257,73,182,2,28.4,1,0,554906.22,78,0,0,False,74,79,47,1,2,0,850.587,37,Ranking Retained,4,0,0,73.3,1468,0,0
+age37-130363,37,start-top-64,start-top-64,True,130363,completed,28,65,False,258,75,181,2,29.07,0,0,629305.08,78,0,0,False,74,79,42,1,2,0,876.534,37,Ranking Retained,4,0,0,73,1468,0,0
+age38-104729,38,start-top-64,start-top-64,True,104729,completed,27,65,False,258,75,182,1,29.07,1,0,551102.06,78,0,0,False,74,78,47,1,2,0,815.612,38,Ranking Retained,4,0,0,73.1,1416,0,0
+age38-130363,38,start-top-64,start-top-64,True,130363,completed,27,65,False,271,89,178,4,32.84,3,0,616940.54,78,0,0,False,74,77,42,1,2,0,824.916,38,Ranking Retained,4,0,0,73.9,1416,0,0
+age39-104729,39,start-top-64,start-top-64,True,104729,completed,26,65,False,252,70,181,1,27.78,2,0,509259.96,78,0,0,False,74,77,46,1,2,0,777.025,39,Ranking Retained,4,0,0,72.7,1363,0,0
+age39-130363,39,start-top-64,start-top-64,True,130363,completed,26,65,False,227,62,163,2,27.31,1,0,458277.81,78,0,0,False,74,76,42,0,1,0,765.524,39,Ranking Retained,2,0,0,72.8,1363,0,0
+age41-104729,41,start-top-64,start-top-64,True,104729,completed,24,65,False,210,50,160,0,23.81,0,0,410841.49,78,0,0,False,74,74,45,0,1,0,725.366,41,Ranking Retained,2,0,0,72.7,1259,0,0
+age41-130363,41,start-top-64,start-top-64,True,130363,completed,24,65,False,198,36,160,2,18.18,0,0,410645.78,78,0,0,False,74,74,40,0,1,0,705.919,41,Ranking Retained,2,0,0,71.7,1259,0,0
+age42-104729,42,start-top-64,start-top-64,True,104729,completed,23,65,False,202,47,155,0,23.27,1,0,372958.11,78,0,0,False,74,74,45,0,1,0,687.922,42,Ranking Retained,2,0,0,72.2,1207,0,0
+age42-130363,42,start-top-64,start-top-64,True,130363,completed,23,65,False,194,38,154,2,19.59,0,0,400976.26,78,0,0,False,74,74,39,0,1,0,667.508,42,Ranking Retained,2,0,0,71.3,1207,0,0
+age43-104729,43,start-top-64,start-top-64,True,104729,completed,22,65,False,188,36,152,0,19.15,0,0,352766.77,78,0,0,False,74,74,45,0,1,0,663.954,43,Ranking Retained,2,0,0,71.6,1155,0,0
+age43-130363,43,start-top-64,start-top-64,True,130363,completed,22,65,False,197,35,160,2,17.77,0,0,461870.56,78,0,0,False,74,74,39,1,2,0,649.84,43,Ranking Retained,4,0,0,71.3,1155,0,0
+age44-104729,44,start-top-64,start-top-64,True,104729,completed,21,65,False,187,40,147,0,21.39,0,0,349621.67,78,0,0,False,74,74,45,0,1,0,623.935,44,Ranking Retained,2,0,0,71.8,1102,0,0
+age44-130363,44,start-top-64,start-top-64,True,130363,completed,21,65,False,180,34,144,2,18.89,0,0,383477.14,78,0,0,False,74,74,39,0,1,0,607.155,44,Ranking Retained,2,0,0,71.3,1102,0,0
+age45-104729,45,start-top-64,start-masters,True,104729,completed,20,65,False,175,35,140,0,20.0,0,0,345727.86,78,0,0,False,74,74,45,0,1,0,572.546,45,Ranking Retained,2,0,0,71.6,1050,0,0
+age45-130363,45,start-top-64,start-masters,True,130363,completed,20,65,False,170,30,140,0,17.65,0,0,348451.89,78,0,0,False,74,74,39,0,1,0,566.181,45,Ranking Retained,2,0,0,71.1,1050,0,0
+age46-104729,46,start-bottom-tour,start-masters,True,104729,completed,19,65,False,146,23,123,0,15.75,0,0,255225.74,105,0,0,False,72,72,44,0,1,0,545.51,46,Seeded Main Tour,1,0,0,71.3,998,0,0
+age46-130363,46,start-bottom-tour,start-masters,True,130363,completed,19,65,False,148,24,124,0,16.22,1,0,216679.94,58.84,0,0,False,72,72,39,0,1,0,542.312,46,Seeded Main Tour,1,0,0,71,998,0,0
+age47-104729,47,start-bottom-tour,start-masters,True,104729,completed,18,65,False,147,29,118,0,19.73,1,0,274624.66,105,0,0,False,72,72,44,0,1,0,520.512,47,Seeded Main Tour,1,0,0,71.6,946,0,0
+age47-130363,47,start-bottom-tour,start-masters,True,130363,completed,18,65,False,131,10,121,0,7.63,0,0,261449.51,58.84,0,0,False,72,72,40,0,1,0,513.796,47,Seeded Main Tour,1,0,0,69.8,946,0,0
+age48-104729,48,start-bottom-tour,start-masters,True,104729,completed,17,65,False,138,29,109,0,21.01,0,0,276245.97,105,0,0,False,72,72,45,0,1,0,488.603,48,Seeded Main Tour,1,0,0,71.9,894,0,0
+age48-130363,48,start-bottom-tour,start-masters,True,130363,completed,17,65,False,128,15,113,0,11.72,0,0,251339.64,58.84,0,0,False,72,72,41,0,1,0,484.535,48,Seeded Main Tour,1,0,0,70.3,894,0,0
+age49-104729,49,start-bottom-tour,start-masters,True,104729,completed,16,65,False,133,26,107,0,19.55,0,0,244461.05,105,0,0,False,72,72,46,0,1,0,460.768,49,Seeded Main Tour,1,0,0,71.6,842,0,0
+age49-130363,49,start-bottom-tour,start-masters,True,130363,completed,16,65,False,127,19,108,0,14.96,0,0,239632.57,58.84,0,0,False,72,72,41,0,1,0,459.727,49,Seeded Main Tour,1,0,0,70.9,842,0,0

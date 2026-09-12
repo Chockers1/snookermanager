@@ -499,5 +499,5 @@ export function getValidatedStartingLevel(levels: NewCareerStartingLevel[], age:
   if (requestedLevel) return requestedLevel
   if (eligibleLevels.length > 0) return eligibleLevels[eligibleLevels.length - 1]
 
-  return levels[0]
+  throw new Error(`No eligible starting route for age ${age}. Choose an age supported by the career catalogue.`)
 }

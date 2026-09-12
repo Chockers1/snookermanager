@@ -268,7 +268,7 @@ export function TournamentHubPage() {
   }
 
   return (
-    <div className="relative flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-auto xl:p-1.5">
+    <div className="relative flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100%+3rem)] xl:gap-2 xl:overflow-auto xl:p-1.5">
 
       {activeTournament.legacyEntryHonoured && <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">Your previously accepted entry has been restored after a save rules update. This exception applies to this event only; future World Championship entries use the ranking cutoff and qualifying results.</p>}
       {isMajorEvent ? (
@@ -466,9 +466,9 @@ export function TournamentHubPage() {
                   )}
                 </div>
                 {tournamentEntered && completedRounds.length === 0 && !(gameState.liveMatch?.tournamentId === activeTournament.id && gameState.liveMatch.status === "In Progress") && <button type="button" className="btn-secondary min-h-8 text-xs xl:w-full" onClick={() => withdrawTournament(activeTournament.id)}>Withdraw Entry</button>}
-                {tournamentEntered && !playability?.canPlay ? (
+                {tournamentEntered && !playability?.canPlay && !advancementDecision ? (
                   <p className="text-center text-[10px] leading-tight text-amber-300">
-                    {advancementDecision ? `Time is paused for “${advancementDecision.title}”. Choose a response in Inbox, then advance to the tournament.` : playability?.reason}
+                    {playability?.reason}
                   </p>
                 ) : null}
               </div>

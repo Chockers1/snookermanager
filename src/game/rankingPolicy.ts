@@ -4,7 +4,7 @@ export function getProTourAccessBand(worldRank: number, hasTourCard: boolean): P
   if (worldRank <= 16) return 'top16'
   if (worldRank <= 32) return 'top32'
   if (worldRank <= 64) return 'top64'
-  if (worldRank <= 128 && hasTourCard) return 'bottomTour'
+  if (hasTourCard) return 'bottomTour'
   return 'offTour'
 }
 

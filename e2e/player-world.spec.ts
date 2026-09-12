@@ -18,6 +18,6 @@ for(const width of [1280,390])test('player profiles and exhibition achievements 
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);await page.screenshot({path:'artifacts/player-profile-'+width+'.png'});
  await selector.selectOption('2026/27');
  const opponentLink=page.locator('details').filter({has:page.locator('summary').filter({hasText:'Profile Open'})}).getByRole('link').first();
- await opponentLink.click();await expect(page.getByLabel('Player history season')).toHaveValue('all');
+ await opponentLink.click();await expect(page.getByLabel('Player history season')).toHaveValue('recent');
  await navigate('/career/stats');await expect(page.getByRole('region',{name:'Exhibition achievements'})).toContainText('Profile Open');await expect(page.getByRole('region',{name:'Exhibition achievements'})).toContainText('£7,500');expect(errors).toEqual([]);
 });

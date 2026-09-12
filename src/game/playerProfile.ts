@@ -1,3 +1,4 @@
+import { humanSeasonStats } from './humanWorldRecord';
 import type { GameState } from '../hooks/useGameState';
 import { scoutingReport } from './realism/scouting';
 export function resolveProfilePlayer(state: GameState, idOrName: string) {
@@ -31,10 +32,13 @@ export const profileRankingColumns = [
 /** Combine durable season summaries with published events, never the player's current tour alone. */
 export function playerSeasonHistory(state: GameState, name: string, history = playerEventHistory(state, name)) {
  const player = resolveProfilePlayer(state, name);
- const seasons = new Set([...(player?.seasons.map(s=>s.season)??[]), ...history.map(e=>e.season)]);
+ const humanSummaries = new Map(name===state.player.fullName?state.history.seasonRecords.map(r=>[r.season,r] as const):[]);
+ const seasons = new Set([...(player?.seasons.map(s=>s.season)??[]), ...history.map(e=>e.season), ...humanSummaries.keys()]);
  if(player && !player.retired) seasons.add(state.season);
  return [...seasons].sort((a,b)=>b.localeCompare(a)).map(season=>{
-  const saved = player?.seasons.find(s=>s.season===season);
+  const stored = player?.seasons.find(s=>s.season===season);
+  const summary = humanSummaries.get(season);
+  const saved = summary ? {...stored,...humanSeasonStats(summary)} : stored;
   const events = history.filter(e=>e.season===season);
   const live = season===state.season && !saved;
   const complete = events.length>0 && events.every(e=>e.stats!==undefined);

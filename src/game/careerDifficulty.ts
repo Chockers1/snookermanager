@@ -6,6 +6,8 @@ export const careerDifficulties = {
   demanding:{label:'Demanding',support:.75,missedCompliance:22,missedLimit:3,description:'75% of background weekly support. Sponsor obligations cost 22 compliance when missed; three missed obligations or compliance below 40 can end a deal.'},
 } as const;
 export function careerDifficulty(state: Pick<GameState,'difficulty'>) {return careerDifficulties[state.difficulty??'standard']??careerDifficulties.standard;}
-export function backgroundWeeklySupport(state: Pick<GameState,'difficulty'|'finance'|'careerSystems'>) {
-  return state.careerSystems.lateCareer.retired?0:Math.round(state.finance.baseCashFlow * (state.finance.baseCashFlow > 0 ? careerDifficulty(state).support : 1));
+export function backgroundWeeklySupport(state: Pick<GameState,'difficulty'|'finance'|'careerSystems'|'player'>) {
+  const support=state.finance.baseCashFlow;
+  const fraction=Math.max(0,Math.min(1,(100000-state.player.cash)/75000));
+  return state.careerSystems.lateCareer.retired?0:Math.round(support * (support > 0 ? careerDifficulty(state).support*fraction : 1));
 }

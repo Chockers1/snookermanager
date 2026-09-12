@@ -40,12 +40,12 @@ export function tournamentEligibility(state: GameState, event: Tournament) {
       selection = 'Main-tour status required. The top 16 at the World Ranking cutoff enter directly; other entrants must complete the attached qualifying route. This main draw is not top-16-only.';
       break;
     case 'worldChampionshipQualifying':
-      field = 'World ranks 17–128 · main-tour qualifying';
+      field = 'Main-tour cardholders outside the top 16';
       selection = 'Main-tour status required. Top-16 players at the designated cutoff enter the main draw directly. Qualifying places must be won; an early-round win may not finish the route.';
       break;
     case 'rookieQualifier':
       field = 'Main-tour qualifying · protected seeds excluded';
-      selection = `Main-tour status and a World Ranking inside 128 are required.${format.seedOffset ? ` Top ${format.seedOffset} seeds enter the main draw directly; this qualifier is for lower seeds.` : ''} Successful qualifiers proceed to the attached event.`;
+      selection = `Main-tour status is required, including protected cardholders ranked below 128.${format.seedOffset ? ` Top ${format.seedOffset} seeds enter the main draw directly; this qualifier is for lower seeds.` : ''} Successful qualifiers proceed to the attached event.`;
       break;
     case 'eliteInvitational':
       if (/^masters$/i.test(event.name)) {
@@ -67,8 +67,8 @@ export function tournamentEligibility(state: GameState, event: Tournament) {
       selection = 'The game accepts main-tour players, elite amateurs, senior-circuit players, age 40+ players or reputation of at least 70. An event named Veteran is not necessarily senior-only.';
       break;
     default:
-      field = 'Main-tour field · World Ranking inside 128';
-      selection = 'Active main-tour status or retained top-64 standing is required. Entry rounds and seed protection follow the event format; a small late-round field is not an entry restriction.';
+      field = 'Main-tour field · active professional status';
+      selection = 'Active main-tour status or retained top-64 standing is required. Protected cardholders remain eligible below World #128. Entry rounds and seed protection follow the event format; a small late-round field is not an entry restriction.';
   }
   if (['internationalChampionship', 'worldOpen', 'homeNationsMain'].includes(format.id)) {
     field = `Top ${attachedMainDirectSeeds(event)} world seeds + successful qualifiers`;

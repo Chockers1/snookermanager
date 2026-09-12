@@ -1,6 +1,6 @@
 # Snooker Career Manager
 
-Snooker Career Manager is a desktop-first single-page career-management game built with React, TypeScript, and Vite. The player controls one created snooker professional across training, tournaments, travel, equipment, staff, finances, sponsorship, recovery, rankings, and multi-season career progression.
+Snooker Career Manager is a desktop-first single-page career-management game built with React, TypeScript, and Vite. The player controls one created snooker player across training, tournaments, travel, equipment, staff, finances, sponsorship, recovery, rankings, and multi-season career progression.
 
 This README is intentionally detailed. It is the main technical and gameplay reference for how the current build works, how the systems depend on each other, and where future development should land.
 
@@ -8,14 +8,14 @@ This README is intentionally detailed. It is the main technical and gameplay ref
 
 The game is currently a client-only management sim with:
 
-- one canonical local save
+- one active career, named local slots and rotating recovery saves
 - one player-controlled career
 - authored tournament and pathway data
 - state-driven route pages
 - season rollover and archive support
 - a separate competition-table model for different circuits
 
-There is no backend, no remote save service, and no multiplayer layer. All meaningful state lives in the browser and is persisted via `localStorage`.
+There is no backend, no remote save service, and no multiplayer layer. Career payloads and historical archives are persisted in IndexedDB; lightweight settings and legacy migration markers use `localStorage`. Portable JSON exports include the full career.
 
 The project is designed around a simple rule:
 
@@ -66,7 +66,7 @@ The live build already includes substantial interconnected systems:
 - Tailwind CSS v3
 - Recharts
 - Lucide React
-- browser `localStorage`
+- browser IndexedDB, with `localStorage` for lightweight settings
 
 ## 5. High-Level Runtime Architecture
 
@@ -75,7 +75,7 @@ flowchart LR
   Player --> UI[Route Pages + Shared Components]
   UI --> Context[GameStateProvider]
   Context --> Store[useGameState]
-  Store --> Persist[localStorage]
+  Store --> Persist[IndexedDB saves and historical archives]
   Seed[Static Data Catalogs] --> Store
   Seed --> Selectors[Shared Route Selectors]
   Store --> Selectors
@@ -119,9 +119,9 @@ For the detailed live-match system report, see `docs/live_match_logic.md`.
 
 Application startup works like this:
 
-1. `src/main.tsx` mounts the app.
+1. `src/main.tsx` prepares browser storage, migrates legacy localStorage saves and decodes the active payload before mounting the app.
 2. `GameStateProvider` calls `useGameState()`.
-3. `useGameState()` tries to load the current save from `localStorage`.
+3. `useGameState()` hydrates and repairs the active IndexedDB save. Starter defaults are created without repairing an unrelated second career.
 4. If no save exists, it builds a starter state from the seed data layer.
 5. `src/App.tsx` mounts the router and lazy route tree inside `AppShell`.
 6. Routes render against the current `gameState` and call actions via `useGame()`.
@@ -890,19 +890,20 @@ This sequence keeps the architecture coherent and prevents UI-first drift.
 
 Persistence is local-first and portable:
 
-- the active save is loaded from `localStorage` and upgraded through a versioned repair step
-- state changes rewrite the active save
+- the active save is loaded from IndexedDB and upgraded through a versioned repair step; legacy localStorage payloads migrate without deleting originals until the database commit succeeds
+- state changes schedule compressed active-save writes; the Saving indicator distinguishes pending work from a completed durable save
 - Save Manager supports multiple named browser-local slots
 - careers can be exported to and imported from JSON
-- the save contains both current progress and accumulated history
+- the active payload retains current progress, the current and previous event seasons, four active CPU seasons and compact selection summaries; older records are retrieved from immutable archive chunks when requested
+- portable exports materialize every archived record; missing or damaged chunks block export with an error instead of silently dropping history
 
 Implications:
 
-- the app works offline
+- the simulation runs locally once application assets are loaded; browser storage belongs to the current origin and browser profile
 - browser storage is the source of truth
 - resetting a career overwrites the active save but leaves named slots intact
 - schema evolution is handled by the save schema version and hydration repair
-- JSON exports provide a user-controlled backup and a future cloud-storage interchange format
+- JSON exports provide a user-controlled backup; export before changing hosting origin or clearing browser data
 
 ## 27. Current Constraints And Tradeoffs
 

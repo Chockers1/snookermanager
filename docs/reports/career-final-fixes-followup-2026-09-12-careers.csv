@@ -1,0 +1,9 @@
+﻿case,startAge,path,seed,seasons,endAge,matches,wins,losses,draws,winPercent,singlesTitles,worldTitles,worldFinals,prize,endCash,minimumCash,debtEpisodes,unresolvedDebt,startOverall,peakOverall,peakAge,endOverall,firstCardAge,cardAtStart,cardAtEnd,retired,finalStatus,worldRank,seniorRank,centuries,highestBreak,maximums,rawSaveBytes,sponsorIncome,otherNet,teamEvents
+age12-start-club-junior-130363-3y,12,Club youth,130363,3,15,70,1,69,0,1.43,0,0,0,0,7170.46,6.0,0,False,47,56,15,56,,False,False,False,Amateur,,,0,46,0,15771359,7694,12063.26,6
+age15-start-national-youth-130363-3y,15,National youth,130363,3,18,69,10,59,0,14.49,0,0,0,0,1193.26,0.1,0,False,63,73,18,73,,False,False,False,Amateur,,,0,99,0,15852831,7694,11968.26,6
+age18-start-elite-amateur-130363-3y,18,Elite amateur,130363,3,21,99,41,55,3,41.41,0,0,0,38050,114778.04,78,0,False,68,79,21,79,20,False,True,False,Bottom Tour / At Risk,92,,2,107,0,16680397,102735,7268.48,6
+age21-start-q-tour-130363-3y,21,Q Tour,130363,3,24,81,54,27,0,66.67,0,0,0,9210,77062.46,78,0,False,72,82,24,82,24,False,True,False,Bottom Tour / At Risk,118,,26,138,0,16664220,70162,21888.82,6
+age30-start-rookie-pro-130363-3y,30,Rookie professional,130363,3,33,69,41,26,2,59.42,0,0,0,75100,231022.1,78,0,False,72,82,33,82,30,True,False,False,Bottom Tour / At Risk,70,,18,144,0,16452460,140501,40348.26,6
+age40-start-top-64-130363-3y,40,Top-64 professional,130363,3,43,59,34,25,0,57.63,0,0,0,90150,243771.01,78,0,False,74,74,40,74,40,True,True,False,Bottom Tour / At Risk,78,,6,132,0,16554520,144642,37340.77,6
+age50-start-masters-104729-30y,50,Seniors,104729,30,80,179,18,161,0,10.06,0,0,0,125,812092.76,78,0,False,68,68,50,38,,False,False,True,Retired,,,0,59,0,129260812,613522,317842.56,56
+age50-start-masters-130363-30y,50,Seniors,130363,30,80,194,21,173,0,10.82,0,0,0,437.5,834070.18,78,0,False,68,68,50,38,,False,False,True,Retired,,,0,56,0,129493901,627614,327046.12,56

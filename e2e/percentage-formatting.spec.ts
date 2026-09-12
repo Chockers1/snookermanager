@@ -20,7 +20,7 @@ test('player condition displays never expose floating-point tails across career 
     ['/tournaments/hub', /Shanghai Masters/],
     ['/player/attributes', /Player Attributes/],
     ['/training', /Build This Week/],
-    ['/training/report', /Fortnightly Training Report/],
+    ['/training/report', /Monthly Training Report/],
     ['/mental', /Mental State/],
     ['/health', /Health Centre/],
     ['/tournament/preparation', /Prepare for/],

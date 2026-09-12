@@ -17,9 +17,9 @@ for(const endOfSeason of [false,true])test('regional pathway standings '+(endOfS
     await expect(table.getByRole('row')).not.toHaveCount(2);
     await expect(table.getByRole('link').first()).toBeVisible();
    }else{
-    await expect(table).toContainText('No completed events in 2026/27 yet.');
-    if(region==='Europe')await expect(table).toContainText('First results due 2026-08-30');
-    if(region==='Q School UK')await expect(table).toContainText('First results due 2027-05-16');
+    await expect(page.getByText(/No published standings yet/)).toBeVisible();
+    await expect(page.getByLabel('Pathway standings')).toHaveValue(region);
+    const first=table.getByRole('row').nth(1);await expect(first.getByRole('cell').nth(0)).toHaveText('—');await expect(first.getByRole('cell').nth(7)).toHaveText('0');
    }
   }
  }

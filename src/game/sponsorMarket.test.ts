@@ -2,13 +2,24 @@ import { describe, expect, it } from 'vitest';
 import { createStarterState, acceptSponsorState, calculateSponsorMatchBonus, finishSeasonState, startNextSeasonState } from '../hooks/useGameState';
 import { reconcileSponsorMarket, sponsorMarketProfile, seasonalSponsorBlocker } from './sponsorMarket';
 function fresh(label='World Ranking',rank=18,rep=87) {
-  const state=createStarterState();state.worldSeed=12345;state.sponsorMarket=undefined;state.sponsorOffers=[];state.sponsors=[];
+  const state=createStarterState();state.worldSeed=12345;state.sponsorMarket=undefined;state.sponsorOffers=[];state.sponsors=[];state.inbox=state.inbox.filter(m=>!m.id.startsWith('sponsor-market:'));
   state.player.reputation=rep;state.player.rankingLabel=label;state.player.careerStage=label;
   state.careerSystems.pro.hasTourCard=label==='World Ranking';state.careerSystems.lateCareer.seniorActive=label==='Senior Ranking';
   const row={...state.rankings[0],playerName:state.player.fullName,ranking:rank};state.rankings=[row];
   return state;
 }
 describe('seasonal sponsor market',()=>{
+  it('requires a recent real final for national senior offers and preserves signed contracts',()=>{
+    const state=fresh('Senior Ranking',1);state.season='2030/31';const deals=structuredClone(state.sponsors);
+    const finish={season:'2029/30',matchesPlayed:4,tournamentName:'World Seniors Championship',canonicalResult:{isFinal:true}} as typeof state.history.tournamentHistory[number];
+    state.history={...state.history,tournamentHistory:[finish]};expect(sponsorMarketProfile(state).tier).toBe(3);
+    expect(sponsorMarketProfile({...state,season:'2031/32'}).tier).toBe(2);
+    const qualifier={...state,history:{...state.history,tournamentHistory:[{...finish,tournamentName:'World Seniors Qualifying'}]}};
+    expect(sponsorMarketProfile(qualifier).tier).toBe(2);
+    const unplayed={...state,history:{...state.history,tournamentHistory:[{...finish,matchesPlayed:0}]}};
+    expect(sponsorMarketProfile(unplayed).tier).toBe(2);expect(state.sponsors).toEqual(deals);
+  });
+
   it('creates reproducible approaches and never rerolls quotes on repeated refreshes',()=>{
     const first=reconcileSponsorMarket(fresh()),again=reconcileSponsorMarket(fresh());
     expect(first.sponsorOffers).toEqual(again.sponsorOffers);expect(first.sponsorOffers).toHaveLength(6);
@@ -19,7 +30,7 @@ describe('seasonal sponsor market',()=>{
   });
   it('uses circuit before rank: a youth or Q School number one cannot attract global offers',()=>{
     const youth=reconcileSponsorMarket(fresh('Youth Ranking',1)),school=reconcileSponsorMarket(fresh('Q School Ranking',1)),senior=reconcileSponsorMarket(fresh('Senior Ranking',1)),elite=reconcileSponsorMarket(fresh('World Ranking',1));
-    expect(sponsorMarketProfile(youth).tier).toBe(1);expect(sponsorMarketProfile(school).tier).toBe(2);expect(sponsorMarketProfile(senior).tier).toBe(3);expect(sponsorMarketProfile(elite).tier).toBe(5);
+    expect(sponsorMarketProfile(youth).tier).toBe(1);expect(sponsorMarketProfile(school).tier).toBe(2);expect(sponsorMarketProfile(senior).tier).toBe(2);expect(sponsorMarketProfile(elite).tier).toBe(5);
     expect(Math.max(...youth.sponsorOffers.map(o=>o.monthlyValue))).toBeLessThan(Math.min(...school.sponsorOffers.map(o=>o.monthlyValue)));
     expect(Math.max(...school.sponsorOffers.map(o=>o.monthlyValue))).toBeLessThan(Math.min(...elite.sponsorOffers.map(o=>o.monthlyValue)));
     expect(sponsorMarketProfile(fresh('World Ranking',1,5)).tier).toBe(1);

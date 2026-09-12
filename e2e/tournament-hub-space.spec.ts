@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { resolveTestDecisions } from '../test-support/resolveTestDecisions';
 import { betweenMatchFixture } from '../test-support/betweenMatchFixture';
 import { finalizeLiveMatch, startLiveMatchState } from '../src/hooks/useGameState';
 import { prepareBetweenMatchesState } from '../src/game/betweenMatches';
@@ -9,7 +10,7 @@ for (const width of [1280, 1920, 390]) test(`busy semi-final hub preserves brack
   const initial = betweenMatchFixture();
   let state = initial.state;
   for (let i = 0; i < 5 && state.tournamentProgress.currentRound !== 'Semi Final'; i++) {
-    state = startLiveMatchState(state, initial.event.id);
+    state = startLiveMatchState(resolveTestDecisions(state), initial.event.id);
     if (!state.liveMatch) throw new Error(state.lastAction);
     state = finalizeLiveMatch(state, { ...state.liveMatch, playerFrames: state.liveMatch.framesNeeded, opponentFrames: 2, status: 'Completed' });
   }
@@ -25,9 +26,9 @@ for (const width of [1280, 1920, 390]) test(`busy semi-final hub preserves brack
   const preparation = page.locator('summary').filter({ hasText: 'Match preparation · Complete' });
   await expect(preparation).toBeVisible();
   await expect(page.getByRole('region', { name: 'Between-match preparation' })).not.toBeVisible();
-  await expect(page.getByRole('link', { name: /Decision waiting/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Decision required/ })).toBeVisible();
   if (width >= 1280) {
-    await expect(page.getByRole('button', { name: 'Play Next Match' })).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Resolve Inbox Decision' })).toBeInViewport();
     await expect(bracket).toBeInViewport();
     expect((await bracket.boundingBox())!.height).toBeGreaterThanOrEqual(270);
     expect(await page.locator('#main-content').evaluate(el => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { readCareerSave, readStoredCareerValue } from './read-career-save';
 import { inboxReadStorageKey } from '../src/game/inboxReadState';
 import {
@@ -17,6 +17,12 @@ import {
   enterTournamentState,
   getNextEligibleTournament,
 } from "../src/hooks/useGameState";
+
+async function minimiseGuide(page: Page) {
+  await expect(page.getByRole('navigation')).toBeVisible();
+  const minimise=page.getByRole('button',{name:'Minimise first-week guide',exact:true});
+  if(await minimise.isVisible())await minimise.click();
+}
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -52,6 +58,7 @@ test("creates a career through the visible setup flow and survives reload", asyn
     page.getByRole("heading", { name: "Your career starts here." }),
   ).toBeVisible();
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await minimiseGuide(page);
   await expect(page.getByText("Browser Journey").first()).toBeVisible();
 });
 
@@ -67,6 +74,7 @@ test("creates and reloads a named save slot using real controls", async ({
   await expect(page.getByText(/Created and switched to “E2E checkpoint”/)).toBeVisible();
   await page.reload();
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await minimiseGuide(page);
   await page.getByRole("button", { name: "Career and save options" }).click();
   await page.getByRole("link", { name: "Save Manager" }).click();
   await expect(page.getByText("E2E checkpoint")).toBeVisible();
@@ -135,6 +143,7 @@ test("inbox uses selected-message actions and persists read state", async ({
   );
   await page.goto("/inbox");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await minimiseGuide(page);
   await page.getByRole("navigation").getByRole("link", { name: /^Inbox/ }).click();
 
   await expect(
@@ -143,7 +152,7 @@ test("inbox uses selected-message actions and persists read state", async ({
   await expect(page.getByText("Latest News")).toHaveCount(0);
   await expect(page.getByText("Tournament Invite")).toHaveCount(0);
   await page
-    .getByRole("button", { name: new RegExp(`Entered ${tournament.name}`) })
+    .getByRole("button", { name: new RegExp(`Event arrangements: ${tournament.name}`) })
     .click();
   await expect(page.getByRole("button", { name: /Book Travel/ })).toBeVisible();
   await expect(page.getByText("Travel not booked")).toBeVisible();
@@ -166,6 +175,7 @@ test("inbox uses selected-message actions and persists read state", async ({
   await expect.poll(async () => (await readCareerSave(page)).inbox.every(message => message.read)).toBe(true);
   await page.reload();
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await minimiseGuide(page);
   await page.getByRole("navigation").getByRole("link", { name: /^Inbox/ }).click();
   await expect(page.getByText("0 unread")).toBeVisible();
   // Continuing the loaded career folds the overlay into a full save.
@@ -188,6 +198,7 @@ test("requires the end-of-season world report before starting the next season", 
   );
   await page.goto("/");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await minimiseGuide(page);
   await expect(page).toHaveURL(/\/season-review/);
   await page.getByRole("dialog", { name: "2026/27 Season Review" }).getByRole("button", { name: "Full Season Review", exact: true }).click();
   await expect(
@@ -244,6 +255,7 @@ test("enters, travels to, and completes every round of a tournament", async ({
   );
   await page.goto("/tournaments/hub");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await minimiseGuide(page);
   await page.getByRole("link", { name: "Tournament Hub" }).click();
   const primary = page
     .getByRole("button", {
@@ -274,11 +286,18 @@ test("enters, travels to, and completes every round of a tournament", async ({
 
   let eventCompleted = false;
   for (let round = 0; round < 10; round += 1) {
+    await expect(page.getByRole('button',{name:/^(Play Next Match|Resolve Inbox Decision)$/})).toBeVisible();
+    const decision=page.getByRole('button',{name:'Resolve Inbox Decision',exact:true});
+    if(await decision.isVisible()){
+      await decision.click();
+      await page.getByRole('button',{name:/^(Protect preparation|Stay with my approach)$/}).first().click();
+      await page.getByRole('navigation').getByRole('link',{name:'Tournament Hub',exact:true}).click();
+    }
     const quickSim = page.getByRole("button", { name: "Quick Sim" });
     await expect(quickSim).toBeEnabled();
     await quickSim.click();
     await expect(page).toHaveURL(/\/match\/result/);
-    await expect(page.getByText("MATCH WON")).toBeVisible();
+    await expect(page.getByText("Match won", {exact:true})).toBeVisible();
     const completedBracket = page.getByRole("button", {
       name: "View Completed Bracket",
     });
@@ -338,6 +357,7 @@ test("live match is a score, tactics, and statistics workspace", async ({
   );
   await page.goto("/");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await minimiseGuide(page);
   await page.getByRole("link", { name: "Tournament Hub" }).click();
   const primary = page
     .getByRole("button", {

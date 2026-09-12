@@ -16,8 +16,8 @@ export function FirstWeekGuide(){
  const open=guide.minimized===false;
  const step=guideSteps.find(s=>s.id===selected)??current;
  const close=(restoreFocus=false)=>{updateFirstWeekGuide('minimize');if(restoreFocus)requestAnimationFrame(()=>launcher.current?.focus())};
- return <aside aria-label="First-week help" className="fixed bottom-12 right-2 z-30 flex max-w-[calc(100vw-1rem)] flex-col items-end gap-2 sm:right-4" onKeyDown={event=>{if(event.key==='Escape'&&open){event.preventDefault();event.stopPropagation();close(true)}}}>
-  {open&&<section ref={panel} tabIndex={-1} id="first-week-guide-panel" aria-label="First week guide" className="flex max-h-[calc(100dvh-8rem)] w-96 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-green-500/40 bg-surface text-sm shadow-2xl">
+ return <aside aria-label="First-week help" className="pointer-events-none fixed bottom-12 right-2 z-30 flex max-w-[calc(100vw-1rem)] flex-col items-end gap-2 sm:right-4" onKeyDown={event=>{if(event.key==='Escape'&&open){event.preventDefault();event.stopPropagation();close(true)}}}>
+  {open&&<section ref={panel} tabIndex={-1} id="first-week-guide-panel" aria-label="First week guide" className="pointer-events-auto flex max-h-[calc(100dvh-8rem)] w-96 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border border-green-500/40 bg-surface text-sm shadow-2xl">
    <header className="flex shrink-0 items-center gap-3 border-b border-border p-3">
     <div className="min-w-0 flex-1"><h2 className="font-semibold text-white">Your first week</h2><p className="text-xs text-gray-400">{guide.completed.length} of {guideSteps.length} completed</p></div>
     <button type="button" aria-label="Minimise first-week guide" className="grid h-9 w-9 shrink-0 place-items-center rounded text-gray-300 hover:bg-white/5 focus-visible:outline focus-visible:outline-green-400" onClick={()=>close(true)}><ChevronDown className="h-5 w-5"/></button>
@@ -40,6 +40,6 @@ export function FirstWeekGuide(){
     <div className="flex items-center justify-between gap-3 border-t border-border pt-3 text-[10px] text-gray-500"><span>Progress saved with this career</span><button type="button" className="shrink-0 text-xs text-gray-400 underline" onClick={()=>updateFirstWeekGuide('dismiss')}>Dismiss guide</button></div>
    </div>
   </section>}
-  <button ref={launcher} type="button" aria-controls="first-week-guide-panel" aria-expanded={open} aria-label={open?'Hide first-week guide':'Open first-week guide'} onClick={()=>{if(open)close();else {updateFirstWeekGuide('expand');requestAnimationFrame(()=>panel.current?.focus())}}} className="flex min-h-11 items-center gap-2 rounded-full border border-green-500/40 bg-surface px-4 py-2 text-xs font-semibold text-white shadow-lg hover:bg-surface-light focus-visible:outline focus-visible:outline-green-400"><BookOpen aria-hidden="true" className="h-4 w-4 text-green-400"/><span>First week</span><span className="text-green-300">{guide.completed.length}/{guideSteps.length}</span></button>
+  <button ref={launcher} type="button" aria-controls="first-week-guide-panel" aria-expanded={open} aria-label={open?'Hide first-week guide':'Open first-week guide'} onClick={()=>{if(open)close();else {updateFirstWeekGuide('expand');requestAnimationFrame(()=>panel.current?.focus())}}} className="pointer-events-auto flex min-h-11 items-center gap-2 rounded-full border border-green-500/40 bg-surface px-4 py-2 text-xs font-semibold text-white shadow-lg hover:bg-surface-light focus-visible:outline focus-visible:outline-green-400"><BookOpen aria-hidden="true" className="h-4 w-4 text-green-400"/><span>First week</span><span className="text-green-300">{guide.completed.length}/{guideSteps.length}</span></button>
  </aside>;
 }
