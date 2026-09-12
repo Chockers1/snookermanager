@@ -1,3 +1,4 @@
+import { PlayerNames } from '../game/PlayerNames';
 import { CareerDecisionNotice } from '../career/CareerDepthPanels';
 import { REQUIRED_DECISION_EVENT } from '../../game/requiredDecision';
 import { FirstWeekGuide } from '../game/FirstWeekGuide';
@@ -122,7 +123,7 @@ export function AppShell({ children }: AppShellProps) {
             {savePending ? "Saving…" : "Update"}
           </span>
           <p className="min-w-0 flex-1 truncate text-[10px] text-gray-400">
-            {gameState.lastAction}
+            <PlayerNames text={gameState.lastAction}/>
           </p>
           <div className="flex shrink-0 items-center gap-3 text-[10px]">
             <span data-testid="season-week" className="whitespace-nowrap text-gray-300">{seasonWeekLabel(gameState)}</span>

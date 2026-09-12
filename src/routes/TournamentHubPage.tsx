@@ -1,3 +1,4 @@
+import { PlayerNames } from '../components/game/PlayerNames';
 import { ActionBlockerNotice } from '../components/game/ActionBlockerNotice';
 import { tournamentEntryBlocker, advancementBlocker } from '../hooks/useGameState';
 import { pendingStory } from '../game/careerDepth/shared';
@@ -389,7 +390,7 @@ export function TournamentHubPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-white sm:text-base">
-                      {gameState.player.fullName}
+                      <PlayerLink name={gameState.player.fullName}/>
                     </p>
                     <p className="text-[11px] text-green-400">
                       Rank{" "}
@@ -685,9 +686,9 @@ export function TournamentHubPage() {
                   Last Result
                 </p>
                 <p className="mt-1 text-gray-400">
-                  {lastResult
+                  <PlayerNames text={lastResult
                     ? `${lastResult.winner} def. ${lastResult.loser} ${lastResult.score}`
-                    : "No completed matches yet"}
+                    : "No completed matches yet"}/>
                 </p>
               </div>
             </div>

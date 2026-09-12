@@ -15,11 +15,15 @@ function arrangement(message: InboxMessage, tournaments: Tournament[]) {
   return { name, reference, confirmations: [{ stage, text: message.preview }] };
 }
 
-/** Only combine stored routine messages. Decisions, deadlines and results are never classified by priority. */
+/** Compact routine messages without classifying decisions, deadlines or final reports by priority. */
 export function compactRoutineInbox(messages: InboxMessage[], tournaments: Tournament[] = []): InboxMessage[] {
   const result: InboxMessage[] = [];
   const arrangements = new Map<string, number>();
   for (const message of messages) {
+    // Older saves contain a notification for every advancing match. The match and
+    // tournament ledgers retain those results; the final report is the inbox recap.
+    if (message.sender === 'Tournament Office' && message.subject.startsWith('Win at ') &&
+        message.actionRoute === '/tournaments/hub' && !message.victoryReport) continue;
     const receipt = arrangement(message, tournaments);
     if (!receipt) { result.push(message); continue; }
     const key = `${receipt.reference.id}:${receipt.reference.startDate}`;

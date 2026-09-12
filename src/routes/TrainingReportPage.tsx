@@ -1,3 +1,5 @@
+import { PlayerLink } from '../components/game/PlayerLink';
+import { PlayerNames } from '../components/game/PlayerNames';
 import { useNavigate } from 'react-router-dom'
 import { Activity, AlertTriangle, BrainCircuit, HeartPulse, ShieldAlert, Target } from 'lucide-react'
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -62,7 +64,7 @@ export function TrainingReportPage() {
           <h1 className="mt-1 text-2xl font-bold text-white">{latestReport && !latestReport.cadence ? 'Training Report' : 'Monthly Training Report'}</h1>
           {latestReport?.seasonNumber !== undefined && <p className="mt-1 text-xs text-green-400">Season {latestReport.seasonNumber} · Week {latestReport.seasonWeek}</p>}
           <p className="mt-1 text-xs text-gray-400">Reports arrive with the first training update of each new calendar month.</p>
-          <p className="mt-1 max-w-3xl text-sm text-gray-400">Recorded feedback for {gameState.player.fullName}: actual attribute movement, fatigue, and next-focus guidance{latestReport ? ` from ${latestReport.startDate} to ${latestReport.endDate}` : ''}.</p>
+          <p className="mt-1 max-w-3xl text-sm text-gray-400">Recorded feedback for <PlayerLink name={gameState.player.fullName}/>: actual attribute movement, fatigue, and next-focus guidance{latestReport ? ` from ${latestReport.startDate} to ${latestReport.endDate}` : ''}.</p>
         </div>
         <button type="button" onClick={() => navigate('/training')} className="btn-primary shrink-0 text-xs">View Next Week Plan</button>
       </div>
@@ -98,7 +100,7 @@ export function TrainingReportPage() {
 
             <div className="card card-body">
               <h3 className="mb-3 text-sm font-semibold text-white">Coach Notes</h3>
-              <p className="text-xs leading-relaxed text-gray-300">{currentCoach ? `${currentCoach.name} sees the clearest next gains in ${nextFocus.slice(0, 2).join(' and ')}. ${gameState.lastAction}` : gameState.lastAction}</p>
+              <p className="text-xs leading-relaxed text-gray-300"><PlayerNames text={currentCoach ? `${currentCoach.name} sees the clearest next gains in ${nextFocus.slice(0, 2).join(' and ')}. ${gameState.lastAction}` : gameState.lastAction}/></p>
               <div className="mt-5 flex items-center gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-surface-light text-xs font-bold text-white">{currentCoach?.name.split(' ').map((part) => part[0]).join('').slice(0, 2) ?? 'ST'}</div>
                 <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{currentCoach?.name ?? 'Support Team'}</p><p className="text-xs text-green-400">{currentCoach?.type ?? 'No active coach'}</p></div>

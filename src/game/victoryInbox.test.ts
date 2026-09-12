@@ -8,6 +8,12 @@ describe('championship inbox reports', () => {
     const {state,event} = victoryFixture();
     const message = state.inbox.find(m=>m.subject===`Post-event report: ${event.name}`)!;
     expect(message.victoryReport?.score).toBe('10–9');
+    expect(state.inbox.filter(m => m.subject.startsWith('Win at '))).toHaveLength(0);
+    expect(state.inbox.filter(m => m.subject === `Post-event report: ${event.name}`)).toHaveLength(1);
+    expect(message.eventResults).toEqual(state.history.tournamentHistory.find(h => h.tournamentId === event.id)!.roundResults);
+    expect(message.eventResults!.length).toBeGreaterThan(1);
+    expect(message.eventResults!.at(-1)).toMatchObject({ round: 'Final', result: 'Won', playerFrames: 10, opponentFrames: 9 });
+
     expect(victoryMessageTitle(message)).toBe('Champion: Wuhan Open');
     expect(victoryMessagePreview(message)).toContain('£140,000 prize secured');
     delete message.victoryReport;

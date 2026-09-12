@@ -1,5 +1,4 @@
 import { isChampionshipLeague } from '../game/championshipLeague';
-import { seasonWeekLabel } from '../game/seasonClock';
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   chalkCatalog,
@@ -1487,20 +1486,24 @@ describe("connected career systems", () => {
     ).toHaveLength(1);
   });
 
-  it("reports exact weekly changes instead of a generic update", () => {
+  it("reports period totals at the monthly boundary instead of a weekly update", () => {
     const state = createStarterState();
-    const advanced = advanceWeekState(state);
+    state.currentDate = '2026-05-25';
+    state.managementReportBaseline = undefined;
+    state.careerDepth = { ...state.careerDepth!, nextSettlementDate: '2026-06-01', stories: [] };
+    state.tournaments = state.tournaments.map(t => ({ ...t, status: 'Skipped' }));
+    const advanced = advanceWeekState(repairGameState(state));
     const report = advanced.inbox.find(
-      (message) => message.subject === `${seasonWeekLabel(state)} report`,
+      (message) => message.subject === 'Monthly management report · May 2026',
     );
 
-    expect(report?.preview).toMatch(/Cash [+-]£[\d,]+/);
+    expect(report?.preview).toMatch(/Cash [+−-]£[\d,]+/);
     expect(report?.preview).toMatch(/confidence [+-]?\d+/i);
     expect(report?.preview).toMatch(/fatigue [+-]?\d+/i);
     expect(report?.preview).not.toMatch(/updated for the new week/i);
     expect(report?.summary).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ label: "Weekly cash flow" }),
+        expect.objectContaining({ label: "Cash change" }),
         expect.objectContaining({ label: "Confidence" }),
         expect.objectContaining({ label: "Fatigue" }),
         expect.objectContaining({ label: "Training progress" }),

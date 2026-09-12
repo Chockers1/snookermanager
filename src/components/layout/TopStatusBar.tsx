@@ -167,14 +167,14 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
       >
         <button
           type="button"
-          onClick={() => navigate("/career/progression")}
+          onClick={() => navigate("/players/" + encodeURIComponent(player.fullName))}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-xs font-bold text-white transition hover:bg-surface-light"
         >
           {player.firstName[0]}
         </button>
         <button
           type="button"
-          onClick={() => navigate("/career/progression")}
+          onClick={() => navigate("/players/" + encodeURIComponent(player.fullName))}
           className="min-w-0 text-left"
         >
           <div className="flex items-center gap-1.5">

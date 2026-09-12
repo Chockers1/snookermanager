@@ -259,7 +259,7 @@ export function MatchResultPage() {
           </div>
           <div className="min-w-0">
             <p className="truncate text-base font-bold text-white">
-              {playerName}
+              <PlayerLink name={playerName}/>
             </p>
             <p className="text-xs text-gray-400">
               {gameState.player.rankingLabel} #
@@ -355,7 +355,7 @@ export function MatchResultPage() {
             <div className="mb-2 flex justify-between text-[10px]">
               <span className="font-semibold text-white">Frame by frame</span>
               <span className="text-gray-500">
-                {playerName} {playerFrames} · {opponentName} {opponentFrames}
+                <PlayerLink name={playerName}/> {playerFrames} · <PlayerLink name={opponentName}/> {opponentFrames}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">

@@ -1,3 +1,5 @@
+import { PlayerNames } from '../components/game/PlayerNames';
+import { PlayerLink } from '../components/game/PlayerLink';
 import { SeasonArchive } from '../components/career/SeasonArchive';
 import { SeasonLifeHistoryPanel } from '../components/career/SeasonLifePanels';
 import { ActionBlockerNotice } from '../components/game/ActionBlockerNotice';
@@ -91,7 +93,7 @@ export function LegacyStatsPage() {
         <div>
           <p className="text-[10px] font-semibold uppercase text-gray-500">Career</p>
           <h1 className="mt-1 text-2xl font-bold text-white">Career Stats & Legacy</h1>
-          <p className="mt-1 text-sm text-gray-400">Your journey, your numbers, your legacy for {gameState.player.fullName}.</p>
+          <p className="mt-1 text-sm text-gray-400">Your journey, your numbers, your legacy for <PlayerLink name={gameState.player.fullName}/>.</p>
         </div>
         <div className="flex gap-2"><button type="button" className="btn-secondary text-xs" onClick={() => navigate('/season-review')}>Season Review</button><button type="button" className="btn-primary text-xs" title={advanceBlocker?.reason} onClick={() => advanceBlocker ? navigate(advanceBlocker.route) : continueWeek()}>Continue Career</button></div>
       </div>
@@ -130,7 +132,7 @@ export function LegacyStatsPage() {
           <div className="card card-body">
             <h3 className="mb-3 text-xs font-semibold text-white">Legacy Breakdown</h3>
             <div className="space-y-3">
-              {legacyBreakdown.map((item) => <div key={item.label}><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{item.label}</span><span className="text-white">{item.value}/{item.max}</span></div><ProgressBar value={item.value} max={item.max} compact /><p className="mt-1 text-[10px] leading-relaxed text-gray-500">{item.detail}</p></div>)}
+              {legacyBreakdown.map((item) => <div key={item.label}><div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{item.label}</span><span className="text-white">{item.value}/{item.max}</span></div><ProgressBar value={item.value} max={item.max} compact /><p className="mt-1 text-[10px] leading-relaxed text-gray-500"><PlayerNames text={item.detail}/></p></div>)}
             </div>
           </div>
 
@@ -166,7 +168,7 @@ export function LegacyStatsPage() {
               <table className="w-full text-xs">
                 <thead><tr className="border-b border-border text-gray-500"><th className="px-4 py-2 text-left">Year</th><th className="px-4 py-2 text-left">Event</th><th className="px-4 py-2 text-left">Opponent</th><th className="px-4 py-2 text-left">Result</th><th className="px-4 py-2 text-left">Score</th><th className="px-4 py-2 text-right">Prize</th><th className="px-4 py-2 text-right">Ranking Credit</th></tr></thead>
                 <tbody>
-                  {finalsData.length > 0 ? finalsData.map((final) => <tr key={final.id} className="border-b border-border/50 hover:bg-surface-light/50"><td className="px-4 py-2 text-gray-400">{final.year}</td><td className="px-4 py-2 text-white">{final.event}</td><td className="px-4 py-2 text-white">{final.opponent}</td><td className={final.result === 'Winner' || final.result === 'Won' ? 'px-4 py-2 text-green-400' : 'px-4 py-2 text-red-400'}>{final.result}</td><td className="px-4 py-2 text-white">{final.score}</td><td className="px-4 py-2 text-right text-green-400">{final.prizeKnown ? formatMoney(final.prize) : '—'}</td><td className={final.impact >= 0 ? 'px-4 py-2 text-right font-medium text-green-400' : 'px-4 py-2 text-right font-medium text-red-400'}>{final.impactKnown ? (final.impact >= 0 ? '+' : '') + final.impact : '—'}</td></tr>) : <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No completed tournament finals are archived yet.</td></tr>}
+                  {finalsData.length > 0 ? finalsData.map((final) => <tr key={final.id} className="border-b border-border/50 hover:bg-surface-light/50"><td className="px-4 py-2 text-gray-400">{final.year}</td><td className="px-4 py-2 text-white">{final.event}</td><td className="px-4 py-2 text-white"><PlayerNames text={final.opponent}/></td><td className={final.result === 'Winner' || final.result === 'Won' ? 'px-4 py-2 text-green-400' : 'px-4 py-2 text-red-400'}>{final.result}</td><td className="px-4 py-2 text-white">{final.score}</td><td className="px-4 py-2 text-right text-green-400">{final.prizeKnown ? formatMoney(final.prize) : '—'}</td><td className={final.impact >= 0 ? 'px-4 py-2 text-right font-medium text-green-400' : 'px-4 py-2 text-right font-medium text-red-400'}>{final.impactKnown ? (final.impact >= 0 ? '+' : '') + final.impact : '—'}</td></tr>) : <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No completed tournament finals are archived yet.</td></tr>}
                 </tbody>
               </table>
             </div>

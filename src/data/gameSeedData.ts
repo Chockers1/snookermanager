@@ -1,3 +1,4 @@
+import { expandedCues, expandedChalks, expandedTips, expandedCases } from './equipmentExpansion';
 import type {
   AttributeSnapshot,
   AttributeGrowthRow,
@@ -861,6 +862,7 @@ export const mockCues: Cue[] = [
       "Miscue Reduction": 18,
     },
   },
+  ...expandedCues,
 ];
 
 export const mockChalks: Chalk[] = [
@@ -1040,6 +1042,7 @@ export const mockChalks: Chalk[] = [
     miscueReduction: 94,
     kickReduction: 92,
   },
+  ...expandedChalks,
 ];
 
 export const mockTips: Tip[] = [
@@ -1219,6 +1222,7 @@ export const mockTips: Tip[] = [
     consistency: 95,
     miscueReduction: 94,
   },
+  ...expandedTips,
 ];
 
 export const mockCases: EquipmentCase[] = [
@@ -1379,6 +1383,7 @@ export const mockCases: EquipmentCase[] = [
     presentation: 98,
     bonuses: { Protection: 18, Storage: 16, Travel: 15, Presentation: 18 },
   },
+  ...expandedCases,
 ];
 
 export const mockTableSetups: TableSetup[] = [
@@ -2181,6 +2186,7 @@ const cueMarketplaceProfiles: Record<
   string,
   Pick<CueMarketplaceItem, "style" | "tags">
 > = {
+  ...Object.fromEntries(expandedCues.map(cue => [cue.id, { style: cue.style, tags: cue.tags }])),
   "cue-1": { style: "Club Practice" },
   "cue-2": { style: "Heritage Touch", tags: ["One-Piece"] },
   "cue-3": {

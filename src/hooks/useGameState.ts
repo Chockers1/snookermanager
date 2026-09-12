@@ -1,3 +1,4 @@
+import { ensureManagementReportBaseline, settleMonthlyManagementReport } from '../game/monthlyManagementReport';
 import { humanSeasonStats, repairHumanWorldRecord } from '../game/humanWorldRecord';
 import {opponentAttributes} from '../game/opponentAbility';
 import { startingPlayerAbility } from '../game/startingPlayerAbility';
@@ -992,6 +993,7 @@ type CareerSystemsState = {
 };
 
 export type GameState = {
+  managementReportBaseline?: import('../game/monthlyManagementReport').ManagementReportBaseline;
   recoveryPlanAvailableOn?: string;
   difficulty?: CareerDifficulty;
   historyArchive?: CareerArchive;
@@ -6539,103 +6541,6 @@ function advanceWholeWeekState(previousState: GameState): GameState {
     },
   };
 
-  const weeklyAttributeChanges = getTrainingAttributeChanges(
-    previousState.attributes,
-    nextState.attributes,
-  );
-  const weeklyImprovements = weeklyAttributeChanges
-    .filter((change) => change.delta > 0)
-    .sort((left, right) => right.delta - left.delta);
-  const confidenceDelta =
-    nextState.player.confidence - previousState.player.confidence;
-  const fatigueDelta = nextState.player.fatigue - previousState.player.fatigue;
-  const moraleDelta = nextState.player.morale - previousState.player.morale;
-  const cashFlow = nextState.finance.cashFlow;
-  const weeklyReportMessage = createInboxMessage(
-    {
-      sender: "Career Manager",
-      subject: `${seasonWeekLabel(protectedState)} report`,
-      preview: `Cash ${cashFlow >= 0 ? "+" : "-"}£${Math.abs(cashFlow).toLocaleString("en-GB")} · confidence ${formatTrainingMetricChange(confidenceDelta)} · fatigue ${formatTrainingMetricChange(fatigueDelta)} · ${weeklyImprovements.length} attribute${weeklyImprovements.length === 1 ? "" : "s"} improved.`,
-      priority:
-        nextState.player.fatigue >= 75 ||
-        nextState.trainingCondition.strain >= 70
-          ? "High"
-          : "Medium",
-      actionLabel: "View Training Report",
-      actionRoute: "/training/report",
-      summary: [
-        {
-          label: "Weekly cash flow",
-          value: `${cashFlow >= 0 ? "+" : "-"}£${Math.abs(cashFlow).toLocaleString("en-GB")}`,
-          detail: `Balance £${nextState.player.cash.toLocaleString("en-GB")}`,
-          tone: cashFlow >= 0 ? "positive" : "negative",
-        },
-        {
-          label: "Confidence",
-          value: `${formatPercent(nextState.player.confidence)}`,
-          detail: `${formatTrainingMetricChange(confidenceDelta)} this week`,
-          tone:
-            confidenceDelta > 0
-              ? "positive"
-              : confidenceDelta < 0
-                ? "warning"
-                : "neutral",
-        },
-        {
-          label: "Fatigue",
-          value: `${formatPercent(nextState.player.fatigue)}`,
-          detail: `${formatTrainingMetricChange(fatigueDelta)} this week`,
-          tone:
-            nextState.player.fatigue >= 75
-              ? "negative"
-              : fatigueDelta > 0
-                ? "warning"
-                : "positive",
-        },
-        {
-          label: "Morale",
-          value: `${formatPercent(nextState.player.morale)}`,
-          detail: `${formatTrainingMetricChange(moraleDelta)} this week`,
-          tone:
-            moraleDelta > 0
-              ? "positive"
-              : moraleDelta < 0
-                ? "warning"
-                : "neutral",
-        },
-        {
-          label: "Training progress",
-          value:
-            weeklyImprovements.length > 0
-              ? `${weeklyImprovements.length} improved`
-              : "No rating change",
-          detail:
-            weeklyImprovements.length > 0
-              ? weeklyImprovements
-                  .slice(0, 4)
-                  .map(
-                    (change) =>
-                      `${change.label} ${formatAttributeChange(change.delta)} (now ${formatAttribute(change.current)})`,
-                  )
-                  .join(" · ")
-              : "Development may be accumulating toward a future rating increase.",
-          tone: weeklyImprovements.length > 0 ? "positive" : "neutral",
-        },
-        {
-          label: "Strain / burnout",
-          value: `${formatPercent(nextState.trainingCondition.strain)} / ${formatPercent(nextState.trainingCondition.burnout)}`,
-          detail: nextState.trainingCondition.strain === 0 && nextState.trainingCondition.burnout === 0 ? "Recovered — no accumulated strain or burnout" : "Current training health",
-          tone:
-            nextState.trainingCondition.strain >= 70 ||
-            nextState.trainingCondition.burnout >= 70
-              ? "negative"
-              : "neutral",
-        },
-      ],
-    },
-    "Today",
-  );
-
   const enteredTournament =
     protectedState.tournaments.find((event) => event.status === "Entered") ??
     protectedState.tournaments.find((event) => event.status === "Booked");
@@ -6647,7 +6552,6 @@ function advanceWholeWeekState(previousState: GameState): GameState {
       {
         ...nextState,
         inbox: [
-          weeklyReportMessage,
           createInboxMessage(
             {
               sender: "Tournament Office",
@@ -6670,7 +6574,6 @@ function advanceWholeWeekState(previousState: GameState): GameState {
       {
         ...nextState,
         inbox: [
-          weeklyReportMessage,
           ...nextState.inbox,
         ].slice(0, 18),
       },
@@ -9350,7 +9253,7 @@ export function repairGameState(state: GameState): GameState {
   );
 
   const repairedLegacy = state.history.legacy ?? careerLegacyOf({ ...state, matches: repairedMatches, history: { ...state.history, matchLog: repairedMatchLog, tournamentHistory: state.history.tournamentHistory.filter(entry => (entry.season !== state.season || !invalidTournamentIds.has(entry.tournamentId))) } });
-  return evolveTourSkills(reconcileAchievements({
+  return ensureManagementReportBaseline(evolveTourSkills(reconcileAchievements({
     ...state,
     schemaVersion: SAVE_SCHEMA_VERSION,
     player: {
@@ -9412,7 +9315,7 @@ export function repairGameState(state: GameState): GameState {
       )
         ? "Save upgraded: repaired recent form, tournament records and title totals, then rebuilt every ranking table strictly by points."
         : state.lastAction,
-  }));
+  })));
 }
 
 function shouldPlayerBeInWorldTable(
@@ -13319,7 +13222,7 @@ function finalizeState(
 ) {
   state = { ...state, history: { ...state.history, legacy: careerLegacyOf(state) } };
   const recalculated = reconcileCareerBudget(recalculateState(reconcileRealism(reconcileCareerDepth(processRankingCalendar(state))), lastAction));
-  const nextState = { ...recalculated, player: { ...recalculated.player, legacyScore: careerLegacyRating(careerLegacyOf(recalculated)).score } };
+  const nextState = settleMonthlyManagementReport({ ...recalculated, player: { ...recalculated.player, legacyScore: careerLegacyRating(careerLegacyOf(recalculated)).score } });
   return snapshotLabel
     ? withHistorySnapshot(nextState, snapshotLabel)
     : nextState;
@@ -16245,21 +16148,6 @@ export function finalizeLiveMatch(
             "Today",
           ),
         ),
-        ...(nextRound
-          ? [
-              createInboxMessage(
-                {
-                  sender: "Tournament Office",
-                  subject: `Win at ${tournament.name}`,
-                  preview: `${state.player.fullName} ${drawn ? "drew with" : won ? "beat" : "lost to"} ${liveMatch.opponentName} ${liveMatch.playerFrames}-${liveMatch.opponentFrames} in the ${liveMatch.round}. Prize: £${prizeMoneyEarned}. Ranking points: ${rankingPointsGained}. Next round: ${nextRound}.`,
-                  priority: "High",
-                  actionLabel: "Continue Tournament",
-                  actionRoute: "/tournaments/hub",
-                },
-                "Today",
-              ),
-            ]
-          : []),
         ...state.inbox,
       ].slice(0, 18),
       history: {
@@ -16393,6 +16281,7 @@ export function finalizeLiveMatch(
           {
             sender: "Tournament Office",
             subject: `Post-event report: ${tournament.name}`,
+            eventResults: completedRounds.map(result => ({ ...result })),
             eventFinance,
             qualificationReport: qualification,
             preview: `${finish} after a ${latestMatch.playerFrames}-${latestMatch.opponentFrames} result. ${qualification ? qualification.explanation : "Review the performance, ranking and financial outcome below."}`,

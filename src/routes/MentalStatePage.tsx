@@ -1,3 +1,4 @@
+import { PlayerNames } from '../components/game/PlayerNames';
 import { ActionBlockerNotice } from '../components/game/ActionBlockerNotice';
 import { advancementBlocker } from '../hooks/useGameState';
 import { useState } from "react";
@@ -118,7 +119,7 @@ export function MentalStatePage() {
                   {mentalData.diagnosis.title}
                 </h3>
                 <p className="mt-1 text-xs leading-4 text-gray-400">
-                  {mentalData.diagnosis.description}
+                  <PlayerNames text={mentalData.diagnosis.description}/>
                 </p>
                 <ul className="mt-2 grid gap-1 text-[11px] text-gray-300 sm:grid-cols-2">
                   {mentalData.diagnosis.factors.map((factor) => (
@@ -328,7 +329,7 @@ export function MentalStatePage() {
                   key={trigger.label}
                   className="flex items-start justify-between gap-3 rounded bg-surface-light/40 p-2.5 text-xs xl:p-1.5 xl:text-[10px]"
                 >
-                  <span className="text-gray-300">{trigger.label}</span>
+                  <span className="text-gray-300"><PlayerNames text={trigger.label}/></span>
                   <span className="shrink-0 text-gray-500">
                     {trigger.timing}
                   </span>

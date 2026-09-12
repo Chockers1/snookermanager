@@ -1,3 +1,4 @@
+import { PlayerNames } from '../components/game/PlayerNames';
 import { pendingStory } from '../game/careerDepth/shared';
 import { SeasonLifeInbox } from '../components/career/SeasonLifePanels';
 import { InboxReportSummary } from '../components/game/InboxReportSummary';
@@ -138,6 +139,10 @@ export function InboxPage() {
     selectedMessage?.subject.startsWith("Post-event report:") ||
       relatedTournament?.status === "Completed",
   );
+  const needsTravel = !isCompletedEventReport && relatedTournament?.status === "Entered" && !relatedTravel;
+  const messageAction = needsTravel
+    ? { actionLabel: "Book Travel", actionRoute: "/travel" }
+    : selectedMessage;
   const entryBlocker = relatedTournament?.status === "Available" && !isCompletedEventReport ? tournamentEntryBlocker(gameState, relatedTournament) : null;
   const daysUntilEvent = relatedTournament
     ? Math.max(
@@ -241,9 +246,8 @@ export function InboxPage() {
           <div className="scrollbar-thin min-h-0 flex-1 divide-y divide-border overflow-y-auto overscroll-contain" aria-label="Inbox messages">
             {filteredInbox.length ? (
               filteredInbox.map((message) => (
-                <button
+                <div
                   key={message.id}
-                  type="button"
                   onClick={() => openMessage(message)}
                   className={`flex min-h-[88px] w-full items-start gap-3 border-l-2 p-3 text-left transition-colors ${selectedMessage?.id === message.id ? "border-l-green-400 bg-green-600/10" : "border-l-transparent hover:bg-surface-light/50"} ${message.victoryReport ? "bg-amber-500/5" : ""} ${message.read ? "opacity-60" : ""}`}
                 >
@@ -251,24 +255,25 @@ export function InboxPage() {
                     className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${message.read ? "bg-transparent" : "bg-green-400"}`}
                   />}
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-start justify-between gap-2">
+                    <span className="flex w-full items-start justify-between gap-2 text-left">
                       <span className="min-w-0 truncate text-sm font-medium text-white">
-                        {victoryMessageTitle(message)}
+                        <PlayerNames text={victoryMessageTitle(message)}/>
                       </span>
                       <span
                         className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] ${priorityClass(message.priority)}`}
                       >
                         {message.priority}
                       </span>
+                      <button type="button" aria-label={victoryMessageTitle(message)} onClick={event => { event.stopPropagation(); openMessage(message); }} className="shrink-0 rounded px-1 text-[10px] text-green-400 hover:underline focus-visible:outline">Open</button>
                     </span>
                     <span className="mt-1 block truncate text-xs text-gray-400">
-                      {victoryMessagePreview(message)}
+                      <PlayerNames text={victoryMessagePreview(message)}/>
                     </span>
                     <span className="mt-1.5 block text-[10px] text-gray-500">
                       {message.sender} · {message.date}
                     </span>
                   </span>
-                </button>
+                </div>
               ))
             ) : (
               <div className="flex h-48 flex-col items-center justify-center px-6 text-center">
@@ -301,16 +306,16 @@ export function InboxPage() {
                 </span>
               </div>
               <h2 className={compactReport ? "mt-1 text-base font-semibold leading-5 text-white" : "mt-2 text-xl font-semibold text-white sm:text-2xl"}>
-                {victoryMessageTitle(selectedMessage)}
+                <PlayerNames text={victoryMessageTitle(selectedMessage)}/>
               </h2>
               {!compactReport && <p className="mt-3 max-w-3xl text-sm leading-5 text-gray-300">
-                {seasonStartReport ? 'Your career position, upcoming entries and previous tournament results.' : gameState.realism?.digest.some(d => d.id === selectedMessage.id) ? 'Results and milestones from your simulated tour.' : selectedMessage.preview}
+                {seasonStartReport ? 'Your career position, upcoming entries and previous tournament results.' : gameState.realism?.digest.some(d => d.id === selectedMessage.id) ? 'Results and milestones from your simulated tour.' : <PlayerNames text={selectedMessage.preview}/>}
               </p>}
               <StoryDecisionPanel messageId={selectedMessage.id} />
       <SeasonLifeInbox messageId={selectedMessage.id} />
               <WorldDigestPanel messageId={selectedMessage.id} />
 
-              {tourChangesReport ? <SeasonTourChangesReport report={tourChangesReport} /> : seasonStartReport ? <SeasonStartReport report={seasonStartReport} live={seasonStartReport.season === gameState.season} /> : seasonReport ? <SeasonEndReport report={seasonReport} /> : eventFinance ? <PostEventReport finance={eventFinance} summary={selectedSummary} qualification={qualification} rankingSnapshot={selectedMessage.eventRanking} victory={selectedMessage.victoryReport} /> : selectedSummary.length ? (
+              {tourChangesReport ? <SeasonTourChangesReport report={tourChangesReport} /> : seasonStartReport ? <SeasonStartReport report={seasonStartReport} live={seasonStartReport.season === gameState.season} /> : seasonReport ? <SeasonEndReport report={seasonReport} /> : eventFinance ? <PostEventReport finance={eventFinance} summary={selectedSummary} qualification={qualification} rankingSnapshot={selectedMessage.eventRanking} victory={selectedMessage.victoryReport} results={selectedMessage.eventResults} /> : selectedSummary.length ? (
                 <InboxReportSummary items={selectedSummary} />
               ) : null}
 
@@ -368,22 +373,22 @@ export function InboxPage() {
                     {entryBlocker?.label ?? "Enter Tournament"}{" "}
                     <ChevronRight className="h-3.5 w-3.5" />
                   </button>
-                ) : selectedMessage.actionRoute &&
-                  selectedMessage.actionLabel ? (
+                ) : messageAction?.actionRoute &&
+                  messageAction.actionLabel ? (
                   <button
                     type="button"
                     className="btn-primary min-h-10 text-xs"
                     onClick={() =>
-                      runMessageAction(selectedMessage.actionRoute!)
+                      runMessageAction(messageAction.actionRoute!)
                     }
                   >
-                    {selectedMessage.actionLabel}{" "}
+                    {messageAction.actionLabel}{" "}
                     <ChevronRight className="h-3.5 w-3.5" />
                   </button>
                 ) : null}
 
                 {relatedTournament &&
-                selectedMessage.actionRoute !== "/tournaments/hub" ? (
+                messageAction?.actionRoute !== "/tournaments/hub" ? (
                   <button
                     type="button"
                     className="btn-secondary min-h-10 text-xs"
@@ -393,7 +398,7 @@ export function InboxPage() {
                   </button>
                 ) : null}
                 {relatedTournament &&
-                selectedMessage.actionRoute !== "/calendar" ? (
+                messageAction?.actionRoute !== "/calendar" ? (
                   <button
                     type="button"
                     className="btn-secondary min-h-10 text-xs"

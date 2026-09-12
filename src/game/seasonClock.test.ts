@@ -22,7 +22,7 @@ describe('career season and week numbering',()=>{
   let next=startNextSeasonState(reloaded);next={...next,tournaments:next.tournaments.map(t=>({...t,status:'Skipped'})),careerDepth:{...next.careerDepth!,stories:[]}};
   for(let i=0;i<20&&next.week===rolled.week;i++)next=advanceWeekState(next);
   expect(next.week).toBe(62);expect(seasonPosition(next)).toEqual({season:2,week:2});
-  expect(next.inbox.some(m=>m.subject==='Season 2 · Week 1 report')).toBe(true);
+  expect(next.inbox.some(m=>m.subject==='Season 2 · Week 1 report')).toBe(false);
   expect(next.history.snapshots.at(-1)).toMatchObject({week:62,seasonNumber:2,seasonWeek:2});
  },30000);
  it('preserves the career season number beyond the twelve-season archive limit',()=>{

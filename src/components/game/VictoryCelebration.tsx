@@ -1,3 +1,4 @@
+import { PlayerLink } from './PlayerLink';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
@@ -5,7 +6,7 @@ import { Trophy, Crown } from 'lucide-react';
 import type { victoryCelebration } from '../../game/victoryCelebration';
 import { formatMoney } from '../../utils/formatters';
 type Victory = NonNullable<ReturnType<typeof victoryCelebration>>;
-function VictoryContent({ victory, ceremony = false }: { victory: Victory; ceremony?: boolean }) {
+function VictoryContent({ victory, ceremony = false, onNavigate }: { victory: Victory; ceremony?: boolean; onNavigate?: () => void }) {
   return <div className={`relative min-w-0 ${ceremony ? 'p-5 text-center sm:p-8' : 'p-5 sm:p-7'}`}>
     <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-amber-300">{victory.season} · {victory.exhibition ? 'Exhibition achievement' : victory.ranking ? 'Ranking title secured' : 'Tournament title secured'}</p>
     <div className={`mt-4 flex gap-5 ${ceremony ? 'flex-col items-center' : 'flex-col sm:flex-row sm:items-center'}`}>
@@ -13,7 +14,7 @@ function VictoryContent({ victory, ceremony = false }: { victory: Victory; cerem
       <div className="min-w-0">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-200">{victory.headline}</p>
         <h2 className={`mt-1 break-words font-black tracking-tight text-white ${ceremony ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'}`}>{victory.name}</h2>
-        <p className="mt-2 text-xl font-bold text-white">{victory.player} <span className="mx-1 text-amber-200">{victory.score}</span> {victory.opponent}</p>
+        <p className="mt-2 text-xl font-bold text-white"><PlayerLink name={victory.player} onNavigate={onNavigate}/> <span className="mx-1 text-amber-200">{victory.score}</span> <PlayerLink name={victory.opponent} onNavigate={onNavigate}/></p>
         <p className="mt-1 text-xs text-gray-300">{victory.location}</p>
       </div>
     </div>
@@ -50,7 +51,7 @@ export function VictoryCelebration({ victory }: { victory: Victory }) {
     </section>
     {createPortal(<dialog ref={ref} aria-label={`${victory.name} victory celebration`} onCancel={acknowledge} className={`m-auto w-[min(42rem,calc(100vw-1.5rem))] max-w-none overflow-hidden rounded-2xl border p-0 text-white shadow-2xl backdrop:bg-black/85 ${panelStyle}`}>
       <div className="flex max-h-[calc(100dvh-2rem)] flex-col">
-        <div className="min-h-0 overflow-y-auto"><VictoryContent victory={victory} ceremony/></div>
+        <div className="min-h-0 overflow-y-auto"><VictoryContent victory={victory} ceremony onNavigate={close}/></div>
         <footer className="flex shrink-0 flex-wrap justify-center gap-2 border-t border-amber-300/15 p-3">
           <button type="button" autoFocus className="btn-primary text-xs" onClick={close}>Continue to match review</button>
           <Link className="btn-secondary text-xs" onClick={close} to={victory.exhibition ? '/career/stats#exhibition-achievements' : '/career/stats#trophy-cabinet'}>{victory.exhibition ? 'View career achievements' : 'View trophy cabinet'}</Link>

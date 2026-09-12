@@ -1,3 +1,5 @@
+import { PlayerNames } from '../components/game/PlayerNames';
+import { PlayerLink } from '../components/game/PlayerLink';
 import { seasonTitleEntries } from '../hooks/useGameState';
 import { seasonTitle, snapshotWeekLabel } from "../game/seasonClock";
 import { SeasonRankings } from '../components/game/SeasonReviewPopup';
@@ -106,7 +108,7 @@ export function SeasonReviewPage() {
 
         <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="card overflow-hidden border-green-500/40 bg-gradient-to-r from-green-600/10 via-surface to-surface p-4">
-            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row"><div><p className="metric-label">Your Season</p><h2 className="mt-1 text-xl font-semibold text-white">{gameState.player.fullName}</h2></div><div className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 border-green-500 text-xl font-bold text-green-400">{record.titles > 1 ? 'A' : record.wins > record.losses ? 'B' : 'C'}</div></div>
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row"><div><p className="metric-label">Your Season</p><h2 className="mt-1 text-xl font-semibold text-white"><PlayerLink name={gameState.player.fullName}/></h2></div><div className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 border-green-500 text-xl font-bold text-green-400">{record.titles > 1 ? 'A' : record.wins > record.losses ? 'B' : 'C'}</div></div>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <div className="rounded-lg bg-background/40 p-3"><p className="metric-label">Final Rank</p><p className="mt-1 text-lg font-bold text-white">#{record.closingRanking}</p><p className={rankingMovement >= 0 ? "text-xs text-green-400" : "text-xs text-red-400"}>{rankingMovement === 0 ? 'No change' : `${rankingMovement > 0 ? 'Up' : 'Down'} ${Math.abs(rankingMovement)}`}</p></div>
               <div className="rounded-lg bg-background/40 p-3"><p className="metric-label">Record</p><p className="mt-1 text-lg font-bold text-white">{record.wins}-{record.losses}</p><p className="text-xs text-gray-400">{record.matchesPlayed} matches</p></div>
@@ -124,8 +126,8 @@ export function SeasonReviewPage() {
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[1fr_18rem]">
-          <div className="card overflow-hidden"><div className="card-header"><h2 className="text-sm font-semibold text-white">Major Tournament Winners</h2></div><div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-3">{transition.majorWinners.length ? transition.majorWinners.map((headline) => <div key={headline.tournamentName} className="bg-surface p-4"><p className="truncate text-[10px] font-semibold uppercase text-amber-400">{headline.tournamentName}</p><p className={`mt-2 truncate font-semibold ${headline.playerWon ? 'text-green-400' : 'text-white'}`}>{headline.winner}</p><p className="mt-1 text-[10px] text-gray-500">Season champion</p></div>) : <p className="col-span-full bg-surface p-6 text-center text-sm text-gray-400">No major tournament winners were recorded.</p>}</div></div>
-          <div className="card p-5 text-center"><Crown className="mx-auto h-8 w-8 text-amber-400" /><p className="mt-2 metric-label">World Number One</p><p className="mt-2 text-xl font-bold text-white">{worldNumberOne?.playerName ?? 'Not recorded'}</p>{worldNumberOne ? <><p className="text-xs text-gray-400">{worldNumberOne.nation}</p><p className="mt-3 text-xs text-green-400">{worldNumberOne.titles} titles · {worldNumberOne.wins}-{worldNumberOne.losses}</p></> : null}</div>
+          <div className="card overflow-hidden"><div className="card-header"><h2 className="text-sm font-semibold text-white">Major Tournament Winners</h2></div><div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-3">{transition.majorWinners.length ? transition.majorWinners.map((headline) => <div key={headline.tournamentName} className="bg-surface p-4"><p className="truncate text-[10px] font-semibold uppercase text-amber-400">{headline.tournamentName}</p><p className={`mt-2 truncate font-semibold ${headline.playerWon ? 'text-green-400' : 'text-white'}`}><PlayerLink name={headline.winner}/></p><p className="mt-1 text-[10px] text-gray-500">Season champion</p></div>) : <p className="col-span-full bg-surface p-6 text-center text-sm text-gray-400">No major tournament winners were recorded.</p>}</div></div>
+          <div className="card p-5 text-center"><Crown className="mx-auto h-8 w-8 text-amber-400" /><p className="mt-2 metric-label">World Number One</p><p className="mt-2 text-xl font-bold text-white">{worldNumberOne ? <PlayerLink name={worldNumberOne.playerName}/> : 'Not recorded'}</p>{worldNumberOne ? <><p className="text-xs text-gray-400">{worldNumberOne.nation}</p><p className="mt-3 text-xs text-green-400">{worldNumberOne.titles} titles · {worldNumberOne.wins}-{worldNumberOne.losses}</p></> : null}</div>
         </section>
 
         <SeasonRankings review={transition} playerName={gameState.player.fullName} />
@@ -302,7 +304,7 @@ export function SeasonReviewPage() {
               End of Season Review
             </h1>
             <p className="mt-1 truncate text-xs text-gray-400">
-              {seasonTitle(gameState)} review for {gameState.player.fullName}.
+              {seasonTitle(gameState)} review for <PlayerLink name={gameState.player.fullName}/>.
             </p>
           </div>
           <div className="card flex shrink-0 items-center gap-3 px-4 py-2.5">
@@ -524,7 +526,7 @@ export function SeasonReviewPage() {
             </p>
             <ul className="min-h-0 space-y-1 overflow-auto text-xs text-green-400 scrollbar-thin">
               {highlights.length ? (
-                highlights.map((item) => <li key={item}>{item}</li>)
+                highlights.map((item) => <li key={item}><PlayerNames text={item}/></li>)
               ) : (
                 <li>No notable results logged yet.</li>
               )}
@@ -616,7 +618,7 @@ export function SeasonReviewPage() {
       </div>
 
 
-      <p role="status" className="shrink-0 text-xs text-amber-300">{gameState.lastAction}</p>
+      <p role="status" className="shrink-0 text-xs text-amber-300"><PlayerNames text={gameState.lastAction}/></p>
       <div className="flex shrink-0 flex-wrap justify-center gap-2 rounded-lg border border-border bg-surface-light/40 px-3 py-2.5">
         <button
           type="button"

@@ -547,6 +547,8 @@ export function CueShopPage() {
       const affordable = gameState.player.cash >= selectedChalk.cost;
       return <>
         <h3 className="text-sm font-bold text-white">{selectedChalk.name}</h3>
+          {selectedChalk.description && <p className="mt-2 text-xs leading-relaxed text-gray-300">{selectedChalk.description}</p>}
+          {selectedChalk.tier && <p className="mt-1 text-[10px] text-green-300">{selectedChalk.tier}</p>}
         <div className="mt-3 space-y-2 text-xs">
           <div className="flex justify-between gap-2"><span className="text-gray-500">Pack price · 5 units</span><span className="font-bold text-green-400">{formatMoney(selectedChalk.cost)}</span></div>
           <div className="flex justify-between gap-2"><span className="text-gray-500">Usable stock</span><span aria-label="Selected chalk stock" className={units <= 1 ? 'text-amber-300' : 'text-white'}>{units} {units === 1 ? 'unit' : 'units'}</span></div>
@@ -562,6 +564,8 @@ export function CueShopPage() {
       return (
         <>
           <h3 className="text-sm font-bold text-white">{selectedTip.name}</h3>
+          {selectedTip.description && <p className="mt-2 text-xs leading-relaxed text-gray-300">{selectedTip.description}</p>}
+          {selectedTip.tier && <p className="mt-1 text-[10px] text-green-300">{selectedTip.tier}</p>}
           <div className="mt-3 space-y-2 text-xs">
             <div className="flex justify-between">
               <span className="text-gray-500">Price</span>
@@ -590,6 +594,7 @@ export function CueShopPage() {
       return (
         <>
           <h3 className="text-sm font-bold text-white">{selectedCase.name}</h3>
+          {selectedCase.description && <p className="mt-2 text-xs leading-relaxed text-gray-300">{selectedCase.description}</p>}
           <div className="mt-3 space-y-2 text-xs">
             <div className="flex justify-between">
               <span className="text-gray-500">Price</span>
@@ -675,6 +680,7 @@ export function CueShopPage() {
     return (
       <>
         <h3 className="text-sm font-bold text-white">{selectedCue.name}</h3>
+          {selectedCue.description && <p className="mt-2 text-xs leading-relaxed text-gray-300">{selectedCue.description}</p>}
         <div className="mt-3 space-y-2 text-xs">
           <div className="flex justify-between">
             <span className="text-gray-500">Price</span>

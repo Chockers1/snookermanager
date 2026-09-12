@@ -1,3 +1,4 @@
+import { PlayerNames } from '../components/game/PlayerNames';
 import { TravelLocationPanel } from '../components/career/RealismPanels';
 import { realismOf, overseasWeeklyCost } from '../game/realism';
 import { careerBudget, nextClubWorkDate } from '../game/careerBudget';
@@ -522,7 +523,7 @@ export function FinancePage() {
                       </td>
                       <td className="px-3 py-2">
                         <p className="truncate text-white">
-                          {transaction.description}
+                          <PlayerNames text={transaction.description}/>
                         </p>
                         <p className="truncate text-[10px] text-gray-500">
                           {transaction.category}
@@ -637,7 +638,7 @@ export function FinancePage() {
                           {formatCompactDate(item.date)}
                         </p>
                         <p className="mt-1 truncate text-white">
-                          {item.description}
+                          <PlayerNames text={item.description}/>
                         </p>
                       </div>
                       <span className="shrink-0 font-semibold text-red-400">

@@ -1,3 +1,4 @@
+import { PlayerNames } from '../components/game/PlayerNames';
 import { EntryCriteriaPanel } from '../components/game/EntryCriteriaPanel'
 import { currentPublishedRanking } from '../game/rankingPresentation'
 import { pathwayAgeLimit } from '../game/pathwayRules'
@@ -192,12 +193,12 @@ export function MatchPreviewPage() {
           </div>
           <div className="mt-0.5 flex min-w-0 items-baseline gap-3">
             <h1 className="shrink-0 text-xl font-bold leading-tight text-white">Match Preview</h1>
-            <p className="hidden min-w-0 truncate text-xs text-gray-400 sm:block">{gameState.player.fullName} against <PlayerLink name={opponentName}/></p>
+            <p className="hidden min-w-0 truncate text-xs text-gray-400 sm:block"><PlayerLink name={gameState.player.fullName}/> against <PlayerLink name={opponentName}/></p>
           </div>
           <p className="mt-1 truncate text-[10px] text-gray-400">
             <span className="font-semibold uppercase tracking-wide text-gray-500">Recent opponent pattern</span>
             <span className="mx-2 text-border">|</span>
-            Event {eventWins}-{eventLosses} · Frames {eventFrameDifferential > 0 ? '+' : ''}{eventFrameDifferential} · {opponentPatternText}
+            Event {eventWins}-{eventLosses} · Frames {eventFrameDifferential > 0 ? '+' : ''}{eventFrameDifferential} · <PlayerNames text={opponentPatternText}/>
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
@@ -255,7 +256,7 @@ export function MatchPreviewPage() {
               {getInitials(gameState.player.fullName)}
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-bold text-white">{gameState.player.fullName}</h2>
+              <h2 className="truncate text-lg font-bold text-white"><PlayerLink name={gameState.player.fullName}/></h2>
               <p className="truncate text-[11px] text-gray-400">{gameState.player.careerStage} - {gameState.player.playingStyle}</p>
               <p className="mt-1.5 text-[11px] text-gray-400">
                 {gameState.player.rankingLabel} <span className="font-bold text-white">{playerRank == null ? 'Unranked' : `#${playerRank}`}</span>
@@ -354,7 +355,7 @@ export function MatchPreviewPage() {
                 </div>
               </div>
               <div className="rounded-lg border border-border bg-surface-light/40 p-2.5 text-[11px] leading-relaxed text-gray-300">
-                <p className="flex gap-2"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" /><span>{scoutNotes}</span></p>
+                <p className="flex gap-2"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" /><span><PlayerNames text={scoutNotes}/></span></p>
               </div>
             </div>
           </div>

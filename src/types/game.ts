@@ -69,6 +69,7 @@ export type Coach = {
 };
 
 export type Cue = {
+  description?: string;
   id: string;
   name: string;
   price: number;
@@ -85,6 +86,8 @@ export type Cue = {
 };
 
 export type Chalk = {
+  description?: string;
+  tier?: Cue['tier'];
   id: string;
   name: string;
   cost: number;
@@ -97,6 +100,8 @@ export type Chalk = {
 };
 
 export type Tip = {
+  description?: string;
+  tier?: Cue['tier'];
   id: string;
   name: string;
   cost: number;
@@ -109,6 +114,7 @@ export type Tip = {
 };
 
 export type EquipmentCase = {
+  description?: string;
   id: string;
   name: string;
   price: number;
@@ -288,6 +294,7 @@ export type TrainingSlot = {
 };
 
 export type InboxMessage = {
+  eventResults?: Array<{ round: string; opponentName: string; result: Match["result"]; playerFrames: number; opponentFrames: number }>;
   routineArrangement?: { name: string; reference: { id: string; startDate: string }; confirmations: Array<{ stage: string; text: string }> };
   victoryReport?: NonNullable<ReturnType<typeof import("../game/victoryCelebration").victoryCelebration>>;
   tourChangesReport?: import("../game/seasonTourChanges").SeasonTourChanges;

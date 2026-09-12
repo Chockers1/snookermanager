@@ -1,3 +1,4 @@
+import { PlayerLink } from '../components/game/PlayerLink';
 import { attributeComparison, attributePeriods, type AttributePeriod } from '../game/attributeHistory'
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -106,7 +107,7 @@ export function PlayerAttributesPage() {
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase text-gray-500">Player Profile</p>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <h1 className="truncate text-2xl font-bold text-white">Player Attributes - {gameState.player.fullName}</h1>
+            <h1 className="truncate text-2xl font-bold text-white">Player Attributes - <PlayerLink name={gameState.player.fullName}/></h1>
             <span className="border-l border-border pl-4 text-xs font-medium text-green-400/80">
               {periodLabel} · +{formatAttribute(totalGained)} gained{totalLost > 0 ? ` · −${formatAttribute(totalLost)} lost` : ''} · {improvedCount} improved
             </span>

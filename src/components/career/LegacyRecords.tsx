@@ -1,3 +1,4 @@
+import { PlayerLink } from '../game/PlayerLink';
 import { useState } from 'react';
 import { Award, Trophy } from 'lucide-react';
 import { legacyRate, type CareerLegacy } from '../../game/careerLegacy';
@@ -54,7 +55,7 @@ export function LegacyRecords({ stats }: { stats: CareerLegacy }) {
         <div className="flex items-center justify-between gap-2"><span className="text-[10px] font-semibold uppercase tracking-wide text-amber-300">{t.category}</span><span className="text-xs text-gray-400">{t.season}</span></div>
         <Trophy aria-hidden="true" className={'mx-auto my-5 h-12 w-12 ' + (t.category === 'Major' ? 'text-amber-300' : 'text-amber-500')} strokeWidth={1.4} />
         <h3 className="text-center text-sm font-semibold leading-snug text-white">{t.name}</h3><p className="mt-1 text-center text-[10px] text-gray-400">{t.circuit}</p>
-        <div className="mt-auto pt-4"><p className="border-t border-amber-400/15 pt-3 text-xs text-gray-300">{t.opponent ? 'Final: ' + t.score + ' vs ' + t.opponent : 'Champion · final details unavailable'}</p><div className="mt-2 flex flex-wrap justify-between gap-2 text-[10px] text-gray-400"><time dateTime={t.date}>{t.date}</time><span className="text-amber-300">{formatMoney(t.prizeMoney)} event earnings</span></div></div>
+        <div className="mt-auto pt-4"><p className="border-t border-amber-400/15 pt-3 text-xs text-gray-300">{t.opponent ? <>Final: {t.score} vs <PlayerLink name={t.opponent}/></> : 'Champion · final details unavailable'}</p><div className="mt-2 flex flex-wrap justify-between gap-2 text-[10px] text-gray-400"><time dateTime={t.date}>{t.date}</time><span className="text-amber-300">{formatMoney(t.prizeMoney)} event earnings</span></div></div>
       </article>)}</div>{trophies.length > visible && <button className="btn-secondary mt-4 text-xs" type="button" onClick={() => setVisible(v => v + 12)}>Show more trophies ({trophies.length - visible} remaining)</button>}
       {stats.recoveredHistory && <p className="mt-4 text-xs text-gray-400">The cabinet restores titles with surviving event records. Earlier titles without an archived event cannot be reconstructed.</p>}</div>}
     </section>

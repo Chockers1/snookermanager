@@ -1,3 +1,5 @@
+import { PlayerNames } from './PlayerNames';
+import { PlayerLink } from './PlayerLink';
 import { InboxVictoryBanner } from './InboxVictoryBanner';
 import { postEventRanking, type PostEventRankingSnapshot } from '../../game/postEventRanking';
 import { Link } from 'react-router-dom';
@@ -7,9 +9,10 @@ import { TournamentRewards } from './TournamentRewards';
 import type { EventFinancialReport } from '../../game/eventFinancialReport';
 import { reportMoney } from '../../game/eventFinancialReport';
 import type { InboxMessage } from '../../types/game';
-export function PostEventReport({finance,summary,qualification,rankingSnapshot,victory}:{finance:EventFinancialReport;summary:NonNullable<InboxMessage['summary']>;qualification?:QualificationReport;rankingSnapshot?:PostEventRankingSnapshot;victory?:InboxMessage['victoryReport']}) {
+export function PostEventReport({finance,summary,qualification,rankingSnapshot,victory,results}:{finance:EventFinancialReport;summary:NonNullable<InboxMessage['summary']>;qualification?:QualificationReport;rankingSnapshot?:PostEventRankingSnapshot;victory?:InboxMessage['victoryReport'];results?:InboxMessage['eventResults']}) {
   const { gameState } = useGame();
   const ranking = postEventRanking(gameState, finance, rankingSnapshot);
+  const eventResults = results ?? gameState.history.tournamentHistory.find(event => event.tournamentId === finance.tournamentId && event.startDate === finance.startDate)?.roundResults;
   const main = qualification?.mainEvent;
   const currentMain = main && gameState.tournaments.find(t => t.id === main.id && t.startDate === main.startDate && !['Completed', 'Skipped'].includes(t.status));
   const finish=summary.find(s=>s.label==='Tournament finish'),rank=summary.find(s=>s.label.includes('Ranking'));
@@ -22,7 +25,7 @@ export function PostEventReport({finance,summary,qualification,rankingSnapshot,v
   ];
   return <section aria-label="Post-event report" className="mt-2 space-y-1.5 text-xs">
     {victory && <InboxVictoryBanner victory={victory}/>}
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-lg border border-border bg-background/30 p-2"><div className="min-w-0"><p className="font-semibold text-white">{qualification ? `Qualified for ${qualification.mainEventName}` : finish?.value??'Event complete'}</p><p className="mt-1 break-words text-[11px] text-gray-400">{finish?.detail}</p></div>{(ranking||rank)&&<div className="max-w-48 text-right"><p className="text-[10px] text-gray-400">{ranking?.rankLabel ?? rank?.label}</p><p className="font-semibold text-white">{ranking?.change ?? ranking?.value ?? rank?.value} <span className="text-[10px] font-normal text-gray-400">{ranking?.detail ?? rank?.detail}</span></p></div>}</div>
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 rounded-lg border border-border bg-background/30 p-2"><div className="min-w-0"><p className="font-semibold text-white">{qualification ? `Qualified for ${qualification.mainEventName}` : finish?.value??'Event complete'}</p><p className="mt-1 break-words text-[11px] text-gray-400"><PlayerNames text={finish?.detail}/></p></div>{(ranking||rank)&&<div className="max-w-48 text-right"><p className="text-[10px] text-gray-400">{ranking?.rankLabel ?? rank?.label}</p><p className="font-semibold text-white">{ranking?.change ?? ranking?.value ?? rank?.value} <span className="text-[10px] font-normal text-gray-400">{ranking?.detail ?? rank?.detail}</span></p></div>}</div>
     {ranking && <div aria-label="Event ranking update" className={`rounded border px-2.5 py-1.5 ${ranking.pending ? 'border-amber-500/30 bg-amber-500/5' : 'border-border bg-background/30'}`}>
       <p className="font-semibold text-white">{ranking.creditLabel} · {ranking.pending ? 'Publishes' : 'Published'} {ranking.snapshot.publication}</p>
       <p className="mt-0.5 text-[10px] text-gray-400">{ranking.pending ? 'Your award has not reached the rankings yet. This report updates when the ranking list is published.' : ranking.change ? 'Movement compares the previous published list with this publication, including other players’ results and expiring earnings.' : 'The exact historical ranking snapshots are unavailable; no movement has been assumed.'}</p>
@@ -33,6 +36,15 @@ export function PostEventReport({finance,summary,qualification,rankingSnapshot,v
       <p className="mt-1 text-[11px] text-gray-300">Qualification earns a place, not a tournament trophy. Prize money follows your main-event finish.</p>
       {currentMain && <Link className="mt-1 inline-block font-semibold text-green-300 underline" to={`/calendar?tournament=${encodeURIComponent(currentMain.id)}`}>View {qualification.mainEventName} entry &amp; travel</Link>}
     </div>}
+    {eventResults?.length ? <details className="rounded border border-border bg-background/30 px-2.5 py-2">
+      <summary className="cursor-pointer font-semibold text-white">Your event results · {eventResults.length} matches · {eventResults.filter(r => r.result === 'Won').length}W / {eventResults.filter(r => r.result === 'Lost').length}L / {eventResults.filter(r => r.result === 'Drawn').length}D</summary>
+      <ol aria-label="Event match results" className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+        {eventResults.map((result, index) => <li key={index} className="flex flex-wrap justify-between gap-x-3 border-t border-border/50 py-1">
+          <span className="min-w-0 break-words text-gray-300">{result.round} · <PlayerLink name={result.opponentName}/></span>
+          <span className="shrink-0 tabular-nums text-white">{result.result} {result.playerFrames}–{result.opponentFrames}</span>
+        </li>)}
+      </ol>
+    </details> : null}
     <div className="grid grid-cols-3 gap-2">{summary.filter(s=>['Pot success','Safety success','Highest break'].includes(s.label)).map(s=><div key={s.label} className="rounded border border-border px-2 py-1"><p className="text-[10px] text-gray-400">{s.label}</p><p className="font-semibold text-green-300">{s.value}</p></div>)}</div>
     <div className="overflow-hidden rounded-lg border border-border bg-background/30"><div className="flex flex-wrap justify-between gap-1 border-b border-border px-2.5 py-1.5"><h3 className="font-semibold text-white">Event finances</h3><span className="text-[10px] text-gray-500">Costs charged through event completion</span></div>
       <dl className="grid divide-y divide-border/60 sm:grid-cols-2">

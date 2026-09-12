@@ -11,6 +11,16 @@ const message = (id: string, subject: string, sender = 'Career Manager'): InboxM
 const receipt = (id: string, subject: string, sender: string): InboxMessage => ({ ...message(id, subject, sender), tournamentReference: reference });
 
 describe('routine inbox cadence', () => {
+  it('removes old routine match-win notices while preserving the event report and meaningful messages', () => {
+    const win = { ...message('win', 'Win at British Open', 'Tournament Office'), actionRoute: '/tournaments/hub', actionLabel: 'Continue Tournament' };
+    const report = message('report', 'Post-event report: British Open', 'Tournament Office');
+    const story = message('story', 'A rivalry is taking shape');
+    const invitation = message('invite', 'Invitation: Next Open', 'Tournament Office');
+    const kept = [report, story, invitation];
+    expect(compactRoutineInbox([win, ...kept])).toEqual(kept);
+    expect(compactRoutineInbox(compactRoutineInbox([win, ...kept]))).toEqual(kept);
+  });
+
   it('keeps confirmations together, resolves the exact invitation, and preserves decisions and deadlines', () => {
     const decision = message('story:deciders', 'Turning deciding frames around');
     const deadline = message('entry-reminder', 'Tournament entry reminders');

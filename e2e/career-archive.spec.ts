@@ -19,7 +19,7 @@ async function open(page:Page){
 async function route(page:Page,url:string){await page.evaluate(url=>{history.pushState({},'',url);dispatchEvent(new PopStateEvent('popstate'))},url)}
 test('loads historical data only when requested and restores full archived draws',async({page})=>{
  const f=await open(page);expect(await page.evaluate(()=>(window as Window & {archiveReads:number}).archiveReads)).toBe(0);
- await route(page,'/players/'+f.id);await expect(page.getByLabel('Player history season').locator('option[value="2010/11"]')).toHaveCount(1);
+ await route(page,'/players/'+f.id);await page.getByRole('tab',{name:'Results',exact:true}).click();await expect(page.getByLabel('Player history season').locator('option[value="2010/11"]')).toHaveCount(1);
  await page.getByLabel('Player history season').selectOption('2010/11');await expect(page.locator('summary').filter({hasText:'Historical exhibition'})).toBeVisible();await page.locator('summary').filter({hasText:'Historical exhibition'}).click();await expect(page.getByText('Historical Opponent',{exact:true})).toBeVisible();
  await route(page,'/career/stats');await page.locator('#season-archive > summary').click();await page.getByLabel('Archive season').selectOption('2010/11');await page.getByRole('button',{name:/Historical exhibition/}).click();await expect(page.locator('#season-archive').getByText('Historical Opponent',{exact:true})).toBeVisible();
 });

@@ -1,3 +1,5 @@
+import { PlayerNames } from '../components/game/PlayerNames';
+import { PlayerLink } from '../components/game/PlayerLink';
 import { GroupFixtures } from '../components/tournaments/GroupFixtures';
 import { isGroupDraw } from '../game/championshipLeague';
 import { useEffect, useRef, useState } from "react";
@@ -233,7 +235,7 @@ export function TournamentDrawPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-white">
-                        {opponent.name}
+                        <PlayerLink name={opponent.name}/>
                       </p>
                       <p className="text-gray-400">
                         Rank {opponent.rank} - {opponent.nation}
@@ -287,7 +289,7 @@ export function TournamentDrawPage() {
               <div className="flex justify-between">
                 <span className="text-gray-400">Projected Route</span>
                 <span className="text-white">
-                  {drawData.currentPosition.projectedRoute}
+                  <PlayerNames text={drawData.currentPosition.projectedRoute}/>
                 </span>
               </div>
             </div>

@@ -1,3 +1,4 @@
+import { PlayerNames } from '../game/PlayerNames';
 import { useState } from 'react';
 import { useGame } from '../../context/useGame';
 import { betweenMatchChoices, betweenMatchEffects, betweenMatchInfo, type BetweenMatchChoice } from '../../game/betweenMatches';
@@ -16,7 +17,7 @@ export function BetweenMatchPanel({ tournamentId, compact = false }: { tournamen
       <h2 className="font-semibold text-white">Before your next match · {info.round}</h2>
       <span className="font-semibold text-amber-300">{info.days === 0 ? 'Same-day turnaround' : info.days === 1 ? 'Overnight break · 1 day between matches' : `${info.days} days between matches`}</span>
     </div>
-    <p className="mt-1 text-gray-300">{dateLabel(info.previousDate)} → {dateLabel(info.nextDate)} · Next opponent: {info.opponent}</p>
+    <p className="mt-1 text-gray-300">{dateLabel(info.previousDate)} → {dateLabel(info.nextDate)} · Next opponent: <PlayerNames text={info.opponent}/></p>
     {applied ? <p role="status" className="mt-2 text-green-300">{betweenMatchChoices.find(c => c.id === applied.choice)?.label} completed · Fatigue {applied.fatigueBefore.toFixed(2)}% → {applied.fatigueAfter.toFixed(2)}% · Confidence {applied.confidenceBefore.toFixed(2)}% → {applied.confidenceAfter.toFixed(2)}%. Ready for the next match.</p> : <>
       <p className="mt-2 text-gray-300">{gameState.player.fatigue >= 40 ? 'Fatigue is elevated: rest is recommended.' : gameState.player.confidence < 65 ? 'Confidence is low: a calm tactical review is recommended.' : 'You are fresh enough for a short practice routine.'} {info.days === 0 ? 'Only a short recovery window is available.' : 'The overnight gap allows more recovery.'}</p>
       <div className={`mt-2 grid gap-2 ${compact ? '' : 'sm:grid-cols-3'}`} role="group" aria-label="Preparation choices">

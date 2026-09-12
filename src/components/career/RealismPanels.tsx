@@ -1,3 +1,5 @@
+import { PlayerNames } from '../game/PlayerNames';
+import { PlayerLink } from '../game/PlayerLink';
 import { useState } from 'react';
 import { useGame } from '../../context/useGame';
 import { CareerDisclosure } from './CareerDepthPanels';
@@ -29,10 +31,10 @@ function QualificationRacesContent() {
         <div className="flex flex-wrap justify-between gap-2"><h3 className="font-bold">{r.name} · top {r.places}</h3><b className={r.position && r.position <= r.places ? 'text-green-400' : 'text-amber-300'}>{r.status}</b></div>
         <p className="mt-2 text-gray-400">{r.oneYear ? 'One-year earnings' : 'Two-year earnings'} · cut-off {r.cutoff} · your position {r.position ? `#${r.position}` : '—'}</p>
         <p className="my-2">Defending <b className="text-amber-300">{money(r.defending)}</b> · gap to line <b>{money(r.gap)}</b></p>
-        <ul className="divide-y divide-border">{r.rivals.map(row => <li key={row.name} className="flex flex-wrap justify-between gap-2 py-1.5"><span>#{row.rank} {row.name}</span><span>{money(row.total)} · defending {money(row.defending)}</span></li>)}</ul>
+        <ul className="divide-y divide-border">{r.rivals.map(row => <li key={row.name} className="flex flex-wrap justify-between gap-2 py-1.5"><span>#{row.rank} <PlayerLink name={row.name}/></span><span>{money(row.total)} · defending {money(row.defending)}</span></li>)}</ul>
         <p className="mt-2 text-gray-500">{r.note}</p>
       </section>)}
-      <section className="rounded-lg border border-border p-3"><h3 className="font-bold">Tour survival · top 64</h3><p className="my-2">{survival.confirmed ? 'Season-end table' : 'Provisional, expiry-adjusted position'}: {survival.position ? `#${survival.position}` : 'not on world ladder'} · defending {money(survival.defending)} · gap {money(survival.gap)}</p><p className="text-green-400">{survival.protectedCard ? 'You have a protected second year on your card.' : 'Ranking and alternative qualification routes remain separate.'}</p><p className="mt-2 text-gray-400">Current one-year rescue places, excluding projected top 64 and protected cards: {survival.oneYearRescue.join(', ') || 'No eligible players yet'}. This is an outlook, not a new card award.</p></section>
+      <section className="rounded-lg border border-border p-3"><h3 className="font-bold">Tour survival · top 64</h3><p className="my-2">{survival.confirmed ? 'Season-end table' : 'Provisional, expiry-adjusted position'}: {survival.position ? `#${survival.position}` : 'not on world ladder'} · defending {money(survival.defending)} · gap {money(survival.gap)}</p><p className="text-green-400">{survival.protectedCard ? 'You have a protected second year on your card.' : 'Ranking and alternative qualification routes remain separate.'}</p><p className="mt-2 text-gray-400">Current one-year rescue places, excluding projected top 64 and protected cards: <PlayerNames text={survival.oneYearRescue.join(', ') || 'No eligible players yet'}/>. This is an outlook, not a new card award.</p></section>
     </div>
   </>;
 }
@@ -50,7 +52,7 @@ export function TrainingBasePanel() {
       <label className="flex flex-wrap items-center gap-3">Base location<select aria-label="Base location" className={input} value={location} onChange={e => setLocation(e.target.value)}>{Object.keys(LOCATIONS).map(name => <option key={name}>{name}</option>)}</select></label>
       <p>Joining / relocation <b className="text-amber-300">{money(joining)}</b> · recurring <b>{money(option.weekly)}/week</b> · four-week base cost {money(option.weekly * 4)} · cash after joining {money(gameState.player.cash - joining)}</p>
       <p className="text-gray-400">Equipment rental and coaches are separate. Facility/base efficiency combined is capped at 115%; projects and partners retain their shared 10% allowance. Base benefits are reduced while away. Relocation reserves travel time and can be reviewed after four weeks.</p>
-      <button className={button} disabled={base === r.base && location === r.home} onClick={() => actOnRealism({ type: 'base', base, location })}>Confirm base and costs</button><p role="status" className="text-amber-300">{gameState.lastAction}</p>
+      <button className={button} disabled={base === r.base && location === r.home} onClick={() => actOnRealism({ type: 'base', base, location })}>Confirm base and costs</button><p role="status" className="text-amber-300"><PlayerNames text={gameState.lastAction}/></p>
     </div>
   </CareerDisclosure>;
 }
@@ -65,7 +67,7 @@ export function TravelLocationPanel({ tournament, travelId }: { tournament?: Tou
       <p>{quote?.hotelNightlyRate !== undefined ? `Event hotel: £${quote.hotelNightlyRate}/night; paid through ${quote.hotelThrough}. Later rounds extend the booking only for additional nights.` : 'Existing event bookings cover their prepaid hotel nights.'}</p><p>After an event you remain at its location. You may travel directly to the next event, or return to your training base.</p><p>Overseas lodging outside prepaid event nights: £35/night · currently projected {money(overseasWeeklyCost(gameState))}/week.</p>
       {r.location !== r.home && <button className={button} onClick={() => actOnRealism({ type: 'return-home', emergencyCredit: gameState.player.cash < returnCost })}>{gameState.player.cash < returnCost ? 'Emergency return' : 'Book return'} to {r.home} · {money(returnCost)} · {route.flight ? '2 days, +12 fatigue' : '1 day, +4 fatigue'}</button>}
       {r.location !== r.home && gameState.player.cash < returnCost && <p className="text-amber-300">The full fare is added to your negative balance. Future earnings repay it; overseas lodging stops on arrival. This does not forgive existing debt.</p>}
-      <p className="text-gray-500">Game estimates: regional geography, standard time zones and authored costs—not live fares or an airline schedule.</p><p role="status" className="text-amber-300">{gameState.lastAction}</p>
+      <p className="text-gray-500">Game estimates: regional geography, standard time zones and authored costs—not live fares or an airline schedule.</p><p role="status" className="text-amber-300"><PlayerNames text={gameState.lastAction}/></p>
     </div>
   </CareerDisclosure>;
 }
@@ -78,8 +80,8 @@ export function VenueScoutingPanel({ tournament, opponent }: { tournament?: Tour
   return <CareerDisclosure title="Conditions and scouting evidence" summary={`Conditions & scouting · ${conditions?.description ?? 'No venue'} · ${report.samples} observations`}>
     <div className={body}>
       {conditions && <section><h3 className="font-bold">{conditions.description}</h3><p className="mt-2">Cloth speed {conditions.speed}/100 · cushion response {conditions.cushions}/100 · room humidity {conditions.humidity}/100</p><p className="mt-2 text-gray-400">Authored venue observations, not live weather. Effects depend on cue-ball control and safety, are capped at −2 to +1 effective skill points and never change permanent attributes.</p><p className="my-2">Current touch adjustment: <b className="text-amber-300">{conditionAdjustment(conditions, gameState.attributes.technical['Cue Ball Control'] ?? 50, gameState.attributes.technical['Safety Play'] ?? 50, familiar)}</b></p><button className={button} disabled={familiar || !tournament || realismOf(gameState).familiarised.includes(`${tournament.id}:${tournament.startDate}`)} onClick={() => tournament && actOnRealism({ type: 'familiarise', eventId: tournament.id })}>{familiar ? 'Familiarisation completed' : tournament && realismOf(gameState).familiarised.includes(`${tournament.id}:${tournament.startDate}`) ? 'Familiarisation booked' : 'Reserve evening table familiarisation · £35'}</button></section>}
-      {opponent && <section className="border-t border-border pt-3"><h3 className="font-bold">{opponent} · OVR {report.ability} · POT {report.potential}</h3><p className="my-2 text-gray-400">{report.note}</p><ul className="my-2 list-inside list-disc text-gray-300">{report.evidence.map(line => <li key={line}>{line}</li>)}</ul><p>Scouting confidence {report.confidence}% · tactical assessments improve through direct matches, shared practice and recorded match reviews.</p><p className="my-2 text-gray-500">Your recorded approaches in meetings: {report.observedPlans.join(' · ') || 'No observed history'}. This is not proof of the opponent’s preferred tactics.</p><button className={button} disabled={!watch} onClick={() => report.id && actOnRealism({ type: 'scout', opponentId: report.id })}>Review recorded match · one evening</button>{watch && <p className="mt-2">{watch.event} · {watch.round} · replaces evening training</p>}</section>}
-      <p role="status" className="text-amber-300">{gameState.lastAction}</p>
+      {opponent && <section className="border-t border-border pt-3"><h3 className="font-bold"><PlayerLink name={opponent}/> · OVR {report.ability} · POT {report.potential}</h3><p className="my-2 text-gray-400"><PlayerNames text={report.note}/></p><ul className="my-2 list-inside list-disc text-gray-300">{report.evidence.map(line => <li key={line}><PlayerNames text={line}/></li>)}</ul><p>Scouting confidence {report.confidence}% · tactical assessments improve through direct matches, shared practice and recorded match reviews.</p><p className="my-2 text-gray-500">Your recorded approaches in meetings: {report.observedPlans.join(' · ') || 'No observed history'}. This is not proof of the opponent’s preferred tactics.</p><button className={button} disabled={!watch} onClick={() => report.id && actOnRealism({ type: 'scout', opponentId: report.id })}>Review recorded match · one evening</button>{watch && <p className="mt-2">{watch.event} · {watch.round} · replaces evening training</p>}</section>}
+      <p role="status" className="text-amber-300"><PlayerNames text={gameState.lastAction}/></p>
     </div>
   </CareerDisclosure>;
 }
@@ -89,6 +91,6 @@ export function WorldDigestPanel({ messageId }: { messageId?: string }) {
   const digests = realismOf(gameState).digest;
   const selected = messageId ? digests.filter(d => d.id === messageId) : digests.slice(0, 12);
   if (!selected.length) return null;
-  const contents = <div className={body}>{selected.map(d => <section key={d.id}><h3 className="font-bold text-green-400">{d.title} · {d.date}</h3><ul className="mt-2 divide-y divide-border">{d.lines.map((line, i) => <li key={i} className="py-2 text-gray-200">{line}</li>)}</ul></section>)}</div>;
+  const contents = <div className={body}>{selected.map(d => <section key={d.id}><h3 className="font-bold text-green-400">{d.title} · {d.date}</h3><ul className="mt-2 divide-y divide-border">{d.lines.map((line, i) => <li key={i} className="py-2 text-gray-200"><PlayerNames text={line}/></li>)}</ul></section>)}</div>;
   return messageId ? contents : <CareerDisclosure title="World results and career milestones" summary="Around the tour · actual results and milestones">{contents}</CareerDisclosure>;
 }
