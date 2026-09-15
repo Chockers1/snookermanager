@@ -13,10 +13,13 @@ for (const eventId of ['pc-69', 'pc-67']) test(`audited rules and fixtures ${eve
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.addInitScript(({ key, save }) => localStorage.setItem(key, save), { key: ACTIVE_SAVE_KEY, save: encodeCareerSave(state) });
   await page.goto('/'); await page.getByRole('button', { name: /Continue Career/ }).click();
+  await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await page.evaluate(() => { history.pushState({}, '', '/tournaments/hub'); dispatchEvent(new PopStateEvent('popstate')); });
+  await page.getByRole('tab',{name:'Event details',exact:true}).click();
   await expect(page.getByText('Round rules and format', { exact: true })).toBeVisible();
   await page.screenshot({ path: `test-results/audit-hub-${eventId}.png`, fullPage: true });
   if (eventId === 'pc-69') {
+    await page.getByRole('tab',{name:'Draw',exact:true}).click();
     const groups = page.getByRole('region', { name: 'Group standings and fixtures' });
     await expect(groups).toContainText('0 of 6 matches');
     await expect(groups.getByLabel('Group stage').locator('option')).toHaveCount(24);

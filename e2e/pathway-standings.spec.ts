@@ -4,6 +4,7 @@ import {ACTIVE_SAVE_KEY,encodeCareerSave} from '../src/game/saveStorage';
 for(const endOfSeason of [false,true])test('regional pathway standings '+(endOfSeason?'after all events':'before first events'),async({page})=>{
  const opening=createStarterState();
  const state=processRankingCalendar({...opening,seasonReview:null,currentDate:endOfSeason?'2027-06-29':'2026-08-12',tournaments:opening.tournaments.map(t=>({...t,status:'Skipped'}))});
+ state.firstWeekGuide = {version:1,dismissed:true,completed:[],skipped:[]};
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();

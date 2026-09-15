@@ -93,7 +93,7 @@ test('international travel and conditions show costs, dates and the booking stat
   await page.screenshot({ path: 'test-results/realism-travel.png', fullPage: true });
   await journey.getByRole('button', { name: 'Close editor' }).click();
   await page.evaluate(() => { history.pushState({}, '', '/tournaments/hub'); dispatchEvent(new PopStateEvent('popstate')); });
-  await page.locator('summary').filter({ hasText: 'Match briefing · opponent & venue' }).click();
+  await page.getByRole('tab',{name:'Match briefing',exact:true}).click();
   await page.getByRole('button', { name: /Conditions & scouting/ }).click();
   const conditions = page.getByRole('dialog', { name: 'Conditions and scouting evidence' });
   await expect(conditions).toContainText('Cloth speed');
@@ -102,6 +102,7 @@ test('international travel and conditions show costs, dates and the booking stat
 });
 test('qualification races are reachable and describe provisional and protected places', async ({ page }) => {
   await open(page, '/rankings', seed());
+  await page.getByRole('tab', { name: 'Pathway', exact: true }).click();
   await page.getByRole('button', { name: /Qualification races/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Qualification and tour survival' });
   await expect(dialog).toContainText('Tour survival · top 64');

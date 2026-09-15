@@ -67,6 +67,7 @@ test('calendar approval executes entry and travel only within the user budget', 
   const event = getNextEligibleTournament(state)!;
   state = { ...state, currentDate: plusDays(event.startDate, -14), player: { ...state.player, cash: 20000 }, careerDepth: { ...depthOf(state), nextSettlementDate: plusDays(event.startDate, -7) } };
   await open(page, '/calendar', state);
+  await page.getByRole('button',{name:'Commitments',exact:true}).click();
   await page.getByText(/Season strategy & commitments/).click();
   await page.getByLabel(`Approve ${event.name}`, { exact: true }).check();
   await page.getByLabel('Spending ceiling', { exact: true }).fill('3000');
@@ -96,7 +97,8 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 1280, height: 72
     await expect(page.getByRole('button', { name: 'Cancel project', exact: true })).toBeVisible();
     await page.screenshot({ path: `artifacts/career-depth-training-${viewport.width}.png` });
     await page.evaluate(() => { history.pushState({}, '', '/calendar'); dispatchEvent(new PopStateEvent('popstate')); });
-    await page.getByText(/Season strategy & commitments/).click();
+    await page.getByRole('button',{name:'Commitments',exact:true}).click();
+  await page.getByText(/Season strategy & commitments/).click();
     await page.getByRole('button', { name: 'Reserve commitment', exact: true }).scrollIntoViewIfNeeded();
     await expect(page.getByRole('button', { name: 'Reserve commitment', exact: true })).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

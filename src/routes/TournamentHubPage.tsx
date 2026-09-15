@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { SectionTabs } from '../components/ui/SectionTabs';
+import { betweenMatchInfo } from '../game/betweenMatches';
 import { PlayerNames } from '../components/game/PlayerNames';
 import { ActionBlockerNotice } from '../components/game/ActionBlockerNotice';
 import { tournamentEntryBlocker, advancementBlocker } from '../hooks/useGameState';
@@ -22,7 +25,6 @@ import {
   Play,
   Search,
   SkipForward,
-  Star,
   Trophy,
 } from "lucide-react";
 import { TournamentBracket } from "../components/tournaments/TournamentBracket";
@@ -56,6 +58,8 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+const hubTabs = ['Draw', 'Preparation', 'Match briefing', 'Event details'] as const;
+
 export function TournamentHubPage() {
   const {
     gameState,
@@ -68,6 +72,7 @@ export function TournamentHubPage() {
     finishSeason,
   } = useGame();
   const navigate = useNavigate();
+  const [tab, setTab] = useState<typeof hubTabs[number]>('Draw');
   const hubData = buildTournamentHubData(gameState);
   const drawData = buildTournamentDrawData(gameState);
   const groupCompetition = isGroupDraw(drawData.bracket);
@@ -194,6 +199,7 @@ export function TournamentHubPage() {
           { label: "Final", status: "upcoming" as const },
         ];
   const lastResult = hubData.recentResults.at(-1);
+  const matchGap = betweenMatchInfo(gameState, activeTournament);
 
   function handleQuickSim() {
     if (!activeTournament) return;
@@ -248,7 +254,7 @@ export function TournamentHubPage() {
       !getTournamentEntryAccess(gameState, t).allowed
     ).sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
     return (
-      <div className="space-y-4">
+      <div className="tournament-hub-page hub-empty" data-testid="tournament-hub-viewport">
 
         <section className="rounded-xl border border-border bg-surface p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-green-400">Tournament Hub</p>
@@ -268,358 +274,38 @@ export function TournamentHubPage() {
     );
   }
 
-  return (
-    <div className="relative flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100%+3rem)] xl:gap-2 xl:overflow-auto xl:p-1.5">
-
-      {activeTournament.legacyEntryHonoured && <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">Your previously accepted entry has been restored after a save rules update. This exception applies to this event only; future World Championship entries use the ranking cutoff and qualifying results.</p>}
-      {isMajorEvent ? (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-amber-500/[0.07] via-rose-950/[0.05] to-transparent"
-        />
-      ) : null}
-      <header
-        className={`relative flex shrink-0 flex-col gap-3 overflow-hidden rounded-xl border px-3 py-3 sm:flex-row sm:items-center sm:px-4 ${
-          isMajorEvent
-            ? "border-amber-500/40 bg-gradient-to-r from-[#211708] via-[#151923] to-[#1c1017] shadow-[0_0_32px_rgba(217,164,65,0.08)]"
-            : "border-border bg-surface/85"
-        }`}
-      >
-        {isMajorEvent ? (
-          <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-amber-300 via-amber-500 to-rose-800" />
-        ) : null}
-        <div className="min-w-0 flex-1">
-          {isMajorEvent ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-amber-300">
-                <Crown className="h-3 w-3" /> {majorLabel}
-              </span>
-              <span className="flex items-center gap-0.5 text-amber-300/80">
-                {Array.from({ length: activeTournament?.prestige ?? 5 }).map(
-                  (_, index) => (
-                    <Star key={index} className="h-2.5 w-2.5 fill-current" />
-                  ),
-                )}
-                <span className="ml-1 text-[9px] uppercase tracking-wider text-amber-100/60">
-                  Prestige
-                </span>
-              </span>
-            </div>
-          ) : (
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">
-              Tournament Hub
-            </p>
-          )}
-          <div className="mt-1 flex min-w-0 flex-col gap-1 lg:flex-row lg:items-baseline lg:gap-3">
-            <h1
-              className={`truncate font-bold leading-tight sm:text-2xl ${
-                isMajorEvent
-                  ? "font-serif text-2xl tracking-tight text-amber-50"
-                  : "text-xl text-white"
-              }`}
-            >
-              {activeTournament?.name ?? "No Active Tournament"}
-            </h1>
-            <p className="truncate text-xs text-gray-400">
-              {activeTournament?.location ?? "Location TBD"} ·{" "}
-              {activeTournament ? tournamentFormatSummary(activeTournament) : "Format pending"}
-            </p>
-          </div>
+  return <div className="tournament-hub-page" data-testid="tournament-hub-viewport">
+    <header className={`hub-header ${isMajorEvent ? 'hub-major' : ''}`}>
+      <div className="hub-event-name"><p className="wellbeing-eyebrow">{isMajorEvent ? majorLabel : 'Tournament Hub'}</p><h1>{activeTournament.name}</h1><p>{activeTournament.location} · {tournamentFormatSummary(activeTournament)}</p></div>
+      <div className="hub-round"><span>Current Round</span><strong>{activeRound ?? 'Entry'}</strong></div>
+      <button className="btn-secondary text-xs" onClick={()=>navigate('/travel')}><MapPin className="h-3.5 w-3.5"/>Travel</button>
+    </header>
+    <section className={`hub-next-match ${isMajorEvent ? 'hub-major-match' : ''}`} aria-label="Next match">
+      <div className="hub-match-heading"><h2>Next Match <span>· {nextMatchStageLabel}</span></h2><span>{advancementDecision?'Decision Needed':playability?.canPlay?'Playable':tournamentEntered?'Preparation Needed':'Entry Needed'}</span></div>
+      <div className="hub-match-content">
+        <div className="hub-contestants">
+          <div className="hub-contestant"><div className="hub-avatar">{initials(gameState.player.fullName)}</div><div><h3><PlayerLink name={gameState.player.fullName}/></h3><p>Rank {playerRow?.ranking ?? gameState.player.amateurRanking ?? gameState.player.worldRanking ?? '—'} · {formatPercent(gameState.player.confidence)} confidence</p></div></div>
+          <span className="hub-versus">VS</span>
+          <div className="hub-contestant hub-opponent"><div className="hub-avatar">{initials(nextOpponent?.playerName ?? 'Opponent')}</div><div><h3><PlayerLink name={nextOpponent?.playerName ?? 'Opponent TBD'}/></h3><p>Rank {nextOpponent?.ranking ?? '—'} · {nextOpponent?.nation ?? 'Nation TBD'}</p></div></div>
         </div>
-        <div
-          className={`flex shrink-0 items-center justify-between rounded-lg border px-4 py-2 sm:block sm:text-center ${
-            isMajorEvent
-              ? "border-amber-400/20 bg-amber-400/[0.07]"
-              : "border-border bg-surface-light/60"
-          }`}
-        >
-          <p className="text-[9px] uppercase tracking-[0.16em] text-gray-500">
-            Current Round
-          </p>
-          <p
-            className={`text-lg font-bold ${isMajorEvent ? "text-amber-300" : "text-green-400"}`}
-          >
-            {activeRound ?? "Entry"}
-          </p>
+        <div className="hub-match-actions">
+          <button className="btn-primary hub-play" onClick={handlePlayLiveMatch}><Play className="h-4 w-4"/>{primaryActionLabel}</button>
+          <button className="btn-secondary text-xs" onClick={()=>navigate(playability?.preparationConfirmed?'/match/preview':'/tournament/preparation')}><Search className="h-3.5 w-3.5"/>Scout</button>
+          {tournamentEntered?<button className="btn-secondary text-xs" disabled={!playability?.canPlay} title={!playability?.canPlay?(entryBlocker?.reason??playability?.reason??'Complete tournament preparation first.'):undefined} onClick={handleQuickSim}>Quick Sim</button>:<button className="btn-secondary text-xs" onClick={()=>skipTournament(activeTournament.id)}><SkipForward className="h-3.5 w-3.5"/>Skip Event</button>}
         </div>
-        <button
-          type="button"
-          className="btn-secondary min-h-11 shrink-0 justify-center px-4 text-xs"
-          onClick={() => navigate("/travel")}
-        >
-          <MapPin className="h-3.5 w-3.5" /> Travel
-        </button>
-      </header>
-
-      <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-2">
-        <div className="grid min-h-0 gap-3 xl:grid-rows-[auto_minmax(16rem,1fr)] xl:gap-2">
-          <section
-            className={`card flex min-h-0 flex-col overflow-hidden ${
-              isMajorEvent
-                ? "border-amber-500/30 bg-gradient-to-r from-amber-500/[0.08] via-surface to-rose-950/10"
-                : "border-green-600/40 bg-gradient-to-r from-green-600/10 via-surface to-surface"
-            }`}
-          >
-            <div className="card-header shrink-0 !py-2">
-              <h2 className="text-sm font-semibold text-white">
-                Next Match{" "}
-                <span className="font-normal text-gray-400">
-                  · {nextMatchStageLabel}
-                </span>
-              </h2>
-              <div className="flex items-center gap-3">
-                <button type="button" className="hidden min-h-7 items-center gap-1 text-xs text-gray-300 hover:text-white xl:inline-flex" onClick={() => navigate(playability?.preparationConfirmed ? '/match/preview' : '/tournament/preparation')}><Search className="h-3.5 w-3.5" /> Scout</button>
-              <span
-                className={`text-[9px] font-semibold uppercase tracking-[0.16em] ${playability?.canPlay ? "text-green-400" : "text-amber-400"}`}
-              >
-                {advancementDecision
-                  ? "Decision Needed"
-                  : playability?.canPlay
-                  ? "Playable"
-                  : tournamentEntered
-                    ? "Preparation Needed"
-                    : "Entry Needed"}
-              </span>
-              </div>
-            </div>
-            <div className="grid min-h-0 flex-1 gap-3 p-3 md:grid-cols-[minmax(0,1fr)_15rem] md:items-center">
-              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-4">
-                <div className="flex min-w-0 flex-col items-center gap-2 text-center sm:flex-row sm:text-left">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-green-500 bg-green-600/20 font-bold text-white">
-                    {initials(gameState.player.fullName)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-white sm:text-base">
-                      <PlayerLink name={gameState.player.fullName}/>
-                    </p>
-                    <p className="text-[11px] text-green-400">
-                      Rank{" "}
-                      {playerRow?.ranking ??
-                        gameState.player.amateurRanking ??
-                        gameState.player.worldRanking ??
-                        "-"}{" "}
-                      · {formatPercent(gameState.player.confidence)} confidence
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xl font-bold text-gray-500">VS</p>
-                <div className="flex min-w-0 flex-col-reverse items-center gap-2 text-center sm:flex-row sm:text-left">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-white sm:text-base">
-                      <PlayerLink name={nextOpponent?.playerName ?? "Opponent TBD"}/>
-                    </p>
-                    <p className="text-[11px] text-gray-400">
-                      Rank {nextOpponent?.ranking ?? "-"} ·{" "}
-                      {nextOpponent?.nation ?? "Nation TBD"}
-                    </p>
-                  </div>
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-red-500/60 bg-red-600/20 font-bold text-white">
-                    {initials(nextOpponent?.playerName ?? "Opponent")}
-                  </div>
-                </div>
-              </div>
-              <div className="grid gap-2 xl:flex xl:flex-wrap xl:items-center">
-                <ActionBlockerNotice blocker={entryBlocker} />
-                <button
-                  type="button"
-                  className={`${
-                    isMajorEvent
-                      ? "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-amber-400 px-5 text-sm font-semibold text-slate-950 transition hover:bg-amber-300"
-                      : "btn-primary min-h-11 w-full justify-center px-5 text-sm"
-                  } xl:w-auto xl:flex-1 xl:px-3 xl:text-xs`}
-                  onClick={handlePlayLiveMatch}
-                >
-                  <Play className="h-4 w-4" /> {primaryActionLabel}
-                </button>
-                <div className="grid grid-cols-2 gap-2 xl:flex">
-                  <button
-                    type="button"
-                    className="btn-secondary min-h-10 justify-center px-3 text-xs xl:hidden"
-                    onClick={() =>
-                      navigate(
-                        playability?.preparationConfirmed
-                          ? "/match/preview"
-                          : "/tournament/preparation",
-                      )
-                    }
-                  >
-                    <Search className="h-3.5 w-3.5" /> Scout
-                  </button>
-                  {tournamentEntered ? (
-                    <button
-                      type="button"
-                      className="btn-secondary min-h-10 justify-center px-3 text-xs"
-                      disabled={!playability?.canPlay} title={!playability?.canPlay ? (entryBlocker?.reason ?? playability?.reason ?? "Complete tournament preparation first.") : undefined}
-                      onClick={handleQuickSim}
-                    >
-                      Quick Sim
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn-secondary min-h-10 justify-center px-3 text-xs"
-                      onClick={() =>
-                        activeTournament && skipTournament(activeTournament.id)
-                      }
-                    >
-                      <SkipForward className="h-3.5 w-3.5" /> Skip Event
-                    </button>
-                  )}
-                </div>
-                {tournamentEntered && completedRounds.length === 0 && !(gameState.liveMatch?.tournamentId === activeTournament.id && gameState.liveMatch.status === "In Progress") && <button type="button" className="btn-secondary min-h-8 text-xs xl:w-full" onClick={() => withdrawTournament(activeTournament.id)}>Withdraw Entry</button>}
-                {tournamentEntered && !playability?.canPlay && !advancementDecision ? (
-                  <p className="text-center text-[10px] leading-tight text-amber-300">
-                    {playability?.reason}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          </section>
-
-          <section
-            className={`card flex min-h-[22rem] flex-col overflow-hidden xl:min-h-0 ${isMajorEvent ? "border-amber-500/20 bg-[#121923]" : ""}`}
-          >
-            <div className="card-header shrink-0">
-              <div>
-                <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
-                  {isMajorEvent ? (
-                    <Crown className="h-3.5 w-3.5 text-amber-300" />
-                  ) : (
-                    <Trophy className="h-3.5 w-3.5 text-green-400" />
-                  )}{" "}
-                  {groupCompetition ? "Groups and Fixtures" : isMajorEvent ? "Championship Draw" : "Tournament Bracket"}
-                </h2>
-                <p className="mt-0.5 text-[10px] text-gray-500">
-                  {groupCompetition ? "Group standings update after every match" : isMajorEvent
-                    ? "Elite field · your route to the title is highlighted"
-                    : "Live draw · your route is highlighted"}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn-secondary min-h-10 justify-center px-3 text-xs"
-                onClick={() => navigate("/tournaments/draw")}
-              >
-                <Maximize2 className="h-3.5 w-3.5" /> {groupCompetition ? "All Groups & Fixtures" : "Open Full Draw"}
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 p-2.5">
-              <>{groupCompetition ? <GroupFixtures tournament={activeTournament ?? null} key={activeRound} rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={activeRound} /> : <TournamentBracket
-                rounds={drawData.bracket}
-                playerName={gameState.player.fullName}
-                currentRound={activeRound}
-                dense
-              />}</>
-            </div>
-          </section>
-        </div>
-
-        <aside aria-label="Tournament information" className="scrollbar-thin flex min-h-0 flex-col gap-3 xl:gap-2 xl:overflow-y-auto xl:pr-1 [&>section]:shrink-0">
-          <section className="card card-body">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white">
-                Match Readiness
-              </h2>
-              <span
-                className={`text-xs font-semibold ${readiness >= 65 && equipmentReady ? "text-green-400" : "text-amber-400"}`}
-              >
-                {readiness >= 65 && equipmentReady
-                  ? "Ready"
-                  : "Needs attention"}
-              </span>
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-lg bg-surface-light/50 p-2">
-                <span className="block text-[9px] uppercase text-gray-500">
-                  Confidence
-                </span>
-                <b className="text-sm text-white">
-                  {formatPercent(gameState.player.confidence)}
-                </b>
-              </div>
-              <div className="rounded-lg bg-surface-light/50 p-2">
-                <span className="block text-[9px] uppercase text-gray-500">
-                  Freshness
-                </span>
-                <b className="text-sm text-white">{formatPercent(freshness)}</b>
-              </div>
-              <div className="rounded-lg bg-surface-light/50 p-2">
-                <span className="block text-[9px] uppercase text-gray-500">
-                  Equipment
-                </span>
-                <b
-                  className={`text-sm ${equipmentReady ? "text-green-400" : "text-red-400"}`}
-                >
-                  {equipmentReady ? "Ready" : "Check"}
-                </b>
-              </div>
-            </div>
-          </section>
-
-          <section className="card card-body">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white">
-                Tournament Progress
-              </h2>
-              <span className="text-[11px] text-amber-400">
-                {groupCompetition ? stageLabels.filter(s => s.status === "completed").length : completedRounds.length} / {stageLabels.length} {groupCompetition ? "stages" : "rounds"}
-              </span>
-            </div>
-            <div
-              className="mt-3 grid gap-1"
-              style={{
-                gridTemplateColumns: `repeat(${stageLabels.length}, minmax(0, 1fr))`,
-              }}
-            >
-              {stageLabels.map((stage) => (
-                <ProgressBar
-                  key={stage.label}
-                  value={
-                    stage.status === "completed"
-                      ? 100
-                      : stage.status === "current"
-                        ? 32
-                        : 0
-                  }
-                  tone={stage.status === "completed" ? "green" : "amber"}
-                  compact
-                />
-              ))}
-            </div>
-            <div className="mt-2 flex justify-between gap-1 text-[9px] text-gray-500">
-              {(stageLabels.length > 8 ? stageLabels.filter(stage => stage.status === "current") : stageLabels).map((stage) => (
-                <span
-                  key={stage.label}
-                  className={
-                    stage.status === "current"
-                      ? "text-amber-400"
-                      : stage.status === "completed"
-                        ? "text-green-400"
-                        : ""
-                  }
-                >
-                  {stage.label
-                    .replace("Quarter Final", "QF")
-                    .replace("Semi Final", "SF")
-                    .replace("Last 16", "L16")}
-                </span>
-              ))}
-            </div>
-          </section>
-
-          <BetweenMatchPanel tournamentId={activeTournament.id} compact />
-          <details className="card shrink-0 text-xs">
-            <summary className="cursor-pointer px-3 py-3 font-semibold text-white">Match briefing · opponent & venue</summary>
-            <div className="space-y-2 px-2 pb-2">
-              <RivalryContext opponent={nextOpponent?.playerName ?? ''} />
-              <TournamentAtmosphere event={activeTournament} rounds={drawData.bracket} opponent={nextOpponent?.playerName} />
-              <VenueScoutingPanel tournament={activeTournament} opponent={nextOpponent?.playerName} />
-            </div>
-          </details>
-          <details className="card shrink-0 text-xs">
-            <summary className="cursor-pointer px-3 py-3 font-semibold text-green-400">Results & rewards · prize and ranking credit</summary>
-            <TournamentRewards event={activeTournament}/>
-          </details>
+      </div>
+      {(entryBlocker||(!playability?.canPlay&&tournamentEntered&&!advancementDecision))&&<div className="hub-match-notice">{entryBlocker?<ActionBlockerNotice blocker={entryBlocker}/>:<p>{playability?.reason}</p>}</div>}
+    </section>
+    <SectionTabs id="hub-sections" label="Tournament hub sections" tabs={hubTabs} active={tab} onChange={setTab}/>
+    <div className="hub-tab-content" role="tabpanel" id="hub-sections-panel" aria-labelledby={`hub-sections-tab-${hubTabs.indexOf(tab)}`}>
+      {tab==='Draw'&&<section className="hub-draw-panel" aria-label="Tournament draw">
+        <div className="hub-draw-heading"><div><h2>{isMajorEvent?<Crown className="h-4 w-4 text-amber-200"/>:<Trophy className="h-4 w-4 text-emerald-300"/>}{groupCompetition?'Groups and Fixtures':isMajorEvent?'Championship Draw':'Tournament Bracket'}</h2><p>{groupCompetition?'Standings and results update after every match.':'Your route is highlighted. Scroll within the draw to explore every match.'}</p></div><button className="btn-secondary text-xs" onClick={()=>navigate('/tournaments/draw')}><Maximize2 className="h-3.5 w-3.5"/>{groupCompetition?'All Groups & Fixtures':'Open Full Draw'}</button></div>
+        <div className="hub-draw-canvas">{groupCompetition?<GroupFixtures tournament={activeTournament} key={activeRound} rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={activeRound}/>:<TournamentBracket rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={activeRound}/>}</div>
+        <footer className="hub-draw-footer"><span>{groupCompetition?stageLabels.filter(stage=>stage.status==='completed').length:completedRounds.length} / {stageLabels.length} {groupCompetition?'stages':'rounds'} complete</span><span><PlayerNames text={lastResult?`${lastResult.winner} def. ${lastResult.loser} ${lastResult.score}`:'No completed matches yet'}/></span></footer>
+      </section>}
+      {tab==='Preparation'&&<div className="hub-support-scroll"><div className="hub-preparation-top"><section className="care-panel care-panel-green"><div className="care-panel-heading"><h2>Match Readiness</h2><span className="care-badge">{readiness>=65&&equipmentReady?'Ready':'Needs attention'}</span></div><div className="care-panel-body"><div className="hub-readiness-values">{[['Confidence',formatPercent(gameState.player.confidence)],['Freshness',formatPercent(freshness)],['Equipment',equipmentReady?'Ready':'Check']].map(([label,value])=><div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div><p>Check your recovery, travel and preparation before starting the match.</p></div><footer className="care-panel-actions"><button className="btn-secondary text-xs" onClick={()=>navigate('/equipment/cues')}>Equipment</button><button className="btn-secondary text-xs" onClick={()=>navigate('/training')}>Training</button></footer></section><section className="care-panel"><div className="care-panel-heading"><h2>Event preparation</h2></div><div className="care-panel-body"><dl className="hub-preparation-checks"><div><dt>Entry</dt><dd>{tournamentEntered?'Confirmed':'Required'}</dd></div><div><dt>Travel</dt><dd>{playability?.travelBooked?'Booked':'Not booked'}</dd></div><div><dt>Preparation</dt><dd>{playability?.preparationConfirmed?'Confirmed':'Required'}</dd></div></dl></div><footer className="care-panel-actions"><button className="btn-secondary text-xs" onClick={()=>navigate('/travel')}>Review travel</button><button className="btn-secondary text-xs" onClick={()=>navigate('/tournament/preparation')}>Tournament preparation</button></footer></section></div>{matchGap?<BetweenMatchPanel tournamentId={activeTournament.id}/>:<div className="hub-support-note">Between-match recovery options appear after your first match when another fixture is scheduled.</div>}</div>}
+      {tab==='Match briefing'&&<div className="hub-support-scroll"><section className="care-panel"><div className="care-panel-heading"><h2>Opponent, venue & atmosphere</h2></div><div className="care-panel-body hub-briefing"><RivalryContext opponent={nextOpponent?.playerName??''}/><TournamentAtmosphere event={activeTournament} rounds={drawData.bracket} opponent={nextOpponent?.playerName}/><VenueScoutingPanel tournament={activeTournament} opponent={nextOpponent?.playerName}/></div></section></div>}
+      {tab==='Event details'&&<div className="hub-support-scroll hub-event-details">
           <section className="card flex min-h-0 flex-col overflow-hidden">
             <div className="card-header shrink-0">
               <h2 className="text-sm font-semibold text-white">
@@ -693,8 +379,13 @@ export function TournamentHubPage() {
               </div>
             </div>
           </section>
-        </aside>
-      </div>
+
+        <section className="care-panel"><div className="care-panel-heading"><h2>Results & rewards</h2></div><div className="care-panel-body"><TournamentRewards event={activeTournament}/></div></section>
+        <section className="care-panel"><div className="care-panel-heading"><h2>Tournament Progress</h2></div><div className="care-panel-body"><div className="hub-stage-list">{stageLabels.map(stage=><div key={stage.label}><span>{stage.label}</span><span>{stage.status}</span><ProgressBar value={stage.status==='completed'?100:stage.status==='current'?32:0} tone={stage.status==='completed'?'green':'amber'} compact/></div>)}</div></div></section>
+        {activeTournament.legacyEntryHonoured&&<p className="hub-support-note">Your previously accepted entry has been restored after a save rules update. This exception applies to this event only; future World Championship entries use the ranking cutoff and qualifying results.</p>}
+        {tournamentEntered&&completedRounds.length===0&&!(gameState.liveMatch?.tournamentId===activeTournament.id&&gameState.liveMatch.status==='In Progress')&&<button className="btn-secondary text-xs" onClick={()=>withdrawTournament(activeTournament.id)}>Withdraw Entry</button>}
+      </div>}
     </div>
-  );
+    <footer className="hub-workspace-footer"><div><span>Confidence <strong>{formatPercent(gameState.player.confidence)}</strong></span><span>Freshness <strong>{formatPercent(freshness)}</strong></span><span>Equipment <strong>{equipmentReady?'Ready':'Check'}</strong></span></div><button className="hub-prep-shortcut" onClick={()=>setTab('Preparation')}>{matchGap?`${matchGap.days===0?'Same-day turnaround':`${matchGap.days}-day gap`} · ${matchGap.applied?'Preparation complete':'Choose recovery'}`:'Review preparation'}</button></footer>
+  </div>;
 }

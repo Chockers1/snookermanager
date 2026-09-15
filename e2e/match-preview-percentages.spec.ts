@@ -11,6 +11,7 @@ test('match preview rounds fractional condition values for display', async ({ pa
   });
   await page.goto('/');
   await page.getByRole('button', { name: /Continue Career/ }).click();
+  await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await page.evaluate(() => {
     window.history.pushState({}, '', '/match/preview');
     window.dispatchEvent(new PopStateEvent('popstate'));

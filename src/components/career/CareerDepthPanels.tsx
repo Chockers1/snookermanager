@@ -1,17 +1,18 @@
+import { DevelopmentEditor } from './DevelopmentEditor';
 import { PlayerNames } from '../game/PlayerNames';
-import { formatPercent, formatAttribute, formatAttributeChange } from '../../utils/formatters';
+import { formatPercent, formatAttribute } from '../../utils/formatters';
 import { PlayerLink } from '../game/PlayerLink';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import { useGame } from '../../context/useGame';
 import { depthOf, pendingStory, plusDays } from '../../game/careerDepth/shared';
-import { PROJECTS, partnerAvailable } from '../../game/careerDepth/developmentProjects';
-import { getRivalry, partnerCandidates, coachRelationshipLabel } from '../../game/careerDepth/relationships';
+import { PROJECTS } from '../../game/careerDepth/developmentProjects';
+import { getRivalry, coachRelationshipLabel } from '../../game/careerDepth/relationships';
 import { STRATEGIES, recommendSeason, recurringCost, currentPlannerTour, PLANNER_TOURS, type PlannerTour } from '../../game/careerDepth/seasonPlanning';
 import { COMMITMENTS, commitmentQuote, commitmentConflict } from '../../game/careerDepth/commitments';
 import { STORY_CHOICES, storyCommitmentDate } from '../../game/careerDepth/careerStories';
-import type { CommitmentKind, ProjectKind, Strategy } from '../../game/careerDepth/types';
+import type { CommitmentKind, Strategy } from '../../game/careerDepth/types';
 
 const input = 'min-h-9 max-w-full rounded border border-border bg-background px-2 py-1 text-xs text-white';
 const button = 'btn-secondary min-h-9 text-xs';
@@ -79,27 +80,10 @@ export function StoryDecisionPanel({ messageId }: { messageId: string }) {
 }
 
 export function DevelopmentPanel({ compact = false }: { compact?: boolean }) {
-  const { gameState, actOnCareer } = useGame();
-  const d = depthOf(gameState), project = d.project;
-  const [kind, setKind] = useState<ProjectKind>('long-pot');
-  const all = project?.closingAttributes ?? { ...gameState.attributes.technical, ...gameState.attributes.mental, ...gameState.attributes.physical };
+  const { gameState } = useGame();
+  const project = depthOf(gameState).project;
   return <CareerDisclosure preview={compact ? { label: "Development & practice", detail: project ? `${PROJECTS[project.kind].name} · ${project.completedWeeks}/${PROJECTS[project.kind].weeks} weeks · ${project.status}` : "No project active · choose a multi-week focus", action: project ? "Manage" : "Choose" } : undefined} title="Development project & practice partner" summary={<>Development & practice · {project ? `${PROJECTS[project.kind].name}: ${project.completedWeeks}/${PROJECTS[project.kind].weeks} weeks` : 'Choose a multi-week project'}</>}>
-    <div className={body}>
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1 text-gray-300">Development project<select aria-label="Development project" className={input} value={kind} onChange={e => setKind(e.target.value as ProjectKind)}>{Object.entries(PROJECTS).map(([id, p]) => <option key={id} value={id}>{p.name} · {p.weeks} weeks</option>)}</select></label>
-        <button className={button} disabled={project?.status === 'active'} onClick={() => actOnCareer({ type: 'project', kind })}>Start project</button>
-        {project?.status === 'active' && <button className={button} onClick={() => actOnCareer({ type: 'cancel-project' })}>Cancel project</button>}
-      </div>
-      <p className="text-gray-300">Relevant sessions: {PROJECTS[project?.kind ?? kind].sessions.join(', ')}. Complete three per week; projects do not auto-fill or add training sessions.</p>
-      {(project?.kind ?? kind) === 'cue-action' && <p className="text-amber-300">Cue-action rebuild: temporary effective consistency −2 during the first two completed training weeks. Permanent consistency is unchanged by this penalty.</p>}
-      {project?.matchEvidence && project.matchEvidence.matches > 0 && <p className="text-gray-300">Measured match evidence ({project.matchEvidence.matches} matches): potting {Math.round(project.matchEvidence.pottingTotal / project.matchEvidence.matches)}% · safety {Math.round(project.matchEvidence.safetyTotal / project.matchEvidence.matches)}% · high break {project.matchEvidence.highestBreak} · long matches {project.matchEvidence.longMatchWins}/{project.matchEvidence.longMatches} won. These results do not award attributes.</p>}
-      {project && <div className="grid gap-2 sm:grid-cols-2"><div><p className="text-green-400">{project.status} · review {project.reviewDate}</p><p className="mt-1 text-gray-300">{project.note}</p><p className="mt-1 text-gray-400">Match evidence: {project.evidenceMatches} matches. {project.evidenceMatches < 5 ? 'Small sample; no reliable performance conclusion yet.' : 'Compare match statistics separately from training gains.'}</p></div><div className="space-y-1">{Object.entries(project.baseline).map(([skill, before]) => <p key={skill} className="flex justify-between gap-3"><span>{skill}</span><span className={(all[skill] ?? before) >= before ? 'text-green-400' : 'text-red-400'}>{formatAttribute(before)} → {formatAttribute(all[skill] ?? before)} ({formatAttributeChange((all[skill] ?? before) - before)})</span></p>)}</div></div>}
-      <label className="flex flex-col gap-1 text-gray-300">Practice partner<select aria-label="Practice partner" className={input} value={d.partnerId ?? ''} onChange={e => actOnCareer({ type: 'partner', id: e.target.value || null })}><option value="">No practice partner</option>{partnerCandidates(gameState).map(p => <option key={p.id} value={p.id}>{p.playerName} · age {p.age} · OVR {p.overallRating ?? '—'}</option>)}</select></label>
-      <details><summary className="cursor-pointer text-green-400">Practice partner profiles</summary><div className="mt-2 flex max-h-40 flex-wrap gap-3 overflow-y-auto">{partnerCandidates(gameState).map(p => <PlayerLink key={p.id} name={p.playerName} id={p.id}/>)}</div></details>
-      <p className="text-gray-400">{d.partnerId ? partnerAvailable(gameState) ? 'Available: one existing technical session becomes shared practice. Project and partner efficiency combined is capped at +10%.' : 'Partner unavailable during competition, travel or injury. No extra sessions or bonus this week.' : 'Select a partner to share an existing technical session—not add an extra training day.'}</p>
-      {d.partnerId && <div className="flex flex-wrap items-center gap-3"><label>Shared practice skill <select aria-label="Shared practice skill" className={input} value={d.partnerFocus ?? 'Long Potting'} onChange={e => actOnCareer({ type: 'partner-focus', skill: e.target.value })}>{['Long Potting', 'Break Building', 'Cue Ball Control', 'Safety Play'].map(skill => <option key={skill}>{skill}</option>)}</select></label><span className="text-green-400">{d.practiceHistory?.[d.partnerId]?.sessions ?? 0} shared sessions completed · benefits target this skill</span></div>}
-      <p role="status" className="text-amber-300"><PlayerNames text={gameState.lastAction}/></p>
-    </div>
+    <DevelopmentEditor/>
   </CareerDisclosure>;
 }
 

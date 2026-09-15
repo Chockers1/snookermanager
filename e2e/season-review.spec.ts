@@ -33,6 +33,7 @@ for (const viewport of [{width:1280,height:720},{width:390,height:844},{width:32
   const before = await readCareerSave(page); expect(before.seasonReview?.pending).toBe(true);
   expect(before.currentDate).toBe('2027-06-30');
   if (viewport.width === 1280) {
+    await page.getByRole('tab',{name:'Next season',exact:true}).click();
     await page.getByRole('button',{name:'Open Review Popup',exact:true}).click();
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button',{name:'Start New Season'}).click();

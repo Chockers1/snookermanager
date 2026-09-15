@@ -9,8 +9,10 @@ test('youth and amateur tables distinguish earned points, seed order and prize m
  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
  await page.evaluate(()=>{history.pushState({},'','/rankings');dispatchEvent(new PopStateEvent('popstate'))});
  await page.getByRole('button',{name:'Youth Ranking',exact:true}).click();
+ await page.getByRole('tab',{name:'Your race',exact:true}).click();
  await expect(page.getByRole('region',{name:'Ranking points explained'})).toContainText('Prize money does not determine rank');
  await expect(page.getByRole('region',{name:'Ranking points explained'})).toContainText('2026-08-23');
+ await page.getByRole('tab',{name:'Standings',exact:true}).click();
  await expect(page.getByText(/No published standings yet/)).toBeVisible();
  const unranked=page.getByRole('table').first().getByRole('row').filter({has:page.getByRole('link',{name:unplayed.playerName,exact:true})});
  await expect(unranked.getByRole('cell').nth(0)).toHaveText('—');await expect(unranked.getByRole('cell').nth(7)).toHaveText('0');

@@ -21,26 +21,30 @@ for (const width of [1280, 1920, 390]) test(`busy semi-final hub preserves brack
   await page.addInitScript(({ key, save }) => localStorage.setItem(key, save), { key: ACTIVE_SAVE_KEY, save: encodeCareerSave(state) });
   await page.goto('/');
   await page.getByRole('button', { name: /Continue Career/ }).click();
+  await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await page.evaluate(() => { history.pushState({}, '', '/tournaments/hub'); dispatchEvent(new PopStateEvent('popstate')); });
   const bracket = page.getByTestId('tournament-bracket');
-  const preparation = page.locator('summary').filter({ hasText: 'Match preparation · Complete' });
+  const preparation = page.getByRole('button',{name:/Preparation complete/});
   await expect(preparation).toBeVisible();
   await expect(page.getByRole('region', { name: 'Between-match preparation' })).not.toBeVisible();
   await expect(page.getByRole('link', { name: /Decision required/ })).toBeVisible();
   if (width >= 1280) {
     await expect(page.getByRole('button', { name: 'Resolve Inbox Decision' })).toBeInViewport();
     await expect(bracket).toBeInViewport();
-    expect((await bracket.boundingBox())!.height).toBeGreaterThanOrEqual(270);
+    // The full-width draw retains three readable match cards even with a decision banner.
+    expect((await bracket.boundingBox())!.height).toBeGreaterThanOrEqual(220);
+    expect((await bracket.boundingBox())!.width).toBeGreaterThan(950);
     expect(await page.locator('#main-content').evaluate(el => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
   }
   const height = (await bracket.boundingBox())!.height;
   await page.screenshot({ path: `test-results/hub-compact-${width}.png`, fullPage: true });
   await preparation.click();
   await expect(page.getByRole('region', { name: 'Between-match preparation' })).toContainText('Tactical review completed');
-  await page.locator('summary').filter({ hasText: 'Match briefing · opponent & venue' }).click();
+  await page.getByRole('tab',{name:'Match briefing',exact:true}).click();
   await page.getByRole('button', { name: /Conditions & scouting/ }).click();
   await expect(page.getByRole('dialog', { name: 'Conditions and scouting evidence' })).toBeVisible();
   await page.getByRole('button', { name: 'Close editor' }).click();
+  await page.getByRole('tab',{name:'Draw',exact:true}).click();
   if (width >= 1280) expect((await bracket.boundingBox())!.height).toBeCloseTo(height, 0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });

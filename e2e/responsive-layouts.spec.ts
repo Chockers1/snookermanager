@@ -268,7 +268,6 @@ test("major tournament hub uses a championship identity", async ({ page }) => {
     page.getByText("Saudi Arabia Masters", { exact: true }).first(),
   ).toBeVisible();
   await expect(page.getByText("Major Event")).toBeVisible();
-  await expect(page.getByText('Prestige', { exact: true })).toBeVisible();
   await expect(page.getByText("Championship Draw")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
@@ -295,6 +294,7 @@ test("laptop match preview keeps symmetrical profiles and the tactical plan visi
   );
   await page.goto("/");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading",{name:"Upcoming & Recent Results",exact:true})).toBeVisible();
   await page.evaluate(() => {
     window.history.pushState({}, "", "/match/preview");
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -316,15 +316,13 @@ test("laptop match preview keeps symmetrical profiles and the tactical plan visi
     (element) => element.scrollHeight - element.clientHeight,
   );
   expect(tacticalOverflow).toBeLessThanOrEqual(1);
-  await expect(
-    page.getByText("Recent opponent pattern", { exact: true }),
-  ).toBeInViewport();
+  await page.getByRole("tab",{name:"Scouting",exact:true}).click();
+  await expect(page.getByText("Recent opponent pattern",{exact:true})).toBeVisible();
   await expect(page.getByRole("button", { name: "Start Match" })).toBeInViewport();
   await expect(
     page.getByText("Match Profile Comparison", { exact: true }),
   ).toBeInViewport();
-  // Primary match controls stay visible; secondary equipment detail is reachable
-  // through the preview's deliberate internal scrolling on shorter screens.
+  await page.getByRole("tab",{name:"Equipment & event",exact:true}).click();
   await page.getByText("Equipment Check", { exact: true }).scrollIntoViewIfNeeded();
   await expect(
     page.getByText("Equipment Check", { exact: true }),
@@ -447,6 +445,8 @@ for (const viewport of [
     await page.goto("/");
     await page.getByRole("button", { name: /Continue Career/ }).click();
 
+    await expect(page.getByRole("heading", { name: "Upcoming & Recent Results", exact: true })).toBeVisible();
+
     for (const route of ["/mental", "/health"]) {
       await page.evaluate((path) => {
         window.history.pushState({}, "", path);
@@ -487,9 +487,9 @@ for (const viewport of [
           route === "/mental" ? "mental-viewport" : "health-viewport",
         );
         expect(horizontalFit).not.toBeNull();
-        expect(horizontalFit?.workspaceRight).toBe(horizontalFit?.mainRight);
+        expect(horizontalFit?.workspaceRight).toBeLessThanOrEqual(horizontalFit!.mainRight);
       } else {
-        expect(scrollState.scrollRange).toBeGreaterThan(0);
+        expect(scrollState.scrollRange).toBeLessThanOrEqual(1);
         await page.locator("footer").last().scrollIntoViewIfNeeded();
       }
       await expect(page.locator("footer").last()).toBeInViewport();

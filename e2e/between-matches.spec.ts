@@ -27,7 +27,7 @@ for (const width of [390, 1440]) test('between-match preparation is clear and pe
   await expect(panel.getByRole('button', { name: 'Apply match preparation' })).toHaveCount(0);
   expect(await panel.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   await navigate('/tournaments/hub');
-  await page.locator('summary').filter({ hasText: 'Match preparation · Complete' }).click();
+  await page.getByRole('tab',{name:'Preparation',exact:true}).click();
   await expect(panel.getByRole('status')).toContainText('Tactical review completed');
   await navigate('/match/preview');
   await expect(panel).toHaveCount(0);

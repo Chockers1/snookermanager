@@ -22,6 +22,7 @@ for (const blocked of [false, true]) test(`preview advances directly and starts 
   await page.addInitScript(({ key, save }) => localStorage.setItem(key, save), { key: ACTIVE_SAVE_KEY, save: encodeCareerSave(state) });
   await page.goto('/');
   await page.getByRole('button', { name: /Continue Career/ }).click();
+  await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await page.evaluate(() => { history.pushState({}, '', '/match/preview'); dispatchEvent(new PopStateEvent('popstate')); });
   await expect(page.getByRole('heading', { name: 'Match Preview', exact: true })).toBeVisible();
   if (blocked) {

@@ -25,7 +25,7 @@ test('loads historical data only when requested and restores full archived draws
 });
 test('portable export includes all chunks and difficulty survives reload without cash grants',async({page,browser})=>{
  await open(page);await route(page,'/settings');await page.getByLabel('Career difficulty',{exact:true}).selectOption('demanding');await expect(page.getByText('Saving…',{exact:true})).toBeHidden();
- await route(page,'/saves');const downloaded=page.waitForEvent('download');await page.getByRole('button',{name:'Export Career',exact:true}).click();const file=await downloaded;const state=JSON.parse(fs.readFileSync((await file.path())!,'utf8'));
+ await route(page,'/saves');await page.getByRole('tab',{name:'Import & export',exact:true}).click();const downloaded=page.waitForEvent('download');await page.getByRole('button',{name:'Export Career',exact:true}).click();const file=await downloaded;const state=JSON.parse(fs.readFileSync((await file.path())!,'utf8'));
  expect(state.historyArchive).toBeUndefined();expect(state.rollingRankings.events.archive.bracket[0].matches[0].top.score).toBe(2);expect(state.difficulty).toBe('demanding');
  const independent=await browser.newContext();const receiver=await independent.newPage();
  try {

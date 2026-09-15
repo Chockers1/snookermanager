@@ -35,8 +35,10 @@ test('achievement goals and monthly tour reports show persisted evidence',async(
   let state=createStarterState();state=evolveTourSkills(state);state=evolveTourSkills({...state,currentDate:plusDays(state.currentDate,40)});
   state.careerDepth={...depthOf(state),achievements:[{id:'century',date:state.currentDate,evidence:'Recorded break of 109.'}]};state=repairGameState(state);
   await open(page,state,'/career/stats');
+  await page.getByRole('tab',{name:'Goals',exact:true}).click();
   const goals=page.getByRole('region',{name:'Career achievement goals'});await expect(goals).toContainText('Recorded break of 109.');
   await page.evaluate(()=>{history.pushState({},'','/rankings');dispatchEvent(new PopStateEvent('popstate'))});
+  await page.getByRole('tab', {name:'Pathway',exact:true}).click();
   await page.locator('summary').filter({hasText:'Tour development · prospects, veterans and rivals'}).click();
   await expect(page.getByText(/Practice focus:/).first()).toBeVisible();
 });

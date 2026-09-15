@@ -77,9 +77,8 @@ test("creates and reloads a named save slot using real controls", async ({
   await minimiseGuide(page);
   await page.getByRole("button", { name: "Career and save options" }).click();
   await page.getByRole("link", { name: "Save Manager" }).click();
-  await expect(page.getByText("E2E checkpoint")).toBeVisible();
-  await page.getByText("E2E checkpoint", { exact: true }).locator("../../..").getByRole("button", { name: "Load", exact: true }).click();
-  await expect(page.getByText(/Loaded “E2E checkpoint”/)).toBeVisible();
+  await expect(page.getByRole("region", {name: "Active career"})).toContainText("E2E checkpoint");
+  await expect(page.getByRole("button", {name: "Already playing", exact: true})).toBeDisabled();
 });
 
 test("shows player summary once in the global dashboard status bar", async ({

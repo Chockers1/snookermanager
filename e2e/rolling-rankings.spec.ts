@@ -6,6 +6,7 @@ import { readCareerSave } from './read-career-save';
 
 test('shows settled CPU events and money rankings, with no duplicate settlement after reload', async ({ page }) => {
   const initial = createStarterState();
+  initial.firstWeekGuide = {version:1,dismissed:true,completed:[],skipped:[]};
   initial.currentDate = '2026-09-01';
   initial.rollingRankings = undefined;
   initial.tournaments = [{ ...initial.tournaments.find(t => t.type === 'Ranking')!, id: 'browser-ranking', name: 'Browser Ranking Open', formatId: 'ukMajor', rankingType: 'World Ranking', startDate: '2026-09-08', endDate: '2026-09-10', status: 'Skipped', winnerPrize: 10000 }];
@@ -19,6 +20,7 @@ test('shows settled CPU events and money rankings, with no duplicate settlement 
   await page.getByRole('button', { name: /Continue Career/ }).click();
   await page.getByRole('link', { name: 'Rankings', exact: true }).click();
   await expect(page.getByRole('columnheader', { name: 'Ranking earnings', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Your race', exact: true }).click();
   await expect(page.getByText(/1 ranking events settled this season/)).toBeVisible();
   const before = (await readCareerSave(page)).rollingRankings;
   await page.reload();

@@ -14,9 +14,11 @@ test('new youth career shows rosters, unranked status and no club-event ranking 
  await expect(page.getByText('Player roster · awaiting results',{exact:true})).toBeVisible();
  await expect(page.locator('tbody tr').first()).toBeVisible();
  await expect(page.locator('tbody').getByText('Rob Taylor',{exact:true})).toBeVisible();
+ await page.getByRole('tab',{name:'Your race',exact:true}).click();
  await expect(page.getByText(/awards no points for this ranking list/)).toBeVisible();
  await expect(page.getByText('Rank 1',{exact:true})).toHaveCount(0);
  await expect(page.getByText('No published ranking history yet.',{exact:true})).toBeVisible();
+ await page.getByRole('tab',{name:'Standings',exact:true}).click();
  for(const tab of ['Amateur Ranking','Q Tour Ranking','Q School OOM','Senior Ranking']){
   await page.getByRole('button',{name:tab,exact:true}).click();
   await expect(page.getByText('Player roster · awaiting results',{exact:true})).toBeVisible();

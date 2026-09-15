@@ -102,8 +102,8 @@ export function PlayerAttributesPage() {
   }
 
   return (
-    <div className="space-y-6 pb-10">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="attributes-page" data-testid="attributes-page">
+      <div className="attributes-heading">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase text-gray-500">Player Profile</p>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -114,32 +114,31 @@ export function PlayerAttributesPage() {
           </div>
           <p className="mt-1 text-sm text-gray-400">{gameState.player.careerStage} - Age {gameState.player.age} - {gameState.player.handedness} - {gameState.player.playingStyle}</p>
         </div>
-        <div className="flex shrink-0 gap-2">
-          <button type="button" className={view === 'grouped' ? 'btn-primary text-xs' : 'btn-secondary text-xs'} onClick={() => setView('grouped')}>Grouped</button>
-          <button type="button" className={view === 'flat' ? 'btn-primary text-xs' : 'btn-secondary text-xs'} onClick={() => setView('flat')}>All</button>
-          <button type="button" className="btn-secondary text-xs" onClick={() => navigate('/training')}>Training <ChevronRight className="h-3 w-3" /></button>
-        </div>
       </div>
-
-      <div className="card card-body space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div role="group" aria-label="Attribute comparison period" className="flex flex-wrap gap-2">
-            {attributePeriods.map(option => <button key={option.value} type="button" aria-pressed={period === option.value} className={period === option.value ? 'btn-primary text-xs' : 'btn-secondary text-xs'} onClick={() => setPeriod(option.value)}>{option.label}</button>)}
-          </div>
-          <button type="button" className="btn-secondary text-xs" onClick={() => recoveryInput.current?.click()}>Recover from older save</button>
-          <input ref={recoveryInput} type="file" aria-label="Older career save" className="hidden" accept=".json,.txt" onChange={async event => {
-            const file = event.target.files?.[0]
-            event.target.value = ''
-            if (!file) return
-            try { setRecoveryMessage(recoverAttributeHistory(await file.text()).message) }
-            catch { setRecoveryMessage('Could not read this file. Choose an exported save from this career.') }
-          }} />
+      <div className="attributes-toolbar" aria-label="Attribute display controls" role="group">
+        <div className="attributes-view-controls" role="group" aria-label="Attribute view">
+          <button type="button" aria-pressed={view === 'grouped'} className={view === 'grouped' ? 'btn-primary' : 'btn-secondary'} onClick={() => setView('grouped')}>Grouped</button>
+          <button type="button" aria-pressed={view === 'flat'} className={view === 'flat' ? 'btn-primary' : 'btn-secondary'} onClick={() => setView('flat')}>All</button>
+          <button type="button" className="btn-secondary" onClick={() => navigate('/training')}>Training <ChevronRight className="h-3 w-3" /></button>
         </div>
+        <div role="group" aria-label="Attribute comparison period" className="attributes-period-controls">
+          {attributePeriods.map(option => <button key={option.value} type="button" aria-pressed={period === option.value} className={period === option.value ? 'btn-primary' : 'btn-secondary'} onClick={() => setPeriod(option.value)}>{option.label}</button>)}
+        </div>
+        <button type="button" className="btn-secondary" onClick={() => recoveryInput.current?.click()}>Recover from older save</button>
+        <input ref={recoveryInput} type="file" aria-label="Older career save" className="hidden" accept=".json,.txt" onChange={async event => {
+          const file = event.target.files?.[0]
+          event.target.value = ''
+          if (!file) return
+          try { setRecoveryMessage(recoverAttributeHistory(await file.text()).message) }
+          catch { setRecoveryMessage('Could not read this file. Choose an exported save from this career.') }
+        }} />
+      </div>
+      <div className="attributes-coverage">
         <p className="text-xs leading-relaxed text-gray-400" data-testid="attribute-coverage">{comparison.note}</p>
         {recoveryMessage && <p role="status" className="text-xs text-gray-300">{recoveryMessage}</p>}
       </div>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+      <div className="attributes-metrics">
         {[
           { label: 'Overall Rating', value: overallRating, sub: baselineOverall === undefined ? 'Historical overall not recorded' : `Baseline ${baselineOverall} · ${formatDelta(overallDelta)}`, icon: Star, tone: 'green', delta: overallDelta },
           { label: 'Potential', value: potential, sub: '/ 100', icon: Sparkles, tone: 'blue' },
@@ -161,10 +160,11 @@ export function PlayerAttributesPage() {
         })}
       </div>
 
+      <div className="attributes-content">
       {view === 'grouped' ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 xl:gap-4">
+        <div className="attributes-groups">
           {attributeGroups.map(([group, attributes]) => (
-            <div key={group} className="card">
+            <div key={group} className="card attribute-group-card">
               <div className="card-header">
                 <h3 className="text-sm font-semibold text-white">{groupLabels[group]}</h3>
                 <span className="text-[9px] font-medium uppercase tracking-wide text-gray-500">{periodLabel} Δ</span>
@@ -176,7 +176,7 @@ export function PlayerAttributesPage() {
           ))}
         </div>
       ) : (
-        <div className="card">
+        <div className="card attributes-flat">
           <div className="card-header"><h3 className="text-sm font-semibold text-white">All Attributes</h3><span className="text-[10px] text-gray-400">{periodLabel} Δ · Strongest to weakest</span></div>
           <div className="card-body grid gap-y-2.5 md:grid-cols-2 xl:grid-cols-3 md:gap-x-6">
             {allAttributes.slice().sort((left, right) => right[1] - left[1]).map(([label, value]) => {
@@ -187,20 +187,20 @@ export function PlayerAttributesPage() {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-12">
-        <div className="card card-body lg:col-span-4">
+      <div className="attributes-insights">
+        <div className="card card-body">
           <h3 className="mb-3 text-xs font-semibold text-white">Strengths</h3>
           <div className="space-y-2">
             {topStrengths.map(([label, value]) => <div key={label} className="flex items-center justify-between rounded bg-surface-light/50 px-3 py-2 text-xs"><span className="text-gray-300">{label}</span><span className="font-semibold text-green-400 tabular-nums">{formatAttribute(value)}</span></div>)}
           </div>
         </div>
-        <div className="card card-body lg:col-span-4">
+        <div className="card card-body">
           <h3 className="mb-3 text-xs font-semibold text-white">Development Gaps</h3>
           <div className="space-y-2">
             {topWeaknesses.map(([label, value]) => <div key={label} className="flex items-center justify-between rounded bg-surface-light/50 px-3 py-2 text-xs"><span className="text-gray-300">{label}</span><span className="font-semibold text-amber-400 tabular-nums">{formatAttribute(value)}</span></div>)}
           </div>
         </div>
-        <div className="card card-body lg:col-span-4">
+        <div className="card card-body">
           <h3 className="mb-2 text-xs font-semibold text-white">Coach Notes</h3>
           <p className="text-xs leading-relaxed text-gray-400">
             {currentCoach
@@ -212,6 +212,7 @@ export function PlayerAttributesPage() {
             <button type="button" className="btn-primary justify-center" onClick={() => navigate('/training')}>Set Focus</button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

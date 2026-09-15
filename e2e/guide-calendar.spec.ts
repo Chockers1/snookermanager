@@ -21,12 +21,12 @@ for (const width of [1366, 390]) for (const alreadyOpen of [false, true]) {
    await guide.getByRole('button', { name: 'Minimise first-week guide' }).click();
    await page.evaluate(() => { history.pushState({}, '', '/calendar'); dispatchEvent(new PopStateEvent('popstate')); });
    await page.getByRole('button', { name: 'Previous month' }).click();
-   await page.getByRole('button', { name: 'Main Tour', exact: true }).click();
+   await page.getByLabel('Tour filter', {exact:true}).selectOption('Main Tour');
    await page.getByRole('button', { name: 'Open first-week guide', exact: true }).click();
   }
   await guide.getByRole('link', { name: 'Open calendar', exact: true }).click();
   await expect(page).toHaveURL(new RegExp('tournament=' + event.id));
-  await expect(page.getByRole('button', { name: 'Junior Pathway', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByLabel('Tour filter', {exact:true})).toHaveValue('Junior Pathway');
   await expect(page.getByRole('heading', { name: event.name, exact: true, level: 2 })).toBeVisible();
   await expect(page.locator('#main-content')).toContainText(month);
   await expect(page.locator('#main-content')).not.toContainText('No events match this month');
@@ -36,6 +36,7 @@ for (const width of [1366, 390]) for (const alreadyOpen of [false, true]) {
   expect(viewed.tournaments.find(t => t.id === event.id)?.status).toBe(before.tournaments.find(t => t.id === event.id)?.status);
   await page.getByRole('button', { name: 'Enter Tournament', exact: true }).click();
   await expect.poll(async () => (await readCareerSave(page)).tournaments.find(t => t.id === event.id)?.status).toBe('Entered');
+  await page.getByRole('button', {name:'Close tournament details',exact:true}).click();
   await page.getByRole('button', { name: 'Open first-week guide', exact: true }).click();
   await expect(guide.getByRole('heading', { name: 'Arrange travel and accommodation' })).toBeVisible();
  });

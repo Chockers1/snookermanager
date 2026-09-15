@@ -6,7 +6,7 @@ import { reconcileRealism } from '../src/game/realism';
 import { ACTIVE_SAVE_KEY, encodeCareerSave } from '../src/game/saveStorage';
 function amateur() {
   const state = createNewCareerState({ fullName: createPlayerIdentitySeed.name, nationality: 'NZL', age: 18, handedness: 'Right-handed', cueStyle: createPlayerIdentitySeed.cueStyle, playingStyle: createPlayerIdentitySeed.playingStyle, personalityArchetype: createPlayerIdentitySeed.personalityArchetype, sliders: createPlayerSliderCatalog.map(s => ({ ...s })), backgroundId: createPlayerBackgroundCatalog[0].id, startingLevelId: 'start-q-school' });
-  state.player.cash=100000; state.equipment=createStarterState().equipment; return state;
+  state.firstWeekGuide!.dismissed=true; state.player.cash=100000; state.equipment=createStarterState().equipment; return state;
 }
 test('New Zealand Q Tour shows groups and updates the table after a match',async({page})=>{
   let state=amateur(); const event=state.tournaments.find(t=>t.id==='pc-29')!; state.tournaments=[event];
@@ -17,6 +17,7 @@ test('New Zealand Q Tour shows groups and updates the table after a match',async
   await page.evaluate(()=>{history.pushState({},'', '/tournaments/hub');dispatchEvent(new PopStateEvent('popstate'));});
   const groups=page.getByRole('region',{name:'Group standings and fixtures'});
   await expect(groups).toContainText('0 of 4 matches');
+  await page.getByRole('tab',{name:'Event details',exact:true}).click();
   await page.getByText('Round rules and format', {exact:true}).click();
   await expect(page.locator('summary').filter({hasText:'Round rules and format'}).locator('..').getByText(/Six months of regional residence required/)).toBeVisible();
   await page.getByRole('button',{name:'Quick Sim',exact:true}).click();

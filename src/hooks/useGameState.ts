@@ -5620,7 +5620,7 @@ function getDisplayedRanking(
   return { ranking: amateurRanking ?? 999, rankingLabel: "Amateur Ranking" };
 }
 
-function createSeasonRecord(
+export function createSeasonRecord(
   state: GameState,
   season: string,
 ): CareerSeasonRecord {
@@ -18632,6 +18632,22 @@ export function useGameState() {
         }
         } catch(error) { setSaveWarning(error instanceof Error ? error.message : 'The save could not be written. Your previous career is preserved.'); return false; }
         finally { savePendingRef.current=false; setSavePending(false); }
+      },
+      async renameSaveSlot(id: string, name: string) {
+        if (savePendingRef.current) return false;
+        const normalized = name.trim();
+        if (!normalized) return false;
+        savePendingRef.current = true; setSavePending(true);
+        try {
+          const slots = readSaveSlotIndex();
+          if (!slots.some(slot => slot.id === id)) return false;
+          const uniqueName = getUniqueSaveSlotName(normalized, id);
+          await commitCareerStorage([[SAVE_SLOT_INDEX_KEY, JSON.stringify(slots.map(slot => slot.id === id ? { ...slot, name: uniqueName } : slot))]]);
+          return true;
+        } catch (error) {
+          setSaveWarning(error instanceof Error ? error.message : 'The career could not be renamed. Its saved progress is unchanged.');
+          return false;
+        } finally { savePendingRef.current = false; setSavePending(false); }
       },
       async deleteSaveSlot(id: string) {
         if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return; }

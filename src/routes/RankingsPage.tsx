@@ -1,9 +1,11 @@
+import { SectionTabs } from '../components/ui/SectionTabs';
+import { CareerEditor } from '../components/career/CareerDepthPanels';
 import {currentRankingTab,rankingRoster} from '../game/rankingPresentation';
 import { FormResult } from '../components/game/FormResult';
 import { PlayerLink } from '../components/game/PlayerLink';
 import { TourDevelopmentPanel } from '../components/career/SeasonExpansionPanels'
 import { pathwayStandings, pathwayListStatus, qTourQualification } from '../game/pathwayRules'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { QualificationRacesPanel } from '../components/career/RealismPanels'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Minus, Target, TrendingDown, TrendingUp } from 'lucide-react'
@@ -234,6 +236,10 @@ export function RankingsPage() {
   const defaultTab = finalRankingTab ?? currentPathTab
   const [activeTab, setActiveTab] = useState<RankingTabKey>(defaultTab)
   const activeConfig = rankingTabs.find((tab) => tab.key === activeTab) ?? rankingTabs[0]
+  const [section, setSection] = useState<'Standings' | 'Your race' | 'Pathway'>('Standings')
+  const [query, setQuery] = useState('')
+  const [showRules, setShowRules] = useState(false)
+  const humanRow = useRef<HTMLTableRowElement>(null)
   const [pathwayList, setPathwayList] = useState('Europe')
   const lists = activeTab === 'qTour' ? ['Europe', 'Asia Pacific', 'Middle East', 'Americas'] : activeTab === 'qSchool' ? ['Q School UK', 'Q School Asia'] : activeTab === 'senior' ? ['Two-year seniors', 'Race to the Crucible'] : []
   const selectedList = lists.includes(pathwayList) ? pathwayList : lists[0]
@@ -344,59 +350,68 @@ export function RankingsPage() {
   const playerMovementTone = playerMovement > 0 ? 'text-green-400' : playerMovement < 0 ? 'text-red-400' : 'text-gray-400'
   const movementLabel = playerMovement > 0 ? `+${playerMovement}` : `${playerMovement}`
 
+  const visibleRows = activeRowsWithRatings.filter(row => `${row.playerName} ${row.nation}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const pendingTotal = pendingEarnings.reduce((total, entry) => total + entry.amount, 0)
+  const targetGap = Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)
+  const changeCircuit = (key: RankingTabKey) => { setActiveTab(key); setQuery('') }
+
   return (
-    <div className={lists.length ? "flex flex-col gap-3" : "flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5"}>
-      {lists.length > 0 && <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface px-4 py-2 text-xs">
-        <label>Pathway standings <select aria-label="Pathway standings" value={selectedList} onChange={e => setPathwayList(e.target.value)} className="ml-2 rounded border border-border bg-background px-2 py-1">{lists.map(list => <option key={list}>{list}</option>)}</select></label>
-        <span className="text-gray-400">{gameState.season} · {selectedList === 'Two-year seniors' ? 'Two-year list' : 'Current season'} · {pathwayStatus?.completed ?? 0} completed events. Other players' results count even when you do not enter.</span>
-        {qTourPlaces?.automatic && <span className="text-emerald-300">Provisional Europe card: {qTourPlaces.automatic}</span>}
-      </div>}
-      <div className="shrink-0 rounded-xl border border-border bg-surface/85 px-4 py-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">Rankings</p>
-            <h1 className="mt-1 text-2xl font-bold leading-tight text-white">Rankings</h1>
-            <p className="mt-1 truncate text-xs text-gray-400">{finalRankingTab ? `Final complete: your updated ${activeConfig.label.toLowerCase()} is shown first.` : 'Track the live ladder, pathway pressure, and the next event impact.'}</p>
-          </div>
-          <div className="flex shrink-0 gap-2">
-            <button type="button" className="btn-secondary px-3 py-2 text-xs" onClick={() => setActiveTab(defaultTab)}>{finalRankingTab ? 'Final Ranking' : 'Current Path'}</button>
-            <button type="button" className="btn-primary px-3 py-2 text-xs" onClick={() => navigate('/calendar')}>Next Event</button>
-          </div>
+    <div className="rankings-page flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden" data-testid="rankings-page">
+      <header className="ranking-header flex shrink-0 items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+        <div><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300">The live ladder · {gameState.season}</p>
+          <h1 className="text-2xl font-bold text-white">Rankings</h1>
+          <p className="ranking-intro text-xs text-gray-300">Follow the field. See what counts and where your next result could take you.</p>
         </div>
-
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {rankingTabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={tab.key === activeTab ? 'tab-active px-2.5 py-1 text-[11px]' : 'tab-inactive px-2.5 py-1 text-[11px]'}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex shrink-0 gap-2">
+          <button className="btn-secondary px-3 py-2 text-xs" onClick={() => changeCircuit(defaultTab)}>{finalRankingTab ? 'Final Ranking' : 'Current Path'}</button>
+          <button className="btn-primary px-3 py-2 text-xs" onClick={() => navigate('/calendar')}>Next Event</button>
         </div>
+      </header>
+      <nav aria-label="Ranking circuits" className="ranking-circuits flex shrink-0 gap-1 overflow-x-auto rounded-lg border border-border bg-surface p-1">
+        {rankingTabs.map((tab, index) => <button key={tab.key} type="button" aria-pressed={tab.key === activeTab}
+          onClick={() => changeCircuit(tab.key)} onKeyDown={event => {
+            const next = event.key === 'ArrowRight' ? (index + 1) % rankingTabs.length : event.key === 'ArrowLeft' ? (index + rankingTabs.length - 1) % rankingTabs.length : null;
+            if (next === null) return;
+            event.preventDefault(); changeCircuit(rankingTabs[next].key);
+            (event.currentTarget.parentElement?.children[next] as HTMLButtonElement)?.focus();
+          }} className={'min-h-10 flex-1 whitespace-nowrap rounded px-3 py-2 text-xs font-semibold ' + (tab.key === activeTab ? 'bg-emerald-500/15 text-emerald-300' : 'text-gray-300 hover:bg-white/5')}>
+          {tab.label}
+        </button>)}
+      </nav>
+      <div className="ranking-summary">
+        <section className="ranking-summary-card ranking-summary-player">
+          <div><p className="ranking-caption">{finalRankingTab ? 'Current Ranking After Final' : `Your ${activeConfig.label}`}</p>
+            <div className="flex items-baseline gap-3"><strong className="ranking-number">{playerRow ? `#${playerRow.ranking}` : 'Unranked'}</strong><span className={'text-xs ' + playerMovementTone}>{movementLabel} movement</span></div>
+          </div>
+          <div className="ranking-summary-detail"><strong>{moneyRanking ? formatMoney(playerRow?.points ?? 0) : `${playerRow?.points ?? 0} points`}</strong><span>{moneyRanking ? 'Counting earnings' : 'Published results only'}</span></div>
+        </section>
+        <section className="ranking-summary-card ranking-summary-target">
+          <div><p className="ranking-caption">Next position</p><strong className="ranking-number">{!playerRow ? 'Start your race' : playerRow.ranking === 1 ? 'Leading' : `#${nextTarget?.ranking ?? playerRow.ranking - 1}`}</strong></div>
+          <div className="ranking-summary-detail">{playerRow && playerRow.ranking > 1 ? <><strong>{moneyRanking ? formatMoney(targetGap) : `${targetGap} pts`} away</strong>{nextTarget && <PlayerLink name={nextTarget.playerName} />}</> : <span>{playerRow ? 'Keep building your lead' : 'Complete a ranking event'}</span>}</div>
+        </section>
+        <button type="button" className="ranking-summary-card ranking-summary-credit text-left" onClick={() => setSection('Your race')}>
+          <div><p className="ranking-caption">{moneyRanking ? 'Awaiting publication' : 'Ranking system'}</p><strong className="ranking-number">{moneyRanking ? formatMoney(pendingTotal) : activeTab === 'qSchool' || activeTab === 'senior' ? 'Frames won' : 'Event points'}</strong></div>
+          <div className="ranking-summary-detail"><span>{moneyRanking ? `${pendingEarnings.length} pending award${pendingEarnings.length === 1 ? '' : 's'}` : 'See rules and sources'}</span><strong className="text-emerald-300">View your race →</strong></div>
+        </button>
       </div>
-
-      {developmentRanking && <section aria-label="Ranking points explained" className="shrink-0 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-gray-300">
-        <p><strong className="text-white">{gameState.season} · Finishing-position points</strong> · Prize money does not determine rank. Only published ranking events count; non-ranking club events and starting seeds earn no points.</p>
-        <p className="mt-1 text-gray-400">Ties use titles, match wins, fewer losses, then alphabetical order.{nextDevelopmentEvent ? ` Next ranking results: ${nextDevelopmentEvent.name} · ${nextDevelopmentEvent.endDate ?? nextDevelopmentEvent.startDate}.` : ''}</p>
-      </section>}
-      {moneyRanking && !finalRankingTab && pendingEarnings.length > 0 && <section aria-label="Pending ranking credit" className="shrink-0 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
-        <h2 className="font-semibold text-amber-300">Results recorded · ranking credit pending</h2>
-        <p className="mt-1 text-gray-300">Rankings update on the event’s scheduled finish date, even if you finish your matches earlier. Prize money is paid separately.</p>
-        <ul className="mt-1 max-h-24 space-y-1 overflow-y-auto">{pendingEarnings.map(e => <li key={e.id} className="text-gray-300">{gameState.rollingRankings?.events[e.eventKey]?.name ?? e.eventKey}: <strong className="text-white">+{formatMoney(e.amount)}</strong> counts from <strong className="text-white">{e.earnedOn}</strong>.</li>)}</ul>
-        <p className="mt-1 text-gray-400">Your eventual position also depends on other players’ results and expiring earnings. Exhibitions award no world-ranking credit.</p>
-      </section>}
-      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
-        <div className="grid min-h-0 min-w-0 gap-3 xl:col-span-8 xl:grid-rows-[minmax(0,1fr)_84px] xl:gap-2">
-          <div className="card min-h-0 min-w-0 flex h-[28rem] flex-col overflow-hidden xl:h-full">
-            <div className="card-header px-3 py-2.5"><h3 className="text-sm font-semibold text-white">{activeConfig.label}</h3><span className="text-[10px] text-gray-400">{rosterOnly ? 'Player roster · awaiting results' : lists.length ? selectedList : developmentRanking ? 'Current-season points' : activeConfig.seasonLabel}</span></div>
+      <div className="ranking-navigation flex shrink-0 items-center gap-2">
+        <SectionTabs id="ranking-sections" label="Ranking sections" tabs={['Standings', 'Your race', 'Pathway'] as const} active={section} onChange={setSection} />
+        <button type="button" className="btn-secondary ml-auto whitespace-nowrap px-3 py-2 text-xs" onClick={() => setShowRules(true)}>How this list works</button>
+      </div>
+      <div role="tabpanel" id="ranking-sections-panel" aria-labelledby={`ranking-sections-tab-${['Standings', 'Your race', 'Pathway'].indexOf(section)}`} className="min-h-0 min-w-0 flex-1 overflow-hidden">
+        {section === 'Standings' && <section className="card flex h-full min-h-0 flex-col overflow-hidden" aria-label="Standings table">
+          <div className="ranking-table-toolbar flex shrink-0 flex-wrap items-center gap-3 border-b border-border px-3 py-2">
+            <div className="mr-auto"><h2 className="text-sm font-bold text-white">{activeConfig.label}</h2><p className="text-[11px] text-gray-300"><span>{rosterOnly ? 'Player roster · awaiting results' : lists.length ? selectedList : developmentRanking ? 'Current-season points' : activeConfig.seasonLabel}</span> · {visibleRows.length} players</p></div>
+            {lists.length > 0 && <select aria-label="Pathway standings" value={selectedList} onChange={e => setPathwayList(e.target.value)} className="rounded border border-border bg-background px-2 py-2 text-xs">{lists.map(list => <option key={list}>{list}</option>)}</select>}
+            <input aria-label="Search players" type="search" placeholder="Find a player or nation…" className="ranking-search rounded border border-border bg-background px-3 py-2 text-xs" value={query} onChange={e => setQuery(e.target.value)} />
+            <button type="button" className="btn-secondary px-3 py-2 text-xs" disabled={!activeRowsWithRatings.some(row => row.playerName === gameState.player.fullName)} onClick={() => { setQuery(''); requestAnimationFrame(() => humanRow.current?.scrollIntoView({ block: 'center', inline: 'nearest' })) }}>Find me</button>
+          </div>
             {rosterOnly && <p className="px-3 py-2 text-xs text-gray-400">No published standings yet. {activeTab === 'youth' ? 'This roster includes eligible under-21 amateurs from other circuits. Existing seeds appear first; inclusion is not a confirmed event entry.' : 'These are the known players on this circuit, in starting seed order.'} Everyone is unranked until results count.{lists.length ? ' This is the circuit-wide roster, not a confirmed regional entry list.' : ''}</p>}
-            <div className="min-h-0 flex-1 overflow-auto scrollbar-thin">
-              <table className="w-full text-[11px]">
+
+          <div className="min-h-0 flex-1 overflow-auto scrollbar-thin" tabIndex={0} aria-label="Ranking table scroll area">
+              <table className="ranking-table w-full text-xs">
                 <thead className="sticky top-0 z-10 bg-surface-light/95 backdrop-blur">
-                  <tr className="border-b border-border text-gray-500">
+                  <tr className="border-b border-border text-gray-300">
                     <th className="px-3 py-2 text-left font-medium">Rank</th>
                     <th className="px-2 py-2 text-center font-medium">Move</th>
                     <th className="px-3 py-2 text-left font-medium">Player</th>
@@ -412,11 +427,11 @@ export function RankingsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {activeRowsWithRatings.length === 0 && <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-400">{pathwayStatus?.empty ?? (developmentRanking ? 'No published ranking results this season yet. Starting seed positions are not earned rankings.' : 'Complete events in this circuit to start its standings.')}</td></tr>}
-                  {activeRowsWithRatings.map((row) => (
-                    <tr key={row.id} className={`border-b border-border/40 ${row.highlighted ? 'bg-green-600/12' : 'hover:bg-surface-light/40'}`}>
+                  {visibleRows.length === 0 && <tr><td colSpan={12} className="px-4 py-8 text-center text-gray-400">{query ? "No players match your search." : pathwayStatus?.empty ?? (developmentRanking ? 'No published ranking results this season yet. Starting seed positions are not earned rankings.' : 'Complete events in this circuit to start its standings.')}</td></tr>}
+                  {visibleRows.map((row) => (
+                    <tr key={row.id} ref={row.playerName === gameState.player.fullName ? humanRow : undefined} data-human={row.playerName === gameState.player.fullName} className={`border-b border-border/40 ${row.highlighted ? 'bg-green-600/12' : 'hover:bg-surface-light/40'}`}>
                       <td className="px-3 py-2 font-bold text-white">{rosterOnly ? "—" : row.ranking}</td>
-                      <td className="px-2 py-2 text-center"><Movement value={row.movement} /></td>
+                      <td className="px-2 py-2 text-center"><Movement value={rosterOnly ? 0 : row.movement} /></td>
                       <td className={`px-3 py-2 font-medium ${row.highlighted ? 'text-green-400' : 'text-white'}`}><PlayerLink name={row.playerName} /></td>
                       <td className="px-2 py-2 text-gray-400">{row.nation}</td>
                       <td className="px-2 py-2 text-center tabular-nums text-gray-300">{row.age ?? "—"}</td>
@@ -450,33 +465,23 @@ export function RankingsPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
           </div>
+          <div className="ranking-table-footer flex shrink-0 flex-wrap justify-between gap-1 border-t border-border px-3 py-2 text-[11px] text-gray-300"><span>Player names open profiles · OVR overall · POT potential</span><span>Form: oldest → newest · W win / D draw / L loss</span></div>
+        </section>}
+        {section === 'Your race' && <div className="h-full overflow-y-auto scrollbar-thin" aria-label="Ranking insights">
+      {moneyRanking && !finalRankingTab && pendingEarnings.length > 0 && <section aria-label="Pending ranking credit" className="shrink-0 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
+        <h2 className="font-semibold text-amber-300">Results recorded · ranking credit pending</h2>
+        <p className="mt-1 text-gray-300">Rankings update on the event’s scheduled finish date, even if you finish your matches earlier. Prize money is paid separately.</p>
+        <ul className="mt-1 max-h-24 space-y-1 overflow-y-auto">{pendingEarnings.map(e => <li key={e.id} className="text-gray-300">{gameState.rollingRankings?.events[e.eventKey]?.name ?? e.eventKey}: <strong className="text-white">+{formatMoney(e.amount)}</strong> counts from <strong className="text-white">{e.earnedOn}</strong>.</li>)}</ul>
+        <p className="mt-1 text-gray-400">Your eventual position also depends on other players’ results and expiring earnings. Exhibitions award no world-ranking credit.</p>
+      </section>}
+      {developmentRanking && <section aria-label="Ranking points explained" className="shrink-0 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-gray-300">
+        <p><strong className="text-white">{gameState.season} · Finishing-position points</strong> · Prize money does not determine rank. Only published ranking events count; non-ranking club events and starting seeds earn no points.</p>
+        <p className="mt-1 text-gray-400">Ties use titles, match wins, fewer losses, then alphabetical order.{nextDevelopmentEvent ? ` Next ranking results: ${nextDevelopmentEvent.name} · ${nextDevelopmentEvent.endDate ?? nextDevelopmentEvent.startDate}.` : ''}</p>
+      </section>}
 
-          <div className="grid h-full grid-cols-2 gap-2 sm:grid-cols-4">
-            {rankingCards.map((card) => (
-              <div key={card.title} className="card min-h-0 px-3 py-2.5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{card.title}</p>
-                <p className="mt-1.5 line-clamp-3 text-[11px] leading-snug text-gray-300">{card.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div aria-label="Ranking insights" className={"flex min-h-0 min-w-0 flex-col gap-3 xl:col-span-4 xl:gap-2 [&>div]:shrink-0 " + (lists.length ? "" : "scrollbar-thin xl:overflow-y-auto xl:overscroll-contain xl:pr-1")}>
-          <div className="card min-w-0 bg-gradient-to-b from-surface-light/80 to-surface/80 px-4 py-3 text-center">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">{finalRankingTab ? 'Current Ranking After Final' : `Your ${activeConfig.label}`}</p>
-            <p className="mt-1 text-3xl font-bold text-white">{playerRow ? `#${playerRow.ranking}` : 'Unranked'}</p>
-            <div className={`mt-1 flex items-center justify-center gap-1 text-xs ${playerMovementTone}`}>
-              {playerMovement > 0 ? <TrendingUp className="h-3 w-3" /> : playerMovement < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
-              <span>{movementLabel} movement</span>
-            </div>
-            <p className="mt-1 text-[11px] text-gray-300">OVR <span className="font-semibold text-white">{playerOverall}</span> <span className="mx-1 text-border">|</span> POT <span className="font-semibold text-green-400">{playerPotential}</span></p>
-            <p className="mt-1 text-[10px] text-gray-400">{moneyRanking ? `${formatMoney(playerRow?.points ?? 0)} counting earnings` : `${playerRow?.points ?? 0} points`}</p>
-            {activeTab === 'world' && <p className="mt-1 text-[10px] text-amber-300">Next 30 days expiring: {formatMoney(earningsSummary.expiring)}</p>}
-          </div>
-
-          <div className="card flex h-32 flex-col overflow-hidden">
+          <div className="ranking-insights-grid">
+          <div className="card ranking-chart flex flex-col overflow-hidden">
             <div className="card-header shrink-0 px-3 py-2"><h3 className="text-sm font-semibold text-white">Ranking Movement</h3></div>
             <div className="min-h-0 flex-1 px-2 py-2">
               {rankingMomentum.length===0 ? <p className="p-2 text-xs text-gray-400">No published ranking history yet.</p> : <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
@@ -493,14 +498,15 @@ export function RankingsPage() {
 
           <div className="card min-h-0 px-3 py-2.5 text-center">
             <h3 className="text-xs font-semibold text-white">Next Target</h3>
-            <p className="mt-1 text-3xl font-bold text-white">{playerRow ? '#' + (nextTarget?.ranking ?? Math.max(1, playerRow.ranking - 1)) : 'Unranked'}</p>
-            <p className="mt-1 text-xs text-green-400">{!playerRow ? 'Complete a ranking event' : <>Needs {moneyRanking ? formatMoney(Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)) : `${Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)} pts`}</>}</p>
+            <p className="mt-1 text-3xl font-bold text-white">{playerRow?.ranking === 1 ? "Leading the list" : playerRow ? '#' + (nextTarget?.ranking ?? Math.max(1, playerRow.ranking - 1)) : 'Unranked'}</p>
+            <p className="mt-1 text-xs text-green-400">{playerRow?.ranking === 1 ? 'Set the pace for the chasing field' : !playerRow ? 'Complete a ranking event' : <>Needs {moneyRanking ? formatMoney(Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)) : `${Math.max(0, (nextTarget?.points ?? 0) - (playerRow?.points ?? 0) + 1)} pts`}</>}</p>
             <p className="mt-1 truncate text-[10px] text-gray-500">{eventAffectsActiveTable ? `${nextTournament?.name} can shift this race.` : nextDevelopmentEvent ? `Next ranking event: ${nextDevelopmentEvent.name}.` : 'Only published results for this ranking list count.'}</p>
           </div>
 
           <div className="card flex flex-col px-3 py-2.5">
             <h3 className="mb-2 text-xs font-semibold text-white">Recent Ranking Sources</h3>
             <div className="max-h-36 space-y-1.5 overflow-y-auto text-[10px] text-gray-400 scrollbar-thin">
+              {activeTab === 'world' && <p className="text-amber-300">Next 30 days expiring: {formatMoney(earningsSummary.expiring)}</p>}
               {activeTab === 'world' && earningsSummary.estimated > 0 && <p className="text-amber-300">Estimated opening carry-over: {formatMoney(earningsSummary.estimated)}. Replaced by recorded results as it expires. New awards post at the event's scheduled finish.</p>}
               {moneyRanking && <p className="text-sky-300">Latest world update: {gameState.rollingRankings?.revisions.at(-1)?.date ?? 'Opening list'} · {Object.values(gameState.rollingRankings?.events ?? {}).filter(e => e.applied && e.ranking && e.season === gameState.season).length} ranking events settled this season.</p>}
               {rankingSources.length > 0 ? rankingSources.map((item) => (
@@ -526,15 +532,28 @@ export function RankingsPage() {
           </div>
 
           <div className="card min-h-0 px-3 py-2.5">
-            <h3 className="mb-2 text-xs font-semibold text-white">Form</h3>
+            <h3 className="mb-2 text-xs font-semibold text-white">Form</h3><p className="mb-3 text-xs text-gray-300">OVR {Math.round(playerOverall)} · POT {Math.round(playerPotential)} · Last ten matches</p>
             <div className="flex flex-wrap items-center gap-1">
+              {gameState.player.form.length === 0 && <p className="text-xs text-gray-300">No recent matches.</p>}
               {gameState.player.form.slice(-10).map((result, index) => <FormResult key={`${result}-${index}`} result={result} />)}
             </div>
           </div>
-        </div>
+
+          </div>
+        </div>}
+        {section === 'Pathway' && <div className="h-full space-y-3 overflow-auto scrollbar-thin">
+          <div className="ranking-pathway-cards">{rankingCards.map(card => <section className="card p-4" key={card.title}><h2 className="text-sm font-semibold text-emerald-300">{card.title}</h2><p className="mt-2 text-sm text-white">{card.body}</p></section>)}</div>
+          {qTourPlaces?.automatic && <p className="text-sm text-emerald-300">Provisional Europe card: {qTourPlaces.automatic}</p>}
+          <QualificationRacesPanel />
+          <TourDevelopmentPanel />
+        </div>}
       </div>
-      <QualificationRacesPanel />
-      <TourDevelopmentPanel />
+      {showRules && <CareerEditor title={`${activeConfig.label} · How it works`} onClose={() => setShowRules(false)}>
+        {developmentRanking ? <section className="space-y-3 text-sm"><p>Finishing-position points determine rank, not prize money. Only published ranking events count; non-ranking club events and starting seeds earn no points.</p><p>Ties use titles, match wins, fewer losses, then alphabetical order.</p>{nextDevelopmentEvent && <p>Next ranking results: {nextDevelopmentEvent.name} · {nextDevelopmentEvent.endDate ?? nextDevelopmentEvent.startDate}.</p>}</section>
+          : moneyRanking ? <section className="space-y-3 text-sm"><p>{activeTab === 'world' ? 'World ranking counts eligible earnings over two years. Older awards expire while new results enter the list.' : 'The one-year list counts eligible ranking earnings from the current season.'}</p><p>Credit publishes on the event’s scheduled finish date. Prize payments are separate. Non-ranking invitationals and exhibitions do not add world-ranking credit.</p><p>Projections hold other players’ totals constant. Other results and expiring earnings can change the eventual position.</p></section>
+          : <section className="space-y-3 text-sm"><p>{selectedList} · {pathwayStatus?.completed ?? 0} completed events. Other players’ results count even when you do not enter.</p><p>{pathwayStatus?.empty}</p><p>{activeTab === 'qSchool' ? 'Q School orders of merit use frames won. Select UK or Asia to see the separate lists.' : activeTab === 'qTour' ? 'Regional Q Tour lists track published event points. Select a region to follow its race.' : 'Select the two-year seniors list or the current Race to the Crucible.'}</p></section>}
+        <p className="mt-4 text-xs text-gray-300">Roster entries are unranked until results count. Roster membership is not confirmation of eligibility or entry for any individual event.</p>
+      </CareerEditor>}
     </div>
   )
 }

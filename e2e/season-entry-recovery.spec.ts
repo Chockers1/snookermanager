@@ -9,6 +9,7 @@ test('season two Shanghai entry remains actionable and can be withdrawn',async({
   await page.evaluate(()=>{history.pushState({},'','/tournaments/hub');dispatchEvent(new PopStateEvent('popstate'))});
   await expect(page.getByRole('heading',{name:'Shanghai Masters',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Enter Tournament',exact:true}).click();
+  await page.getByRole('tab',{name:'Event details',exact:true}).click();
   await expect(page.getByRole('button',{name:'Withdraw Entry',exact:true})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Shanghai Masters',exact:true})).toBeVisible();
   const entered=await readCareerSave(page);
@@ -17,6 +18,7 @@ test('season two Shanghai entry remains actionable and can be withdrawn',async({
   expect(entered.tournaments.find(t=>t.name==='Shanghai Masters')?.status).toBe('Entered');
   await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();
   await page.evaluate(()=>{history.pushState({},'','/tournaments/hub');dispatchEvent(new PopStateEvent('popstate'))});
+  await page.getByRole('tab',{name:'Event details',exact:true}).click();
   await expect(page.getByRole('button',{name:'Withdraw Entry',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Withdraw Entry',exact:true}).click();
   await expect(page.getByRole('button',{name:'Enter Tournament',exact:true})).toBeVisible();

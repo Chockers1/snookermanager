@@ -46,6 +46,7 @@ test('player condition displays never expose floating-point tails across career 
       expect(text.match(/\d+\.\d{3,}/g), route).toBeNull();
     }
     if (route === '/tournaments/hub') {
+      await page.getByRole('tab',{name:'Preparation',exact:true}).click();
       const readiness = page.getByRole('heading', { name: 'Match Readiness' }).locator('..').locator('..');
       await expect(readiness).toContainText('94.79%');
       await expect(readiness).toContainText('83.05%');

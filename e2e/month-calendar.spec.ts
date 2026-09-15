@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { createStarterState } from '../src/hooks/useGameState';
 import { ACTIVE_SAVE_KEY, encodeCareerSave } from '../src/game/saveStorage';
 async function open(page: Page) {
-  const state = createStarterState(); state.currentDate = '2026-05-11';
+  const state = createStarterState(); state.currentDate = '2026-05-11'; state.firstWeekGuide = {version:1,dismissed:true,completed:[],skipped:[]};
   state.tournaments = [
     { ...state.tournaments.find(t => t.name === 'World Championship')!, startDate: '2026-04-28', endDate: '2026-05-04', status: 'Available' as const },
     { ...state.tournaments.find(t => t.id === 'pc-31')!, startDate: '2026-05-05', endDate: '2026-05-07', status: 'Available' as const },

@@ -29,6 +29,7 @@ for (const width of [1366, 390]) test('required decision pauses the career until
   await open('/tournaments/hub');
   await expect(page.getByRole('button', { name: 'Quick Sim', exact: true })).toBeDisabled();
   await open('/mental');
+  await page.getByRole('tab',{name:'Recovery plans',exact:true}).click();
   await page.getByRole('button', { name: 'Apply selected plan', exact: true }).first().click();
   await expect(page).toHaveURL(new RegExp('message=' + encodeURIComponent(story.id)));
   const blocked = await readCareerSave(page);
