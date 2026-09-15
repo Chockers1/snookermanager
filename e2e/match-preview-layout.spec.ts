@@ -25,6 +25,18 @@ for(const [width,height,scale] of [[1920,1080,100],[1366,768,130],[1280,720,100]
    for(const article of await analysis.getByRole('article').all()) await expect(article).toBeInViewport();
    await expect(analysis.getByRole('button',{name:'View comparison →'})).toBeInViewport();
   }
+  if(tab==='Scouting'){
+   const cards=page.locator('.preview-attribute-card');
+   await expect(cards).toHaveCount(6);
+   if(width>=768){
+    for(const card of await cards.all()) await expect(card).toBeInViewport({ratio:1});
+    for(const body of await page.locator('.preview-scouting .care-panel-body').all()){
+     const overflow=await body.evaluate(el=>({vertical:el.scrollHeight-el.clientHeight,horizontal:el.scrollWidth-el.clientWidth}));
+     expect(overflow.vertical).toBeLessThanOrEqual(2);expect(overflow.horizontal).toBeLessThanOrEqual(2);
+    }
+   }
+   expect(await page.locator('.preview-scouting').evaluate(el=>el.scrollWidth<=el.clientWidth+2)).toBe(true);
+  }
   await page.screenshot({path:`artifacts/preview-redesign-${width}-${tab.replaceAll(' ','-')}.png`});
  }
  await tactics.getByRole('button',{name:'Safety',exact:true}).click();await tactics.getByRole('button',{name:'Counter',exact:true}).click();await tactics.getByRole('button',{name:'Quick',exact:true}).click();

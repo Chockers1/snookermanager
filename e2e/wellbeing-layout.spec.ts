@@ -25,6 +25,20 @@ for (const [width,height,scale] of [[1920,1080,100],[1366,768,130],[1280,720,100
     await expect(page.getByRole('button',{name:'Adjust training',exact:true})).toBeInViewport();
     await expect(page.getByRole('button',{name:/^(Review|View) treatment options$/})).toBeInViewport();
    }
+   if(route==='health' && tab==='Treatments'){
+    const options=page.locator('.health-treatment-option');await expect(options).toHaveCount(6);
+    for(const option of await options.all()){
+     await option.click();await expect(option).toHaveAttribute('aria-pressed','true');
+     if(width>=768){
+      for(const card of await options.all()) await expect(card).toBeInViewport({ratio:1});
+      for(const body of await page.locator('.health-treatments .care-panel-body').all()){
+       const overflow=await body.evaluate(el=>({vertical:el.scrollHeight-el.clientHeight,horizontal:el.scrollWidth-el.clientWidth}));
+       expect(overflow.vertical).toBeLessThanOrEqual(2);expect(overflow.horizontal).toBeLessThanOrEqual(2);
+      }
+      await expect(page.getByRole('button',{name:'Apply treatment',exact:true})).toBeInViewport({ratio:1});
+     }
+    }
+   }
    if(route==='mental' && tab==='Overview' && width>=768){
     for(const body of await page.locator('.mental-overview .care-panel-body').all()){
      const dimensions=await body.evaluate(el=>({content:el.scrollHeight,available:el.clientHeight}));

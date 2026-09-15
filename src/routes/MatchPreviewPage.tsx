@@ -91,7 +91,6 @@ export function MatchPreviewPage() {
     weaknesses,
     matchAttributeComparison,
     attributeComparison,
-    scoutNotes,
     scoutConfidence,
     tacticalPlan,
     cueFamiliarity,
@@ -238,11 +237,15 @@ export function MatchPreviewPage() {
       {tab==='Scouting'&&<div className="preview-scouting">
         <section className="care-panel"><div className="care-panel-heading"><h2><Search className="h-4 w-4"/>Scout Report</h2><span className="care-badge">{formatPercent(scoutConfidence)} confidence</span></div><div className="care-panel-body">
           <div className="preview-strengths">{[{label:'Your strongest routes',rows:keyScoutRows},{label:'Risk watch',rows:riskScoutRows}].map(group=><div key={group.label}><h3>{group.label}</h3>{group.rows.map(trait=><div className="preview-trait" key={trait.label}><span>{trait.label}</span><strong>{formatAttribute(trait.value)}</strong><ProgressBar value={trait.value} compact/></div>)}</div>)}</div>
-          <div className="care-note"><PlayerNames text={scoutNotes}/></div><h3>Recent opponent pattern</h3><p><PlayerNames text={opponentPatternText}/></p><p>Event {eventWins}–{eventLosses} · Frame difference {eventFrameDifferential>0?'+':''}{eventFrameDifferential}</p>
+          <div className="care-note">Overall ratings are public. Attribute ranges and edges are scouting estimates, not shot records. Ranks across different circuits are not comparable.</div><h3>Recent opponent pattern</h3><p><PlayerNames text={opponentPatternText}/></p><p>Event {eventWins}–{eventLosses} · Frame difference {eventFrameDifferential>0?'+':''}{eventFrameDifferential}</p>
         </div></section>
         <section className="care-panel"><div className="care-panel-heading"><h2>Match Profile Comparison</h2><span className="care-badge">You vs {getInitials(opponentName)}</span></div><div className="care-panel-body">
           <div className="preview-comparison-summary">{matchAttributeComparison.map(item=><div key={item.label}><span>{item.label}</span><strong>{formatAttribute(item.player)} <small>/ {estimateRange(item.opponent)}</small></strong><em className={getEdgeTone(item.edge)}>{formatEdgeLabel(item.edge)}</em></div>)}</div>
-          <div className="preview-comparison-table"><div className="preview-comparison-row preview-comparison-head"><span>Attribute</span><span>You</span><span>Opponent estimate</span><span>Edge estimate</span></div>{attributeComparison.map(item=><div className="preview-comparison-row" key={item.label}><span>{item.label}</span><strong>{formatAttribute(item.player)}</strong><span>{estimateRange(item.opponent)}</span><span className={getEdgeTone(item.edge)}>{formatEdgeLabel(item.edge)}</span></div>)}</div>
+          <div className="preview-attribute-cards" aria-label="Attribute comparison">{attributeComparison.map(item=><article className="preview-attribute-card" key={item.label}>
+            <h3>{item.label}</h3>
+            <dl><div><dt>You</dt><dd>{formatAttribute(item.player)}</dd></div><div><dt>Opponent estimate</dt><dd>{estimateRange(item.opponent)}</dd></div></dl>
+            <div className="preview-attribute-edge"><span>Estimated edge</span><strong className={getEdgeTone(item.edge)}>{formatEdgeLabel(item.edge)}</strong></div>
+          </article>)}</div>
         </div></section>
       </div>}
       {tab==='Equipment & event'&&<div className="preview-equipment-layout">

@@ -5574,6 +5574,13 @@ export const mockTreatmentOptions: TreatmentOptionItem[] = [
     cost: 120,
     timeRequired: "1 day",
   },
+  {
+    id: "treat-6",
+    title: "Sleep & Recovery",
+    description: "Structured sleep and relaxation for fatigue and burnout. Does not reduce injury time.",
+    cost: 90,
+    timeRequired: "3 days",
+  },
 ];
 
 export const mockInjuryHistory: InjuryHistoryRow[] = [

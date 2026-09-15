@@ -17,6 +17,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
+import type { CSSProperties } from "react";
 import { NavLink } from "react-router-dom";
 import clsx from "clsx";
 import { useGame } from "../../context/useGame";
@@ -50,11 +51,11 @@ export function Sidebar() {
   ).length;
 
   return (
-    <aside className="scrollbar-thin flex h-full w-[min(18rem,88vw)] shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar xl:w-52">
-      <div className="border-b border-border p-4">
+    <aside style={{ "--sidebar-link-count": sidebarGroups.reduce((total, group) => total + group.items.length, 0) } as CSSProperties} className="app-sidebar scrollbar-thin flex h-full w-[min(18rem,88vw)] shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar xl:w-52">
+      <div className="app-sidebar-brand border-b border-border p-4">
         <h1><img className="h-10 w-auto max-w-full object-contain object-left" src="/assetts/ingame/in-game-logo.svg" width="821" height="313" alt="Snooker Career Manager" /></h1>
       </div>
-      <nav className="flex-1 space-y-4 px-2 py-2">
+      <nav className="app-sidebar-nav flex flex-1 flex-col gap-4 px-2 py-2">
         {sidebarGroups.map((group) => (
           <div key={group.title}>
             <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
@@ -71,7 +72,7 @@ export function Sidebar() {
                       end={item.path === "/"}
                       className={({ isActive }) =>
                         clsx(
-                          "flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors xl:min-h-0",
+                          "app-sidebar-link flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors xl:min-h-0",
                           isActive
                             ? "bg-green-600/20 font-medium text-green-400"
                             : "text-gray-400 hover:bg-white/5 hover:text-white",

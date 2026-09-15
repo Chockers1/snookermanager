@@ -42,4 +42,25 @@ describe('visible and useful treatment', () => {
     expect(result.finance.ledger.find(t => t.category === 'Health')).toMatchObject({ amount: 180, type: 'Expense' });
     expect(result.inbox[0].preview).toContain('calendar date is unchanged');
   });
+  it('offers sleep recovery with burnout relief, unchanged injury time and one charge after reload', () => {
+    const state = healthy();
+    state.player.cash = 1000;
+    state.player.fatigue = 36;
+    state.trainingCondition.strain = 22;
+    state.trainingCondition.burnout = 20;
+    state.trainingCondition.injuryWeeks = 2;
+    expect(buildHealthCentreData(state).treatments.find(t => t.id === 'treat-6')).toMatchObject({title: 'Sleep & Recovery', cost: 90});
+    const result = scheduleTreatmentState(state, 'treat-6');
+    expect(result.player.cash).toBe(910);
+    expect(result.player.fatigue).toBe(18);
+    expect(result.trainingCondition).toMatchObject({strain: 16, burnout: 6, injuryWeeks: 2});
+    expect(result.attributes).toEqual(state.attributes);
+    expect(result.health.history[0].treatment).toBe('Sleep & Recovery');
+    expect(result.finance.ledger.find(t => t.category === 'Health')).toMatchObject({amount: 90, type: 'Expense'});
+    const repeated = scheduleTreatmentState(JSON.parse(JSON.stringify(result)), 'treat-6');
+    expect(repeated.player).toEqual(result.player);
+    expect(repeated.finance).toEqual(result.finance);
+    expect(repeated.lastAction).toContain('already underway');
+  });
+
 });
