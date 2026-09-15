@@ -2,12 +2,13 @@ import { seasonalSponsorBlocker } from '../game/sponsorMarket';
 import { sponsorExpectations, sponsorRanking } from "../game/sponsorPerformance";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Info, Scale, Star } from "lucide-react";
+import { Scale, Star } from "lucide-react";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
 import { buildSponsorshipContractData } from "../utils/liveRouteData";
-import { formatMoney } from "../utils/formatters";
+import { formatMoney, formatPercent } from "../utils/formatters";
 import { getSponsorObligationProfile } from "../hooks/useGameState";
+import { SectionTabs } from "../components/ui/SectionTabs";
 import { depthOf } from "../game/careerDepth/shared";
 
 function probabilityClass(value: number) {
@@ -51,9 +52,12 @@ export function SponsorshipContractPage() {
     "Conservative" | "Balanced" | "Ambitious"
   >("Balanced");
 
+  const tabs = ["Package", "Comparison", "Negotiation", "Performance"] as const;
+  const [tab, setTab] = useState<typeof tabs[number]>("Package");
+
   if (!selectedOffer || selectedOffer.status !== "Available" || !contractData) {
     return (
-      <div className="space-y-6 pb-10">
+      <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto">
         <div>
           <p className="text-[10px] font-semibold uppercase text-gray-500">
             Support
@@ -98,323 +102,57 @@ export function SponsorshipContractPage() {
   );
 
   return (
-    <div className="space-y-6 pb-10">
-      <div>
-        <p className="text-[10px] font-semibold uppercase text-gray-500">
-          Support
-        </p>
-        <h1 className="mt-1 text-2xl font-bold text-white">
-          Sponsorship Contract Detail
-        </h1>
-        <p className="mt-1 text-sm text-gray-400">
-          Sponsor: {selectedOffer.name}. Review package, negotiation levers, and
-          brand impact{selectedSponsorSlot ? ` for the ${selectedSponsorSlot} slot` : ""}.
-        </p>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-12">
-        <div className="space-y-4 xl:col-span-8">
-          <div className="card card-body">
-            <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
-              <div className="flex items-center justify-center rounded-xl border border-border bg-surface-light p-6 text-center text-4xl font-semibold text-green-400">
-                A
-              </div>
-              <div>
-                <div className="flex items-center gap-3">
-                  <h2 className="text-3xl font-semibold text-white">
-                    {selectedOffer.name}
-                  </h2>
-                  <span className="rounded bg-green-600/20 px-2 py-1 text-[10px] text-green-400">
-                    Exclusive
-                  </span>
-                </div>
-                <p className="mt-2 text-gray-400">{selectedOffer.category}</p>
-                <div className="mt-5 grid grid-cols-2 gap-3 text-xs lg:grid-cols-4">
-                  <div className="rounded bg-surface-light/50 p-3">
-                    <span className="text-gray-500">Brand Fit</span>
-                    <p className="mt-1 text-lg font-bold text-green-400">
-                      {selectedOffer.brandFit}%
-                    </p>
-                  </div>
-                  <div className="rounded bg-surface-light/50 p-3">
-                    <span className="text-gray-500">Required Rep</span>
-                    <p className="mt-1 text-lg font-bold text-amber-400">
-                      {selectedOffer.minimumReputation}+
-                    </p>
-                  </div>
-                  <div className="rounded bg-surface-light/50 p-3">
-                    <span className="text-gray-500">Status</span>
-                    <p className="mt-1 text-lg font-bold text-white">Review</p>
-                  </div>
-                  <div className="rounded bg-surface-light/50 p-3">
-                    <span className="text-gray-500">Deal Rating</span>
-                    <p className="mt-1 text-lg font-bold text-green-400">
-                      {Math.round(
-                        (selectedOffer.brandFit +
-                          Math.min(100, selectedOffer.monthlyValue / 25)) /
-                          2,
-                      )}
-                      /100
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {[
-              ["Monthly Payment", formatMoney(selectedOffer.monthlyValue)],
-              ["Win Bonuses", selectedOffer.bonusClause],
-              ["Length", selectedOffer.contractLength],
-              ["Behaviour", selectedOffer.behaviour],
-            ].map(([label, value]) => (
-              <div key={label} className="card card-body">
-                <p className="metric-label">{label}</p>
-                <p className="mt-2 text-sm font-semibold text-white">{value}</p>
-              </div>
-            ))}
-          </div>
-          <div className="card overflow-hidden">
-            <div className="card-header">
-              <h3 className="text-sm font-semibold text-white">
-                Sponsor Slots Included
-              </h3>
-            </div>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border text-gray-500">
-                  <th className="px-3 py-2 text-left">Slot</th>
-                  <th className="px-3 py-2 text-left">Annual Value</th>
-                  <th className="px-3 py-2 text-left">Visibility</th>
-                  <th className="px-3 py-2 text-left">Fit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {contractData.includedSlots.map((slot) => (
-                  <tr key={slot.slot} className="border-b border-border/50">
-                    <td className="px-3 py-2 text-white">{slot.slot}</td>
-                    <td className="px-3 py-2 text-white">
-                      {formatMoney(slot.annualValue)}
-                    </td>
-                    <td className="px-3 py-2 text-gray-400">
-                      {slot.visibility}
-                    </td>
-                    <td className="px-3 py-2">
-                      {stars(Math.max(1, Math.round(slot.fit / 20)))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="card card-body">
-              <h3 className="mb-3 text-xs font-semibold text-white">
-                Advisor Notes
-              </h3>
-              <p className="text-sm text-gray-400">
-                {contractData.advisor.note}
-              </p>
-              <p className="mt-3 text-green-400">
-                Recommendation: {contractData.advisor.recommendation}
-              </p>
-            </div>
-            <div className="card overflow-hidden">
-              <div className="card-header">
-                <h3 className="text-sm font-semibold text-white">
-                  Deal Comparison
-                </h3>
-              </div>
-              <table className="w-full text-xs">
-                <tbody>
-                  {contractData.comparisonRows.map((row) => (
-                    <tr key={row.metric} className="border-b border-border/50">
-                      <td className="px-3 py-2 text-white">{row.metric}</td>
-                      <td className="px-3 py-2 text-gray-400">{row.current}</td>
-                      <td className="px-3 py-2 text-green-400">
-                        {row.proposed}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div className="card card-body">
-            <h3 className="mb-3 text-xs font-semibold text-white">
-              Obligations & Brand Impact
-            </h3>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-gray-400">Reputation Potential</span>
-                  <span className="text-green-400">+{reputationImpact}</span>
-                </div>
-                <ProgressBar
-                  value={Math.min(100, reputationImpact * 12)}
-                  compact
-                />
-              </div>
-              <div>
-                <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-gray-400">Fan Reaction</span>
-                  <span className="text-green-400">
-                    {selectedOffer.brandFit}%
-                  </span>
-                </div>
-                <ProgressBar value={selectedOffer.brandFit} compact />
-              </div>
-              <div>
-                <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-gray-400">Obligation Load</span>
-                  <span className="text-amber-400">
-                    {obligationProfile.obligationLoad}/5
-                  </span>
-                </div>
-                <ProgressBar
-                  value={obligationProfile.obligationLoad * 20}
-                  tone="amber"
-                  compact
-                />
-              </div>
-            </div>
-            <p className="mt-4 flex items-center gap-2 rounded border border-amber-600/30 bg-amber-600/10 p-3 text-xs text-amber-100">
-              <Info className="h-4 w-4" /> Weekly cost:{" "}
-              {obligationProfile.weeklyFatigueCost} fatigue. Category perk:{" "}
-              {obligationProfile.perk}. Performance bonuses are paid
-              automatically when earned.
-            </p>
-          </div>
+    <div data-testid="sponsor-contract-page" className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden">
+      <header className="card flex shrink-0 flex-wrap items-center justify-between gap-3 p-4">
+        <div className="min-w-0">
+          <p className="text-xs text-emerald-300">Sponsorship Contract Detail</p>
+          <h1 className="mt-1 text-xl font-bold text-white">{selectedOffer.name}</h1>
+          <p className="mt-1 text-xs text-gray-300">{selectedOffer.category} · {selectedSponsorSlot ?? "Choose an available sponsor slot"}</p>
         </div>
-        <div className="space-y-4 xl:col-span-4">
-          <div className="card card-body">
-            <h3 className="mb-3 text-xs font-semibold text-white">
-              Negotiation Options
-            </h3>
-              <div className="space-y-3">
-                {introduction?.offerId === selectedOffer.id && !introduction.used && introduction.expiresDate >= gameState.currentDate && <p className="rounded border border-green-500/30 bg-green-500/10 p-2 text-xs text-green-400">Warm introduction: +5 percentage points on your next negotiation, available until {introduction.expiresDate}. Existing contract and slot rules still apply.</p>}
-                {contractData.negotiationOptions.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => setSelectedNegotiationLabel(item.label)}
-                  className={`w-full rounded border p-3 text-left text-xs ${selectedNegotiationLabel === item.label ? "border-green-600/30 bg-green-600/10" : "border-border bg-surface-light/50"}`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-semibold text-white">{item.label}</p>
-                      <p className="mt-1 text-gray-400">{item.adjustment}</p>
-                    </div>
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-[10px] ${probabilityClass(item.probability)}`}
-                    >
-                      {item.sponsorResponse}
-                    </span>
-                  </div>
-                  <div className="mt-2">
-                    <ProgressBar
-                      value={item.probability}
-                      tone={
-                        item.probability >= 65
-                          ? "green"
-                          : item.probability >= 45
-                            ? "amber"
-                            : "red"
-                      }
-                      compact
-                    />
-                  </div>
-                  <p className="mt-2 text-green-400">{item.impact}</p>
-                </button>
-              ))}
+        <div className="text-right"><p className="text-xl font-bold text-emerald-400">{formatMoney(selectedOffer.monthlyValue)}<span className="text-xs"> /mo</span></p><p className="mt-1 text-xs text-gray-300">{selectedOffer.contractLength} · {formatPercent(selectedOffer.brandFit)} fit</p></div>
+      </header>
+      <SectionTabs id="sponsor-contract" label="Contract sections" tabs={tabs} active={tab} onChange={setTab} />
+      <div id="sponsor-contract-panel" role="tabpanel" aria-labelledby={`sponsor-contract-tab-${tabs.indexOf(tab)}`} tabIndex={0} className="min-h-0 flex-1 overflow-auto">
+        {tab === "Package" && <div className="grid min-h-full gap-3 lg:grid-cols-2">
+          <section className="card flex flex-col p-4">
+            <h2 className="text-sm font-bold text-white">Your package</h2>
+            <div className="my-4 grid grid-cols-2 gap-3">
+              {[["Monthly payment", formatMoney(selectedOffer.monthlyValue)], ["Contract length", selectedOffer.contractLength], ["Brand fit", formatPercent(selectedOffer.brandFit)], ["Required reputation", `${selectedOffer.minimumReputation}+`]].map(([label, value]) => <div key={label} className="rounded-lg border border-border bg-surface-light p-3"><p className="text-xs text-gray-300">{label}</p><p className="mt-2 text-lg font-bold text-white">{value}</p></div>)}
             </div>
-          </div>
-          <div className="card card-body">
-            <h3 className="mb-3 text-xs font-semibold text-white">
-              Negotiation Tone
-            </h3>
-            <div className="grid gap-2">
-            {marketBlocker && <p role="status" className="text-xs text-amber-300">{marketBlocker}</p>}
-            {selectedOffer.seasonal && <p className="text-xs text-gray-400">{selectedOffer.note}</p>}
-              {(["Conservative", "Balanced", "Ambitious"] as const).map(
-                (tone) => (
-                  <button
-                    key={tone}
-                    type="button"
-                    onClick={() => setNegotiationTone(tone)}
-                    className={
-                      negotiationTone === tone
-                        ? "tab-active text-xs"
-                        : "tab-inactive text-xs"
-                    }
-                  >
-                    {tone}
-                  </button>
-                ),
-              )}
-            </div>
-          </div>
-          <div className="card card-body">
-            <h3 className="mb-3 text-xs font-semibold text-white">Strengths</h3>
-            <ul className="space-y-2 text-xs text-gray-400">
-              {contractData.advisor.strengths.map((item) => (
-                <li key={item} className="flex gap-2">
-                  <span className="text-green-400">+</span>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="card card-body">
-            <h3 className="mb-3 text-xs font-semibold text-white">Risks</h3>
-            <ul className="space-y-2 text-xs text-gray-400">
-              {contractData.advisor.risks.map((item) => (
-                <li key={item} className="flex gap-2">
-                  <span className="text-red-400">-</span>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="grid gap-2">
-            <p className="rounded-lg border border-border bg-surface-light p-3 text-xs text-gray-400">Performance terms: starts at 75/100 satisfaction. Aim for {expectations.expectedWinRate}% match wins{expectations.rankingTarget !== null ? ` and top ${expectations.rankingTarget} in ${expectations.rankingLabel}` : ""}. Below 40 brings a warning and at least six more competitive matches to recover. Only a score below 25 after that period can end the deal. Wins rebuild confidence; weeks without matches do not lower satisfaction.</p>
-            <button
-              type="button"
-              className="btn-primary justify-center text-xs"
-              disabled={Boolean(marketBlocker)}
-              onClick={() => acceptSponsor(selectedOffer.id, selectedSponsorSlot)}
-            >
-              <Star className="h-3.5 w-3.5" /> Accept Contract
-            </button>
-            <button
-              type="button"
-              className="btn-secondary justify-center text-xs"
-              disabled={Boolean(marketBlocker)}
-              onClick={() =>
-                negotiateSponsor(
-                  selectedOffer.id,
-                  selectedNegotiationLabel,
-                  negotiationTone,
-                )
-              }
-            >
-              <Scale className="h-3.5 w-3.5" /> Negotiate Terms
-            </button>
-            <button
-              type="button"
-              className="btn-secondary justify-center text-xs"
-              onClick={() => rejectSponsor(selectedOffer.id)}
-            >
-              Reject Deal
-            </button>
-            <Link
-              to="/sponsorship"
-              className="btn-secondary justify-center text-xs"
-            >
-              Compare Offers
-            </Link>
-          </div>
-        </div>
+            <dl className="space-y-3 text-sm"><div><dt className="text-gray-300">Win bonuses</dt><dd className="mt-1 font-semibold text-emerald-300">{selectedOffer.bonusClause}</dd></div><div><dt className="text-gray-300">Behaviour clause</dt><dd className="mt-1 text-white">{selectedOffer.behaviour}</dd></div></dl>
+            {selectedOffer.seasonal && <p className="mt-4 border-t border-border pt-3 text-xs text-gray-300">{selectedOffer.note}</p>}
+          </section>
+          <section className="card p-4">
+            <h2 className="text-sm font-bold text-white">Advisor notes</h2><p className="mt-3 text-sm text-gray-300">{contractData.advisor.note}</p><p className="mt-3 rounded-lg bg-emerald-500/10 p-3 text-sm text-emerald-300">{contractData.advisor.recommendation}</p>
+            <h3 className="mb-2 mt-5 text-sm font-semibold text-white">Strengths</h3><ul className="space-y-2 text-xs text-gray-300">{contractData.advisor.strengths.map(item => <li key={item}>+ {item}</li>)}</ul>
+            <h3 className="mb-2 mt-5 text-sm font-semibold text-white">Risks</h3><ul className="space-y-2 text-xs text-gray-300">{contractData.advisor.risks.map(item => <li key={item}>− {item}</li>)}</ul>
+          </section>
+        </div>}
+        {tab === "Comparison" && <div className="grid min-h-full gap-3 lg:grid-cols-2">
+          <section className="card overflow-hidden"><h2 className="card-header text-sm font-bold text-white">Deal comparison</h2><div className="overflow-auto"><table className="w-full text-sm"><thead><tr className="text-left text-gray-300"><th className="p-3">Metric</th><th className="p-3">Current</th><th className="p-3">Proposed</th></tr></thead><tbody>{contractData.comparisonRows.map(row => <tr key={row.metric} className="border-t border-border"><th className="p-3 text-left font-medium text-white">{row.metric}</th><td className="p-3 text-gray-300">{row.current}</td><td className="p-3 text-emerald-300">{row.proposed}</td></tr>)}</tbody></table></div></section>
+          <section className="card overflow-hidden"><h2 className="card-header text-sm font-bold text-white">Sponsor slots included</h2><div className="overflow-auto"><table className="w-full text-xs"><thead><tr className="text-left text-gray-300">{["Slot", "Annual value", "Visibility", "Fit"].map(label => <th key={label} className="p-3">{label}</th>)}</tr></thead><tbody>{contractData.includedSlots.map(slot => <tr key={slot.slot} className="border-t border-border"><th className="p-3 text-left font-medium text-white">{slot.slot}</th><td className="p-3 text-white">{formatMoney(slot.annualValue)}</td><td className="p-3 text-gray-300">{slot.visibility}</td><td className="whitespace-nowrap p-3" aria-label={formatPercent(slot.fit)}>{stars(Math.max(1, Math.round(slot.fit / 20)))}</td></tr>)}</tbody></table></div></section>
+        </div>}
+        {tab === "Negotiation" && <div className="grid min-h-full gap-3 lg:grid-cols-[2fr_1fr]">
+          <section className="card flex flex-col p-4"><h2 className="text-sm font-bold text-white">Negotiation options</h2>
+            {introduction?.offerId === selectedOffer.id && !introduction.used && introduction.expiresDate >= gameState.currentDate && <p className="mt-3 rounded border border-green-500/30 bg-green-500/10 p-2 text-xs text-green-400">Warm introduction: +5 percentage points on your next negotiation, available until {introduction.expiresDate}. Existing contract and slot rules still apply.</p>}
+            <div className="mt-3 grid flex-1 gap-3 sm:grid-cols-2">{contractData.negotiationOptions.map(item => <button key={item.label} type="button" aria-pressed={selectedNegotiationLabel === item.label} onClick={() => setSelectedNegotiationLabel(item.label)} className={`flex flex-col justify-center rounded-lg border p-4 text-left ${selectedNegotiationLabel === item.label ? "border-emerald-500 bg-emerald-500/10" : "border-border bg-surface-light"}`}><span className="flex flex-wrap items-start justify-between gap-2"><span className="text-sm font-bold text-white">{item.label}</span><span className={`rounded px-2 py-1 text-xs ${probabilityClass(item.probability)}`}>{item.sponsorResponse}</span></span><span className="mt-2 text-xs text-gray-300">{item.adjustment}</span><span className="my-3 block w-full"><ProgressBar value={item.probability} compact /></span><span className="text-sm font-semibold text-emerald-300">{item.impact}</span></button>)}</div>
+          </section>
+          <section className="card flex flex-col p-4"><h2 className="text-sm font-bold text-white">Negotiation tone</h2><p className="mt-3 text-xs text-gray-300">Choose a proposal and tone before submitting.</p><div className="my-4 grid gap-2">{(["Conservative", "Balanced", "Ambitious"] as const).map(tone => <button key={tone} type="button" aria-pressed={negotiationTone === tone} onClick={() => setNegotiationTone(tone)} className={negotiationTone === tone ? "tab-active" : "tab-inactive"}>{tone}</button>)}</div><div className="mt-auto rounded-lg border border-border p-3 text-sm text-white"><p className="text-xs text-gray-300">Selected proposal</p><p className="mt-2 font-semibold">{selectedNegotiationLabel}</p><p className="mt-1 text-emerald-300">{negotiationTone} approach</p></div></section>
+        </div>}
+        {tab === "Performance" && <div className="grid min-h-full gap-3 lg:grid-cols-2">
+          <section className="card p-4"><h2 className="text-sm font-bold text-white">Obligations & brand impact</h2><div className="my-4 grid gap-3">{[["Reputation potential", `+${reputationImpact}`], ["Fan reaction", formatPercent(selectedOffer.brandFit)], ["Obligation load", `${obligationProfile.obligationLoad}/5`], ["Weekly fatigue cost", `${obligationProfile.weeklyFatigueCost}`], ["Category perk", obligationProfile.perk]].map(([label,value]) => <div key={label} className="flex items-center justify-between gap-4 rounded-lg bg-surface-light p-3"><span className="text-sm text-gray-300">{label}</span><strong className="text-sm text-white">{value}</strong></div>)}</div><p className="text-xs text-gray-300">Performance bonuses are paid automatically when earned.</p></section>
+          <section className="card p-4"><h2 className="text-sm font-bold text-white">Performance terms</h2><div className="my-4 grid grid-cols-2 gap-3"><div className="rounded-lg bg-surface-light p-4"><p className="text-xs text-gray-300">Starting satisfaction</p><p className="mt-2 text-2xl font-bold text-emerald-300">75/100</p></div><div className="rounded-lg bg-surface-light p-4"><p className="text-xs text-gray-300">Target match wins</p><p className="mt-2 text-2xl font-bold text-white">{expectations.expectedWinRate}%</p></div></div>{expectations.rankingTarget !== null && <p className="mb-4 text-sm text-white">Ranking target: top {expectations.rankingTarget} in {expectations.rankingLabel}.</p>}<ul className="space-y-4 text-sm text-gray-300"><li>Below 40 satisfaction brings a warning and at least six more competitive matches to recover.</li><li>Only a score below 25 after that recovery period can end the deal.</li><li>Wins rebuild confidence. Weeks without matches do not lower satisfaction.</li></ul></section>
+        </div>}
       </div>
+      <footer className="card shrink-0 p-3">
+        {marketBlocker && <p role="status" className="mb-2 text-xs text-amber-300">{marketBlocker}</p>}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <button type="button" className="btn-primary justify-center text-xs" disabled={Boolean(marketBlocker)} onClick={() => acceptSponsor(selectedOffer.id, selectedSponsorSlot)}><Star className="h-3.5 w-3.5" />Accept Contract</button>
+          <button type="button" className="btn-secondary justify-center text-xs" disabled={Boolean(marketBlocker)} onClick={() => tab !== "Negotiation" ? setTab("Negotiation") : negotiateSponsor(selectedOffer.id, selectedNegotiationLabel, negotiationTone)}><Scale className="h-3.5 w-3.5" />{tab === "Negotiation" ? "Submit Negotiation" : "Negotiate Terms"}</button>
+          <button type="button" className="btn-secondary justify-center text-xs" onClick={() => rejectSponsor(selectedOffer.id)}>Reject Deal</button>
+          <Link to="/sponsorship" className="btn-secondary justify-center text-xs">Compare Offers</Link>
+        </div>
+      </footer>
     </div>
   );
 }

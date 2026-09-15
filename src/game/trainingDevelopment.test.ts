@@ -1,3 +1,5 @@
+import { COACH_TRAINING_SKILLS, coachTrainingBonus } from './coachTraining';
+import type { Coach, CoachContract } from '../types/game';
 import { describe, expect, it } from 'vitest';
 import { applyTrainingPlanState, createStarterState, previewTrainingDevelopment } from '../hooks/useGameState';
 import { buildFocusedTrainingPlan, buildTrainingCell, trainingSkillWork, TRAINING_SESSION_OPTIONS } from '../utils/trainingPlan';
@@ -50,5 +52,41 @@ describe('session-specific development', () => {
     expect(trainingSkillWork(plan.map(d => ({...d, competitionName: 'Real match'})))).toEqual({});
     expect(trainingSkillWork(plan.map(d => ({...d, careerCommitmentId: 'work'})))).toEqual({});
     expect(trainingSkillWork(buildFocusedTrainingPlan('recovery', state.currentDate, 10))).toEqual({});
+  });
+});
+
+
+describe('coach specialisms match advertised training benefits', () => {
+  for (const type of Object.keys(COACH_TRAINING_SKILLS) as Coach['type'][]) it(`${type} helps the stated skills in either slot, with matching settlement`, () => {
+    const state = fresh();
+    const coach = { ...state.coaches[0], type, level: 'Elite' as const, compatibility: 88 };
+    state.coaches = [coach];
+    const week = buildFocusedTrainingPlan('balanced', state.currentDate, 10).map((day, i) => ({ ...day,
+      morning: buildTrainingCell(TRAINING_SESSION_OPTIONS[(i * 2) % TRAINING_SESSION_OPTIONS.length].id),
+      afternoon: buildTrainingCell(TRAINING_SESSION_OPTIONS[(i * 2 + 1) % TRAINING_SESSION_OPTIONS.length].id), evening: buildTrainingCell('rest') }));
+    const baseline = previewTrainingDevelopment(state, week);
+    const contract: CoachContract = { coachId: coach.id, slot: 'Lead Coach', startedWeek: state.week, contractWeeks: 8, weeksRemaining: 8, contractLabel: '8 Week Trial', weeklyCost: 100, totalCost: 800 };
+    const lead = previewTrainingDevelopment({ ...state, coachContracts: [contract] }, week);
+    const specialist = { ...state, coachContracts: [{ ...contract, slot: 'Specialist Coach' as const }] };
+    expect(previewTrainingDevelopment(specialist, week)).toEqual(lead);
+    const applied = applyTrainingPlanState(specialist, week);
+    const beforeSkills = { ...state.attributes.technical, ...state.attributes.mental, ...state.attributes.physical };
+    const afterSkills = { ...applied.attributes.technical, ...applied.attributes.mental, ...applied.attributes.physical };
+    for (const item of baseline) {
+      const actual = lead.find(g => g.label === item.label)!.value;
+      expect(actual).toBeCloseTo(item.value * (1 + coachTrainingBonus(coach, item.label)), 8);
+      expect(afterSkills[item.label] - beforeSkills[item.label]).toBeCloseTo(actual, 8);
+    }
+    expect(baseline.some(g => COACH_TRAINING_SKILLS[type].includes(g.label))).toBe(true);
+    expect(previewTrainingDevelopment(specialist, buildFocusedTrainingPlan('recovery', state.currentDate, 10))).toEqual([]);
+  });
+  it('adds overlapping coaches up to the 30% ceiling', () => {
+    const state = fresh();
+    const coach = { ...state.coaches[0], type: 'Tactical' as const, level: 'Elite' as const, compatibility: 100 };
+    state.coaches = [coach, { ...coach, id: 'second-specialist' }];
+    const week = buildFocusedTrainingPlan('safety', state.currentDate, 10);
+    const baseline = previewTrainingDevelopment(state, week).find(g => g.label === 'Safety Play')!.value;
+    state.coachContracts = state.coaches.map((c, i) => ({ coachId: c.id, slot: i ? 'Specialist Coach' : 'Lead Coach', startedWeek: state.week, contractWeeks: 8, weeksRemaining: 8, contractLabel: '8 Week Trial', weeklyCost: 100, totalCost: 800 }));
+    expect(previewTrainingDevelopment(state, week).find(g => g.label === 'Safety Play')!.value).toBeCloseTo(baseline * 1.3, 8);
   });
 });

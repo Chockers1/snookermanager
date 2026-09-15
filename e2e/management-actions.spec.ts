@@ -12,6 +12,7 @@ async function openCareer(page: Page, route: string, state = createStarterState(
   }, { key: ACTIVE_SAVE_KEY, value: JSON.stringify(state) });
   await page.goto('/');
   await page.getByRole('button', { name: /Continue Career/ }).click();
+  await expect(page.getByRole('heading', { name: 'Upcoming & Recent Results', exact: true })).toBeVisible();
   await page.evaluate((url) => {
     history.pushState({}, '', url);
     dispatchEvent(new PopStateEvent('popstate'));
@@ -48,6 +49,7 @@ test('finance exports a report and saves budget allocations without spending cas
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   expect((await download).suggestedFilename()).toMatch(/\.csv$/);
+  await page.getByRole('tab', { name: 'Budget', exact: true }).click();
   await page.getByRole('button', { name: 'Manage Budget' }).click();
   const dialog = page.getByRole('dialog', { name: 'Monthly Budget Manager' });
   await expect(dialog).toBeVisible();
@@ -56,6 +58,7 @@ test('finance exports a report and saves budget allocations without spending cas
   await input.fill(String(target));
   await dialog.getByRole('button', { name: 'Save Allocation' }).click();
   await expect(dialog).not.toBeVisible();
+  await page.getByRole('tab', { name: 'Budget', exact: true }).click();
   await page.getByRole('button', { name: 'Manage Budget' }).click();
   await expect(dialog.getByRole('spinbutton').first()).toHaveValue(String(target));
   const cash = (await readCareerSave(page)).player.cash;
@@ -70,9 +73,9 @@ test('sponsor slots select their own signing destination and comparison opens', 
     await page.getByRole('button', { name: new RegExp(`Vacant.*${slot}`) }).click();
     await expect(page.getByRole('button', { name: `Fill ${slot}`, exact: true })).toBeVisible();
   }
-  await page.getByRole('button', { name: 'Compare Offers', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Close Comparison', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Close Comparison', exact: true }).click();
+  await page.getByRole('tab', { name: 'Comparison', exact: true }).click();
+  await expect(page.getByRole('table')).toBeVisible();
+  await page.getByRole('tab', { name: 'Offers', exact: true }).click();
   await page.getByRole('button', { name: 'Fill Social Media Partner', exact: true }).click();
   await expect.poll(async () => (await readCareerSave(page)).sponsors.map(sponsor => sponsor.slot)).toContain('Social Media Partner');
 });

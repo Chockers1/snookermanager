@@ -21,6 +21,14 @@ for (const width of [1366, 390]) for (const populated of [false, true]) {
   await expect(page.locator('#main-content')).toBeVisible();
   await page.evaluate(() => { history.pushState({}, '', '/training'); dispatchEvent(new PopStateEvent('popstate')); });
   await expect(page.locator('#main-content')).not.toContainText('Tactical & scheduling advice');
+  const support = page.getByLabel('Training support');
+  await expect(support).toContainText('Development & practice'); await expect(support).toContainText('Training base');
+  if (width >= 1280) {
+    const tops = await support.locator(':scope > section').evaluateAll(nodes => nodes.map(n => n.getBoundingClientRect().top));
+    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(2);
+    expect(await page.locator('main').evaluate(el => el.scrollHeight <= el.clientHeight + 2)).toBe(true);
+  }
+  await page.screenshot({ path: `artifacts/training-support-${width}-${populated}.png` });
   await page.getByRole('button', { name: /Form assessment/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Form evidence and recovery', exact: true });
   await expect(dialog).toBeVisible();

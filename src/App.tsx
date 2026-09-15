@@ -1,3 +1,4 @@
+import { BrandLoadingScreen } from './components/game/BrandLoadingScreen';
 import { TeamEventsPage } from './components/career/SeasonLifePanels';
 import { DiagnosticRuntime } from './components/game/DiagnosticRuntime';
 import { AccessibilityRuntime } from './components/game/AccessibilityRuntime';
@@ -163,19 +164,12 @@ const CareerLauncherPage = lazy(() =>
   })),
 );
 
-function RouteLoadingFallback() {
-  return (
-    <div className="rounded-2xl border border-scm-border bg-scm-panelSoft/90 px-6 py-10 text-center text-sm text-scm-textSoft">
-      Loading table view...
-    </div>
-  );
-}
 
 export function AppRoutes() {
   const { careerSessionMode, gameState } = useGame();
   const location = useLocation();
 
-  if (careerSessionMode === "launcher" && location.pathname === "/settings") return <main className="mx-auto max-w-4xl p-4"><Suspense fallback={<RouteLoadingFallback/>}><SettingsPage/></Suspense></main>;
+  if (careerSessionMode === "launcher" && location.pathname === "/settings") return <main className="mx-auto max-w-4xl p-4"><Suspense fallback={<BrandLoadingScreen/>}><SettingsPage/></Suspense></main>;
 
   if (careerSessionMode === "launcher") {
     const knownEntryPath = appRoutes.some((route) => {
@@ -184,7 +178,7 @@ export function AppRoutes() {
       return location.pathname.startsWith(`${routePrefix}/`);
     });
     return (
-      <Suspense fallback={<RouteLoadingFallback />}>
+      <Suspense fallback={<BrandLoadingScreen fullScreen />}>
         {knownEntryPath ? <CareerLauncherPage /> : <NotFoundPage />}
       </Suspense>
     );
@@ -192,7 +186,7 @@ export function AppRoutes() {
 
   if (careerSessionMode === "creating") {
     return (
-      <Suspense fallback={<RouteLoadingFallback />}>
+      <Suspense fallback={<BrandLoadingScreen fullScreen />}>
         <Routes>
           <Route path="/new-career" element={<NewCareerPage />} />
           <Route path="*" element={<Navigate to="/new-career" replace />} />
@@ -214,7 +208,7 @@ export function AppRoutes() {
 
   return (
     <AppShell>
-      <Suspense fallback={<RouteLoadingFallback />}>
+      <Suspense fallback={<BrandLoadingScreen />}>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/new-career" element={<NewCareerPage />} />

@@ -1,0 +1,51 @@
+file,dimensions,bytes,sha256,role,runtime
+public/assetts/achievements/achievement-template-locked-256x256.png,256x256,11973,fcb5b54e7a713c50611a8c612e65d7614c0e7942c9ecb7a7305f344cb9963858,Retained source / publishing / alternative artwork,False
+public/assetts/achievements/achievement-template-locked-64x64.png,64x64,5223,bd5885e65a1edb16f398a81eaabec8e34ddec9c2c65223eaaf7837d6b1b49866,Retained source / publishing / alternative artwork,False
+public/assetts/achievements/achievement-template-unlocked-256x256.png,256x256,19627,fea2fbc2fd6e670c0ba89a5be6ff115b7338263d0d786e0212303781848d34f6,Retained source / publishing / alternative artwork,False
+public/assetts/achievements/achievement-template-unlocked-64x64.png,64x64,7469,34ee44fefbcbc999bc9fd8b58e4485a127224a18a63beda9461a4fd20681e3a6,Retained source / publishing / alternative artwork,False
+public/assetts/asset-manifest.csv,,2830,f5c0a19c81c95bddf2fc32f919fc2548b56f5458de8409f7ea4356cbe973dd7c,Retained source / publishing / alternative artwork,False
+public/assetts/asset-pack-preview.jpg,1260x900,223512,1ff9cde29b35d6866308ce27b96c9125b28df17191a107d7e231e1d6b3f39ae7,Retained source / publishing / alternative artwork,False
+public/assetts/brand/snooker-career-manager-icon-symbol-1024.png,1024x1024,186565,ab528261bbf409253a9316ab3b2c65dea20aac60f1fe80f2d18c40e2a37b3b20,Retained source / publishing / alternative artwork,False
+public/assetts/brand/snooker-career-manager-logo-horizontal-3000w.png,3000x1144,1245012,705dacb63c53d5cda16e92c07e902b7cf5eb5e2a98939978a5f9f265909c9948,Retained source / publishing / alternative artwork,False
+public/assetts/brand/snooker-career-manager-logo-horizontal.svg,,10457,c715331fc1747e0148d30b6ee5da3b662a625ec95a942b4b49657b35142de5dd,Retained source / publishing / alternative artwork,False
+public/assetts/brand/snooker-career-manager-logo-stacked.png,1900x1197,902721,149401a23e9cafc553db669f71892fcf74cd3df5b79f7778024bc523174d483c,Retained source / publishing / alternative artwork,False
+public/assetts/brand/snooker-career-manager-logo-stacked.svg,,9987,dcf281334a00a11430f0b48a1e222e0505599ec1b02a869f53fb9b08cbd2c269,Retained source / publishing / alternative artwork,False
+public/assetts/brand/snooker-career-manager-logo-white-3000w.png,3000x1144,258880,e5fb73f573b301a7922ed0f32366c58ba1d4d18fa3e19d1c4e2eb33a06152ba9,Retained source / publishing / alternative artwork,False
+"public/assetts/ChatGPT Image Sep 7, 2026, 08_15_52 PM.png",1672x941,1548953,73e6e300ff02517d42dcc676df18d98ab92ed51e92ae758329061eb3301dd0a8,Retained source / publishing / alternative artwork,False
+public/assetts/icons/apple-touch-icon-180x180.png,180x180,28197,469dc5ade7a2e7392305a0d193301628cb6cf49d010b58462824f5e162a16432,Runtime / browser branding,True
+public/assetts/icons/favicon.ico,32x32,3218,b94193d36abb0515edf96d941c1cc834c142a51481df09f1dfdb55cdd401f173,Runtime / browser branding,True
+public/assetts/icons/favicon.svg,,825,92108670c9130b27c57ce654f49b11002159b0e5b4c07c80a0f6984fa2f95884,Runtime / browser branding,True
+public/assetts/icons/game-icon-master-1024.png,1024x1024,137723,9dcacda649afec3f6fca704a5b0fb3783b4b30ae69a4bfb0df39cad9b079ab8f,Retained source / publishing / alternative artwork,False
+public/assetts/icons/steam-app-icon-184x184.jpg,184x184,18126,2f6e34ecb9beb102e765496ce6ee2966511d2643b8034db9495b33c1da764a20,Retained source / publishing / alternative artwork,False
+public/assetts/icons/steam-shortcut-icon-256x256.png,256x256,43519,b1bf3fcba728bd5a2b8a4bc5fd67b1b2231261d32105cb736a348d91ebb028d3,Retained source / publishing / alternative artwork,False
+public/assetts/icons/steam-shortcut-icon-512x512.png,512x512,97006,7d1ca6555db794dab5921e5fc49a48c9a864ac89f2b1e93048a2e6cf45e5af7f,Retained source / publishing / alternative artwork,False
+public/assetts/icons/web-app-icon-192x192.png,192x192,30733,1fe7d7e73a4b7ae82c0c87206d32771121bcaf48aba3f3916667d1f1d9b597ab,Runtime / browser branding,True
+public/assetts/icons/web-app-icon-512x512.png,512x512,97006,7d1ca6555db794dab5921e5fc49a48c9a864ac89f2b1e93048a2e6cf45e5af7f,Runtime / browser branding,True
+public/assetts/icons/windows-executable-icon.ico,256x256,76366,01782f72d7826f97586096447db457ccd7b66bece7a32859ca9096329d23a28c,Retained source / publishing / alternative artwork,False
+public/assetts/ingame/in-game-logo-2000w-transparent.png,2000x763,837131,8de2185dc8365b0c266f5860e5bd6a597811c713853b1c3bc9fa9d82e136510a,Retained source / publishing / alternative artwork,False
+public/assetts/ingame/in-game-logo.svg,,10457,c715331fc1747e0148d30b6ee5da3b662a625ec95a942b4b49657b35142de5dd,Runtime / browser branding,True
+public/assetts/ingame/loading-screen-background-3840x2160.png,3840x2160,4446740,74db0a15535817861bdfdfd9d187404d088a8453cb9affa757a6582d616a4ce2,Runtime / browser branding,True
+public/assetts/ingame/main-menu-background-3840x2160.png,3840x2160,4247552,2cc742b068f2d93d67f83ece5d21d1994b3a027fd6dcb040421e1e770470e0ff,Runtime / browser branding,True
+public/assetts/install-assets.ps1,,334,a8128c407075979d59e925f6667983d9a63a28fd8731ae74a7b8d399cf0909f3,Retained source / publishing / alternative artwork,False
+public/assetts/marketing/social-square-1080x1080.png,1080x1080,1380069,7ee9e47d6dd43c59ec7164db070328bf8a36a0d8cdeb91510c76673bd3757a61,Retained source / publishing / alternative artwork,False
+public/assetts/marketing/social-vertical-1080x1920.png,1080x1920,1781201,4de25e39922a4d47804acba718795d99681d67d2d746494288e1ff49834309bb,Retained source / publishing / alternative artwork,False
+public/assetts/marketing/steam-announcement-cover-800x450.png,800x450,488110,ce10255d2177a24e607a486e0c7e17a6c821726ec938b915fde29201bae8562a,Retained source / publishing / alternative artwork,False
+public/assetts/marketing/steam-event-header-1920x622.png,1920x622,1414882,0ba240d5b7a808f68b3e47326616615432faabd0c9486c1f988f3bce85b83b22,Retained source / publishing / alternative artwork,False
+public/assetts/marketing/website-social-link-preview-1200x630.png,1200x630,974160,a86210f66d8ac8b22ede56d232bfe1d3c09c7924abe9a48c627373265de718bb,Retained source / publishing / alternative artwork,False
+public/assetts/marketing/youtube-thumbnail-base-1280x720.png,1280x720,1156296,5a921644357a0cb8c24e58302a9b53a02e7a0c94befb6cd1e65cff56657592d7,Retained source / publishing / alternative artwork,False
+public/assetts/master/snooker-career-manager-background-no-title-3840x2160.png,3840x2160,4247552,2cc742b068f2d93d67f83ece5d21d1994b3a027fd6dcb040421e1e770470e0ff,Retained source / publishing / alternative artwork,False
+public/assetts/master/snooker-career-manager-key-art-original-1672x941.png,1672x941,1638037,1603cd7e3370b095621ada7b6cc61d34f37e3a65174db8d0bc987f1a4d149e61,Retained source / publishing / alternative artwork,False
+public/assetts/master/snooker-career-manager-main-promotional-artwork-6000x4000.jpg,6000x4000,3277194,a8687a35a50fa241aba9ae5f931a2ca811db9cb1455d91545ec82d84fc85c573,Retained source / publishing / alternative artwork,False
+public/assetts/README.md,,860,3ad4d61dfe3b316a770596e4daab606deeec5ee75dc8fb30a513fa3a4ae51237,Retained source / publishing / alternative artwork,False
+public/assetts/screenshots/README.md,,612,3dac9e3e92ba2012f8be8a0441c33a3f3f1a7b5ddb317d3f11cc05944d98217e,Retained source / publishing / alternative artwork,False
+public/assetts/steam/library/steam-library-capsule-600x900.png,600x900,681469,927f942e8781a1e3d8efd8169b49309d56a21569bf67a6d4b3aa3a9e4907b87c,Retained source / publishing / alternative artwork,False
+public/assetts/steam/library/steam-library-header-920x430.png,920x430,538005,839046420e2885e460bc9e8c73087632a8cdcf361c66cb35b23b2eceea41d820,Retained source / publishing / alternative artwork,False
+public/assetts/steam/library/steam-library-hero-3840x1240.png,3840x1240,2824746,5be84ff4a4e66a420d0b6d58f431b8654ab18e7bd092ebe52a24b853523d79c9,Retained source / publishing / alternative artwork,False
+public/assetts/steam/library/steam-library-logo-1280w-transparent.png,1280x488,470593,145b7e88fbd2f8c26c69c1c2abdec2a8a7fdcd4177e4658ed842d4216b067dfd,Retained source / publishing / alternative artwork,False
+public/assetts/steam/store/steam-bundle-header-707x232.png,707x232,235917,d9e0b979fcc8daab5a66c6f9e722b5f69062e604e6284f048e93922156823c97,Retained source / publishing / alternative artwork,False
+public/assetts/steam/store/steam-header-capsule-920x430.png,920x430,538005,839046420e2885e460bc9e8c73087632a8cdcf361c66cb35b23b2eceea41d820,Retained source / publishing / alternative artwork,False
+public/assetts/steam/store/steam-main-capsule-1232x706.png,1232x706,1100108,7821bbe3413be05648c63e8597b223b437def71256e4c692405d367a9e569e58,Retained source / publishing / alternative artwork,False
+public/assetts/steam/store/steam-page-background-1438x810.png,1438x810,1319624,1811be97fd6dae5103f1624c456b4cfc2688c3889f24ccd9ac039c63f1167988,Retained source / publishing / alternative artwork,False
+public/assetts/steam/store/steam-small-capsule-462x174.png,462x174,124625,dcf3f6a522a7a8d0312f711e90897f5f8e1629e0837bab91552bd4c1a53915a1,Retained source / publishing / alternative artwork,False
+public/assetts/steam/store/steam-vertical-capsule-748x896.png,748x896,844621,facd331b34c57391bcae5f8062b9ff5458248b93e92087d1cee345ffb294b5dc,Retained source / publishing / alternative artwork,False
+public/assetts/trailer/README.md,,298,c9e7eab2e95dd86cc0fda022f405da14a61b55e0e00dcc284f9ea0a559424271,Retained source / publishing / alternative artwork,False

@@ -1,12 +1,14 @@
+import { SectionTabs } from '../components/ui/SectionTabs';
+import { CareerEditor } from '../components/career/CareerDepthPanels';
 import { careerLegacyOf, careerLegacyRating } from '../game/careerLegacy'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarDays, Check, ChevronRight, Circle, Lock, Route, Trophy } from 'lucide-react'
+import { CalendarDays, Check, ChevronRight, Route, Trophy, Target, Users } from 'lucide-react'
 import { ProgressBar } from '../components/ui/ProgressBar'
 import { useGame } from '../context/useGame'
 import { careerPathStageCatalog } from '../data/catalogs'
 import { calculateAverage, calculateTechnicalAverage } from '../utils/calculations'
-import { formatMoney } from '../utils/formatters'
+import { formatMoney, formatAttribute, formatPercent } from '../utils/formatters'
 import type { Coach, Tournament } from '../types/game'
 
 const COACH_LEVEL_VALUE: Record<Coach['level'], number> = {
@@ -127,22 +129,21 @@ function getRequirementStatus(label: string, metrics: StageMetricSnapshot) {
   return false
 }
 
-function tierClass(tier: string) {
-  if (tier.includes('Foundation') || tier.includes('Development')) return 'bg-green-600/20 text-green-400'
-  if (tier.includes('Pre-Pro') || tier.includes('Qualification') || tier.includes('Professional')) return 'bg-blue-600/20 text-blue-400'
-  if (tier.includes('Elite')) return 'bg-amber-600/20 text-amber-400'
-  return 'bg-red-600/20 text-red-400'
-}
-
 export function CareerProgressionPage() {
   const navigate = useNavigate()
   const { gameState } = useGame()
+  const [tab, setTab] = useState<'Overview' | 'Full Pathway' | 'Events' | 'Career Snapshot'>('Overview')
+  const [selectedStageId, setSelectedStageId] = useState<string | null>(null)
   const [tierFilter, setTierFilter] = useState<'All' | string>('All')
   const tierOptions = ['All', ...Array.from(new Set(careerPathStageCatalog.map((stage) => stage.tier)))]
   const committedEvents = getCommittedEvents(gameState.tournaments)
   const currentCoach = gameState.coaches.find((coach) => coach.id === gameState.currentCoachId) ?? null
   const coachLevel = currentCoach ? COACH_LEVEL_VALUE[currentCoach.level] : 0
   const careerTotals = getCanonicalCareerTotals(gameState)
+  const legacy = careerLegacyOf(gameState)
+  const legacyRating = careerLegacyRating(legacy)
+  const trophies = [...new Map(legacy.trophies.map(trophy => [trophy.id, trophy])).values()]
+  const majorTitles = trophies.filter(trophy => trophy.category === 'Major').length
   const worldRanking = gameState.player.worldRanking ?? null
   const metrics: StageMetricSnapshot = {
     careerStage: gameState.player.careerStage,
@@ -151,8 +152,8 @@ export function CareerProgressionPage() {
     reputation: gameState.player.reputation,
     confidence: gameState.player.confidence,
     cash: gameState.player.cash,
-    legacyScore: careerLegacyRating(careerLegacyOf(gameState)).score,
-    worldTitles: careerLegacyRating(careerLegacyOf(gameState)).worldTitles,
+    legacyScore: legacyRating.score,
+    worldTitles: legacyRating.worldTitles,
     technicalAverage: calculateTechnicalAverage(gameState.attributes.technical),
     mentalAverage: calculateAverage(Object.values(gameState.attributes.mental)),
     breakBuilding: gameState.attributes.technical['Break Building'] ?? 0,
@@ -182,124 +183,117 @@ export function CareerProgressionPage() {
   const visibleStages = stages.filter((stage) => (tierFilter === 'All' ? true : stage.tier === tierFilter))
   const currentStage = stages.find((stage) => stage.current) ?? stages[0]
   const nextStage = stages.find((stage) => stage.stage === nextStageNumber) ?? stages[stages.length - 1]
-  const requirements = (nextStage.requirements ?? nextStage.moveUpWhen ?? []).slice(0, 6).map((label) => ({ label, complete: getRequirementStatus(label, metrics) }))
-  const currentStageEvents = gameState.tournaments.filter((event) => (event.stageId ?? 1) === currentStage.stage).sort((left, right) => left.startDate.localeCompare(right.startDate)).slice(0, 4)
-  const nextStageEvents = gameState.tournaments.filter((event) => (event.stageId ?? 1) === nextStage.stage).sort((left, right) => left.startDate.localeCompare(right.startDate)).slice(0, 4)
+  const requirements = (nextStage.requirements ?? nextStage.moveUpWhen ?? []).map((label) => ({ label, complete: getRequirementStatus(label, metrics) }))
+  const currentStageEvents = gameState.tournaments.filter((event) => (event.stageId ?? 1) === currentStage.stage).sort((left, right) => left.startDate.localeCompare(right.startDate))
+  const nextStageEvents = gameState.tournaments.filter((event) => (event.stageId ?? 1) === nextStage.stage).sort((left, right) => left.startDate.localeCompare(right.startDate))
   const playerRankingText = worldRanking != null ? `World #${worldRanking}` : `${gameState.player.rankingLabel} #${gameState.player.amateurRanking ?? '-'}`
   const statusLabel = currentStageProgress >= 70 ? 'On Track' : currentStageProgress >= 40 ? 'Building' : 'Needs Momentum'
 
+  const compactStageNames: Record<number, string> = {
+    5: 'Q Tour / Global Amateur',
+    7: 'Rookie Professional',
+    8: 'Tour Survivor / Top 64',
+    11: 'Major / Triple Crown Contender',
+    14: 'Senior Tour / Legends',
+  }
+  const selectedStage = stages.find(stage => stage.id === selectedStageId)
+  const stageStatus = (stage: typeof currentStage) => stage.current ? 'Current stage' : stage.complete ? 'Earlier stage' : 'Later stage'
+  const overviewCards = 'card flex min-h-80 flex-col overflow-hidden lg:min-h-0'
+
   return (
-    <div className="space-y-6 pb-10">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[10px] font-semibold uppercase text-gray-500">Career</p>
-          <h1 className="mt-1 text-2xl font-bold text-white">Career Pathway</h1>
-          <p className="mt-1 text-sm text-gray-400">Fourteen-stage pathway from junior clubs to senior legends, driven by live save state.</p>
-          {gameState.careerSystems.lateCareer.retirementPending && <p role="status" className="mt-2 text-sm text-amber-300">Retirement follows your booked competitions. Finish your existing entries; new entries are closed.</p>}
-          {gameState.careerSystems.lateCareer.retired && <p role="status" className="mt-2 text-sm text-gray-300">Retired from competition. Your career records remain available, and you can advance the calendar to follow the tour.</p>}
-        </div>
-        <div className="card card-body min-w-44 text-center">
-          <p className="text-[10px] uppercase text-gray-500">Career Progression</p>
-          <p className="mt-1 text-3xl font-bold text-green-400">{overallProgress}%</p>
-          <p className="text-xs text-gray-400">Stage {currentStageNumber} of {careerPathStageCatalog.length}</p>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {tierOptions.map((tier) => <button key={tier} type="button" onClick={() => setTierFilter(tier)} className={tierFilter === tier ? 'tab-active text-xs' : 'tab-inactive text-xs'}>{tier}</button>)}
-        <button type="button" className="btn-secondary ml-auto text-xs" onClick={() => navigate('/calendar')}><CalendarDays className="h-3.5 w-3.5" /> Calendar</button>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-12">
-        <div className="space-y-4 xl:col-span-8">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {visibleStages.map((stage) => (
-              <div key={stage.id} className={`card card-body relative ${stage.current ? 'border-green-500' : stage.complete ? 'border-green-600/30' : 'opacity-65'}`}>
-                <div className="mb-2 flex items-center gap-2">
-                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${stage.complete ? 'bg-green-600 text-white' : stage.current ? 'border border-green-500 bg-green-600/20 text-green-400' : 'bg-surface-light text-gray-500'}`}>
-                    {stage.complete ? <Check className="h-3 w-3" /> : stage.stage}
-                  </span>
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] ${tierClass(stage.tier)}`}>{stage.tier}</span>
-                </div>
-                <h3 className="min-h-8 text-xs font-semibold text-white">{stage.name}</h3>
-                <p className="mt-1 line-clamp-2 min-h-8 text-[10px] leading-4 text-gray-500">{stage.tourCircuit ?? stage.tournaments}</p>
-                <div className="mt-2"><ProgressBar value={stage.progress} compact /><span className="text-[10px] text-gray-400">{stage.progress}%</span></div>
-                {!stage.complete && !stage.current ? <Lock className="absolute right-3 top-3 h-3 w-3 text-gray-600" /> : null}
-                {stage.current ? <span className="absolute right-2 top-2 rounded bg-green-600 px-1.5 py-0.5 text-[9px] font-semibold text-white">CURRENT</span> : null}
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden" data-testid="career-progression-page">
+      <header className="card flex shrink-0 flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div className="min-w-0"><h1 className="text-2xl font-bold text-white">Career Pathway</h1><p className="mt-1 text-xs text-gray-300">{currentStage.name} · {playerRankingText}</p></div>
+        <div className="flex items-center gap-4"><div className="text-right"><p className="text-lg font-bold text-green-300">{overallProgress}%</p><p className="text-[10px] text-gray-300">Stage {currentStageNumber} of {careerPathStageCatalog.length}</p></div><button className="btn-secondary text-xs" onClick={() => navigate('/calendar')}><CalendarDays className="h-3.5 w-3.5" /> Calendar</button></div>
+      </header>
+      {gameState.careerSystems.lateCareer.retirementPending && <p role="status" className="shrink-0 rounded-lg border border-amber-500/30 p-2 text-xs text-amber-200">Retirement follows your booked competitions. Finish your existing entries; new entries are closed.</p>}
+      {gameState.careerSystems.lateCareer.retired && <p role="status" className="shrink-0 rounded-lg border border-border p-2 text-xs text-gray-300">Retired from competition. Your career records remain available, and you can advance the calendar to follow the tour.</p>}
+      <SectionTabs id="career-progression" label="Career progression sections" tabs={['Overview', 'Full Pathway', 'Events', 'Career Snapshot'] as const} active={tab} onChange={setTab} />
+      <div id="career-progression-panel" role="tabpanel" aria-labelledby={`career-progression-tab-${['Overview', 'Full Pathway', 'Events', 'Career Snapshot'].indexOf(tab)}`} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {tab === 'Overview' && <div className="pathway-overview">
+          <section className="pathway-now" aria-label="Current stage">
+            <header className="pathway-overview-heading"><span className="pathway-overview-icon"><Route aria-hidden="true" /></span><div><p>Your position</p><h2>Where you are now</h2></div><span className="pathway-tier">{currentStage.tier}</span></header>
+            <div className="pathway-overview-body">
+              <div className="pathway-current-title"><span>{String(currentStageNumber).padStart(2, '0')}</span><div><p>Current career stage</p><h3>{currentStage.name}</h3></div></div>
+              <p className="pathway-stage-description">{currentStage.description}</p>
+              <div className="pathway-context"><div><span>Your circuit</span><strong>{currentStage.tourCircuit ?? currentStage.tournaments}</strong></div><div><span>Career focus</span><strong>{currentStage.progressionType}</strong></div><div><span>Commercial support</span><strong>{gameState.sponsors.length > 0 ? `${gameState.sponsors.length} active sponsors` : `${currentStage.sponsor} sponsor access`}</strong></div></div>
+              <div className="pathway-current-note"><Target aria-hidden="true" /><p>Choose events that serve this stage. Check eligibility, costs and recovery time before booking.</p></div>
+            </div>
+            <footer className="pathway-overview-actions"><button onClick={() => setSelectedStageId(currentStage.id)}>Stage details <ChevronRight aria-hidden="true" /></button><button className="pathway-action-primary" onClick={() => setTab('Events')}>View stage events <CalendarDays aria-hidden="true" /></button></footer>
+          </section>
+          <section className="pathway-next" aria-label="Next step">
+            <header className="pathway-overview-heading"><span className="pathway-overview-icon"><Trophy aria-hidden="true" /></span><div><p>Your next target</p><h2>{nextStage.name}</h2></div></header>
+            <div className="pathway-overview-body">
+              <div className="pathway-target-progress"><div><strong>{statusLabel}</strong><span>{requirements.filter(requirement => requirement.complete).length} / {requirements.length} requirements met</span></div><ProgressBar value={currentStageProgress} compact /></div>
+              <div className="pathway-requirements"><h3>What you need</h3>{requirements.map((requirement, index) => <div key={requirement.label} className={`pathway-requirement ${requirement.complete ? 'pathway-requirement--met' : ''}`}><span className="pathway-requirement-marker">{requirement.complete ? <Check aria-hidden="true" /> : String(index + 1).padStart(2, '0')}</span><p>{requirement.label}</p><span className="pathway-requirement-status">{requirement.complete ? 'Met' : 'To achieve'}</span></div>)}</div>
+              <button className="pathway-unlocks" onClick={() => setSelectedStageId(nextStage.id)}><span><strong>What comes next</strong><span>{(nextStage.unlocks ?? []).length} unlocks · view full stage details</span></span><ChevronRight aria-hidden="true" /></button>
+            </div>
+            <footer className="pathway-overview-actions"><button className="pathway-action-primary" onClick={() => navigate('/calendar')}>Check entry & qualification <ChevronRight aria-hidden="true" /></button></footer>
+          </section>
+        </div>}
+        {tab === 'Full Pathway' && <>
+          <div className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 text-xs"><p className="text-gray-300">Select a stage to read its requirements and unlocks.</p><label className="flex items-center gap-2 text-white">Tier<select aria-label="Tier" className="rounded-lg border border-border bg-surface p-2" value={tierFilter} onChange={event => setTierFilter(event.target.value)}>{tierOptions.map(tier => <option key={tier}>{tier}</option>)}</select></label></div>
+          <div className="pathway-map" aria-label="Pathway stages" role="region">
             {[
-              ['Ranking', playerRankingText],
-              ['Status', statusLabel],
-              ['Cash', formatMoney(gameState.player.cash)],
-              ['Coach', currentCoach?.level ?? 'None'],
-              ['Technical Avg', metrics.technicalAverage],
-              ['Mental Avg', metrics.mentalAverage],
-              ['Career Wins', metrics.wins],
-              ['Sponsors', metrics.sponsors],
-            ].map(([label, value]) => <div key={label} className="card card-body"><p className="metric-label">{label}</p><p className="mt-2 text-lg font-semibold text-white">{value}</p></div>)}
-          </div>
-
-          <div className="card">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Current Stage Events</h3><span className="text-[10px] text-gray-400">{currentStage.tourCircuit ?? currentStage.tournaments}</span></div>
-            <div className="card-body grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {currentStageEvents.length > 0 ? currentStageEvents.map((event) => <div key={event.id} className="rounded bg-surface-light/50 p-3 text-xs"><p className="font-semibold text-white">{event.name}</p><p className="mt-1 text-gray-400">{event.month ?? ''} W{event.week ?? 1} - {event.status}</p><p className="mt-1 text-gray-500">{event.progressionImpact ?? 'Builds pathway momentum.'}</p></div>) : <div className="col-span-4 text-sm text-gray-400">No events are currently mapped to this stage.</div>}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4 xl:col-span-4">
-          <div className="card">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">{currentStage.name}</h3><span className="rounded bg-green-600 px-1.5 py-0.5 text-[10px] text-white">Current Stage</span></div>
-            <div className="card-body space-y-3">
-              <p className="text-xs leading-relaxed text-gray-400">{currentStage.description}</p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded bg-surface-light p-3"><p className="text-gray-500">Progression</p><p className="mt-1 text-white">{currentStage.progressionType}</p></div>
-                <div className="rounded bg-surface-light p-3"><p className="text-gray-500">Sponsor Access</p><p className="mt-1 text-white">{gameState.sponsors.length > 0 ? `${gameState.sponsors.length} active` : currentStage.sponsor}</p></div>
-              </div>
-              <button type="button" className="btn-primary w-full justify-center text-xs" onClick={() => navigate('/calendar')}><Route className="h-3.5 w-3.5" /> View Stage Calendar</button>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-header"><h3 className="text-sm font-semibold text-white">Next Step: {nextStage.name}</h3></div>
-            <div className="card-body space-y-3">
-              <div>
-                <p className="mb-2 text-[10px] font-semibold uppercase text-gray-500">Requirements</p>
-                <div className="space-y-1.5">
-                  {requirements.map((requirement) => <div key={requirement.label} className="flex items-center gap-2 text-xs"><span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border ${requirement.complete ? 'border-green-500 bg-green-600' : 'border-gray-600'}`}>{requirement.complete ? <Check className="h-2 w-2 text-white" /> : null}</span><span className={requirement.complete ? 'text-green-400' : 'text-gray-400'}>{requirement.label}</span></div>)}
+              { name: 'Build your game', detail: 'Youth & amateur', from: 1, to: 5, colour: 'blue' },
+              { name: 'Make your mark', detail: 'Qualification & professional tour', from: 6, to: 10, colour: 'green' },
+              { name: 'Leave a legacy', detail: 'Major titles & later career', from: 11, to: 14, colour: 'gold' },
+            ].map(phase => {
+              const phaseStages = visibleStages.filter(stage => stage.stage >= phase.from && stage.stage <= phase.to)
+              if (!phaseStages.length) return null
+              return <section key={phase.name} className={`pathway-phase pathway-phase--${phase.colour}`} aria-label={phase.detail}>
+                <header className="pathway-phase-heading"><div><p>{phase.detail}</p><h2>{phase.name}</h2></div><span>{String(phase.from).padStart(2, '0')}–{phase.to}</span></header>
+                <div className="pathway-phase-stages">
+                  {phaseStages.map(stage => <button key={stage.id} onClick={() => setSelectedStageId(stage.id)} aria-haspopup="dialog" aria-label={`${stage.stage}. ${stage.name} · ${stageStatus(stage)}`} aria-current={stage.current ? 'step' : undefined} title={stage.name} className={`pathway-stage ${stage.current ? 'pathway-stage--current' : ''}`}>
+                    <span className="pathway-stage-number">{String(stage.stage).padStart(2, '0')}</span>
+                    <span className="pathway-stage-copy"><span className="pathway-stage-status">{stage.current ? 'You are here' : stage.complete ? 'Earlier stage' : 'Ahead of you'}</span><span className="pathway-stage-title">{compactStageNames[stage.stage] ?? stage.name}</span><span className="pathway-stage-tier">{stage.tier}</span></span>
+                    <ChevronRight className="pathway-stage-arrow" aria-hidden="true" />
+                  </button>)}
                 </div>
+              </section>
+            })}
+          </div>
+        </>}
+        {tab === 'Events' && <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">{[{ title: 'Current Stage Events', stage: currentStage, events: currentStageEvents }, { title: 'Upcoming Unlock Events', stage: nextStage, events: nextStageEvents }].map(group => <section key={group.title} className={overviewCards}><header className="card-header shrink-0"><div><h2 className="text-sm font-bold text-white">{group.title}</h2><p className="mt-1 text-xs text-gray-300">{group.stage.name}</p></div></header><div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">{group.events.map(event => <button key={event.id} className="w-full rounded-lg border border-border bg-surface-light/50 p-3 text-left" onClick={() => navigate(`/calendar?tournament=${encodeURIComponent(event.id)}`)}><p className="text-sm font-semibold text-white">{event.name}</p><p className="mt-1 text-xs text-gray-300">{event.startDate} · {event.status}</p>{event.progressionImpact && <p className="mt-2 text-xs text-gray-300">{event.progressionImpact}</p>}<p className="mt-2 text-xs font-semibold text-green-300">View event & eligibility →</p></button>)}{group.events.length === 0 && <p className="p-3 text-sm text-gray-300">No events are currently mapped to this stage.</p>}</div></section>)}</div>}
+        {tab === 'Career Snapshot' && <div className="career-snapshot" data-testid="career-snapshot">
+          <section className="snapshot-panel snapshot-panel--gold">
+            <header className="snapshot-heading"><span className="snapshot-icon"><Trophy aria-hidden="true" /></span><div><p>Your career</p><h2>Results & standing</h2></div></header>
+            <div className="snapshot-body">
+              <div className="snapshot-feature"><p>Current ranking</p><strong>{playerRankingText}</strong><span>{currentStage.name}</span></div>
+              <div className="snapshot-results-grid" aria-label="Career results totals">
+                {[
+                  ['Match wins', metrics.wins], ['Matches played', metrics.matchesPlayed],
+                  ['Win rate', metrics.matchesPlayed ? formatPercent(metrics.wins / metrics.matchesPlayed * 100) : '—'],
+                  ['Tournament titles', trophies.length], ['Major titles', majorTitles], ['World titles', legacyRating.worldTitles],
+                ].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
               </div>
-              <div>
-                <p className="mb-2 text-[10px] font-semibold uppercase text-gray-500">Unlocks</p>
-                <div className="space-y-1.5">
-                  {(nextStage.unlocks ?? []).slice(0, 4).map((unlock) => <div key={unlock} className="flex items-center gap-2 text-xs text-gray-400"><Circle className="h-2.5 w-2.5 text-green-400" />{unlock}</div>)}
-                </div>
-              </div>
-              <button type="button" className="btn-secondary w-full justify-center text-xs" onClick={() => navigate('/calendar')}>View {nextStage.name} <ChevronRight className="h-3 w-3" /></button>
+              <p className="snapshot-titles-note">Major and World titles are included in tournament titles.</p>
+              <div className="snapshot-note"><span>Next-step readiness</span><strong>{statusLabel}</strong><p>{requirements.filter(item => item.complete).length} of {requirements.length} requirements met</p></div>
             </div>
-          </div>
-
-          <div className="card card-body">
-            <p className="mb-2 text-[10px] font-semibold uppercase text-gray-500">Upcoming Unlock Events</p>
-            <div className="space-y-2">
-              {nextStageEvents.length > 0 ? nextStageEvents.map((event) => <div key={event.id} className="rounded bg-surface-light p-2 text-xs"><p className="font-semibold text-white">{event.name}</p><p className="text-gray-400">{event.month ?? ''} W{event.week ?? 1} - {event.status}</p></div>) : <p className="text-xs text-gray-400">No future events are listed for this stage yet.</p>}
+            <button className="snapshot-link" onClick={() => setTab('Overview')}>Review next step <ChevronRight aria-hidden="true" /></button>
+          </section>
+          <section className="snapshot-panel snapshot-panel--blue">
+            <header className="snapshot-heading"><span className="snapshot-icon"><Target aria-hidden="true" /></span><div><p>Your game</p><h2>Skills & development</h2></div></header>
+            <div className="snapshot-body">
+              {[['Technical average', metrics.technicalAverage], ['Mental average', metrics.mentalAverage]].map(([label, value]) => <div className="snapshot-skill" key={label}><div><span>{label}</span><strong>{formatAttribute(Number(value))}<small> /100</small></strong></div><ProgressBar value={Number(value)} compact /></div>)}
+              <div className="snapshot-detail"><div className="flex items-center justify-between gap-3"><span>Confidence</span><b>{formatPercent(metrics.confidence)}</b></div><ProgressBar value={metrics.confidence} compact /></div>
+              <div className="snapshot-note"><span>Development focus</span><strong>Build a balanced game</strong><p>These are current ability averages. Open Attributes to review changes over time.</p></div>
             </div>
-          </div>
+            <button className="snapshot-link" onClick={() => navigate('/player/attributes')}>View player attributes <ChevronRight aria-hidden="true" /></button>
+          </section>
+          <section className="snapshot-panel snapshot-panel--green">
+            <header className="snapshot-heading"><span className="snapshot-icon"><Users aria-hidden="true" /></span><div><p>Your support</p><h2>Team & finances</h2></div></header>
+            <div className="snapshot-body">
+              <div className="snapshot-feature"><p>Available funds</p><strong>{formatMoney(metrics.cash)}</strong><span>Current cash balance</span></div>
+              <div className="snapshot-pair"><div><span>Coach level</span><strong>{currentCoach?.level ?? 'None'}</strong></div><div><span>Active sponsors</span><strong>{metrics.sponsors}</strong></div></div>
+              <div className="snapshot-note"><span>Lead coach</span><strong>{currentCoach?.name ?? 'Training independently'}</strong><p>{currentCoach ? 'Review coaching strengths, agreements and costs in Staff.' : 'Your training continues without a coach. Recruit when your budget allows.'}</p></div>
+            </div>
+            <div className="snapshot-footer"><button className="snapshot-link" onClick={() => navigate('/staff/coaches')}>Manage staff <ChevronRight aria-hidden="true" /></button><button className="snapshot-link" onClick={() => navigate('/finance')}>Finances <ChevronRight aria-hidden="true" /></button></div>
+          </section>
+        </div>}
 
-          <div className="card card-body">
-            <p className="mb-2 text-[10px] font-semibold uppercase text-gray-500">Pathway Tips</p>
-            <ul className="space-y-1.5 text-xs text-gray-400">
-              <li className="flex gap-2"><Trophy className="mt-0.5 h-3 w-3 text-green-400" /> Prioritise events that match the current pathway tier.</li>
-              <li className="flex gap-2"><Trophy className="mt-0.5 h-3 w-3 text-green-400" /> Treat Q Tour and Q School as separate progression systems.</li>
-              <li className="flex gap-2"><Trophy className="mt-0.5 h-3 w-3 text-green-400" /> Keep funding, coach quality, and fatigue aligned before jumping tiers.</li>
-            </ul>
-          </div>
-        </div>
       </div>
+      {selectedStage && <CareerEditor title={`${selectedStage.stage}. ${selectedStage.name}`} onClose={() => setSelectedStageId(null)}><div className="min-h-0 space-y-4 overflow-y-auto p-4 text-sm text-gray-300"><p className="font-semibold text-green-300">{selectedStage.tier} · {stageStatus(selectedStage)}</p><p>{selectedStage.description}</p><p><b className="text-white">Circuit: </b>{selectedStage.tourCircuit ?? selectedStage.tournaments}</p><h3 className="font-semibold text-white">Requirements</h3><ul className="space-y-2">{(selectedStage.requirements ?? selectedStage.moveUpWhen ?? []).map(requirement => <li key={requirement} className="flex justify-between gap-3"><span>{requirement}</span><span className="shrink-0 text-xs">{getRequirementStatus(requirement, metrics) ? 'Met' : 'To work on'}</span></li>)}</ul><h3 className="font-semibold text-white">Unlocks</h3><ul className="list-inside list-disc space-y-2">{(selectedStage.unlocks ?? []).map(unlock => <li key={unlock}>{unlock}</li>)}</ul><p className="text-xs">Event entry and qualification rules are confirmed in Calendar.</p><button className="btn-primary text-xs" onClick={() => navigate('/calendar')}>View calendar</button></div></CareerEditor>}
     </div>
   )
 }

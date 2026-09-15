@@ -23,7 +23,7 @@ import {
   type PreparationSupportId,
 } from "../game/tournamentPreparation";
 import { getNextEligibleTournament } from "../hooks/useGameState";
-import { formatMoney, formatPercent } from "../utils/formatters";
+import { formatMoney, formatPercent, formatAttribute } from "../utils/formatters";
 
 const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
 
@@ -286,7 +286,7 @@ export function TournamentPreparationPage() {
           <section className="rounded-lg border border-border bg-surface p-3">
             <div className="flex justify-between"><div><h2 className="text-[11px] font-semibold text-white">Temporary tournament form</h2><p className="text-[8px] text-gray-500">Permanent attributes are unchanged</p></div><span className="text-[8px] text-green-400">Opening peak</span></div>
             <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[8px]">
-              {temporaryAttributes.map((attribute) => <div key={attribute.label} className="flex justify-between gap-2"><span className="truncate text-gray-400">{attribute.label}</span><b className="shrink-0 text-green-400">{attribute.before} → {clamp(attribute.before + attribute.bonus)}</b></div>)}
+              {temporaryAttributes.map((attribute) => <div key={attribute.label} className="flex justify-between gap-2"><span className="truncate text-gray-400">{attribute.label}</span><b className="shrink-0 text-green-400">{formatAttribute(attribute.before)} → {formatAttribute(clamp(attribute.before + attribute.bonus))}</b></div>)}
             </div>
           </section>
 

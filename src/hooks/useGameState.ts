@@ -1,3 +1,4 @@
+import { coachTrainingBonus } from '../game/coachTraining';
 import { ensureManagementReportBaseline, settleMonthlyManagementReport } from '../game/monthlyManagementReport';
 import { humanSeasonStats, repairHumanWorldRecord } from '../game/humanWorldRecord';
 import {opponentAttributes} from '../game/opponentAbility';
@@ -71,7 +72,7 @@ import { sessionPlan, pendingMatchBreak, resolveSessionBreak } from '../game/rea
 import { venueConditions, conditionAdjustment, familiarisedFor } from '../game/realism/conditions';
 import { travelOptionsFor, journeyQuote } from '../game/realism/travel';
 import { hotelStayPlan } from '../game/realism/accommodation';
-import { trainingBaseCost, baseTrainingMultiplier } from '../game/realism/base';
+import { trainingBaseCost, effectiveBaseTrainingMultiplier } from '../game/realism/base';
 import { protectCommitmentSessions, tournamentCommitmentConflict } from "../game/careerDepth/commitments";
 import { learnedCounter, getRivalry, coachNegotiationAdjustment } from "../game/careerDepth/relationships";
 import { recordProjectOutcome } from "../game/careerDepth/developmentProjects";
@@ -154,6 +155,7 @@ import {
   getCoachAvailability,
   getCoachContractOptions,
   getCoachContractWeeks,
+  getCoachTerminationCost,
   getCoachSlotLimit as getCoachSlotLimitForRanking,
 } from "../utils/coachMarket";
 import {
@@ -17223,14 +17225,28 @@ export function fireCoachState(previousState: GameState, coachId: string) {
   const coach = previousState.coaches.find((item) => item.id === coachId);
   if (!contract || !coach) return previousState;
 
+  const payout = getCoachTerminationCost(contract);
+  if (previousState.player.cash < payout) return recalculateState(previousState,
+    `Cannot terminate ${coach.name}: the remaining contract payout is £${payout.toLocaleString('en-GB')}. Keep the current contract until you can afford the payout or it expires.`);
+
   return finalizeState(
     {
       ...previousState,
       coachContracts: previousState.coachContracts.filter(
         (item) => item.coachId !== coachId,
       ),
+      finance: {
+        ...previousState.finance,
+        ledger: payout > 0 ? [{
+          id: `coach-termination-${coachId}-${Date.now()}`,
+          date: previousState.currentDate,
+          description: `${coach.name}: remaining contract payout (${contract.weeksRemaining} weeks)`,
+          category: "Staff", amount: payout, type: "Expense" as const,
+        }, ...previousState.finance.ledger].slice(0, 200) : previousState.finance.ledger,
+      },
       player: {
         ...previousState.player,
+        cash: previousState.player.cash - payout,
         morale: clamp(previousState.player.morale - 2, 0, 100),
       },
       inbox: [
@@ -17238,7 +17254,7 @@ export function fireCoachState(previousState: GameState, coachId: string) {
           {
             sender: "Staff Office",
             subject: `${coach.name} released`,
-            preview: `${coach.name} has been removed from the ${contract.slot} slot. Weekly staff exposure has dropped by £${contract.weeklyCost}.`,
+            preview: `${coach.name} has been removed from the ${contract.slot} slot. Remaining contract payout: £${payout.toLocaleString("en-GB")}. Weekly staff costs fall by £${contract.weeklyCost}.`,
             priority: "Medium",
           },
           "Today",
@@ -17246,7 +17262,7 @@ export function fireCoachState(previousState: GameState, coachId: string) {
         ...previousState.inbox,
       ].slice(0, 18),
     },
-    `Released ${coach.name} from the ${contract.slot} slot.`,
+    `Released ${coach.name} from the ${contract.slot} slot. Paid £${payout.toLocaleString("en-GB")} to settle the remaining contract.`,
     "Coach Change",
   );
 }
@@ -17498,18 +17514,14 @@ export function previewTrainingDevelopment(state: GameState, week: TrainingPlann
   ))));
   if (state.trainingAppliedWeek === state.week || state.health.activeIssue || state.trainingCondition.injuryWeeks > 0) return [];
   const adaptation = getTrainingAdaptationMultiplier(state.player.fatigue, state.trainingCondition.strain, state.trainingCondition.burnout);
-  const facility = Math.min(1.15, getFacilityTrainingMultiplier(state.equipment) * baseTrainingMultiplier(state));
-  const specialisms: Record<string, string[]> = {
-    Technical: ['Long Potting', 'Cue Ball Control', 'Consistency', 'Hand Steadiness'],
-    'Break Building': ['Break Building', 'Cue Ball Control'], 'Cue Action': ['Consistency', 'Cue Ball Control', 'Hand Steadiness'],
-    Tactical: ['Safety Play', 'Composure'], Mental: ['Focus', 'Composure', 'Resilience', 'Big Match Nerve', 'Professionalism'],
-    Fitness: ['Stamina', 'Balance', 'Recovery Rate', 'Shoulder Health'],
-  };
+  const trainingState = { ...state, trainingPlan: plan };
+  const equipmentFacility = getFacilityTrainingMultiplier(state.equipment);
   return Object.entries(trainingSkillWork(plan)).map(([label, work]) => {
     const coaching = state.coachContracts.reduce((bonus, contract) => {
       const coach = state.coaches.find(c => c.id === contract.coachId);
-      return bonus + (coach && specialisms[coach.type]?.includes(label) ? (coach.level === 'Elite' ? .15 : coach.level === 'High' ? .1 : .05) * (.75 + coach.compatibility / 400) : 0);
+      return bonus + (coach ? coachTrainingBonus(coach, label) : 0);
     }, 0);
+    const facility = effectiveBaseTrainingMultiplier(trainingState, label, equipmentFacility);
     const raw = Math.min(6, work) * adaptation * facility * (1 + Math.min(.3, coaching)) * developmentTrainingBonus(state, plan, label);
     return { label, value: getScaledTrainingGain(state, label, raw) };
   }).filter(gain => gain.value > 0).sort((a,b) => b.value - a.value || a.label.localeCompare(b.label));
@@ -18827,6 +18839,7 @@ export function useGameState() {
                 item.coachId === coachId
                   ? {
                       ...item,
+                      endsOn: plusDays(item.endsOn ?? previousState.careerDepth?.seasonLife?.staff[coachId]?.end ?? plusDays(previousState.currentDate, item.weeksRemaining * 7), extensionWeeks * 7),
                       contractLabel: extensionOption.label,
                       contractWeeks: item.contractWeeks + extensionWeeks,
                       weeklyCost: extensionOption.weeklyCost,

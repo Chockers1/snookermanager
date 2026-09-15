@@ -6,10 +6,7 @@ import './styles/globals.css'
 import App from './App.tsx'
 
 async function start() {
- const loading = document.createElement('p');
- loading.setAttribute('role', 'status');
- loading.textContent = 'Loading your saved career…';
- document.getElementById('root')!.replaceChildren(loading);
+ // Preserve the branded HTML loading screen while saved careers are prepared.
  await prepareCareerStorage();
  await prepareActiveCareerDecode();
  createRoot(document.getElementById('root')!).render(

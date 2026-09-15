@@ -1,8 +1,8 @@
+import { SectionTabs } from '../components/ui/SectionTabs';
 import { staffUnavailable } from '../game/seasonLife/staff';
-import { StaffMovementPanel } from '../components/career/SeasonLifePanels';
 import { useState } from "react";
-import { CoachRelationshipsPanel } from "../components/career/CareerDepthPanels";
-import { Check, Search, SlidersHorizontal, Users, X } from "lucide-react";
+import { StaffTeamPanel } from "../components/career/StaffTeamPanel";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
 import {
@@ -14,7 +14,7 @@ import {
   getCoachSlotLimit,
   type CoachPriceBand,
 } from "../utils/coachMarket";
-import { formatMoney } from "../utils/formatters";
+import { formatMoney, formatPercent } from "../utils/formatters";
 
 const COACH_SLOT_NAMES = ["Lead Coach", "Specialist Coach"] as const;
 const PRICE_BANDS: { key: CoachPriceBand; label: string }[] = [
@@ -48,10 +48,11 @@ export function CoachMarketPage() {
   const {
     gameState,
     hireCoach,
-    fireCoach,
     extendCoachContract,
     negotiateCoachContract,
   } = useGame();
+  const [tab, setTab] = useState<'Recruitment' | 'My team'>('Recruitment');
+  const [coachTab, setCoachTab] = useState<'Profile' | 'Impact' | 'Contract'>('Profile');
   const [search, setSearch] = useState("");
   const [sortMode, setSortMode] = useState<"fit" | "overall" | "cost">("fit");
   const [typeFilter, setTypeFilter] = useState("All");
@@ -62,8 +63,6 @@ export function CoachMarketPage() {
   const [selectedCoachId, setSelectedCoachId] = useState(
     gameState.coaches[0]?.id ?? "",
   );
-  const [compareIds, setCompareIds] = useState<string[]>([]);
-  const [showComparison, setShowComparison] = useState(false);
   const [selectedContractLabel, setSelectedContractLabel] =
     useState("8 Week Trial");
   const [selectedHiringSlot, setSelectedHiringSlot] =
@@ -138,9 +137,8 @@ export function CoachMarketPage() {
     );
 
   const selectedCoach =
-    gameState.coaches.find((coach) => coach.id === selectedCoachId) ??
-    visibleCoaches[0] ??
-    gameState.coaches[0];
+    visibleCoaches.find((coach) => coach.id === selectedCoachId) ??
+    visibleCoaches[0];
   const selectedContract =
     activeContracts.find(
       (contract) => contract.coachId === selectedCoach?.id,
@@ -168,11 +166,6 @@ export function CoachMarketPage() {
     !alreadySigned &&
     forecast.affordable,
   );
-  const allAvailableCount = gameState.coaches.filter(
-    (coach) =>
-      getCoachAvailability(coach, ranking, gameState.player.reputation)
-        .available,
-  ).length;
   const overall = selectedCoach
     ? Math.round(
         (selectedCoach.technical +
@@ -183,110 +176,30 @@ export function CoachMarketPage() {
       )
     : 0;
   const impact = selectedCoach ? getCoachProjectedImpact(selectedCoach) : null;
-  const comparisonCoaches = compareIds
-    .map((id) => gameState.coaches.find((coach) => coach.id === id))
-    .filter((coach): coach is NonNullable<typeof coach> => Boolean(coach));
-
-  function toggleCompare(coachId: string) {
-    setCompareIds((current) =>
-      current.includes(coachId)
-        ? current.filter((id) => id !== coachId)
-        : current.length < 3
-          ? [...current, coachId]
-          : current,
-    );
-  }
-
   return (
-    <div className="flex min-h-0 flex-col gap-3 xl:-m-6 xl:h-[calc(100vh-5.5rem)] xl:gap-2 xl:overflow-hidden xl:p-1.5">
-      <CoachRelationshipsPanel />
-      <StaffMovementPanel />
-      <section className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-surface/85 px-4 py-3">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden" data-testid="staff-page">
+      <section className="flex shrink-0 flex-wrap items-center gap-3 rounded-xl border border-border bg-surface/85 px-3 py-2">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-green-400">
             Staff
           </p>
-          <h1 className="mt-1 text-2xl font-bold text-white">Coach Market</h1>
-          <p className="mt-1 text-xs text-gray-400">
+          <h1 className="text-xl font-bold text-white">Staff</h1>
+          <p className="text-xs text-gray-300">
             Build a coaching team that fits your goals and budget.
           </p>
         </div>
-        <div className="ml-auto grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {[
-            ["Coaches", gameState.coaches.length],
-            ["Available", allAvailableCount],
-            ["Open slots", Math.max(0, slotLimit - activeContracts.length)],
-            ["Staff spend", `${formatMoney(totalCoachCost)}/wk`],
-          ].map(([label, value]) => (
-            <div
-              key={label}
-              className="min-w-[88px] rounded-lg bg-surface-light px-3 py-2 text-center"
-            >
-              <span className="block text-[9px] uppercase text-gray-500">
-                {label}
-              </span>
-              <b className="text-sm text-white">{value}</b>
-            </div>
-          ))}
-        </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-2 md:grid-cols-3">
-        {COACH_SLOT_NAMES.map((slot, index) => {
-          const contract = activeContracts.find((entry) => entry.slot === slot);
-          const unlocked = index < slotLimit;
-          return (
-            <button
-              key={slot}
-              type="button"
-              disabled={!unlocked}
-              aria-pressed={selectedHiringSlot === slot}
-              onClick={() => {
-                setSelectedHiringSlot(slot);
-                if (contract) setSelectedCoachId(contract.coachId);
-              }}
-              className={`card min-h-[72px] p-3 text-left transition-colors ${selectedHiringSlot === slot ? "border-green-400 ring-1 ring-green-400/40" : contract ? "border-green-600/30 bg-green-600/10" : unlocked ? "border-dashed hover:border-green-500/60 hover:bg-green-500/5" : "border-red-600/20 opacity-60"}`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="metric-label">{slot}</p>
-                {selectedHiringSlot === slot && unlocked ? (
-                  <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[9px] font-semibold text-green-300">
-                    Selected
-                  </span>
-                ) : null}
-              </div>
-              <p className="mt-1 truncate text-sm font-semibold text-white">
-                {contract?.coach?.name ?? (unlocked ? "Open slot" : "Locked")}
-              </p>
-              <p className="mt-1 truncate text-[10px] text-gray-400">
-                {contract
-                  ? `${contract.weeksRemaining} weeks · ${formatMoney(contract.weeklyCost)}/wk`
-                  : unlocked
-                    ? "Click to hire into this slot"
-                    : "Raise ranking or reputation"}
-              </p>
-            </button>
-          );
-        })}
-        <div className="card min-h-[72px] p-3">
-          <div className="flex justify-between">
-            <p className="metric-label">Budget headroom</p>
-            <span
-              className={`text-[10px] ${gameState.finance.cashFlow >= 0 ? "text-green-400" : "text-red-400"}`}
-            >
-              {gameState.finance.cashFlow >= 0 ? "Healthy" : "Under pressure"}
-            </span>
-          </div>
-          <p className="mt-1 text-lg font-bold text-white">
-            {formatMoney(Math.max(0, gameState.finance.cashFlow))}/wk
-          </p>
-          <p className="text-[10px] text-gray-400">
-            Current cash flow after staff commitments
-          </p>
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-border bg-surface/85 p-3">
+      <SectionTabs id="staff" label="Staff sections" tabs={['Recruitment', 'My team'] as const} active={tab} onChange={setTab} />
+      <div id="staff-panel" role="tabpanel" aria-labelledby={`staff-tab-${['Recruitment', 'My team'].indexOf(tab)}`} className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+      {tab === 'My team' && <StaffTeamPanel slots={COACH_SLOT_NAMES} slotLimit={slotLimit} onManage={(slot, coachId) => {
+        setSelectedHiringSlot(slot);
+        if (coachId) setSelectedCoachId(coachId);
+        setSearch(''); setTypeFilter('All'); setPriceBand('All'); setAvailabilityFilter('all');
+        setTab('Recruitment'); setCoachTab(coachId ? 'Contract' : 'Profile');
+      }} />}
+      {tab === 'Recruitment' && <>
+      <section className="shrink-0 rounded-xl border border-border bg-surface/85 p-2">
         <div className="flex flex-col gap-2 lg:flex-row">
           <label className="relative min-w-0 flex-1">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
@@ -333,14 +246,7 @@ export function CoachMarketPage() {
             <option value="overall">Overall rating</option>
             <option value="cost">Lowest cost</option>
           </select>
-          <button
-            type="button"
-            disabled={compareIds.length < 2}
-            onClick={() => setShowComparison(true)}
-            className="btn-secondary h-9 justify-center px-3 text-xs"
-          >
-            <Users className="h-3.5 w-3.5" /> Compare {compareIds.length}/3
-          </button>
+
         </div>
         <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin">
           {PRICE_BANDS.map((band) => (
@@ -356,8 +262,8 @@ export function CoachMarketPage() {
         </div>
       </section>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-12 xl:gap-2">
-        <section className="card flex min-h-[420px] flex-col overflow-hidden xl:col-span-7 xl:min-h-0">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto lg:grid-cols-12 lg:overflow-hidden">
+        <section className="card flex min-h-[420px] flex-col overflow-hidden lg:col-span-6 lg:min-h-0">
           <div className="card-header">
             <div>
               <h2 className="text-sm font-semibold text-white">
@@ -377,7 +283,6 @@ export function CoachMarketPage() {
                 gameState.player.reputation,
               );
               const cardImpact = getCoachProjectedImpact(coach);
-              const compared = compareIds.includes(coach.id);
               const strongest = Math.max(
                 coach.technical,
                 coach.tactical,
@@ -385,32 +290,17 @@ export function CoachMarketPage() {
                 coach.motivation,
               );
               return (
-                <article
+                <button
+                  type="button"
+                  aria-label={`View ${coach.name}`}
+                  aria-pressed={selectedCoach?.id === coach.id}
+                  onClick={() => { setSelectedCoachId(coach.id); setCoachTab('Profile'); }}
                   key={coach.id}
-                  className={`rounded-lg border p-3 text-left transition-colors ${selectedCoach?.id === coach.id ? "border-green-500 bg-green-500/10" : "border-border bg-surface-light/55 hover:border-green-500/35"}`}
+                  className={`min-w-0 rounded-lg border p-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-green-400 ${selectedCoach?.id === coach.id ? "border-green-500 bg-green-500/10" : "border-border bg-surface-light/55 hover:border-green-500/35"}`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCoachId(coach.id)}
-                      className="min-w-0 flex-1 text-left"
-                    >
-                      <p className="truncate text-sm font-semibold text-white">
-                        {coach.name}
-                      </p>
-                      <p className="truncate text-[10px] text-green-300">
-                        {coach.type} · {coach.specialism}
-                      </p>
-                    </button>
-                    <label className="flex shrink-0 items-center gap-1 text-[9px] text-gray-400">
-                      <input
-                        type="checkbox"
-                        checked={compared}
-                        onChange={() => toggleCompare(coach.id)}
-                      />{" "}
-                      Compare
-                    </label>
-                  </div>
+                  <span className="block truncate text-sm font-semibold text-white">{coach.name}</span>
+                  <span className="block text-[10px] font-semibold text-green-300">{coach.type} specialist</span>
+                  <span className="mt-1 block text-[10px] leading-relaxed text-gray-200">Trains: {cardImpact.skills.join(' · ')}</span>
                   <div className="mt-3 grid grid-cols-4 gap-1 text-center">
                     <div>
                       <b className="block text-sm text-white">
@@ -424,9 +314,9 @@ export function CoachMarketPage() {
                     </div>
                     <div>
                       <b className="block text-sm text-white">
-                        +{cardImpact.primaryGain}
+                        +{formatPercent(cardImpact.trainingBonus * 100)}
                       </b>
-                      <span className="text-[8px] text-gray-500">IMPACT</span>
+                      <span className="text-[8px] text-gray-500">TRAINING</span>
                     </div>
                     <div>
                       <b className="block text-sm text-green-300">
@@ -449,7 +339,7 @@ export function CoachMarketPage() {
                       {available.available ? "Available now" : "Locked"}
                     </span>
                   </div>
-                </article>
+                </button>
               );
             })}
             {visibleCoaches.length === 0 ? (
@@ -461,8 +351,10 @@ export function CoachMarketPage() {
         </section>
 
         {selectedCoach ? (
-          <aside className="scrollbar-thin flex min-h-0 flex-col gap-2 overflow-y-auto xl:col-span-5">
-            <section className="card flex min-h-[330px] shrink-0 flex-col overflow-hidden border-green-500/30">
+          <aside className="flex min-h-0 flex-col gap-2 lg:col-span-6">
+            <SectionTabs id="coach-detail" label="Selected coach" tabs={['Profile', 'Impact', 'Contract'] as const} active={coachTab} onChange={setCoachTab} />
+            <div id="coach-detail-panel" role="tabpanel" aria-labelledby={`coach-detail-tab-${['Profile', 'Impact', 'Contract'].indexOf(coachTab)}`} className="flex min-h-0 flex-1 flex-col">
+            {coachTab === 'Profile' && <section className="card flex min-h-0 flex-1 flex-col overflow-hidden border-green-500/30">
               <div className="card-header">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-green-500/15 font-bold text-green-300">
@@ -484,66 +376,59 @@ export function CoachMarketPage() {
                   {availability.available ? "Available" : "Locked"}
                 </span>
               </div>
-              <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-3">
-                <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto p-3">
+                <div className="grid shrink-0 grid-cols-2 gap-2 text-center">
                   {[
                     ["Player fit", `${selectedCoach.compatibility}%`],
-                    ["Overall", overall],
                     ["Base/wk", formatMoney(selectedCoach.weeklyCost)],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-lg bg-surface-light p-2">
                       <b className="block text-sm text-white">{value}</b>
-                      <span className="text-[9px] uppercase tracking-wide text-gray-500">
+                      <span className="text-[9px] uppercase tracking-wide text-white">
                         {label}
                       </span>
                     </div>
                   ))}
                 </div>
 
-                <p className="mb-2 mt-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                <p className="mb-2 mt-3 shrink-0 text-xs font-semibold text-white">
                   Coach ratings
                 </p>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                <div className="grid flex-1 auto-rows-fr grid-cols-3 gap-3">
                   {[
+                    ["Overall", overall],
                     ["Technical", selectedCoach.technical],
                     ["Tactical", selectedCoach.tactical],
                     ["Mental", selectedCoach.mental],
                     ["Motivation", selectedCoach.motivation],
                     ["Discipline", selectedCoach.discipline],
                   ].map(([label, value]) => (
-                    <div key={label as string} className="rounded-lg border border-border bg-background/35 p-2">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="truncate text-[9px] text-gray-400">{label}</span>
-                        <b className="text-xs text-white">{value}</b>
+                    <div key={label as string} className="flex min-h-28 min-w-0 flex-col justify-center rounded-lg border border-border bg-surface-light/50 p-3">
+                      <div className="flex flex-col items-start gap-2">
+                        <span className="text-xs text-white">{label}</span>
+                        <b className="text-2xl text-green-300">{value}</b>
                       </div>
-                      <div className="mt-1.5">
+                      <div className="mt-3">
                         <ProgressBar value={value as number} compact />
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <p className="mb-2 mt-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-                  Projected weekly impact
-                </p>
-                <div className="grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-3">
-                  <div className="flex justify-between gap-2 rounded-lg border border-green-500/20 bg-green-500/10 p-2.5">
-                    <span className="truncate">{impact?.primaryLabel}</span>
-                    <b className="shrink-0 text-green-300">+{impact?.primaryGain}</b>
-                  </div>
-                  <div className="flex justify-between gap-2 rounded-lg border border-green-500/20 bg-green-500/10 p-2.5">
-                    <span className="truncate">Tactical bonus</span>
-                    <b className="shrink-0 text-green-300">+{impact?.tacticalBonus}%</b>
-                  </div>
-                  <div className="flex justify-between gap-2 rounded-lg border border-green-500/20 bg-green-500/10 p-2.5">
-                    <span className="truncate">Fatigue support</span>
-                    <b className="shrink-0 text-green-300">-{impact?.fatigueReduction ?? 0}%</b>
-                  </div>
-                </div>
-
+              </div>
+            </section>}
+            {coachTab === 'Impact' && <section className="card flex min-h-0 flex-1 flex-col overflow-hidden">
+              <h2 className="card-header text-sm font-bold text-white">{selectedCoach.name} · Development impact</h2>
+              <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                <h3 className="mb-2 text-sm font-semibold text-white">{selectedCoach.type} specialist</h3>
+                <p className="mb-3 text-xs text-gray-300">{selectedCoach.specialism}</p>
+                <div className="grid gap-2 sm:grid-cols-2">{impact?.skills.map(skill => <div key={skill} className="rounded-lg border border-green-500/20 bg-green-500/10 p-2 text-xs"><span className="block text-white">{skill}</span><b className="text-green-300">+{formatPercent(impact.trainingBonus * 100)} training gains</b></div>)}</div>
+                <p className="mt-3 text-xs leading-relaxed text-gray-200">The boost applies to gains from relevant training sessions, in either staff slot. A 0.20-point session gain becomes {(0.2 * (1 + (impact?.trainingBonus ?? 0))).toFixed(2)} before other limits; this is not a guaranteed weekly attribute increase.</p>
+                <p className="mt-2 text-xs leading-relaxed text-gray-300">Both contracted coaches contribute. Bonuses on the same skill add together, capped at 30%. Level and player fit set this coach’s rate. Skills outside this list receive no direct development bonus. Training workload, fatigue and development limits still apply.</p>
+                <p className="mt-2 text-xs text-gray-300">Training → Development shows the forecast for your actual weekly plan and current staff.</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <div className="rounded-lg bg-surface-light/50 p-2.5">
-                    <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-500">Strengths</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-white">Strengths</p>
                     <p className="mt-1 text-[10px] leading-relaxed text-gray-300">{selectedCoach.strengths.join(" · ")}</p>
                   </div>
                   <div className="rounded-lg bg-red-500/5 p-2.5">
@@ -553,13 +438,15 @@ export function CoachMarketPage() {
                 </div>
               </div>
             </section>
-            <section className="card min-h-[210px] shrink-0 overflow-hidden p-3">
-              <div className="flex justify-between">
+            }
+            {coachTab === 'Contract' && <section className="card flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+              <p className="shrink-0 text-sm font-semibold text-white">{selectedCoach.name}</p>
+              <div className="flex shrink-0 items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-xs font-bold text-white">
+                  <h2 className="text-sm font-bold text-white">
                     Contract Options
                   </h2>
-                  <p className="text-[9px] text-gray-500">
+                  <p className="text-xs text-gray-300">
                     {selectedContract?.slot ?? hiringSlot ?? "No open slot"}
                   </p>
                 </div>
@@ -569,34 +456,37 @@ export function CoachMarketPage() {
                   {forecast.status}
                 </span>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="grid flex-1 grid-cols-2 auto-rows-fr gap-3">
                 {selectedOptions.map((option) => (
                   <button
                     key={option.label}
                     type="button"
+                    aria-pressed={selectedOption?.label === option.label}
                     onClick={() => setSelectedContractLabel(option.label)}
-                    className={`rounded-lg border p-2 text-left text-[10px] ${selectedOption?.label === option.label ? "border-green-500 bg-green-500/10" : "border-border bg-surface-light/50"}`}
+                    className={`flex min-h-28 min-w-0 flex-col justify-center rounded-lg border p-3 text-left text-xs ${selectedOption?.label === option.label ? "border-green-500 bg-green-500/10" : "border-border bg-surface-light/50"}`}
                   >
-                    <b className="block text-white">{option.label}</b>
-                    <span className="text-gray-400">
+                    <b className="block text-sm text-white">{option.label}</b>
+                    <span className="mt-2 text-gray-300">
                       {formatMoney(option.weeklyCost)}/wk
                     </span>
-                    <strong className="mt-1 block text-green-300">
+                    <strong className="mt-1 block text-lg text-green-300">
                       {formatMoney(option.totalCost)}
                     </strong>
+                    <span className="text-[10px] text-gray-300">Total contract cost</span>
                   </button>
                 ))}
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
+              <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-border pt-3">
                 <div>
-                  <p className="text-[9px] text-gray-500">After signing</p>
+                  <p className="text-xs text-gray-300">After signing</p>
+                  <p className="text-[10px] text-gray-300">Paid weekly. Early termination pays out all remaining weeks.</p>
                   <b className="text-xs text-white">
                     Staff {formatMoney(forecast.projectedStaffSpend)}/wk · Cash
                     flow {forecast.projectedWeeklyCashFlow >= 0 ? "+" : "-"}
                     {formatMoney(Math.abs(forecast.projectedWeeklyCashFlow))}/wk
                   </b>
                 </div>
-                <div className="ml-auto flex gap-2">
+                <div className="ml-auto flex flex-wrap gap-2">
                   {alreadySigned ? (
                     <>
                       <select
@@ -640,9 +530,9 @@ export function CoachMarketPage() {
                       <button
                         type="button"
                         className="btn-secondary px-3 py-2 text-xs"
-                        onClick={() => fireCoach(selectedCoach.id)}
+                        onClick={() => setTab('My team')}
                       >
-                        Release
+                        Manage contract
                       </button>
                     </>
                   ) : (
@@ -671,85 +561,16 @@ export function CoachMarketPage() {
                 </div>
               </div>
             </section>
+            }
+            </div>
           </aside>
         ) : null}
       </div>
 
-      {showComparison ? (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Coach comparison"
-        >
-          <div className="w-full max-w-5xl rounded-xl border border-border bg-surface p-4 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-white">
-                  Compare Coaches
-                </h2>
-                <p className="text-xs text-gray-400">
-                  Side-by-side cost, fit and projected development.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn-secondary p-2"
-                onClick={() => setShowComparison(false)}
-                aria-label="Close comparison"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {comparisonCoaches.map((coach) => {
-                const coachImpact = getCoachProjectedImpact(coach);
-                return (
-                  <button
-                    key={coach.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedCoachId(coach.id);
-                      setShowComparison(false);
-                    }}
-                    className="rounded-lg border border-border bg-surface-light p-4 text-left hover:border-green-500/40"
-                  >
-                    <div className="flex justify-between">
-                      <b className="text-white">{coach.name}</b>
-                      <Check className="h-4 w-4 text-green-400" />
-                    </div>
-                    <p className="mt-1 text-[10px] text-green-300">
-                      {coach.type} · {coach.specialism}
-                    </p>
-                    <div className="mt-4 space-y-2 text-xs text-gray-300">
-                      <p className="flex justify-between">
-                        <span>Fit</span>
-                        <b>{coach.compatibility}%</b>
-                      </p>
-                      <p className="flex justify-between">
-                        <span>Weekly cost</span>
-                        <b>{formatMoney(coach.weeklyCost)}</b>
-                      </p>
-                      <p className="flex justify-between">
-                        <span>{coachImpact.primaryLabel}</span>
-                        <b className="text-green-300">
-                          +{coachImpact.primaryGain}/wk
-                        </b>
-                      </p>
-                      <p className="flex justify-between">
-                        <span>Tactical bonus</span>
-                        <b className="text-green-300">
-                          +{coachImpact.tacticalBonus}%
-                        </b>
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </>}
+      </div>
+
+
     </div>
   );
 }

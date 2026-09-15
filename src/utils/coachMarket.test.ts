@@ -31,8 +31,8 @@ describe("expanded coach market", () => {
 
   it("calculates gameplay impact and blocks unaffordable appointments", () => {
     const impact = getCoachProjectedImpact(coachCatalog[0]);
-    expect(impact.primaryGain).toBeGreaterThan(0);
-    expect(impact.tacticalBonus).toBeGreaterThan(0);
+    expect(impact.trainingBonus).toBeGreaterThan(0);
+    expect(impact.skills).toContain("Long Potting");
 
     const option = getCoachContractOptions(coachCatalog.at(-1)!)[3];
     expect(getCoachAffordabilityForecast(100, 50, 0, option).affordable).toBe(

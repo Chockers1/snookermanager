@@ -4,7 +4,7 @@ import { Award, Trophy } from 'lucide-react';
 import { legacyRate, type CareerLegacy } from '../../game/careerLegacy';
 import { formatMoney } from '../../utils/formatters';
 
-export function LegacyRecords({ stats }: { stats: CareerLegacy }) {
+export function LegacyRecords({ stats, view = 'all' }: { stats: CareerLegacy; view?: 'all' | 'records' | 'trophies' }) {
   const [category, setCategory] = useState('All titles');
   const [visible, setVisible] = useState(12);
   const categories = [...new Set(stats.trophies.map(t => t.category))].sort();
@@ -34,19 +34,19 @@ export function LegacyRecords({ stats }: { stats: CareerLegacy }) {
     ] },
   ];
   return <>
-    <section className="card" aria-labelledby="career-records-heading">
+    {view !== 'trophies' && <section className="card legacy-records" aria-labelledby="career-records-heading">
       <div className="card-header"><div><h2 id="career-records-heading" className="text-base font-semibold text-white">Career Records</h2><p className="mt-1 text-xs text-gray-400">Your numbers across every circuit and season.</p></div><Award className="h-5 w-5 shrink-0 text-green-400" /></div>
-      <div className="card-body grid gap-5 sm:grid-cols-2 2xl:grid-cols-4">
-        {groups.map(group => <div key={group.title}><h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-green-400">{group.title}</h3><dl className="space-y-3">{group.rows.map(([label, value]) => <div key={label} className="flex items-baseline justify-between gap-3 text-xs"><dt className="text-gray-400">{label}</dt><dd className="shrink-0 font-semibold tabular-nums text-white">{value}</dd></div>)}</dl></div>)}
+      <div className="legacy-records-grid">
+        {groups.map(group => <div className="legacy-record-group" key={group.title}><h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-green-400">{group.title}</h3><dl>{group.rows.map(([label, value]) => <div key={label} className="flex items-baseline justify-between gap-3 text-xs"><dt className="text-gray-400">{label}</dt><dd className="shrink-0 font-semibold tabular-nums text-white">{value}</dd></div>)}</dl></div>)}
       </div>
       <div className="border-t border-border px-4 py-3 text-xs leading-relaxed text-gray-400">
         <p>Potting and safety rates are frame-weighted averages of simulated match estimates ({stats.performanceMatches} matches). Whitewashes exclude single-frame events.</p>
         {stats.recoveredHistory && <p className="mt-1">Older saves use surviving records: detailed breaks and fouls cover {stats.detailedMatches} of {stats.matchesPlayed} matches; frames and streaks cover {stats.frameMatches}. Exact maximum counts cover {stats.maximumMatches} matches. Missing records are not treated as zero.</p>}
         {!stats.recoveredHistory && <p className="mt-1">Career totals and trophies are saved permanently as you complete matches.</p>}
       </div>
-    </section>
+    </section>}
 
-    <section id="trophy-cabinet" className="card scroll-mt-4 overflow-hidden" aria-labelledby="trophy-cabinet-heading">
+    {view !== 'records' && <section id="trophy-cabinet" className="card legacy-trophy-cabinet scroll-mt-4 overflow-hidden" aria-labelledby="trophy-cabinet-heading">
       <div className="card-header flex-wrap gap-3"><div><h2 id="trophy-cabinet-heading" className="flex items-center gap-2 text-base font-semibold text-white"><Trophy className="h-5 w-5 text-amber-400" /> Trophy Cabinet <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-xs text-amber-300">{stats.trophies.length}</span></h2><p className="mt-1 text-xs text-gray-400">Every recorded title, from your first local win to the biggest stage.</p></div>
         {categories.length > 0 && <select aria-label="Trophy category" value={category} onChange={e => { setCategory(e.target.value); setVisible(12); }} className="max-w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-gray-200"><option>All titles</option>{categories.map(c => <option key={c}>{c}</option>)}</select>}
       </div>
@@ -58,6 +58,6 @@ export function LegacyRecords({ stats }: { stats: CareerLegacy }) {
         <div className="mt-auto pt-4"><p className="border-t border-amber-400/15 pt-3 text-xs text-gray-300">{t.opponent ? <>Final: {t.score} vs <PlayerLink name={t.opponent}/></> : 'Champion · final details unavailable'}</p><div className="mt-2 flex flex-wrap justify-between gap-2 text-[10px] text-gray-400"><time dateTime={t.date}>{t.date}</time><span className="text-amber-300">{formatMoney(t.prizeMoney)} event earnings</span></div></div>
       </article>)}</div>{trophies.length > visible && <button className="btn-secondary mt-4 text-xs" type="button" onClick={() => setVisible(v => v + 12)}>Show more trophies ({trophies.length - visible} remaining)</button>}
       {stats.recoveredHistory && <p className="mt-4 text-xs text-gray-400">The cabinet restores titles with surviving event records. Earlier titles without an archived event cannot be reconstructed.</p>}</div>}
-    </section>
+    </section>}
   </>;
 }

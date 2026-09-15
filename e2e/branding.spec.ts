@@ -1,0 +1,33 @@
+import { expect, test } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+const output='artifacts/branding';mkdirSync(output,{recursive:true});
+const viewports=[{width:1280,height:720},{width:1366,height:768},{width:1920,height:1080},{width:2560,height:1440},{width:3840,height:2160},{width:390,height:844}];
+for(const viewport of viewports)test(`supplied menu artwork and controls at ${viewport.width}`,async({page})=>{
+ test.setTimeout(90000);await page.setViewportSize(viewport);
+ const errors:string[]=[];const missing:string[]=[];const requests:string[]=[];
+ page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400)missing.push(r.url()+':'+r.status())});page.on('request',r=>requests.push(r.url()));
+ await page.goto('/');await expect(page.getByRole('heading',{name:'Your career starts here.'})).toBeVisible();
+ await expect(page).toHaveTitle('Snooker Career Manager');
+ const logo=page.getByRole('img',{name:'Snooker Career Manager',exact:true});await expect(logo).toBeVisible();
+ expect(await logo.evaluate((el:HTMLImageElement)=>el.complete&&el.naturalWidth>0)).toBe(true);
+ const ratio=await logo.evaluate(el=>el.getBoundingClientRect().width/el.getBoundingClientRect().height);expect(ratio).toBeCloseTo(821/313,1);
+ await expect(page.locator('.brand-main-menu-background')).toHaveCSS('background-size',/cover/);
+ await expect(page.getByRole('button',{name:/Continue Career/})).toBeDisabled();await expect(page.getByRole('button',{name:/New Career/})).toBeEnabled();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await page.screenshot({path:`${output}/main-menu-${viewport.width}x${viewport.height}.png`,fullPage:true});
+ await page.getByRole('button',{name:/Load Career/}).click();await expect(page.getByRole('heading',{name:'Named careers'})).toBeVisible();
+ await page.getByRole('button',{name:'Close',exact:true}).click();await page.getByText('Restore automatic backup',{exact:true}).click();await expect(page.getByRole('region',{name:'Save recovery'})).toBeVisible();
+ await page.getByRole('button',{name:/New Career/}).click();await expect(page).toHaveURL('/new-career');
+ expect(errors).toEqual([]);expect(missing).toEqual([]);expect(requests.filter(url=>/\/assetts\/(steam|marketing|master|brand|achievements|screenshots|trailer)\//.test(url))).toEqual([]);
+});
+test('branded initial loading, favicon and browser metadata',async({page,request})=>{
+ await page.setViewportSize({width:1920,height:1080});let release:()=>void=()=>{};
+ await page.route('**/src/main.tsx',route=>new Promise<void>(resolve=>{release=()=>{void route.continue();resolve()}}));
+ await page.goto('/',{waitUntil:'commit'});await expect(page.getByRole('status')).toHaveText('Loading your saved career…');
+ await expect(page.getByRole('img',{name:'Snooker Career Manager'})).toBeVisible();
+ await expect.poll(()=>page.getByRole('img',{name:'Snooker Career Manager'}).evaluate((el:HTMLImageElement)=>el.complete&&el.naturalWidth>0)).toBe(true);
+ await page.screenshot({path:output+'/loading-1920x1080.png'});release();await expect(page.getByRole('heading',{name:'Your career starts here.'})).toBeVisible();
+ const manifest=await (await request.get('/manifest.webmanifest')).json();expect(manifest.name).toBe('Snooker Career Manager');expect(manifest.display).toBe('browser');
+ for(const url of ['/assetts/icons/favicon.svg','/assetts/icons/favicon.ico','/assetts/icons/apple-touch-icon-180x180.png',...manifest.icons.map((i:{src:string})=>i.src)])expect((await request.get(url)).ok(),url).toBe(true);
+ await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href','/assetts/icons/favicon.svg');
+});

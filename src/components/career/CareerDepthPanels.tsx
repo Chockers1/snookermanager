@@ -1,5 +1,5 @@
 import { PlayerNames } from '../game/PlayerNames';
-import { formatPercent } from '../../utils/formatters';
+import { formatPercent, formatAttribute, formatAttributeChange } from '../../utils/formatters';
 import { PlayerLink } from '../game/PlayerLink';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -29,10 +29,10 @@ export function CareerEditor({ title, children, onClose, required = false }: { t
     </div>
   </dialog>, document.body);
 }
-export function CareerDisclosure({ summary, title, children, onOpenChange }: { summary: ReactNode; title: string; children: ReactNode; onOpenChange?: (open:boolean)=>void }) {
+export function CareerDisclosure({ summary, title, children, onOpenChange, preview }: { preview?: { label: string; detail: ReactNode; action: string }; summary: ReactNode; title: string; children: ReactNode; onOpenChange?: (open:boolean)=>void }) {
   const location = useLocation();
   const [open, setOpen] = useState(title === 'Plan your season and commitments' && new URLSearchParams(location.search).has('commitments'));
-  return <section className={disclosure}><button type="button" aria-haspopup="dialog" className="w-full cursor-pointer px-3 py-2 text-left font-semibold text-white" onClick={() => { setOpen(true); onOpenChange?.(true); }}>▸ {summary}</button>{open && <CareerEditor title={title} onClose={() => { setOpen(false); onOpenChange?.(false); }}>{children}</CareerEditor>}</section>;
+  return <section className={disclosure}>{preview ? <div className="flex h-full items-center justify-between gap-3 px-3 py-2.5"><div className="min-w-0"><h2 className="text-xs font-semibold text-white">{preview.label}</h2><p className="mt-1 text-xs leading-relaxed text-gray-300">{preview.detail}</p></div><button type="button" aria-label={preview.label + ": " + preview.action} aria-haspopup="dialog" className="btn-secondary shrink-0 px-3 py-2 text-xs" onClick={() => { setOpen(true); onOpenChange?.(true); }}>{preview.action}</button></div> : <button type="button" aria-haspopup="dialog" className="w-full cursor-pointer px-3 py-2 text-left font-semibold text-white" onClick={() => { setOpen(true); onOpenChange?.(true); }}>▸ {summary}</button>}{open && <CareerEditor title={title} onClose={() => { setOpen(false); onOpenChange?.(false); }}>{children}</CareerEditor>}</section>;
 }
 
 export function CareerDecisionNotice() {
@@ -78,12 +78,12 @@ export function StoryDecisionPanel({ messageId }: { messageId: string }) {
   </section>;
 }
 
-export function DevelopmentPanel() {
+export function DevelopmentPanel({ compact = false }: { compact?: boolean }) {
   const { gameState, actOnCareer } = useGame();
   const d = depthOf(gameState), project = d.project;
   const [kind, setKind] = useState<ProjectKind>('long-pot');
   const all = project?.closingAttributes ?? { ...gameState.attributes.technical, ...gameState.attributes.mental, ...gameState.attributes.physical };
-  return <CareerDisclosure title="Development project & practice partner" summary={<>Development & practice · {project ? `${PROJECTS[project.kind].name}: ${project.completedWeeks}/${PROJECTS[project.kind].weeks} weeks` : 'Choose a multi-week project'}</>}>
+  return <CareerDisclosure preview={compact ? { label: "Development & practice", detail: project ? `${PROJECTS[project.kind].name} · ${project.completedWeeks}/${PROJECTS[project.kind].weeks} weeks · ${project.status}` : "No project active · choose a multi-week focus", action: project ? "Manage" : "Choose" } : undefined} title="Development project & practice partner" summary={<>Development & practice · {project ? `${PROJECTS[project.kind].name}: ${project.completedWeeks}/${PROJECTS[project.kind].weeks} weeks` : 'Choose a multi-week project'}</>}>
     <div className={body}>
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1 text-gray-300">Development project<select aria-label="Development project" className={input} value={kind} onChange={e => setKind(e.target.value as ProjectKind)}>{Object.entries(PROJECTS).map(([id, p]) => <option key={id} value={id}>{p.name} · {p.weeks} weeks</option>)}</select></label>
@@ -93,7 +93,7 @@ export function DevelopmentPanel() {
       <p className="text-gray-300">Relevant sessions: {PROJECTS[project?.kind ?? kind].sessions.join(', ')}. Complete three per week; projects do not auto-fill or add training sessions.</p>
       {(project?.kind ?? kind) === 'cue-action' && <p className="text-amber-300">Cue-action rebuild: temporary effective consistency −2 during the first two completed training weeks. Permanent consistency is unchanged by this penalty.</p>}
       {project?.matchEvidence && project.matchEvidence.matches > 0 && <p className="text-gray-300">Measured match evidence ({project.matchEvidence.matches} matches): potting {Math.round(project.matchEvidence.pottingTotal / project.matchEvidence.matches)}% · safety {Math.round(project.matchEvidence.safetyTotal / project.matchEvidence.matches)}% · high break {project.matchEvidence.highestBreak} · long matches {project.matchEvidence.longMatchWins}/{project.matchEvidence.longMatches} won. These results do not award attributes.</p>}
-      {project && <div className="grid gap-2 sm:grid-cols-2"><div><p className="text-green-400">{project.status} · review {project.reviewDate}</p><p className="mt-1 text-gray-300">{project.note}</p><p className="mt-1 text-gray-400">Match evidence: {project.evidenceMatches} matches. {project.evidenceMatches < 5 ? 'Small sample; no reliable performance conclusion yet.' : 'Compare match statistics separately from training gains.'}</p></div><div className="space-y-1">{Object.entries(project.baseline).map(([skill, before]) => <p key={skill} className="flex justify-between gap-3"><span>{skill}</span><span className={(all[skill] ?? before) >= before ? 'text-green-400' : 'text-red-400'}>{before} → {all[skill] ?? before} ({(all[skill] ?? before) - before >= 0 ? '+' : ''}{Math.round(((all[skill] ?? before) - before) * 10) / 10})</span></p>)}</div></div>}
+      {project && <div className="grid gap-2 sm:grid-cols-2"><div><p className="text-green-400">{project.status} · review {project.reviewDate}</p><p className="mt-1 text-gray-300">{project.note}</p><p className="mt-1 text-gray-400">Match evidence: {project.evidenceMatches} matches. {project.evidenceMatches < 5 ? 'Small sample; no reliable performance conclusion yet.' : 'Compare match statistics separately from training gains.'}</p></div><div className="space-y-1">{Object.entries(project.baseline).map(([skill, before]) => <p key={skill} className="flex justify-between gap-3"><span>{skill}</span><span className={(all[skill] ?? before) >= before ? 'text-green-400' : 'text-red-400'}>{formatAttribute(before)} → {formatAttribute(all[skill] ?? before)} ({formatAttributeChange((all[skill] ?? before) - before)})</span></p>)}</div></div>}
       <label className="flex flex-col gap-1 text-gray-300">Practice partner<select aria-label="Practice partner" className={input} value={d.partnerId ?? ''} onChange={e => actOnCareer({ type: 'partner', id: e.target.value || null })}><option value="">No practice partner</option>{partnerCandidates(gameState).map(p => <option key={p.id} value={p.id}>{p.playerName} · age {p.age} · OVR {p.overallRating ?? '—'}</option>)}</select></label>
       <details><summary className="cursor-pointer text-green-400">Practice partner profiles</summary><div className="mt-2 flex max-h-40 flex-wrap gap-3 overflow-y-auto">{partnerCandidates(gameState).map(p => <PlayerLink key={p.id} name={p.playerName} id={p.id}/>)}</div></details>
       <p className="text-gray-400">{d.partnerId ? partnerAvailable(gameState) ? 'Available: one existing technical session becomes shared practice. Project and partner efficiency combined is capped at +10%.' : 'Partner unavailable during competition, travel or injury. No extra sessions or bonus this week.' : 'Select a partner to share an existing technical session—not add an extra training day.'}</p>
@@ -163,15 +163,6 @@ export function SeasonPlanningPanel() {
   </CareerDisclosure>;
 }
 
-export function CoachRelationshipsPanel() {
-  const { gameState, actOnCareer } = useGame();
-  const d = depthOf(gameState);
-  return <details className={disclosure}><summary className="cursor-pointer px-3 py-2 font-semibold text-white">Working relationships & agreed development</summary><div className={body}>{gameState.coachContracts.length ? gameState.coachContracts.map(c => {
-    const relation = d.coachRelationships[c.coachId];
-    return <div key={c.coachId} className="space-y-2"><p><span className="font-semibold text-white">{gameState.coaches.find(coach => coach.id === c.coachId)?.name}</span> · <span className="text-green-400">{coachRelationshipLabel(relation?.trust ?? 55)}</span><span className="block text-gray-400">{relation?.note ?? 'Agree a development project in Training.'}</span></p><button className={button} onClick={() => actOnCareer({ type: 'coach-review', id: c.coachId })}>Review development together</button></div>;
-  }) : <p className="text-gray-400">Hire a coach to build an ongoing development relationship.</p>}<p>Agreed goal: {d.project?.status === 'active' ? PROJECTS[d.project.kind].name : 'No active project'}. Workload and adherence influence future negotiations—not a single defeat.</p><Link className="text-green-400" to="/training">Review development project</Link></div></details>;
-}
-
 export function RivalryContext({ opponent }: { opponent: string }) {
   const { gameState } = useGame();
   const relationship = getRivalry(gameState, opponent);
@@ -187,7 +178,7 @@ export function CareerSeasonSummary() {
     <div className={body}>
       {d.objectiveRecord && <p className="text-green-400">Personal objectives: {d.objectiveRecord.achieved}/{d.objectiveRecord.total} achieved across {d.objectiveRecord.matches} matches.</p>}
       {[...d.stories].reverse().map(s => <details key={s.id} className="rounded border border-border p-3"><summary className="cursor-pointer font-semibold text-white">{s.createdDate} · <PlayerNames text={s.title}/> · {s.status}</summary><p className="mt-2 text-gray-400"><PlayerNames text={s.evidence}/></p>{s.updates.map((update, i) => <p key={i} className="mt-2 border-l-2 border-green-600 pl-2 text-gray-300"><PlayerNames text={update}/></p>)}</details>)}
-      {d.projectHistory.map(p => <div key={p.id}><p className="text-white">{PROJECTS[p.kind].name} · {p.status} · {p.completedWeeks} training weeks</p>{p.closingAttributes && <p className="text-gray-400">{Object.entries(p.baseline).map(([skill, before]) => `${skill}: ${before} → ${p.closingAttributes![skill]}`).join(' · ')}</p>}</div>)}
+      {d.projectHistory.map(p => <div key={p.id}><p className="text-white">{PROJECTS[p.kind].name} · {p.status} · {p.completedWeeks} training weeks</p>{p.closingAttributes && <p className="text-gray-400">{Object.entries(p.baseline).map(([skill, before]) => `${skill}: ${formatAttribute(before)} → ${formatAttribute(p.closingAttributes![skill])}`).join(' · ')}</p>}</div>)}
       {Object.entries(d.coachRelationships).map(([id, relation]) => <p key={id}>{gameState.coaches.find(c => c.id === id)?.name ?? 'Former coach'} · {coachRelationshipLabel(relation.trust)} · <PlayerNames text={relation.note}/></p>)}
       {Object.values(d.relationships).filter(r => r.rivalry).map(r => <p key={r.opponentId}><PlayerLink name={r.name} id={r.opponentId}/> · competitive rivalry · H2H {r.wins}–{r.losses}{gameState.worldPlayers.find(p => p.id === r.opponentId)?.retired ? ' · retired' : ''}</p>)}
       <Link className="text-green-400" to="/calendar">Set the next season strategy</Link>

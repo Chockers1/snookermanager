@@ -1,3 +1,4 @@
+import { SectionTabs } from '../components/ui/SectionTabs';
 import { FormRecoveryPanel } from '../components/career/SeasonLifePanels';
 import { formatPercent } from '../utils/formatters';
 import { seasonWeekLabel } from "../game/seasonClock";
@@ -92,6 +93,7 @@ function TrainingPlannerContent() {
     gameState.attributes,
     currentCoach?.compatibility ?? 0,
   );
+  const [summaryTab, setSummaryTab] = useState<"Plan" | "Development" | "Events">("Plan");
   const developmentGains = previewTrainingDevelopment(gameState, plannerWeek);
   const selectedPreset = TRAINING_FOCUS_PRESETS.find(
     (preset) => preset.id === selectedFocus,
@@ -179,12 +181,14 @@ function TrainingPlannerContent() {
 
   return (
     <div
-      className="mx-auto flex w-full max-w-[1680px] flex-col gap-2 pb-5 xl:h-full xl:min-h-0 xl:overflow-hidden xl:pb-0"
+      className="mx-auto flex w-full max-w-[1680px] flex-col gap-2 pb-5 lg:h-full lg:min-h-0 lg:overflow-hidden lg:pb-0"
       data-testid="training-planner"
     >
-      <DevelopmentPanel />
-      <FormRecoveryPanel />
-      <TrainingBasePanel />
+      <div className="grid shrink-0 gap-2 lg:grid-cols-3" aria-label="Training support">
+        <DevelopmentPanel compact />
+        <FormRecoveryPanel compact />
+        <TrainingBasePanel compact />
+      </div>
       <header className="flex shrink-0 flex-col gap-2 rounded-xl border border-border bg-surface/85 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-green-400">
@@ -224,7 +228,7 @@ function TrainingPlannerContent() {
             Auto-fills the week · event and travel sessions remain protected
           </span>
         </div>
-        <div className="scrollbar-thin grid auto-cols-[145px] grid-flow-col gap-1.5 overflow-x-auto xl:grid-flow-row xl:grid-cols-7">
+        <div className="scrollbar-thin grid auto-cols-[145px] grid-flow-col gap-1.5 overflow-x-auto lg:grid-flow-row lg:grid-cols-7">
           {TRAINING_FOCUS_PRESETS.map((preset) => (
             <button
               key={preset.id}
@@ -244,10 +248,10 @@ function TrainingPlannerContent() {
         </div>
       </section>
 
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto xl:overflow-hidden">
-        <div className="grid min-h-full gap-2 xl:h-full xl:grid-cols-[minmax(0,1fr)_350px]">
+      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
+        <div className="grid min-h-full gap-2 lg:h-full lg:grid-cols-[minmax(0,1fr)_350px]">
           <div className="flex min-h-0 min-w-0 flex-col gap-2">
-            <section className="card flex min-h-[390px] flex-1 flex-col overflow-hidden xl:min-h-0">
+            <section className="card flex min-h-[390px] flex-1 flex-col overflow-hidden lg:min-h-0">
               <div className="card-header shrink-0 py-2">
                 <div>
                   <h2 className="flex items-center gap-2 text-sm font-semibold">
@@ -410,10 +414,10 @@ function TrainingPlannerContent() {
               {forecasts.map((card) => (
                 <div key={card.label} className="card px-3 py-2">
                   <div className="mb-1.5 flex justify-between gap-2">
-                    <span className="text-[8px] uppercase text-gray-500">
+                    <span className="text-[8px] uppercase text-white">
                       {card.label}
                     </span>
-                    <b className={`text-sm ${card.text}`}>{card.value}</b>
+                    <b className={`whitespace-nowrap text-sm ${card.text}`}>{card.value}</b>
                   </div>
                   <ProgressBar value={card.score} tone={card.bar} compact />
                 </div>
@@ -421,8 +425,11 @@ function TrainingPlannerContent() {
             </section>
           </div>
 
-          <aside className="scrollbar-thin flex min-h-0 flex-col gap-2 overflow-y-auto">
-            <section className="card flex shrink-0 flex-col xl:grow border-green-500/25 p-3">
+          <aside className="flex min-h-0 min-w-0 flex-col gap-2" aria-label="Training summary">
+            <SectionTabs id="training-summary" label="Training summary" tabs={['Plan', 'Development', 'Events'] as const} active={summaryTab} onChange={setSummaryTab} />
+            <div id="training-summary-panel" role="tabpanel" aria-labelledby={`training-summary-tab-${['Plan', 'Development', 'Events'].indexOf(summaryTab)}`} className="flex min-h-0 flex-1 flex-col gap-2">
+            {summaryTab === 'Plan' && <>
+            <section className="card flex shrink-0 flex-col lg:grow border-green-500/25 p-3">
               <div className="flex justify-between gap-3">
                 <div>
                   <p className="text-[8px] uppercase tracking-wider text-green-400">
@@ -446,14 +453,15 @@ function TrainingPlannerContent() {
                 {selectedPreset?.description ??
                   "You have manually adjusted one or more sessions."}
               </p>
-              <div className="mt-2 flex justify-between border-t border-border pt-2 text-[9px] xl:mt-auto">
+              <div className="mt-2 flex justify-between border-t border-border pt-2 text-[9px] lg:mt-auto">
                 <span className="text-gray-400">Fatigue risk</span>
                 <b className={riskTone(summary.fatigueRisk)}>
                   {formatPercent(summary.fatigueRisk)}
                 </b>
               </div>
             </section>
-            <section className="card flex shrink-0 flex-col xl:grow overflow-hidden">
+            </>}
+            {summaryTab === 'Development' && <section className="card flex shrink-0 flex-col lg:grow overflow-hidden">
               <div className="card-header py-2">
                 <div>
                   <h2 className="text-xs font-semibold">
@@ -465,7 +473,7 @@ function TrainingPlannerContent() {
                 </div>
                 <span className="text-[8px] text-green-400">Estimated</span>
               </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2 p-3 xl:flex-1 xl:content-center">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 p-2 lg:flex-1 lg:content-center">
                 {developmentGains.length === 0 && <p className="col-span-2 text-xs text-gray-400">{gameState.trainingAppliedWeek === gameState.week ? "This week’s gains are already applied." : "No skill gains: recovery, competition or injury takes priority."}</p>}
                 {developmentGains.map((gain) => {
                   const adjusted = Number(gain.value.toFixed(2));
@@ -486,7 +494,8 @@ function TrainingPlannerContent() {
                 })}
               </div>
             </section>
-            <section className="card flex shrink-0 flex-col xl:grow p-3">
+            }
+            {summaryTab === 'Plan' && <section className="card flex shrink-0 flex-col lg:grow p-3">
               <div className="mb-2 flex justify-between">
                 <h2 className="text-xs font-semibold">Weekly Balance</h2>
                 <button
@@ -498,7 +507,7 @@ function TrainingPlannerContent() {
                   Full report
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2 xl:flex-1 xl:content-center">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2 lg:flex-1 lg:content-center">
                 {summary.balance.map((item) => (
                   <div key={item.label}>
                     <div className="mb-1 flex justify-between text-[8px]">
@@ -510,7 +519,8 @@ function TrainingPlannerContent() {
                 ))}
               </div>
             </section>
-            <section className="card flex shrink-0 flex-col xl:grow p-3">
+            }
+            {summaryTab === 'Events' && <section className="card flex shrink-0 flex-col lg:grow p-3">
               <div className="flex justify-between">
                 <h2 className="text-xs font-semibold">
                   Competition Protection
@@ -560,6 +570,8 @@ function TrainingPlannerContent() {
                 </p>
               )}
             </section>
+            }
+            </div>
           </aside>
         </div>
       </div>

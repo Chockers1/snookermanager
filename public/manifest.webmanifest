@@ -1,0 +1,24 @@
+{
+  "name": "Snooker Career Manager",
+  "short_name": "Snooker Career Manager",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "browser",
+  "background_color": "#09130f",
+  "theme_color": "#09130f",
+  "icons": [
+    {
+      "src": "/assetts/icons/web-app-icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assetts/icons/web-app-icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

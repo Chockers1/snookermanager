@@ -1,3 +1,4 @@
+import { SectionTabs } from '../components/ui/SectionTabs';
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -120,6 +121,12 @@ export function CueShopPage() {
     "performance",
   );
   const [ownedOnly, setOwnedOnly] = useState(false);
+  const [detailTab, setDetailTab] = useState<'Selected Item' | 'My Setup' | 'History'>('Selected Item');
+  const [mobileView, setMobileView] = useState<{ category: EquipmentTab; pane: 'Items' | 'Details' }>({ category: activeTab, pane: 'Items' });
+  const mobilePane = mobileView.category === activeTab ? mobileView.pane : 'Items';
+  const setMobilePane = (pane: 'Items' | 'Details') => setMobileView({ category: activeTab, pane });
+  function selectItem(select: () => void) { select(); setDetailTab('Selected Item'); setMobilePane('Details'); }
+
 
   const currentCue = gameState.equipment.currentCueId
     ? (cueMarketplaceCatalog.find(
@@ -291,7 +298,7 @@ export function CueShopPage() {
           <button
             key={chalk.id}
             type="button"
-            onClick={() => setSelectedChalkId(chalk.id)}
+            onClick={() => selectItem(() => setSelectedChalkId(chalk.id))}
             className={equipmentCardClass({
               selected: selectedChalk.id === chalk.id,
               owned,
@@ -336,7 +343,7 @@ export function CueShopPage() {
           <button
             key={tip.id}
             type="button"
-            onClick={() => setSelectedTipId(tip.id)}
+            onClick={() => selectItem(() => setSelectedTipId(tip.id))}
             className={equipmentCardClass({
               selected: selectedTip.id === tip.id,
               owned,
@@ -377,7 +384,7 @@ export function CueShopPage() {
           <button
             key={entry.id}
             type="button"
-            onClick={() => setSelectedCaseId(entry.id)}
+            onClick={() => selectItem(() => setSelectedCaseId(entry.id))}
             className={equipmentCardClass({
               selected: selectedCase.id === entry.id,
               owned,
@@ -420,7 +427,7 @@ export function CueShopPage() {
           <button
             key={table.id}
             type="button"
-            onClick={() => setSelectedTableId(table.id)}
+            onClick={() => selectItem(() => setSelectedTableId(table.id))}
             className={equipmentCardClass({
               selected: selectedTable.id === table.id,
               owned,
@@ -460,7 +467,7 @@ export function CueShopPage() {
         <button
           key={action.id}
           type="button"
-          onClick={() => setSelectedActionId(action.id)}
+          onClick={() => selectItem(() => setSelectedActionId(action.id))}
           className={`card card-body text-left ${selectedAction.id === action.id ? "border-green-500" : "hover:border-border-light"}`}
         >
           <div className="mb-3 flex items-start justify-between">
@@ -498,7 +505,7 @@ export function CueShopPage() {
         <button
           key={cue.id}
           type="button"
-          onClick={() => setSelectedCueId(cue.id)}
+          onClick={() => selectItem(() => setSelectedCueId(cue.id))}
           className={equipmentCardClass({
             selected: selectedCue.id === cue.id,
             owned,
@@ -720,14 +727,14 @@ export function CueShopPage() {
   }
 
   return (
-    <div className="space-y-4 pb-10 sm:space-y-6">
-      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden" data-testid="equipment-page">
+      <div className="card flex min-w-0 shrink-0 flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase text-gray-500">
             Equipment
           </p>
           <h1 className="mt-1 text-2xl font-bold text-white">Cue Shop</h1>
-          <p className="mt-1 text-sm text-gray-400">
+          <p className="mt-1 hidden text-xs text-gray-300 sm:block">
             Equipment marketplace and current setup management.
           </p>
         </div>
@@ -753,31 +760,10 @@ export function CueShopPage() {
           </button>
         </div>
       </div>
-      <div
-        className="-mx-1 grid grid-flow-col auto-cols-[minmax(8.5rem,1fr)] gap-1 overflow-x-auto border-b border-border px-1 sm:grid-flow-row sm:grid-cols-6"
-        role="tablist"
-        aria-label="Equipment categories"
-      >
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            aria-current={activeTab === tab.id ? "page" : undefined}
-            onClick={() => navigate(tab.path)}
-            className={`min-h-12 w-full whitespace-nowrap rounded-b-none px-3 ${
-              activeTab === tab.id
-                ? "tab-active text-xs"
-                : "tab-inactive text-xs"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <SectionTabs id="equipment-category" label="Equipment categories" tabs={tabs.map(t => t.label)} active={tabs.find(t => t.id === activeTab)!.label} onChange={label => { navigate(tabs.find(t => t.label === label)!.path); setDetailTab('Selected Item'); setMobileView({ category: tabs.find(t => t.label === label)!.id, pane: 'Items' }); }} />
+      <div className="shrink-0 lg:hidden"><SectionTabs id="equipment-mobile" label="Equipment view" tabs={['Items', 'Details'] as const} active={mobilePane} onChange={setMobilePane} /></div>
       {activeTab !== "maintenance" ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-border bg-surface/60 px-3 py-2 text-[10px] text-gray-400">
+        <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-border bg-surface/60 px-3 py-2 text-[10px] text-gray-400">
           <span className="font-semibold uppercase tracking-wide text-gray-500">
             Item status
           </span>
@@ -795,28 +781,26 @@ export function CueShopPage() {
           </span>
         </div>
       ) : null}
-      <div className="grid gap-4 xl:grid-cols-12">
-        <div className="grid gap-3 sm:grid-cols-2 xl:col-span-8">
+      <div id="equipment-mobile-panel" className="flex min-h-0 flex-1 flex-col">
+      <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-12" id="equipment-category-panel" role="tabpanel" aria-labelledby={`equipment-category-tab-${tabs.findIndex(t => t.id === activeTab)}`}>
+        <div className={`${mobilePane === 'Items' ? 'grid' : 'hidden'} min-h-0 content-start gap-3 overflow-y-auto pr-1 sm:grid-cols-2 lg:col-span-8 lg:grid`} aria-label="Equipment items" role="region" tabIndex={0}>
           {renderCards()}
         </div>
-        <div className="space-y-4 xl:col-span-4">
-          <div className="card">
-            <div className="card-header">
-              <h3 className="text-sm font-semibold text-white">
-                Selected Item
-              </h3>
-            </div>
-            <div className="card-body">{renderDetail()}</div>
-          </div>
-          <div className="card card-body">
+        <div className={`${mobilePane === 'Details' ? 'flex' : 'hidden'} min-h-0 flex-col gap-2 lg:col-span-4 lg:flex`}>
+          <SectionTabs id="equipment-detail" label="Equipment details" tabs={['Selected Item', 'My Setup', 'History'] as const} active={detailTab} onChange={setDetailTab} />
+          <div id="equipment-detail-panel" role="tabpanel" aria-labelledby={`equipment-detail-tab-${['Selected Item', 'My Setup', 'History'].indexOf(detailTab)}`} className="flex min-h-0 flex-1 flex-col">
+          {detailTab === 'Selected Item' && <div className="card flex min-h-0 flex-1 flex-col">
+            <div className="card-body min-h-0 flex-1 overflow-y-auto">{renderDetail()}</div>
+          </div>}
+          {detailTab === 'My Setup' && <div className="card card-body min-h-0 flex-1 overflow-y-auto">
             <h3 className="mb-3 text-xs font-semibold text-white">
               Current Equipment Summary
             </h3>
             <div className="space-y-2 text-xs">
               {equippedSlots.map(([label, value]) => (
-                <div key={label} className="flex justify-between">
-                  <span className="text-gray-400">{label}</span>
-                  <span className="text-white">{value}</span>
+                <div key={label} className="flex justify-between gap-3">
+                  <span className="shrink-0 text-gray-300">{label}</span>
+                  <span className="min-w-0 text-right text-white">{value}</span>
                 </div>
               ))}
             </div>
@@ -838,16 +822,17 @@ export function CueShopPage() {
             >
               Finalize Chalk/Tip Setup
             </button>
-          </div>
-          <div className="card overflow-hidden">
+          </div>}
+          {detailTab === 'History' && <div className="card min-h-0 flex-1 overflow-y-auto">
             <div className="card-header">
               <h3 className="text-sm font-semibold text-white">
                 Maintenance History
               </h3>
             </div>
+            {gameState.maintenance.history.length === 0 && <p className="p-3 text-xs text-gray-300">No maintenance recorded yet.</p>}
             <table className="w-full text-[10px]">
               <tbody>
-                {gameState.maintenance.history.slice(0, 5).map((item) => (
+                {gameState.maintenance.history.map((item) => (
                   <tr key={item.id} className="border-b border-border/50">
                     <td className="px-3 py-2 text-gray-400">{item.date}</td>
                     <td className="px-3 py-2 text-white">{item.service}</td>
@@ -858,8 +843,10 @@ export function CueShopPage() {
                 ))}
               </tbody>
             </table>
+          </div>}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

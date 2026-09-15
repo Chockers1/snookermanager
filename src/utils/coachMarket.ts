@@ -1,4 +1,5 @@
-import type { Coach, CoachContractOption } from "../types/game";
+import { COACH_TRAINING_SKILLS, coachTrainingBonus } from '../game/coachTraining';
+import type { Coach, CoachContract, CoachContractOption } from "../types/game";
 
 export type CoachPriceBand =
   "All" | "Budget" | "Value" | "Premium" | "Elite" | "Short-term";
@@ -72,41 +73,7 @@ export function getCoachPriceBand(
 }
 
 export function getCoachProjectedImpact(coach: Coach) {
-  const strongestRating = Math.max(
-    coach.technical,
-    coach.tactical,
-    coach.mental,
-    coach.motivation,
-  );
-  const primaryGain = Number(
-    (((strongestRating - 45) / 15) * (coach.compatibility / 100)).toFixed(1),
-  );
-  const tacticalBonus = Math.max(
-    1,
-    Math.round((coach.tactical - 50) / 10 + coach.compatibility / 35),
-  );
-  const fatigueReduction =
-    coach.type === "Fitness"
-      ? Math.max(2, Math.round((coach.motivation - 55) / 8))
-      : 0;
-  const primaryLabel =
-    coach.type === "Break Building"
-      ? "Break Building"
-      : coach.type === "Cue Action"
-        ? "Cue Ball Control"
-        : coach.type === "Mental"
-          ? "Composure"
-          : coach.type === "Fitness"
-            ? "Recovery Rate"
-            : coach.type === "Tactical"
-              ? "Safety Play"
-              : "Long Potting";
-  return {
-    primaryLabel,
-    primaryGain: Math.max(0.5, primaryGain),
-    tacticalBonus,
-    fatigueReduction,
-  };
+  return { skills: COACH_TRAINING_SKILLS[coach.type], trainingBonus: coachTrainingBonus(coach) };
 }
 
 export function getCoachAffordabilityForecast(
@@ -138,4 +105,8 @@ export function getCoachAffordabilityForecast(
     projectedWeeklyCashFlow,
     cashCoverWeeks,
   };
+}
+
+export function getCoachTerminationCost(contract: Pick<CoachContract, "weeklyCost" | "weeksRemaining">) {
+  return Math.round(Math.max(0, contract.weeksRemaining) * Math.max(0, contract.weeklyCost) * 100) / 100;
 }

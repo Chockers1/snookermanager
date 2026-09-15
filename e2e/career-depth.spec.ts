@@ -56,7 +56,7 @@ test('major story choice persists through reading, reload and follow-up navigati
   await page.reload();
   await page.getByRole('button', { name: /Continue Career/ }).click();
   await page.evaluate(() => { history.pushState({}, '', '/training'); dispatchEvent(new PopStateEvent('popstate')); });
-  await page.getByText(/Development & practice/).click();
+  await page.getByRole('button', { name: /Development & practice/ }).click();
   await expect(page.getByText('Pressure-management programme', { exact: false }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Start project', exact: true })).toBeDisabled();
   expect((await saved(page)).careerDepth?.stories[0].status).toBe('resolved');
@@ -88,7 +88,7 @@ for (const viewport of [{ width: 1920, height: 1080 }, { width: 1280, height: 72
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     await open(page, '/training');
-    await page.getByText(/Development & practice/).click();
+    await page.getByRole('button', { name: /Development & practice/ }).click();
     await page.getByLabel('Development project', { exact: true }).selectOption('safety');
     await page.getByRole('button', { name: 'Start project', exact: true }).click();
     await expect.poll(async () => (await saved(page)).careerDepth?.project?.kind).toBe('safety');

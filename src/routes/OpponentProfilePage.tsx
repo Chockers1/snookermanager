@@ -91,8 +91,8 @@ function PlayerProfileContent(){
    </select>
  </label>;
  const openSeason = (season: string) => { setSelectedSeason(season); setLimit(15); setTab('Results'); };
- return <div className="min-w-0 space-y-3 pb-4" data-testid="player-profile">
-   <header className="relative overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/50 via-surface to-surface p-4 sm:p-6">
+ return <div className="flex min-w-0 flex-col gap-3 xl:min-h-full" data-testid="player-profile">
+   <header className="relative shrink-0 overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/50 via-surface to-surface p-4 sm:p-6">
      <div className="flex flex-wrap items-start justify-between gap-4">
        <div className="flex min-w-0 flex-1 items-center gap-4">
          <div aria-hidden="true" className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-emerald-400/25 bg-emerald-400/10 text-2xl font-black text-emerald-200 sm:h-20 sm:w-20">{initials}</div>
@@ -121,7 +121,7 @@ function PlayerProfileContent(){
      </div>
    </header>
 
-   <div role="tablist" aria-label="Player profile sections" className="flex gap-1 overflow-x-auto rounded-xl border border-border bg-surface p-1">
+   <div role="tablist" aria-label="Player profile sections" className="flex shrink-0 gap-1 overflow-x-auto rounded-xl border border-border bg-surface p-1">
      {profileTabs.map((item, index) => <button type="button" key={item} role="tab" id={`profile-tab-${item}`} aria-selected={tab === item} aria-controls={`profile-panel-${item}`} tabIndex={tab === item ? 0 : -1}
        onClick={() => setTab(item)} onKeyDown={event => {
          const next = event.key === 'ArrowRight' ? (index + 1) % profileTabs.length : event.key === 'ArrowLeft' ? (index + profileTabs.length - 1) % profileTabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? profileTabs.length - 1 : null;
@@ -131,24 +131,24 @@ function PlayerProfileContent(){
      </button>)}
    </div>
 
-   <div role="tabpanel" id={`profile-panel-${tab}`} aria-labelledby={`profile-tab-${tab}`} className="min-w-0">
-   {tab === 'Overview' && <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1.5fr)_minmax(300px,1fr)]">
-     <div className="min-w-0 space-y-3">
-       <section className="card p-4"><SectionTitle title="Current form"><span className="text-[10px] text-gray-500">Last {recent.length} recorded matches · newest first</span></SectionTitle>
+   <div role="tabpanel" id={`profile-panel-${tab}`} aria-labelledby={`profile-tab-${tab}`} className="flex min-w-0 flex-1 flex-col">
+   {tab === 'Overview' && <div className="grid flex-1 items-stretch gap-3 xl:grid-cols-[minmax(0,1.5fr)_minmax(300px,1fr)]">
+     <div className="flex min-w-0 flex-col gap-3">
+       <section className="card p-4 xl:flex-1"><SectionTitle title="Current form"><span className="text-[10px] text-gray-500">Last {recent.length} recorded matches · newest first</span></SectionTitle>
          {recent.length ? <><div className="flex flex-wrap gap-2">{recent.map(m => <div key={m.id} className="flex min-w-12 flex-col items-center gap-1.5"><ResultBadge result={m.result}/><span className="text-[10px] tabular-nums text-gray-400">{m.score}</span></div>)}</div><p className="mt-3 text-xs text-gray-400">{recent.filter(m => m.result === 'Won').length} wins · {recent.filter(m => m.result === 'Lost').length} losses · {recent.filter(m => m.result === 'Drawn').length} draws</p></> : <p className="text-xs text-gray-400">No published recent match records.</p>}
        </section>
-       <section className="card p-4"><SectionTitle title={`${gameState.season} at a glance`}><CalendarDays className="h-4 w-4 text-emerald-400"/></SectionTitle>
+       <section className="card p-4 xl:flex-1"><SectionTitle title={`${gameState.season} at a glance`}><CalendarDays className="h-4 w-4 text-emerald-400"/></SectionTitle>
          {thisSeason ? <><div className="grid grid-cols-3 gap-3"><div><p className="text-[10px] text-gray-400">Wins–losses–draws</p><p className="mt-1 font-semibold text-white">{thisSeason.wins ?? '—'}–{thisSeason.losses ?? '—'}–{thisSeason.draws ?? '—'}</p></div><div><p className="text-[10px] text-gray-400">Titles</p><p className="mt-1 font-semibold text-white">{thisSeason.titles}</p></div><div><p className="text-[10px] text-gray-400">Prize money</p><p className="mt-1 break-words font-semibold text-emerald-300">{thisSeason.prize == null ? '—' : formatMoney(thisSeason.prize)}</p></div></div><button className="mt-3 inline-flex items-center gap-1 text-xs text-emerald-300 hover:underline" onClick={() => openSeason(thisSeason.season)}>Explore this season <ChevronRight className="h-3 w-3"/></button></> : <p className="text-xs text-gray-400">No results recorded for this season.</p>}
        </section>
-       <section className="card p-4"><SectionTitle title="Latest results"><button className="text-xs text-emerald-300 hover:underline" onClick={() => setTab('Results')}>All results →</button></SectionTitle>
+       <section className="card p-4 xl:flex-1"><SectionTitle title="Latest results"><button className="text-xs text-emerald-300 hover:underline" onClick={() => setTab('Results')}>All results →</button></SectionTitle>
          <div className="divide-y divide-border/70">{history.slice(0, 5).map(e => <div key={e.key} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"><div className="min-w-0"><p className="break-words text-xs font-medium text-white">{e.name}</p><p className="mt-1 text-[10px] text-gray-500">{e.date} · {e.circuit}</p></div><span className={'max-w-[45%] text-right text-[11px] ' + (e.result === 'Winner' ? 'text-amber-300' : 'text-gray-300')}>{e.result}</span></div>)}</div>{!history.length && <p className="text-xs text-gray-400">No published event records yet.</p>}
        </section>
      </div>
-     <div className="min-w-0 space-y-3">
-       <section className="card overflow-hidden"><div className="p-4"><SectionTitle title="Your head-to-head">{relation && <span className="rounded bg-amber-500/10 px-2 py-1 text-[10px] text-amber-200">{rivalryStage(relation)}</span>}</SectionTitle>
+     <div className="flex min-w-0 flex-col gap-3">
+       <section className="card overflow-hidden xl:flex-1"><div className="p-4"><SectionTitle title="Your head-to-head">{relation && <span className="rounded bg-amber-500/10 px-2 py-1 text-[10px] text-amber-200">{rivalryStage(relation)}</span>}</SectionTitle>
          {relation ? <><div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-2 text-center"><div><p className="text-3xl font-bold tabular-nums text-emerald-300">{relation.wins}</p><p className="mt-1 text-[10px] text-gray-400">Your wins</p></div><span className="text-gray-600">—</span><div><p className="text-3xl font-bold tabular-nums text-white">{relation.losses}</p><p className="mt-1 text-[10px] text-gray-400">Their wins</p></div></div><p className="mt-2 text-center text-[10px] text-gray-500">{relation.deciders} deciding frames{relation.draws ? ` · ${relation.draws} draws` : ''}</p></> : <p className="text-xs text-gray-400">{human ? 'This is your own profile.' : 'Your first meeting is still to come.'}</p>}
        </div>{meetings.length > 0 && <div className="max-h-48 divide-y divide-border/60 overflow-y-auto border-t border-border bg-background/25 px-4">{meetings.slice(0, 5).map(m => <div key={m.id} className="flex items-center gap-2 py-2.5"><ResultBadge result={m.result}/><div className="min-w-0 flex-1"><p className="break-words text-[11px] text-gray-300">{m.event}</p><p className="text-[9px] text-gray-500">{m.date}</p></div><b className="text-xs tabular-nums text-white">{m.score}</b></div>)}</div>}</section>
-       <section className="card p-4"><SectionTitle title="Scouting report"><Target className="h-4 w-4 text-emerald-400"/></SectionTitle>
+       <section className="card p-4 xl:flex-1"><SectionTitle title="Scouting report"><Target className="h-4 w-4 text-emerald-400"/></SectionTitle>
          {human ? <Link className="text-xs text-emerald-300 hover:underline" to="/player/attributes">View your own attributes →</Link> : <><div className="flex justify-between text-[11px]"><span className="text-gray-400">{scouting.samples} observations</span><span className="text-emerald-300">{scouting.confidence}% report confidence</span></div><div className="my-2 h-1.5 rounded bg-background"><div className="h-full rounded bg-emerald-500" style={{ width: `${scouting.confidence}%` }}/></div>
            <p className="mt-3 text-xs leading-relaxed text-gray-300"><PlayerNames text={scouting.note}/></p>
            <details className="mt-3 text-xs"><summary className="cursor-pointer text-gray-400 hover:text-white">Assessment evidence</summary><ul className="mt-2 space-y-2 text-[11px] leading-relaxed text-gray-400">{scouting.evidence.map(e => <li key={e}><PlayerNames text={e}/></li>)}</ul></details>

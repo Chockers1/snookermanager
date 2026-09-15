@@ -20,7 +20,7 @@ for (const width of [1280, 390]) test(`player names navigate across career pages
     ['/player/attributes', `Player Attributes - ${state.player.fullName}`, state.player.fullName],
     ['/training/report', 'Monthly Training Report', state.player.fullName],
     ['/match/result', 'Match Review', opponent.playerName],
-    ['/career/stats', 'Career Stats & Legacy', opponent.playerName],
+    ['/career/stats#trophy-cabinet', 'Career Stats & Legacy', opponent.playerName],
     ['/rankings', 'Rankings', opponent.playerName],
   ]) {
     await navigate(path);

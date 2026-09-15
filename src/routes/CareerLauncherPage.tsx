@@ -32,10 +32,10 @@ export function CareerLauncherPage() {
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-background px-4 py-6 text-white sm:px-6 sm:py-10 lg:px-10">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(34,197,94,0.14),transparent_34%),radial-gradient(circle_at_85%_80%,rgba(242,183,5,0.08),transparent_30%)]" />
+      <div aria-hidden="true" className="brand-main-menu-background pointer-events-none absolute inset-0" />
       <div className="relative mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-5xl flex-col justify-center">
         <header className="mb-7 max-w-2xl sm:mb-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-green-400">Snooker Career Manager</p>
+          <img className="brand-menu-logo" src="/assetts/ingame/in-game-logo.svg" width="821" height="313" alt="Snooker Career Manager" fetchPriority="high" />
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-5xl">Your career starts here.</h1>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-gray-400 sm:text-base">Continue your tour, create a new player, or restore another career. The dashboard opens only after you choose a save.</p>
         </header>

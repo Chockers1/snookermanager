@@ -52,12 +52,7 @@ export function Sidebar() {
   return (
     <aside className="scrollbar-thin flex h-full w-[min(18rem,88vw)] shrink-0 flex-col overflow-y-auto border-r border-border bg-sidebar xl:w-52">
       <div className="border-b border-border p-4">
-        <h1 className="text-lg font-bold leading-tight tracking-tight text-white">
-          SNOOKER
-        </h1>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-green-400">
-          Career Manager
-        </p>
+        <h1><img className="h-10 w-auto max-w-full object-contain object-left" src="/assetts/ingame/in-game-logo.svg" width="821" height="313" alt="Snooker Career Manager" /></h1>
       </div>
       <nav className="flex-1 space-y-4 px-2 py-2">
         {sidebarGroups.map((group) => (

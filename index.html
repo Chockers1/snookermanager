@@ -2,12 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/assetts/icons/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/assetts/icons/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/assetts/icons/apple-touch-icon-180x180.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#09130f" />
+    <meta name="application-name" content="Snooker Career Manager" />
+    <meta name="description" content="Build your snooker career through training, tournaments, rankings and the decisions beyond the table." />
+    <link rel="stylesheet" href="/src/styles/branding.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>snooker_career</title>
+    <title>Snooker Career Manager</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <section class="brand-loading brand-loading--fullscreen" aria-label="Loading Snooker Career Manager">
+        <img class="brand-loading-logo" src="/assetts/ingame/in-game-logo.svg" width="821" height="313" alt="Snooker Career Manager" />
+        <p role="status">Loading your saved career…</p>
+      </section>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useGame } from '../../context/useGame';
 import { CareerDisclosure } from './CareerDepthPanels';
 import { qualificationRaces, survivalRace } from '../../game/realism/races';
-import { TRAINING_BASES, baseTrainingMultiplier } from '../../game/realism/base';
+import { TRAINING_BASES, baseTrainingMultiplier, trainingLocationProfile } from '../../game/realism/base';
 import { realismOf, overseasWeeklyCost } from '../../game/realism';
 import { LOCATIONS, journeyQuote, routeBetween } from '../../game/realism/travel';
 import { venueConditions, conditionAdjustment, familiarisedFor } from '../../game/realism/conditions';
@@ -39,19 +39,29 @@ function QualificationRacesContent() {
   </>;
 }
 
-export function TrainingBasePanel() {
+export function TrainingBasePanel({ compact = false }: { compact?: boolean }) {
   const { gameState, actOnRealism } = useGame();
   const r = realismOf(gameState), current = TRAINING_BASES[r.base];
   const [base, setBase] = useState<BaseKind>(r.base), [location, setLocation] = useState(r.home);
   const option = TRAINING_BASES[base], moving = location !== r.home;
+  const profile = trainingLocationProfile(location);
   const joining = base === r.base && !moving ? 0 : option.joining + (moving ? Math.round(300 + routeBetween(r.location, location).distanceKm * 0.065) : 0);
-  return <CareerDisclosure title="Training base and relocation" summary={`Training base · ${current.name} · ${r.home} · ${money(current.weekly)}/week`}>
+  return <CareerDisclosure preview={compact ? { label: "Training base", detail: `${current.name} · ${r.home} · ${money(current.weekly)}/week`, action: "Manage" } : undefined} title="Training base and relocation" summary={`Training base · ${current.name} · ${r.home} · ${money(current.weekly)}/week`}>
     <div className={body}>
       <p>Current location <b>{r.location}</b> · home base <b>{r.home}</b> · access-adjusted training factor <b>{Math.round(baseTrainingMultiplier(gameState) * 100)}%</b></p>
       <div className="grid gap-3 sm:grid-cols-3">{Object.entries(TRAINING_BASES).map(([id, b]) => <button key={id} aria-pressed={base === id} className={`rounded-lg border p-3 text-left ${base === id ? 'border-green-500 bg-green-500/10' : 'border-border'}`} onClick={() => setBase(id as BaseKind)}><b className="block">{b.name}</b><span className="my-2 block text-green-400">{money(b.weekly)}/week · {b.tableSessions} priority sessions</span><span className="text-gray-400">{b.description}</span></button>)}</div>
-      <label className="flex flex-wrap items-center gap-3">Base location<select aria-label="Base location" className={input} value={location} onChange={e => setLocation(e.target.value)}>{Object.keys(LOCATIONS).map(name => <option key={name}>{name}</option>)}</select></label>
+      <label className="flex flex-wrap items-center gap-3">Base location<select aria-label="Base location" className={input} value={location} onChange={e => setLocation(e.target.value)}>{Object.keys(LOCATIONS).map(name => <option key={name} value={name}>{name} · {trainingLocationProfile(name)?.name}</option>)}</select></label>
+      {profile && <section aria-label="Location training benefits" className="space-y-2 rounded-lg border border-border bg-background/50 p-3">
+        <h3 className="font-bold">{location} · {profile.name}</h3>
+        <p className="text-green-400">Faster development: {profile.strengths.join(' and ')} · +6% training gains</p>
+        <p className="text-amber-300">Trade-off: {profile.tradeoff} · −4% training gains</p>
+        <p>All other skills develop at their normal rate. These affect gains from scheduled sessions, not your current ratings; a skill still needs training to improve.</p>
+        <p className="text-gray-400">Applies with any base tier while at home, after arrival. No location effect while away. Bonuses share the 115% facility cap, so equipment and access can reduce the extra benefit. Expected Development includes these effects.</p>
+        {r.location !== r.home && <p className="text-amber-300">Your current home programme is inactive while you are in {r.location}.</p>}
+        <p className="text-gray-400">Fictional practice programmes. Subscription fees depend on the base tier; relocation cost and journeys to events depend on location.</p>
+      </section>}
       <p>Joining / relocation <b className="text-amber-300">{money(joining)}</b> · recurring <b>{money(option.weekly)}/week</b> · four-week base cost {money(option.weekly * 4)} · cash after joining {money(gameState.player.cash - joining)}</p>
-      <p className="text-gray-400">Equipment rental and coaches are separate. Facility/base efficiency combined is capped at 115%; projects and partners retain their shared 10% allowance. Base benefits are reduced while away. Relocation reserves travel time and can be reviewed after four weeks.</p>
+      <p className="text-gray-400">Equipment rental and coaches are separate. Facility, base and location efficiency combined is capped at 115%; projects and partners retain their shared 10% allowance. Base benefits are reduced while away. Relocation reserves travel time and can be reviewed after four weeks.</p>
       <button className={button} disabled={base === r.base && location === r.home} onClick={() => actOnRealism({ type: 'base', base, location })}>Confirm base and costs</button><p role="status" className="text-amber-300"><PlayerNames text={gameState.lastAction}/></p>
     </div>
   </CareerDisclosure>;

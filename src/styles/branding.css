@@ -1,0 +1,44 @@
+/* Only in-game artwork is referenced here. Publishing/source assets remain dormant. */
+.brand-main-menu-background {
+  background: linear-gradient(90deg, rgb(4 10 8 / 88%), rgb(4 10 8 / 48%)),
+    url('/assetts/ingame/main-menu-background-3840x2160.png') center / cover no-repeat;
+}
+.brand-menu-logo {
+  display: block;
+  width: clamp(15rem, 30vw, 28rem);
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  object-position: left center;
+  margin-bottom: 1.5rem;
+}
+.brand-loading {
+  box-sizing: border-box;
+  display: flex;
+  min-height: 14rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 2rem;
+  border-radius: 0.75rem;
+  color: #f1eee4;
+  text-align: center;
+  font: 1rem/1.5 system-ui, sans-serif;
+  background: linear-gradient(rgb(4 10 8 / 45%), rgb(4 10 8 / 75%)),
+    url('/assetts/ingame/loading-screen-background-3840x2160.png') center / cover no-repeat #09130f;
+}
+.brand-loading--fullscreen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  border-radius: 0;
+}
+.brand-loading-logo {
+  width: min(22rem, 75vw);
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+.brand-loading p { margin: 0; }
+/* Avoid a browser-default margin around the pre-React loading screen. */
+body:has(> #root > .brand-loading--fullscreen) { margin: 0; background: #09130f; }

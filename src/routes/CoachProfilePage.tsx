@@ -5,9 +5,10 @@ import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
 import {
   getCoachAvailability,
+  getCoachProjectedImpact,
   getCoachContractOptions,
 } from "../utils/coachMarket";
-import { formatMoney } from "../utils/formatters";
+import { formatMoney, formatPercent } from "../utils/formatters";
 
 function getPlayerRanking(
   fullName: string,
@@ -62,18 +63,8 @@ export function CoachProfilePage() {
     ["Motivation", coach.motivation],
     ["Compatibility", coach.compatibility],
   ] as const;
-  const predictedImpact = [
-    {
-      label: "Long Potting",
-      value: Math.max(1, Math.round(coach.technical / 18)),
-    },
-    {
-      label: "Safety Play",
-      value: Math.max(1, Math.round(coach.tactical / 18)),
-    },
-    { label: "Focus", value: Math.max(1, Math.round(coach.mental / 18)) },
-    { label: "Stamina", value: Math.max(1, Math.round(coach.motivation / 20)) },
-  ];
+  const coaching = getCoachProjectedImpact(coach);
+  const predictedImpact = coaching.skills.map(label => ({ label, value: coaching.trainingBonus * 100 }));
 
   function handleHireCoach() {
     if (!availability.available) return;
@@ -193,16 +184,17 @@ export function CoachProfilePage() {
             </div>
             <div className="card card-body">
               <h3 className="mb-3 text-xs font-semibold text-white">
-                Predicted Impact
+                Specialist training benefits
               </h3>
               <div className="space-y-3">
+                <p className="text-xs text-gray-300">Boosts relevant training gains in either staff slot. No scheduled practice means no attribute gain. Overlapping coach bonuses add up to 30%; this is not a fixed weekly improvement.</p>
                 {predictedImpact.map((item) => (
                   <div key={item.label}>
                     <div className="mb-1 flex justify-between text-xs">
                       <span className="text-gray-400">{item.label}</span>
-                      <span className="text-green-400">+{item.value}</span>
+                      <span className="text-green-400">+{formatPercent(item.value)} gains</span>
                     </div>
-                    <ProgressBar value={item.value * 12} compact />
+                    <ProgressBar value={item.value / 30 * 100} compact />
                   </div>
                 ))}
               </div>

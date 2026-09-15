@@ -21,7 +21,7 @@ test('loads historical data only when requested and restores full archived draws
  const f=await open(page);expect(await page.evaluate(()=>(window as Window & {archiveReads:number}).archiveReads)).toBe(0);
  await route(page,'/players/'+f.id);await page.getByRole('tab',{name:'Results',exact:true}).click();await expect(page.getByLabel('Player history season').locator('option[value="2010/11"]')).toHaveCount(1);
  await page.getByLabel('Player history season').selectOption('2010/11');await expect(page.locator('summary').filter({hasText:'Historical exhibition'})).toBeVisible();await page.locator('summary').filter({hasText:'Historical exhibition'}).click();await expect(page.getByText('Historical Opponent',{exact:true})).toBeVisible();
- await route(page,'/career/stats');await page.locator('#season-archive > summary').click();await page.getByLabel('Archive season').selectOption('2010/11');await page.getByRole('button',{name:/Historical exhibition/}).click();await expect(page.locator('#season-archive').getByText('Historical Opponent',{exact:true})).toBeVisible();
+ await route(page,'/career/stats#tournament-history');await page.locator('#season-archive > summary').click();await page.getByLabel('Archive season').selectOption('2010/11');await page.getByRole('button',{name:/Historical exhibition/}).click();await expect(page.locator('#season-archive').getByText('Historical Opponent',{exact:true})).toBeVisible();
 });
 test('portable export includes all chunks and difficulty survives reload without cash grants',async({page,browser})=>{
  await open(page);await route(page,'/settings');await page.getByLabel('Career difficulty',{exact:true}).selectOption('demanding');await expect(page.getByText('Saving…',{exact:true})).toBeHidden();
@@ -32,7 +32,7 @@ test('portable export includes all chunks and difficulty survives reload without
   await receiver.goto(new URL('/',page.url()).href);
   await receiver.locator('input[type="file"]').setInputFiles({name:'portable.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(state))});
   await expect(receiver.locator('#main-content')).toBeVisible();await expect(receiver.getByText('Saving…',{exact:true})).toBeHidden();
-  await route(receiver,'/career/stats');await receiver.locator('#season-archive > summary').click();await receiver.getByLabel('Archive season').selectOption('2010/11');await receiver.getByRole('button',{name:/Historical exhibition/}).click();await expect(receiver.locator('#season-archive').getByText('Historical Opponent',{exact:true})).toBeVisible();
+  await route(receiver,'/career/stats#tournament-history');await receiver.locator('#season-archive > summary').click();await receiver.getByLabel('Archive season').selectOption('2010/11');await receiver.getByRole('button',{name:/Historical exhibition/}).click();await expect(receiver.locator('#season-archive').getByText('Historical Opponent',{exact:true})).toBeVisible();
  } finally {await independent.close();}
 
  const cash=state.player.cash;await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.locator('#main-content')).toBeVisible();await route(page,'/settings');await expect(page.getByLabel('Career difficulty',{exact:true})).toHaveValue('demanding');
@@ -44,6 +44,7 @@ test('difficulty and financial estimates remain keyboard accessible at largest t
  const mode=page.getByLabel('Career difficulty',{exact:true});await mode.focus();await page.keyboard.press('Home');await page.keyboard.press('Enter');await expect(mode).toHaveValue('relaxed');
  await expect(page.getByText(/150% of background weekly support/)).toBeVisible();
  await route(page,'/finance');await expect(page.getByRole('heading',{name:'Recurring Monthly Estimate',exact:true})).toBeVisible();
+ await page.getByRole('tab', {name:'Season',exact:true}).click();
  await expect(page.getByText('Season opening cash',{exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
  await page.screenshot({path:'artifacts/career-v012/finance-large-text.png',fullPage:true});

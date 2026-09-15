@@ -36,5 +36,5 @@ for(const width of [1280,390])test('player profiles and exhibition achievements 
  const contained=await page.getByTestId('player-profile').locator('header').evaluate(el=>{const outer=el.getBoundingClientRect();return Array.from(el.querySelectorAll('a')).every(a=>{const r=a.getBoundingClientRect();return r.left>=outer.left&&r.right<=outer.right})});expect(contained).toBe(true);
  expect(await page.getByRole('tablist',{name:'Player profile sections'}).evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
  await page.screenshot({path:'artifacts/profile-redesign-large-'+width+'.png',fullPage:true});
- await navigate('/career/stats');await expect(page.getByRole('region',{name:'Exhibition achievements'})).toContainText('Profile Open');await expect(page.getByRole('region',{name:'Exhibition achievements'})).toContainText('£7,500');expect(errors).toEqual([]);
+ await navigate('/career/stats#exhibition-achievements');await expect(page.getByRole('region',{name:'Exhibition achievements'})).toContainText('Profile Open');await expect(page.getByRole('region',{name:'Exhibition achievements'})).toContainText('£7,500');expect(errors).toEqual([]);
 });

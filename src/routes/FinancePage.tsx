@@ -1,3 +1,5 @@
+import { SectionTabs } from '../components/ui/SectionTabs';
+import { CareerEditor } from '../components/career/CareerDepthPanels';
 import { PlayerNames } from '../components/game/PlayerNames';
 import { TravelLocationPanel } from '../components/career/RealismPanels';
 import { realismOf, overseasWeeklyCost } from '../game/realism';
@@ -17,8 +19,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -27,7 +27,7 @@ import {
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
 import { buildFinanceData } from "../utils/liveRouteData";
-import { formatMoney } from "../utils/formatters";
+import { formatMoney, formatPercent } from "../utils/formatters";
 
 function formatSignedMoney(value: number) {
   return `${value >= 0 ? "+" : "-"}${formatMoney(Math.abs(value))}`;
@@ -70,6 +70,7 @@ export function FinancePage() {
     tournamentPlanner,
     forecastCards,
   } = buildFinanceData(gameState);
+  const [tab, setTab] = useState<'Overview' | 'Income & Costs' | 'Transactions' | 'Budget' | 'Season'>('Overview');
   const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
   const [budgetTargets, setBudgetTargets] = useState<Record<string, number>>(
     () => ({ ...gameState.finance.budgetTargets }),
@@ -105,6 +106,7 @@ export function FinancePage() {
   const recentTransactions = [
     ...gameState.finance.ledger.map((transaction) => ({
       ...transaction,
+      amount: transaction.type === "Expense" ? -Math.abs(transaction.amount) : Math.abs(transaction.amount),
       status: "Completed",
     })),
     ...gameState.matches
@@ -151,7 +153,7 @@ export function FinancePage() {
     })),
   ]
     .sort((left, right) => getDateValue(right.date) - getDateValue(left.date))
-    .slice(0, 5);
+;
 
   const upcomingExpenses = tournamentPlanner
     .map((item) => ({
@@ -224,13 +226,13 @@ export function FinancePage() {
   }
 
   return (
-    <div className="flex min-h-full min-w-0 flex-col gap-3 pb-6 xl:-m-6 xl:p-2">
-      <div className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface/85 px-4 py-3">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden" data-testid="finance-page">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface/85 px-4 py-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold leading-tight text-white">
             Finance Dashboard
           </h1>
-          <p className="mt-1 truncate text-xs text-gray-400">
+          <p className="mt-1 hidden text-xs text-gray-300 sm:block">
             Track your financial health and budget performance for the team.
           </p>
         </div>
@@ -252,70 +254,65 @@ export function FinancePage() {
         </div>
       </div>
 
-      <div className={"card flex flex-wrap items-center justify-between gap-3 p-3 " + (budget.warning ? "border-amber-500/50" : "")}>
-        <div className="min-w-0 text-sm"><p className="font-semibold text-white">{budget.warning ? 'Cash needs attention' : 'Career cash outlook'}</p><p className="text-gray-400">Four-week projection {formatMoney(budget.projected)}{budget.runway !== null ? ' · ' + budget.runway + ' weeks of funds at current spending' : ''}. Club work pays £120 for one reserved day, once per week.</p></div>
-        <button className="btn-secondary shrink-0 px-3 py-2" disabled={!workDate} onClick={() => workDate && actOnCareer({type:'commitment',kind:'club-work',startDate:workDate})}>{workDate ? 'Book club work · '+workDate : 'No free work date in next 28 days'}</button>
-      </div>
-      {realismOf(gameState).location !== realismOf(gameState).home && <><p className="text-xs text-amber-300">Overseas lodging adds {formatMoney(overseasWeeklyCost(gameState))}/week. Return home to stop this cost; an emergency fare can be added to your negative balance.</p><TravelLocationPanel /></>}
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <div className="card min-h-0 p-3">
+      <div className="grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="card min-h-0 p-2.5">
           <div className="flex items-center gap-2">
             <Wallet className="h-4 w-4 text-green-400" />
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-300">
               Current Balance
             </p>
           </div>
-          <p className="mt-2 truncate text-3xl font-bold text-white">
+          <p className="mt-1 truncate text-xl font-bold text-white">
             {formatMoney(gameState.player.cash)}
           </p>
-          <p className="mt-1 text-[11px] text-gray-400">Available funds</p>
+          <p className="mt-1 text-[11px] text-gray-300">Available funds</p>
         </div>
-        <div className="card min-h-0 p-3">
+        <div className="card min-h-0 p-2.5">
           <div className="flex items-center gap-2">
             <Coins className="h-4 w-4 text-green-400" />
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-300">
               Monthly Cash Flow Estimate
             </p>
           </div>
           <p
-            className={`mt-2 truncate text-3xl font-bold ${currentMonthNet >= 0 ? "text-green-400" : "text-red-400"}`}
+            className={`mt-1 truncate text-xl font-bold ${currentMonthNet >= 0 ? "text-green-400" : "text-red-400"}`}
           >
             {formatSignedMoney(currentMonthNet)}
           </p>
-          <p className="mt-1 text-[11px] text-gray-400">
+          <p className="mt-1 text-[11px] text-gray-300">
             Current recurring income less costs
           </p>
         </div>
-        <div className="card min-h-0 p-3">
+        <div className="card min-h-0 p-2.5">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-green-400" />
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-300">
               One-month Projection
             </p>
           </div>
           <p
-            className={`mt-2 truncate text-3xl font-bold ${projectedMonthEnd >= 0 ? "text-green-400" : "text-red-400"}`}
+            className={`mt-1 truncate text-xl font-bold ${projectedMonthEnd >= 0 ? "text-green-400" : "text-red-400"}`}
           >
             {projectedMonthEnd >= 0 ? "+" : "-"}
             {formatMoney(Math.abs(projectedMonthEnd))}
           </p>
-          <p className="mt-1 text-[11px] text-gray-400">
+          <p className="mt-1 text-[11px] text-gray-300">
             Current terms held constant
           </p>
         </div>
-        <div className="card min-h-0 p-3">
+        <div className="card min-h-0 p-2.5">
           <div className="flex items-center gap-2">
             <Receipt className="h-4 w-4 text-green-400" />
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-300">
               Upcoming Event Estimates
             </p>
           </div>
           <p
-            className={`mt-2 truncate text-3xl font-bold ${pendingExpensesTotal > 0 ? "text-red-400" : "text-white"}`}
+            className={`mt-1 truncate text-xl font-bold ${pendingExpensesTotal > 0 ? "text-red-400" : "text-white"}`}
           >
             {formatMoney(pendingExpensesTotal)}
           </p>
-          <p className="mt-1 text-[11px] text-gray-400">
+          <p className="mt-1 text-[11px] text-gray-300">
             {pendingExpensesTotal > 0
               ? `${upcomingExpenses.length} possible event costs`
               : "No eligible events to estimate"}
@@ -323,10 +320,17 @@ export function FinancePage() {
         </div>
       </div>
 
-      <div className="space-y-3">
-        <p className="text-xs text-gray-400">Background support is paid in full below £25,000 cash, tapers to zero at £100,000, and resumes if your balance falls. Monthly estimates use current contracts and support over 52 weeks / 12 months. Future prizes, new bookings, purchases and contract changes are excluded.</p>
-        <div className="card flex h-56 min-h-0 flex-col overflow-hidden sm:h-64">
-          <div className="card-header">
+      <SectionTabs id="finance" label="Finance sections" tabs={['Overview', 'Income & Costs', 'Transactions', 'Budget', 'Season'] as const} active={tab} onChange={setTab} />
+      <div id="finance-panel" role="tabpanel" aria-labelledby={`finance-tab-${['Overview', 'Income & Costs', 'Transactions', 'Budget', 'Season'].indexOf(tab)}`} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {tab === 'Overview' && <div className="flex min-h-full flex-col gap-2">
+      <div className={"card flex flex-wrap items-center justify-between gap-3 p-3 " + (budget.warning ? "border-amber-500/50" : "")}>
+        <div className="min-w-0 flex-1 text-xs"><p className="font-semibold text-white">{budget.warning ? 'Cash needs attention' : 'Career cash outlook'}</p><p className="text-gray-400">Four-week projection {formatMoney(budget.projected)}{budget.runway !== null ? ' · ' + budget.runway + ' weeks of funds at current spending' : ''}. Club work pays £120 for one reserved day, once per week.</p></div>
+        <button className="btn-secondary shrink-0 px-3 py-2 text-xs" disabled={!workDate} onClick={() => workDate && actOnCareer({type:'commitment',kind:'club-work',startDate:workDate})}>{workDate ? 'Book club work · '+workDate : 'No free work date in next 28 days'}</button>
+      </div>
+      {realismOf(gameState).location !== realismOf(gameState).home && <><p className="text-xs text-amber-300">Overseas lodging adds {formatMoney(overseasWeeklyCost(gameState))}/week. Return home to stop this cost; an emergency fare can be added to your negative balance.</p><TravelLocationPanel /></>}
+        <details className="shrink-0 text-xs text-gray-300"><summary className="cursor-pointer text-white">How estimates and background support work</summary><p className="mt-2">Background support is paid in full below £25,000 cash, tapers to zero at £100,000, and resumes if your balance falls. Monthly estimates use current contracts and support over 52 weeks / 12 months. Future prizes, new bookings, purchases and contract changes are excluded.</p></details>
+        <div className="card flex min-h-40 flex-1 flex-col overflow-hidden">
+          <div className="card-header shrink-0">
             <h3 className="text-sm font-semibold text-white">
               Recurring Monthly Estimate
             </h3>
@@ -346,7 +350,7 @@ export function FinancePage() {
               </span>
             </div>
           </div>
-          <div className="card-body h-full min-h-0 p-3">
+          <div className="card-body min-h-0 flex-1 p-3">
             <ResponsiveContainer
               width="100%"
               height="100%"
@@ -389,7 +393,9 @@ export function FinancePage() {
           </div>
         </div>
 
-        <div className="grid min-h-0 grid-cols-1 gap-3 md:grid-cols-2">
+        </div>}
+        {tab === 'Income & Costs' && <>
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-2">
           {[
             {
               title: "Recurring Monthly Income",
@@ -406,95 +412,47 @@ export function FinancePage() {
           ].map((group) => (
             <div
               key={group.title}
-              className="card flex min-h-52 flex-col overflow-hidden"
+              className="card flex min-h-80 flex-col overflow-hidden lg:min-h-0"
             >
               <div className="card-header">
                 <h3 className="text-sm font-semibold text-white">
                   {group.title}
                 </h3>
               </div>
-              <div className="card-body grid min-h-0 flex-1 grid-cols-[0.85fr_0.75fr_1.25fr] gap-4 p-4">
-                <div className="flex min-h-0 flex-col justify-center">
-                  <p className="text-3xl font-bold text-white">
-                    {formatMoney(group.total)}
-                  </p>
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    Total{" "}
-                    {group.title.startsWith("Income") ? "income" : "expenses"}
-                  </p>
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="flex shrink-0 flex-wrap items-end justify-between gap-3 border-b border-border px-5 py-4">
+                  <div>
+                    <p className="text-xs text-gray-300">Total {group.title.endsWith('Income') ? 'income' : 'expenses'} per month</p>
+                    <p className="mt-1 text-3xl font-bold tabular-nums text-white">{formatMoney(group.total)}</p>
+                  </div>
+                  <span className="rounded-full bg-surface-light px-3 py-1 text-xs text-gray-300">{group.items.length} {group.items.length === 1 ? 'category' : 'categories'}</span>
                 </div>
-                <div className="min-h-0">
-                  {group.items.length > 0 ? (
-                    <ResponsiveContainer
-                      width="100%"
-                      height="100%"
-                      minWidth={0}
-                      minHeight={0}
-                      initialDimension={{ width: 1, height: 1 }}
-                    >
-                      <PieChart>
-                        <Pie
-                          data={group.items}
-                          dataKey="value"
-                          nameKey="label"
-                          innerRadius={28}
-                          outerRadius={44}
-                          paddingAngle={2}
-                          stroke="none"
-                        >
-                          {group.items.map((item, index) => (
-                            <Cell
-                              key={item.label}
-                              fill={group.colors[index % group.colors.length]}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            background: "#141e2a",
-                            border: "1px solid #1e2d3d",
-                            borderRadius: 8,
-                            fontSize: 11,
-                          }}
-                          formatter={(value) => formatMoney(Number(value ?? 0))}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : null}
-                </div>
-                <div className="space-y-2 overflow-auto pr-1 scrollbar-thin">
+                <div className="scrollbar-thin min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
                   {group.items.map((item, index) => (
-                    <div
-                      key={item.label}
-                      className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 text-[11px]"
-                    >
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{
-                          backgroundColor:
-                            group.colors[index % group.colors.length],
-                        }}
-                      />
-                      <span className="truncate text-gray-300">
-                        {item.label}
-                      </span>
-                      <span className="whitespace-nowrap text-white">
-                        {formatMoney(item.value)}
-                      </span>
-                      <span className="whitespace-nowrap text-gray-500">
-                        {item.share}%
-                      </span>
+                    <div key={item.label} className="rounded-xl border border-border bg-background/30 p-4">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                        <span className="text-sm font-semibold text-white">{item.label}</span>
+                        <span className="text-lg font-bold tabular-nums text-white">{formatMoney(item.value)}<span className="ml-2 text-xs font-normal text-gray-300">/ month</span></span>
+                      </div>
+                      <div className="mt-3 flex items-center gap-3">
+                        <div aria-hidden="true" className="h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-light">
+                          <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, item.share))}%`, backgroundColor: group.colors[index % group.colors.length] }} />
+                        </div>
+                        <span className="w-14 shrink-0 text-right text-xs font-semibold tabular-nums text-white">{formatPercent(item.share)}<span className="sr-only"> of monthly total</span></span>
+                      </div>
                     </div>
                   ))}
+                  {group.items.length === 0 && <p className="rounded-xl border border-dashed border-border p-5 text-sm text-gray-300">No recurring {group.title.endsWith('Income') ? 'income' : 'expenses'} at present.</p>}
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="grid min-h-0 grid-cols-1 gap-3 lg:grid-cols-12">
-          <div className="card flex min-h-72 flex-col overflow-hidden lg:col-span-5">
-            <div className="card-header">
+        </>}
+        {tab === 'Transactions' && <>
+          <div className="card flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="card-header shrink-0">
               <h3 className="text-sm font-semibold text-white">
                 Recent Transactions
               </h3>
@@ -513,6 +471,7 @@ export function FinancePage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {recentTransactions.length === 0 && <tr><td colSpan={5} className="p-4 text-gray-300">No transactions recorded yet.</td></tr>}
                   {recentTransactions.map((transaction) => (
                     <tr
                       key={transaction.id}
@@ -555,20 +514,22 @@ export function FinancePage() {
             </div>
           </div>
 
-          <div className="card flex min-h-72 flex-col overflow-hidden lg:col-span-4">
-            <div className="card-header">
+        </>}
+        {tab === 'Budget' && <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
+          <div className="card flex min-h-80 lg:min-h-0 flex-col overflow-hidden ">
+            <div className="card-header shrink-0">
               <h3 className="text-sm font-semibold text-white">
                 Monthly Budget Overview
               </h3>
             </div>
-            <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
+            <div className="card-body flex flex-1 min-h-0 flex-col justify-between gap-2 p-3">
               <div className="grid grid-cols-[1.1fr_0.6fr_0.6fr_0.65fr] gap-2 text-[10px] uppercase tracking-[0.12em] text-gray-500">
                 <span>Category</span>
                 <span className="text-right">Budget</span>
                 <span className="text-right">Spent</span>
                 <span className="text-right">Remaining</span>
               </div>
-              <div className="flex-1 space-y-2 overflow-auto pr-1 scrollbar-thin">
+              <div className="min-h-0 flex-1 space-y-2 overflow-auto pr-1 scrollbar-thin">
                 {budgetAllocation.map((item) => {
                   const budgetLimit = getBudgetLimit(
                     item.label,
@@ -619,13 +580,13 @@ export function FinancePage() {
             </div>
           </div>
 
-          <div className="card flex min-h-72 flex-col overflow-hidden lg:col-span-3">
-            <div className="card-header">
+          <div className="card flex min-h-80 lg:min-h-0 flex-col overflow-hidden ">
+            <div className="card-header shrink-0">
               <h3 className="text-sm font-semibold text-white">
                 Upcoming Expenses
               </h3>
             </div>
-            <div className="card-body flex h-full min-h-0 flex-col justify-between gap-2 p-3">
+            <div className="card-body flex flex-1 min-h-0 flex-col justify-between gap-2 p-3">
               <div className="space-y-2 overflow-auto pr-1 scrollbar-thin">
                 {upcomingExpenses.length > 0 ? (
                   upcomingExpenses.map((item) => (
@@ -661,11 +622,11 @@ export function FinancePage() {
               </button>
             </div>
           </div>
-        </div>
-
-        <div className="grid min-h-0 grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="card min-h-32 p-4">
-            <p className="metric-label">Season opening cash</p>
+        </div>}
+        {tab === 'Season' && <>
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-3">
+          <div className="card flex min-h-32 flex-col justify-center p-4">
+            <p className="text-xs text-white">Season opening cash</p>
             <p className="mt-2 truncate text-2xl font-bold text-white">
               {opening ? formatMoney(opening.snapshot.cash) : 'Not recorded'}
             </p>
@@ -673,8 +634,8 @@ export function FinancePage() {
               {opening ? `${opening.snapshot.date}${opening.partial ? ' · earliest surviving snapshot' : ''}` : 'No opening balance survives'}
             </p>
           </div>
-          <div className="card min-h-32 p-4">
-            <p className="metric-label">Prize money this season</p>
+          <div className="card flex min-h-32 flex-col justify-center p-4">
+            <p className="text-xs text-white">Prize money this season</p>
             <p className="mt-2 truncate text-2xl font-bold text-white">
               {formatMoney(seasonPrize)}
             </p>
@@ -682,8 +643,8 @@ export function FinancePage() {
               Recorded singles prize awards
             </p>
           </div>
-          <div className="card min-h-32 p-4">
-            <p className="metric-label">Cash change this season</p>
+          <div className="card flex min-h-32 flex-col justify-center p-4">
+            <p className="text-xs text-white">Cash change this season</p>
             <p
               className={`mt-2 truncate text-2xl font-bold ${(seasonCashChange ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`}
             >
@@ -694,22 +655,12 @@ export function FinancePage() {
             </p>
           </div>
         </div>
+        </>}
       </div>
 
       {budgetEditorOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="budget-editor-title"
-        >
-          <div className="card w-full max-w-lg p-5 shadow-2xl">
-            <h2
-              id="budget-editor-title"
-              className="text-lg font-semibold text-white"
-            >
-              Monthly Budget Manager
-            </h2>
+        <CareerEditor title="Monthly Budget Manager" onClose={() => setBudgetEditorOpen(false)}>
+          <div className="min-h-0 overflow-y-auto p-4">
             <p className="mt-1 text-xs text-gray-400">
               Move your planned funds between categories. This changes planning
               limits, not your cash balance.
@@ -762,7 +713,7 @@ export function FinancePage() {
               </button>
             </div>
           </div>
-        </div>
+        </CareerEditor>
       ) : null}
     </div>
   );
