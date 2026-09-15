@@ -1,6 +1,6 @@
 import { PlayerLink } from '../game/PlayerLink';
 import { useState } from 'react';
-import { Award, Trophy } from 'lucide-react';
+import { Award, Trophy, Target, Flag, Zap, BarChart3 } from 'lucide-react';
 import { legacyRate, type CareerLegacy } from '../../game/careerLegacy';
 import { formatMoney } from '../../utils/formatters';
 
@@ -37,7 +37,7 @@ export function LegacyRecords({ stats, view = 'all' }: { stats: CareerLegacy; vi
     {view !== 'trophies' && <section className="card legacy-records" aria-labelledby="career-records-heading">
       <div className="card-header"><div><h2 id="career-records-heading" className="text-base font-semibold text-white">Career Records</h2><p className="mt-1 text-xs text-gray-400">Your numbers across every circuit and season.</p></div><Award className="h-5 w-5 shrink-0 text-green-400" /></div>
       <div className="legacy-records-grid">
-        {groups.map(group => <div className="legacy-record-group" key={group.title}><h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-green-400">{group.title}</h3><dl>{group.rows.map(([label, value]) => <div key={label} className="flex items-baseline justify-between gap-3 text-xs"><dt className="text-gray-400">{label}</dt><dd className="shrink-0 font-semibold tabular-nums text-white">{value}</dd></div>)}</dl></div>)}
+        {groups.map((group, index) => <div className="legacy-record-group" key={group.title}><header><span>{[<Target />, <BarChart3 />, <Flag />, <Zap />][index]}</span><h3>{group.title}</h3></header><dl className="legacy-record-feature"><div><dt>{group.rows[0][0]}</dt><dd>{group.rows[0][1]}</dd></div></dl><dl>{group.rows.slice(1).map(([label, value]) => <div key={label} className="flex items-baseline justify-between gap-3 text-xs"><dt className="text-gray-400">{label}</dt><dd className="shrink-0 font-semibold tabular-nums text-white">{value}</dd></div>)}</dl></div>)}
       </div>
       <div className="border-t border-border px-4 py-3 text-xs leading-relaxed text-gray-400">
         <p>Potting and safety rates are frame-weighted averages of simulated match estimates ({stats.performanceMatches} matches). Whitewashes exclude single-frame events.</p>

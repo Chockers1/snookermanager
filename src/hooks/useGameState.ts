@@ -16605,6 +16605,7 @@ export function createNewCareerState(config?: NewCareerConfig): GameState {
     config?.startingLevelId,
   );
   const careerConfig: NewCareerConfig = {
+    difficulty: config?.difficulty === 'relaxed' || config?.difficulty === 'demanding' ? config.difficulty : 'standard',
     fullName: config?.fullName?.trim() || createPlayerIdentitySeed.name,
     nationality: config?.nationality || createPlayerIdentitySeed.nationality,
     age: config?.age ?? createPlayerIdentitySeed.age,
@@ -18516,10 +18517,6 @@ export function useGameState() {
 
   const actions = useMemo(
     () => ({
-      setCareerDifficulty(difficulty: CareerDifficulty) {
-        if(!['relaxed','standard','demanding'].includes(difficulty))return;
-        setGameState(previous=>finalizeState({...previous,difficulty}, 'Career difficulty changed. Support and future missed obligations use the selected rules. No cash granted or past penalties changed.'));
-      },
       updateFirstWeekGuide(action:'dismiss'|'resume'|'skip'|'equipment'|'minimize'|'expand',step?:GuideStep) {
         setGameState(previous=>{
           const guide=previous.firstWeekGuide??freshGuide(previous);

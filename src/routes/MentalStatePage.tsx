@@ -37,9 +37,9 @@ export function MentalStatePage() {
   <section aria-label="Mental state summary" className="wellbeing-metrics mental-metrics">{data.metrics.slice(0,6).map(metric=><article key={metric.label}><p>{metric.label}</p><div><strong>{formatPercent(metric.value)}</strong><span className={toneClass(metric.tone)}>{metric.detail}</span></div><ProgressBar value={metric.value} tone={metric.tone} compact/></article>)}</section>
   <SectionTabs id="mental-sections" label="Mental sections" tabs={tabs} active={tab} onChange={setTab}/>
   <div role="tabpanel" id="mental-sections-panel" aria-labelledby={`mental-sections-tab-${tabs.indexOf(tab)}`} className="wellbeing-content">
-   {tab==='Overview'&&<div className="wellbeing-overview">
+   {tab==='Overview'&&<div className="wellbeing-overview mental-overview">
     <section className="care-panel care-panel-gold"><div className="care-panel-heading"><span className="wellbeing-eyebrow">Current assessment</span><span className="care-badge">Severity {formatPercent(data.diagnosis.severity)}</span></div><div className="care-panel-body">
-     <h2>{data.diagnosis.title}</h2><p>Review fatigue, confidence and workload together. These are game estimates, not proof that a particular result has one cause.</p>
+     <h2>{data.diagnosis.title}</h2><p>Fatigue, confidence and workload are game estimates, not proof of a result’s cause.</p>
      <h3>What is contributing</h3><ul className="care-evidence">{data.diagnosis.factors.map(factor=><li key={factor}>{factor}</li>)}</ul>
      <div className="care-stat-pair"><div><span>Recovery outlook</span><strong>{data.diagnosis.recoveryOutlook}</strong></div><div><span>Estimated recovery chance</span><strong>{formatPercent(data.diagnosis.recoveryChance)}</strong></div></div>
     </div><footer className="care-panel-actions"><button className="btn-primary text-xs" onClick={()=>setTab('Recovery plans')}>Choose a recovery plan <ChevronRight className="h-3 w-3"/></button></footer></section>

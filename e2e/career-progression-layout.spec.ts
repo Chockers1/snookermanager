@@ -27,6 +27,15 @@ for (const [width, height, scale] of [[1920, 1080, 100], [1366, 768, 130], [1100
     await expect(page.getByRole('dialog')).toContainText('Unlocks');
     await page.keyboard.press('Escape');
    }
+   if (name === 'Events') {
+    const events = page.getByTestId('pathway-events');
+    await expect(events.getByRole('region', { name: 'Current stage events' })).toBeVisible();
+    expect(await events.evaluate(el => el.scrollHeight <= el.clientHeight + 2 && el.scrollWidth <= el.clientWidth + 2)).toBe(true);
+    for (const card of await events.locator('.pathway-event').all()) {
+     expect(await card.evaluate(el => el.scrollHeight <= el.clientHeight + 2 && el.scrollWidth <= el.clientWidth + 2)).toBe(true);
+     await expect(card).toHaveAttribute('href', /\/calendar\?tournament=/);
+    }
+   }
    if (name === 'Full Pathway') {
     const stages = page.getByRole('region', { name: 'Pathway stages' });
     await expect(stages.getByRole('button')).toHaveCount(14);
@@ -60,5 +69,12 @@ for (const [width, height, scale] of [[1920, 1080, 100], [1366, 768, 130], [1100
   }
   await tabs.getByRole('tab', { name: 'Career Snapshot' }).focus(); await page.keyboard.press('Home');
   await expect(tabs.getByRole('tab', { name: 'Overview', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await tabs.getByRole('tab', { name: 'Events', exact: true }).click();
+  const eventLink = page.getByTestId('pathway-events').locator('.pathway-event').first();
+  if (await eventLink.count()) {
+   const target = await eventLink.getAttribute('href');
+   await eventLink.focus(); await page.keyboard.press('Enter');
+   await expect(page).toHaveURL(url => url.pathname + url.search === target);
+  }
  });
 }

@@ -1,3 +1,4 @@
+import { PathwayEvents } from '../components/career/PathwayEvents'
 import { SectionTabs } from '../components/ui/SectionTabs';
 import { CareerEditor } from '../components/career/CareerDepthPanels';
 import { careerLegacyOf, careerLegacyRating } from '../game/careerLegacy'
@@ -198,7 +199,6 @@ export function CareerProgressionPage() {
   }
   const selectedStage = stages.find(stage => stage.id === selectedStageId)
   const stageStatus = (stage: typeof currentStage) => stage.current ? 'Current stage' : stage.complete ? 'Earlier stage' : 'Later stage'
-  const overviewCards = 'card flex min-h-80 flex-col overflow-hidden lg:min-h-0'
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden" data-testid="career-progression-page">
@@ -254,7 +254,10 @@ export function CareerProgressionPage() {
             })}
           </div>
         </>}
-        {tab === 'Events' && <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">{[{ title: 'Current Stage Events', stage: currentStage, events: currentStageEvents }, { title: 'Upcoming Unlock Events', stage: nextStage, events: nextStageEvents }].map(group => <section key={group.title} className={overviewCards}><header className="card-header shrink-0"><div><h2 className="text-sm font-bold text-white">{group.title}</h2><p className="mt-1 text-xs text-gray-300">{group.stage.name}</p></div></header><div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">{group.events.map(event => <button key={event.id} className="w-full rounded-lg border border-border bg-surface-light/50 p-3 text-left" onClick={() => navigate(`/calendar?tournament=${encodeURIComponent(event.id)}`)}><p className="text-sm font-semibold text-white">{event.name}</p><p className="mt-1 text-xs text-gray-300">{event.startDate} · {event.status}</p>{event.progressionImpact && <p className="mt-2 text-xs text-gray-300">{event.progressionImpact}</p>}<p className="mt-2 text-xs font-semibold text-green-300">View event & eligibility →</p></button>)}{group.events.length === 0 && <p className="p-3 text-sm text-gray-300">No events are currently mapped to this stage.</p>}</div></section>)}</div>}
+        {tab === 'Events' && <PathwayEvents groups={[
+          { title: 'Current stage events', stage: currentStage.name, events: currentStageEvents },
+          ...(nextStage.id !== currentStage.id ? [{ title: 'Next-stage opportunities', stage: nextStage.name, events: nextStageEvents }] : []),
+        ]} />}
         {tab === 'Career Snapshot' && <div className="career-snapshot" data-testid="career-snapshot">
           <section className="snapshot-panel snapshot-panel--gold">
             <header className="snapshot-heading"><span className="snapshot-icon"><Trophy aria-hidden="true" /></span><div><p>Your career</p><h2>Results & standing</h2></div></header>

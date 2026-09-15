@@ -2,9 +2,10 @@ import { test, expect, type Page } from '@playwright/test';
 import { createNewCareerState } from '../src/hooks/useGameState';
 import { careerLegacyOf, recordLegacyMatch } from '../src/game/careerLegacy';
 import { ACCESSIBILITY_KEY } from '../src/game/accessibility';
+import { initializeSeasonLife } from '../src/game/seasonLife';
 import { ACTIVE_SAVE_KEY, encodeCareerSave } from '../src/game/saveStorage';
 import type { Match } from '../src/types/game';
-async function open(page: Page, populated: boolean | 'rt' = false) {
+async function open(page: Page, populated: boolean | 'rt' = false, configure?: (state: ReturnType<typeof createNewCareerState>) => void) {
   const state = createNewCareerState();
   if (populated === 'rt') {
     state.history.legacy = { ...careerLegacyOf(state), matchesPlayed: 38, wins: 23, losses: 15, centuries: 7, prizeMoney: 240000 };
@@ -17,6 +18,7 @@ async function open(page: Page, populated: boolean | 'rt' = false) {
     }
     state.history.legacy = stats;
   }
+  configure?.(state);
   await page.addInitScript(({ key, save }) => { if (!localStorage.getItem(key)) localStorage.setItem(key, save); }, { key: ACTIVE_SAVE_KEY, save: encodeCareerSave(state) });
   await page.goto('/'); await page.getByRole('button', { name: /Continue Career/ }).click(); await expect(page.getByRole('heading', { name: 'Upcoming & Recent Results', exact: true })).toBeVisible();
   await page.evaluate(() => { history.pushState({}, '', '/career/stats'); dispatchEvent(new PopStateEvent('popstate')); });
@@ -69,6 +71,7 @@ test('RT’s titleless save no longer shows a perfect legacy or world champion l
   await expect(score.locator('span.text-4xl')).toHaveText('2');
   await expect(score).toContainText('Tour Professional'); await expect(score).not.toContainText('World Champion');
   await page.getByRole('tab', { name: 'Tournament History', exact: true }).click();
+  await page.getByRole('button', { name: 'Completed events', exact: true }).click();
   await expect(page.getByRole('columnheader', { name: 'Ranking Credit' })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: 'Legacy Impact' })).toHaveCount(0);
 });
@@ -77,7 +80,7 @@ for (const width of [1920, 1366, 390]) test(`Legacy tabs contain long records at
   await page.setViewportSize({ width, height: width === 390 ? 844 : width === 1366 ? 768 : 900 });
   if (width === 1366) await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ textScale: 130, reducedMotion: true })), ACCESSIBILITY_KEY);
   await open(page, true);
-  for (const tab of ['Overview', 'Records', 'Trophies', 'Tournament History', 'Trends', 'Goals', 'Stories']) {
+  for (const tab of ['Overview', 'Records', 'Trophies', 'Tournament History', 'Trends', 'Achievements', 'Stories']) {
     await page.getByRole('tab', { name: tab, exact: true }).click();
     await expect(page.getByRole('tabpanel')).toBeVisible();
     if (width >= 1024 && ['Overview', 'Records', 'Trends'].includes(tab)) {
@@ -86,7 +89,29 @@ for (const width of [1920, 1366, 390]) test(`Legacy tabs contain long records at
     if (width >= 1024 && tab === 'Overview') {
       expect(await page.locator('.legacy-identity').evaluate(el => el.scrollHeight <= el.clientHeight + 2)).toBe(true);
     }
-    if (['Overview', 'Records', 'Trends'].includes(tab)) await page.screenshot({ path: `artifacts/legacy-redesign-${width}-${tab}.png` });
+    await page.screenshot({ path: `artifacts/legacy-redesign-${width}-${tab}.png` });
+    if (tab === 'Trophies') {
+      await page.getByRole('button', {name: 'Exhibition wins', exact:true}).click();
+      await expect(page.getByRole('region', {name: 'Exhibition achievements'})).toBeVisible();
+      await page.getByRole('button', {name: 'Competitive titles', exact:true}).click();
+    }
+    if (tab === 'Tournament History') {
+      await page.getByRole('button', {name: 'World archive', exact:true}).click();
+      await expect(page.getByLabel('Archive season')).toBeVisible();
+      await page.getByRole('button', {name: 'Your tournaments', exact:true}).click();
+      await page.getByLabel('History tournament').selectOption({index:1});
+      await expect(page.getByRole('tab', {name: 'Tournament History', exact:true})).toHaveAttribute('aria-selected','true');
+    }
+    if (tab === 'Trends') {
+      await page.getByRole('button', {name:'Confidence',exact:true}).click();
+      await page.getByLabel('Trend history window').selectOption('24');
+      await expect(page.getByRole('heading', {name:'Confidence',exact:true})).toBeVisible();
+    }
+    if (tab === 'Stories') {
+      await page.getByRole('button', {name:'Interviews',exact:true}).click();
+      await expect(page.getByRole('heading', {name:'No interviews recorded yet'})).toBeVisible();
+      await page.getByRole('button', {name:'Season summaries',exact:true}).click();
+    }
     if (width === 1920 && tab === 'Overview') await page.screenshot({ path: 'artifacts/legacy-overview-contained.png' });
     expect(await page.locator('main').evaluate(el => el.scrollHeight <= el.clientHeight + 2)).toBe(true);
     expect(await page.locator('main').evaluate(el => el.scrollWidth <= el.clientWidth + 2)).toBe(true);
@@ -97,4 +122,36 @@ for (const width of [1920, 1366, 390]) test(`Legacy tabs contain long records at
   await page.evaluate(() => { history.pushState({}, '', '/career/stats#trophy-cabinet'); dispatchEvent(new PopStateEvent('popstate')); });
   await expect(page.getByRole('tab', { name: 'Trophies', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.screenshot({ path: `artifacts/legacy-tabs-${width}.png` });
+});
+
+
+test('populated trend values, milestones and archived journal entries remain readable', async ({page}) => {
+  await page.setViewportSize({width:1366,height:768});
+  await open(page,true,state => {
+    Object.assign(state, initializeSeasonLife(state));
+    const life=state.careerDepth!.seasonLife!;
+    life.stories=[{id:'journal-review',kind:'form',title:'A steadier opening',created:'2026-05-01',defaultText:'Continue training',resolved:'2026-05-10',steps:[{date:'2026-05-10',text:'Three relevant weeks of practice completed.'}]}];
+    life.archivedStories=[{id:'old-review',date:'2025-08-01',title:'First steps with your coach',text:'The development review was completed.'}];
+    life.interviews=[{id:'interview-test',eventId:'event-test',title:'After the final',context:'You won the County Open final.',created:'2026-05-10',deadline:'2026-05-13',answered:'2026-05-10',response:'praise',reaction:state.worldPlayers[0].playerName+' appreciated your comments.'}];
+    life.summaries=[{season:'2025/26',text:'Your first coaching partnership developed.'}];
+    const base=state.history.snapshots[0];
+    state.history.snapshots=[0,1,2].map(i=>({...base,date:`2026-05-${String(i+1).padStart(2,'0')}`,week:i+1,confidence:77.123456+i,ranking:14-i,totalPrizeMoney:1000+i*250}));
+  });
+  await page.getByRole('tab',{name:'Trends',exact:true}).click();
+  await page.getByRole('button',{name:'Confidence',exact:true}).click();
+  await expect(page.locator('.legacy-trend-ledger')).toContainText('79.12%');
+  await expect(page.locator('.legacy-trend-ledger')).not.toContainText('79.123456');
+  await expect(page.locator('.legacy-chart-canvas svg')).toBeVisible();
+  await page.screenshot({path:'artifacts/legacy-trends-populated.png'});
+  await page.getByRole('tab',{name:'Achievements',exact:true}).click();
+  await expect(page.locator('.legacy-goal--earned')).not.toHaveCount(0);
+  await page.getByRole('tab',{name:'Stories',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'A steadier opening',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'First steps with your coach',exact:true})).toBeVisible();
+  await page.screenshot({path:'artifacts/legacy-stories-populated.png'});
+  await page.getByRole('button',{name:'Interviews',exact:true}).click();
+  await expect(page.locator('.legacy-journal-response')).toContainText('Praised opponent');
+  await expect(page.locator('.legacy-journal-response').getByRole('link').first()).toBeVisible();
+  await page.getByRole('button',{name:'Season summaries',exact:true}).click();
+  await expect(page.locator('.legacy-journal-list')).toContainText('Your first coaching partnership developed.');
 });

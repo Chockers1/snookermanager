@@ -18,6 +18,13 @@ for(const [width,height,scale] of [[1920,1080,100],[1366,768,130],[1280,720,100]
   for(const option of ['Attack','Balanced','Safety','Composed','Confident','Counter','Steady','Quick'])await expect(tactics.getByRole('button',{name:option,exact:true})).toBeInViewport();
   expect((await page.locator('.preview-content').boundingBox())!.height).toBeGreaterThan(width<768?180:240);
   await expect(page.getByText('Danger zone',{exact:true})).toHaveCount(0);await expect(page.getByText('Personal match objectives',{exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:/Conditions & scouting/})).toHaveCount(0);
+  if(tab==='Matchup' && width>=768){
+   const analysis=page.locator('.preview-analysis');
+   expect(await analysis.locator('.care-panel-body').evaluate(el=>el.scrollHeight<=el.clientHeight+2)).toBe(true);
+   await expect(analysis.getByRole('article')).toHaveCount(3);
+   for(const article of await analysis.getByRole('article').all()) await expect(article).toBeInViewport();
+   await expect(analysis.getByRole('button',{name:'View comparison →'})).toBeInViewport();
+  }
   await page.screenshot({path:`artifacts/preview-redesign-${width}-${tab.replaceAll(' ','-')}.png`});
  }
  await tactics.getByRole('button',{name:'Safety',exact:true}).click();await tactics.getByRole('button',{name:'Counter',exact:true}).click();await tactics.getByRole('button',{name:'Quick',exact:true}).click();

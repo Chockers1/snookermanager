@@ -24,7 +24,7 @@ for(const width of [1366,390])test('guide docks, reopens, saves progress and sta
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
  await page.screenshot({path:`artifacts/career-v012/guide-popup-${width}.png`,fullPage:true});
  await panel.getByRole('button',{name:'Dismiss guide'}).click();await expect(panel).toHaveCount(0);await expect(launcher).toHaveCount(0);
- await page.getByRole('button',{name:'Show first-week guide',exact:true}).click();await expect(panel).toBeVisible();
+ await page.getByRole('tab',{name:'Career',exact:true}).click();await page.getByRole('button',{name:'Show first-week guide',exact:true}).click();await expect(panel).toBeVisible();
 });
 
 for(const width of [1366,390])test('ready equipment ticks automatically in an existing guide at '+width,async({page})=>{

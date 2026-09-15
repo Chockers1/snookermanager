@@ -1,14 +1,15 @@
 import { TournamentRewards } from '../game/TournamentRewards';
 import { PlayerLink } from '../game/PlayerLink';
 import { Fragment, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useGame } from '../../context/useGame';
 import { bestTournamentEdition, sameCareerTournament, tournamentCareerEditions, tournamentEditionSummary, tournamentHistoryOptions, tournamentRoundHistory } from '../../game/tournamentCareerHistory';
 import { formatMoney } from '../../utils/formatters';
 
 export function TournamentCareerHistory() {
   const { gameState } = useGame();
-  const [params,setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const {hash}=useLocation(), navigate=useNavigate();
   const [tour,setTour] = useState('All tours');
   const [expanded,setExpanded] = useState<string | null>(null);
   const options = tournamentHistoryOptions(gameState);
@@ -26,7 +27,7 @@ export function TournamentCareerHistory() {
     <div className="card-body space-y-4">
       <div className="grid gap-3 sm:grid-cols-[minmax(140px,1fr)_minmax(0,3fr)]">
         <label className="text-xs text-gray-400">Tour<select aria-label="History tour" value={tour} onChange={e=>{setTour(e.target.value);setExpanded(null)}} className="mt-1 w-full min-w-0 rounded border border-border bg-surface p-2 text-white"><option>All tours</option>{tours.map(t=><option key={t}>{t}</option>)}</select></label>
-        <label className="text-xs text-gray-400">Tournament<select aria-label="History tournament" value={selected?.id ?? ''} onChange={e=>{setParams({tournament:e.target.value},{replace:true});setExpanded(null)}} className="mt-1 w-full min-w-0 rounded border border-border bg-surface p-2 text-white">{filtered.map(t=><option key={t.id} value={t.id}>{t.name} · {t.eventType}</option>)}</select></label>
+        <label className="text-xs text-gray-400">Tournament<select aria-label="History tournament" value={selected?.id ?? ''} onChange={e=>{navigate({search:'?tournament='+encodeURIComponent(e.target.value),hash},{replace:true});setExpanded(null)}} className="mt-1 w-full min-w-0 rounded border border-border bg-surface p-2 text-white">{filtered.map(t=><option key={t.id} value={t.id}>{t.name} · {t.eventType}</option>)}</select></label>
       </div>
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {[['Recorded appearances',played.length],['Best finish',best ? best.finish+' · '+best.season : 'No completed run'],['Match record',played.reduce((n,e)=>n+e.wins,0)+'W · '+played.reduce((n,e)=>n+e.draws,0)+'D · '+played.reduce((n,e)=>n+e.losses,0)+'L'],['Recorded prize money',formatMoney(played.reduce((n,e)=>n+(e.prize??0),0))]].map(([label,value])=><div key={label} className="min-w-0 rounded bg-surface-light/50 p-3"><p className="text-[10px] text-gray-400">{label}</p><p className="mt-1 break-words text-sm font-semibold text-white">{value}</p></div>)}

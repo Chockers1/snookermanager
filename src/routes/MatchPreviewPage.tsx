@@ -232,7 +232,6 @@ export function MatchPreviewPage() {
           <div className="preview-h2h"><div><h2><Users className="h-4 w-4"/>Head-to-Head</h2><span>Your recorded meetings</span></div><dl><div><dt>Your Wins</dt><dd>{wins}</dd></div><div><dt>Meetings</dt><dd>{totalMeetings}</dd></div><div><dt>Losses</dt><dd>{losses}</dd></div></dl><button className="preview-text-link" onClick={()=>navigate('/career/rivalries')}>View history →</button></div>
         </section>
         <section className="care-panel preview-analysis"><div className="care-panel-heading"><h2><Swords className="h-4 w-4"/>Matchup Analysis</h2><span className="care-badge">Pre-match outlook</span></div><div className="care-panel-body">
-          <p>Compare your approaches before choosing the opening frame tactics.</p>
           <div className="preview-approaches">{tacticalPlan.map(item=><article key={item.label}><div><h3>{item.label}</h3><strong>{formatPercent(item.level)}</strong></div><ProgressBar value={item.level} tone={item.level>=65?'green':'amber'} compact/><p>{item.description}</p></article>)}</div>
         </div><footer className="care-panel-actions"><span className="text-xs text-gray-300">Detailed opponent attributes are scouting estimates.</span><button className="preview-text-link" onClick={()=>setTab('Scouting')}>View comparison →</button></footer></section>
       </div>}

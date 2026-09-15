@@ -34,8 +34,8 @@ export function DashboardFinanceSummary({ state }: { state: GameState }) {
 }
 
 export function DashboardCareerSummary({ state, coachName }: { state: GameState; coachName?: string }) {
-  return <div data-testid="dashboard-career-content" className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto] gap-2 p-3">
-    <div className="flex min-w-0 items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2">
+  return <div data-testid="dashboard-career-content" className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto] gap-2 p-3 text-center">
+    <div className="flex min-w-0 items-center justify-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 px-3 py-2">
       <span className="h-2 w-2 shrink-0 rounded-full bg-green-400" />
       <p className="min-w-0 text-xs font-semibold leading-snug text-green-400">{state.player.competitiveStatus ?? state.player.rankingLabel}</p>
     </div>

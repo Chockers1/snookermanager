@@ -39,7 +39,7 @@ for(const [width,zoom] of [[390,1],[1280,2]] as const)test('long names and large
  const state=createStarterState();state.player.fullName='Alexander Montgomery-Worthington-Smythe';
  await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await readCareerSave(page);
- await navigate(page,'/settings');await page.getByLabel('Text size',{exact:true}).selectOption('130');await page.getByLabel('Higher text contrast').check();await page.getByLabel('Enable keyboard navigation shortcuts').check();
+ await navigate(page,'/settings');await page.getByLabel('Text size',{exact:true}).selectOption('130');await page.getByLabel('Higher text contrast').check();await page.getByRole('tab',{name:'Controls',exact:true}).click();await page.getByLabel('Enable keyboard navigation shortcuts').check();
  // A half-width CSS viewport approximates 200% browser zoom reflow; OS/browser zoom remains a manual check.
  for(const route of ['/','/calendar','/rankings','/player/attributes','/inbox','/training','/tournaments/hub','/tournaments/draw','/finance','/saves']){
   await navigate(page,route);await expect(page.locator('#main-content')).toBeVisible();

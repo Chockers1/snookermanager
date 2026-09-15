@@ -10,6 +10,12 @@ import {backgroundWeeklySupport,careerDifficulty} from './careerDifficulty';
 import {publicityReputationGain,sponsorRenewalCeiling,sponsorRenewalQuote,sponsorWeeklyPayment} from './sponsorEconomy';
 import {applySeasonalAgeRegression} from './playerAgeing';
 describe('long career finances and recovery',()=>{
+ it.each(['relaxed','standard','demanding'] as const)('preserves %s difficulty during career creation',difficulty=>{
+  const state=createNewCareerState({fullName:'Difficulty Test',nationality:'England',age:21,handedness:'Right-handed',cueStyle:createPlayerIdentitySeed.cueStyle,playingStyle:createPlayerIdentitySeed.playingStyle,personalityArchetype:createPlayerIdentitySeed.personalityArchetype,sliders:createPlayerSliderCatalog.map(slider=>({...slider})),backgroundId:createPlayerBackgroundCatalog[0].id,startingLevelId:'start-q-tour',difficulty});
+  expect(state.difficulty).toBe(difficulty);
+  state.player.cash=10000;state.finance.baseCashFlow=200;
+  expect(backgroundWeeklySupport(state)).toBe(difficulty==='relaxed'?300:difficulty==='demanding'?150:200);
+ });
  it('tapers support without taxing winnings and restores it when reserves fall',()=>{
   const s=createStarterState();s.finance.baseCashFlow=200;
   for(const [cash,support] of [[-500,200],[25000,200],[62500,100],[100000,0],[40000000,0]]){
