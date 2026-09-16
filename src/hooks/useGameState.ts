@@ -52,7 +52,8 @@ import { entryClosed, entryDeadline } from '../game/tournamentEntry';
 import { developmentEdge, evolveTourSkills } from '../game/tourDevelopment';
 import { frameStory, visitStory } from '../game/contextCommentary';
 import { matchObjectives, assessMatchObjectives, matchDebrief } from "../game/matchInsights";
-import { sponsorPerformance, sponsorRanking, reviewSponsorPerformance } from "../game/sponsorPerformance";
+import { sponsorPerformance, sponsorRanking, reviewSponsorPerformance, sponsorPerformanceNoticeText, sponsorPerformanceTermsText } from "../game/sponsorPerformance";
+import { sponsorVolatility, sponsorVolatilityDescription } from '../game/sponsorVolatility';
 import { careerLegacyOf, careerLegacyRating, recordLegacyMatch, type CareerLegacy } from '../game/careerLegacy';
 import { pathwayEntryReason, pathwayAgeLimit, pathwayPlacementPrize, nationRegion, residenceRegion, qTourRegion, Q_TOUR_POINTS, qTourQualification, seniorQualification, pathwayCardAwards, securedPathwayCards } from '../game/pathwayRules';
 import { stepShootOut, stepBallShootOut, attemptGoldenBall, handicapAllowance } from '../game/specialMatchRules';
@@ -6239,7 +6240,7 @@ export function startNextSeasonState(previousState: GameState): GameState {
   );
 }
 
-export function advanceWeekState(previousState: GameState): GameState {
+export function advanceWeekState(previousState: GameState, stopDate?: string): GameState {
   const decisionBlocked = blockForRequiredDecision(previousState);
   if (decisionBlocked) return decisionBlocked;
   previousState = processRankingCalendar(previousState);
@@ -6257,7 +6258,10 @@ export function advanceWeekState(previousState: GameState): GameState {
   const entered = previousState.tournaments.find(t => t.status === 'Entered');
   if (entered && previousState.currentDate >= entered.startDate && previousState.currentDate <= (entered.endDate ?? entered.startDate)) return { ...previousState, lastAction: 'Your tournament is ready. Complete preparation and play, or explicitly withdraw, before advancing.' };
   if (entered && previousState.travel.bookings[entered.id] && !previousState.travel.bookings[entered.id].preparation) return { ...previousState, lastAction: 'Choose and confirm your tournament preparation before advancing.' };
-  const boundary = nextCareerBoundary(previousState);
+  const careerBoundary = nextCareerBoundary(previousState);
+  // A caller may stop between settlements without applying a full week's work early.
+  const boundary = stopDate && stopDate > previousState.currentDate && stopDate < careerBoundary
+    ? stopDate : careerBoundary;
   if (entered && !previousState.travel.bookings[entered.id] && boundary >= journeyQuote(previousState, entered, '').departure) return { ...previousState, lastAction: 'Book travel before advancing through the departure window.' };
   const seasonBoundary = getNextSeasonStartDate(previousState.tournaments);
   if (seasonBoundary <= boundary && seasonBoundary < depthOf(previousState).nextSettlementDate) {
@@ -6784,17 +6788,18 @@ export function skipTournamentState(
       ),
     },
   };
-  const nextTournament = getNextEligibleTournament(skippedState);
+  const advancedState = advanceAfterTournamentSkip(skippedState);
+  const nextTournament = getNextEligibleTournament(advancedState);
 
   return finalizeState(
     {
-      ...skippedState,
+      ...advancedState,
       inbox: [
         ...(nextTournament
           ? [
               createTournamentInvitationMessage(
                 nextTournament,
-                skippedState.currentDate,
+                advancedState.currentDate,
                 "next",
               ),
             ]
@@ -6810,14 +6815,34 @@ export function skipTournamentState(
           },
           "Today",
         ),
-        ...previousState.inbox,
+        ...advancedState.inbox,
       ].slice(0, 18),
     },
-    nextTournament
-      ? `Skipped ${tournament.name}. ${nextTournament.name} is now the next event to consider.`
-      : `Skipped ${tournament.name}. No other eligible event is currently available.`,
+    `Skipped ${tournament.name}. ${advancedState.lastAction}`,
     "Tournament Decision",
   );
+}
+
+/** Simulate free time, leaving a week to decide entry, travel and preparation. */
+function advanceAfterTournamentSkip(initialState: GameState): GameState {
+  let state = initializeCareerDepth(initialState);
+  for (let step = 0; step < 400; step++) {
+    const blocker = requiredDecisionBlocker(state);
+    if (blocker) return { ...state, lastAction: blocker.reason };
+    if (state.seasonReview?.pending) return { ...state, lastAction: 'Complete your season review before advancing.' };
+    if (state.liveMatch?.status === 'In Progress') return { ...state, lastAction: 'Resume your live match before advancing.' };
+    const target = getNextEligibleTournament(state);
+    if (!target) return { ...state, lastAction: 'No other eligible event is currently available. Review the calendar or finish the season.' };
+    if (target.status === 'Entered') return { ...state, lastAction: `Continue ${target.name} in the Tournament Hub.` };
+    const stopDate = plusDays(entryDeadline(target), -7);
+    if (state.currentDate >= stopDate) return { ...state, lastAction:
+      `${state.currentDate > initialState.currentDate ? `Advanced to ${state.currentDate}.` : 'Already within the next entry window.'} ${target.name}: entry closes ${entryDeadline(target)}. Enter or skip it before booking travel.` };
+    const before = state;
+    state = advanceWeekState(state, stopDate);
+    if (state.currentDate === before.currentDate || state.seasonReview?.pending) return state;
+    if (depthOf(state).commitments.some(c => c.status === 'scheduled' && c.startDate === state.currentDate)) return state;
+  }
+  return { ...state, lastAction: 'Advance paused. Review the calendar before continuing.' };
 }
 
 function ensureLockedWorldChampionshipEntry(state: GameState) {
@@ -7529,6 +7554,7 @@ function normalizeSponsor(sponsor: SponsorDeal, index: number): SponsorDeal {
   const profile = getSponsorObligationProfile(sponsor);
   return {
     ...sponsor,
+    volatility: sponsorVolatility(sponsor).key,
     slot:
       sponsor.slot ||
       SPONSOR_SLOT_NAMES[index] ||
@@ -9104,6 +9130,11 @@ function repairLegacyWorldEntry(state: GameState): GameState {
 }
 
 export function repairGameState(state: GameState): GameState {
+  // Add stable company temperament to older saves without replaying result reviews.
+  state = { ...state,
+    sponsors: state.sponsors.map(sponsor => ({ ...sponsor, volatility: sponsorVolatility(sponsor).key })),
+    sponsorOffers: state.sponsorOffers.map(offer => ({ ...offer, volatility: sponsorVolatility(offer).key })),
+  };
   state = alignTournamentEntry(state);
   state = alignMajorSelection(state);
   state = recoverTournamentArchive(state);
@@ -15810,7 +15841,7 @@ export function finalizeLiveMatch(
   const performanceMessages = sponsorReviews.flatMap(({ sponsor, notice }) => !notice ? [] : [createInboxMessage({
     sender: sponsor.name,
     subject: notice === 'terminated' ? 'Sponsorship ended after performance review' : notice === 'warning' ? 'Sponsor performance warning' : notice === 'recovered' ? 'Sponsor confidence restored' : 'Sponsor concerned about results',
-    preview: notice === 'terminated' ? `${sponsor.name} ended the deal after the six-match recovery period with satisfaction below 25/100. The ${sponsor.slot} slot is free and £${sponsor.monthlyValue}/month has been removed.` : notice === 'warning' ? `Satisfaction is ${Math.round(sponsor.performance!.satisfaction)}/100. You have at least six further competitive matches to recover. Stay at 25 or above to avoid cancellation; reach 50 to clear the warning.` : notice === 'recovered' ? 'Satisfaction is back to 50 or above. Your performance warning has been cleared.' : 'Satisfaction has fallen below 50/100. Wins and maintaining your agreed ranking help rebuild confidence. There is no immediate cancellation.',
+    preview: sponsorPerformanceNoticeText(sponsor, notice),
     priority: notice === 'warning' || notice === 'terminated' ? 'High' : 'Medium', actionLabel: 'Review Sponsors', actionRoute: '/sponsorship',
   }, 'Today')]);
 
@@ -17929,6 +17960,7 @@ export function acceptSponsorState(
   }
 
   const acceptedSponsor: SponsorDeal = {
+    volatility: sponsorVolatility(offer).key,
     signedSeason: previousState.season,
     id: offer.id,
     name: offer.name,
@@ -17977,7 +18009,7 @@ export function acceptSponsorState(
           {
             sender: "Commercial Team",
             subject: `${offer.name} deal accepted`,
-            preview: `${offer.name} now occupies the ${sponsorSlot} slot, contributes £${offer.monthlyValue}/month, and runs for ${offer.contractLength.toLowerCase()}.`,
+            preview: `${offer.name} now occupies the ${sponsorSlot} slot, contributes £${offer.monthlyValue}/month, and runs for ${offer.contractLength.toLowerCase()}. ${sponsorVolatilityDescription(acceptedSponsor)} ${sponsorPerformanceTermsText}`,
             priority: "High",
             actionLabel: "Open Sponsorships",
             actionRoute: "/sponsorship",

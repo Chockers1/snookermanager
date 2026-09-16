@@ -128,7 +128,7 @@ export function TournamentPreparationPage() {
       allocations,
       supportIds,
     );
-    navigate("/match/preview");
+    navigate("/tournaments/hub");
   }
 
   if (!tournament || !booking) {

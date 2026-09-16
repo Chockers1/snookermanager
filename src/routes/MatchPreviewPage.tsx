@@ -138,6 +138,7 @@ export function MatchPreviewPage() {
     }
     if (daysUntilStart > 0 && !activeLiveMatch) {
       continueToNextTournament()
+      navigate('/tournaments/hub')
       return
     }
     if (activeLiveMatch) {
@@ -160,7 +161,7 @@ export function MatchPreviewPage() {
       <div className="preview-header-metrics"><div><span>Ability comparison</span><strong>{difficultyLabel}</strong></div><div><span>Readiness</span><strong>{readinessScore}%</strong></div></div>
       <button type="button" onClick={handleStartMatch} className="btn-primary preview-start">{nextAction.label}<ChevronRight className="h-4 w-4"/></button>
     </header>
-    {!activeLiveMatch&&!playability?.canPlay&&<p role="status" className="preview-blocker">{decisionBlocker?.reason??advanceBlocker?.reason??playability?.reason}{daysUntilStart>0&&!decisionBlocker&&!advanceBlocker&&` Advance to ${activeTournament?.startDate} here, then review your updated condition and start the match.`}</p>}
+    {!activeLiveMatch&&!playability?.canPlay&&<p role="status" className="preview-blocker">{decisionBlocker?.reason??advanceBlocker?.reason??playability?.reason}{daysUntilStart>0&&!decisionBlocker&&!advanceBlocker&&` Advance to ${activeTournament?.startDate} and open the Tournament Hub to review the draw and your next match.`}</p>}
     <SectionTabs id="preview-sections" label="Match preview sections" tabs={PREVIEW_TABS} active={tab} onChange={setTab}/>
     <div className="preview-content" role="tabpanel" id="preview-sections-panel" aria-labelledby={`preview-sections-tab-${PREVIEW_TABS.indexOf(tab)}`}>
       {tab==='Matchup'&&<div className="preview-matchup">

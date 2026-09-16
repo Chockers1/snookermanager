@@ -1,0 +1,11 @@
+.draw-fullscreen-trigger{flex-shrink:0;min-width:36px;min-height:36px;padding:8px;justify-content:center}
+.draw-fullscreen-dialog{position:fixed;inset:0;width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;padding:0;border:0;background:#0b141d;color:#e2e8f0;overflow:hidden}
+.draw-fullscreen-dialog[open]{display:flex;flex-direction:column}
+.draw-fullscreen-dialog::backdrop{background:#0b141d}
+.draw-fullscreen-dialog>header{display:flex;flex-shrink:0;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-bottom:1px solid #2b4354;background:linear-gradient(110deg,#15372e,#152333)}
+.draw-fullscreen-dialog h2{font-size:calc(17px * var(--text-scale,1));font-weight:700;color:#fff;overflow-wrap:anywhere}
+.draw-fullscreen-dialog header p{margin-top:3px;font-size:calc(11px * var(--text-scale,1));color:#bfd2de}
+.draw-fullscreen-dialog header button{flex-shrink:0;font-size:calc(12px * var(--text-scale,1))}
+.draw-fullscreen-content{flex:1;min-height:0;min-width:0;overflow:auto;padding:14px}
+.draw-fullscreen-dialog :is(button,a,[tabindex]):focus-visible{outline:2px solid #6ee7b7;outline-offset:2px}
+@media(max-width:600px){.draw-fullscreen-dialog>header{padding:10px;gap:8px}.draw-fullscreen-dialog header button span{display:none}.draw-fullscreen-content{padding:8px}}

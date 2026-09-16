@@ -279,8 +279,6 @@ test("enters, travels to, and completes every round of a tournament", async ({
   await page.getByRole("button", { name: "Confirm Travel" }).first().click();
   await expect(page).toHaveURL(/\/tournament\/preparation/);
   await page.getByRole("button", { name: "Confirm plan" }).click();
-  await expect(page).toHaveURL(/\/match\/preview/);
-  await page.getByRole("link", { name: "Tournament Hub" }).click();
   await expect(page).toHaveURL(/\/tournaments\/hub/);
   await expect(primary).toContainText("Advance to Tournament");
   await primary.click();
@@ -321,6 +319,7 @@ test("enters, travels to, and completes every round of a tournament", async ({
   expect(eventCompleted).toBe(true);
   await page.getByRole("button", { name: "Continue to match review", exact: true }).click();
   await expect(page.getByText(/Final/).first()).toBeVisible();
+  await page.getByRole('tab', { name: 'Career Impact', exact: true }).click();
   await expect(page.getByText("Sponsor Bonus")).toBeVisible();
   await expect(page.getByText("Equipment Wear")).toBeVisible();
   await page.getByRole("button", { name: "View Completed Bracket" }).click();
@@ -378,8 +377,6 @@ test("live match is a score, tactics, and statistics workspace", async ({
   await page.getByRole("button", { name: "Confirm Travel" }).first().click();
   await expect(page).toHaveURL(/\/tournament\/preparation/);
   await page.getByRole("button", { name: "Confirm plan" }).click();
-  await expect(page).toHaveURL(/\/match\/preview/);
-  await page.getByRole("link", { name: "Tournament Hub" }).click();
   await expect(page).toHaveURL(/\/tournaments\/hub/);
   await page.getByRole("button", { name: "Advance to Tournament" }).click();
   await page.getByRole("button", { name: "Play Next Match" }).click();

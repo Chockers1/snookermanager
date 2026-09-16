@@ -6,26 +6,26 @@ import { startProject, cancelProject, PROJECTS } from './developmentProjects';
 import { commitmentQuote, scheduleCommitment } from './commitments';
 import { supportedConfidence } from '../confidenceSystem';
 
-export const STORY_CHOICES: Record<StoryKind, { id: StoryChoice; label: string; effect: string }[]> = {
+export const STORY_CHOICES: Record<StoryKind, { id: StoryChoice; label: string; benefit: string; effect: string }[]> = {
   deciders: [
-    { id: 'programme', label: 'Pressure programme', effect: '4 training weeks · 3 mental/review sessions per week · review in 28 days' },
-    { id: 'support', label: 'Mental support session', effect: '£90 now · up to +3 confidence (diminishes at high confidence) · review in 28 days' },
-    { id: 'continue', label: 'Keep my approach', effect: 'No cost or immediate penalty · review subsequent deciding frames' },
+    { id: 'programme', label: 'Pressure programme', benefit: '5% extra training gains in Composure and Focus during qualifying project weeks. Earned gains stay; there is no instant attribute boost or completion bonus.', effect: '4 training weeks · complete at least 3 Mental Training / Review sessions each week. Set them in Training; competition or injury pauses progress. Review in 28 days.' },
+    { id: 'support', label: 'Mental support session', benefit: 'Immediate confidence support without replacing your development project. Permanent attributes are unchanged.', effect: '£90 now · up to +3 confidence (diminishes at high confidence) · review in 28 days' },
+    { id: 'continue', label: 'Keep my approach', benefit: 'Keep your existing routine and project while gathering more deciding-frame evidence. No additional confidence or training boost.', effect: 'No cost or immediate penalty · review subsequent deciding frames' },
   ],
   breakthrough: [
-    { id: 'exhibition', label: 'Accept paid exhibition', effect: '1 day reserved · fee paid afterwards · fatigue +6 · replaces all three training sessions' },
-    { id: 'sponsor', label: 'Seek sponsor introduction', effect: 'An eligible sponsor gets a warm introduction: +5 percentage points on your next negotiation within 28 days. No guaranteed deal.' },
-    { id: 'protect', label: 'Protect preparation', effect: 'No income · no added fatigue or commitments' },
+    { id: 'exhibition', label: 'Accept paid exhibition', benefit: 'Earn the quoted appearance fee when the exhibition is completed.', effect: '1 day reserved · fee paid afterwards · fatigue +6 · replaces all three training sessions' },
+    { id: 'sponsor', label: 'Seek sponsor introduction', benefit: 'Improve your chance of agreeing terms with an eligible sponsor. No money or contract is awarded just for choosing this.', effect: 'An eligible sponsor gets a warm introduction: +5 percentage points on your next negotiation within 28 days. No guaranteed deal.' },
+    { id: 'protect', label: 'Protect preparation', benefit: 'Keep time available for training and recovery without the exhibition workload. No additional stat boost.', effect: 'No income · no added fatigue or commitments' },
   ],
   'early-exits': [
-    { id: 'technique', label: 'Rebuild cue action', effect: '6 training weeks · temporary effective consistency −2 for first 2 training weeks' },
-    { id: 'coach', label: 'Review coaching options', effect: 'No automatic hiring or firing · compare your staff · review in 28 days' },
-    { id: 'continue', label: 'Stay with my approach', effect: 'No cost or immediate penalty · reassess after four weeks' },
+    { id: 'technique', label: 'Rebuild cue action', benefit: '5% extra training gains in Consistency and Cue Ball Control during qualifying project weeks. Earned gains stay; this is not +5 attribute points or a guaranteed improvement in results.', effect: '6 training weeks · complete at least 3 Line-Up Drill / Long Pot Routine sessions each week. Set them in Training; competition or injury pauses progress. Effective Consistency −2 until 2 qualifying weeks are completed. No start fee or completion bonus.' },
+    { id: 'coach', label: 'Review coaching options', benefit: 'Compare coach specialisms and training impact to find a better fit for your weaknesses. Any improvement depends on changes you choose to make; this response gives no immediate stat boost.', effect: 'Opens a coaching-review message with a link to Staff. No automatic hiring, firing or spending; review contract costs before signing. Results reviewed in 28 days.' },
+    { id: 'continue', label: 'Stay with my approach', benefit: 'Preserve your current training plan and project, avoiding the cue-action adjustment penalty while collecting more match evidence. No additional training or confidence boost.', effect: 'No cost or immediate penalty · reassess results after four weeks' },
   ],
   television: [
-    { id: 'media', label: 'Accept media appearance', effect: '1 day reserved · appearance fee · fatigue +3 · replaces three sessions. Higher public expectations: defeats cost 1 extra confidence for 28 days.' },
-    { id: 'coach-prep', label: 'Coach-managed preparation', effect: 'Protect time · start a four-week pressure programme with your current coach' },
-    { id: 'protect', label: 'Decline optional media', effect: 'No fee or added pressure · keep your preparation time' },
+    { id: 'media', label: 'Accept media appearance', benefit: 'Earn the quoted fee after completing the appearance.', effect: '1 day reserved · appearance fee · fatigue +3 · replaces three sessions. Higher public expectations: defeats cost 1 extra confidence for 28 days.' },
+    { id: 'coach-prep', label: 'Coach-managed preparation', benefit: '5% extra training gains in Composure and Focus during qualifying pressure-project weeks. Earned gains stay; there is no instant attribute boost.', effect: 'Active coach required · 4 training weeks with at least 3 Mental Training / Review sessions per week. Set them in Training; competition or injury pauses progress. No completion bonus.' },
+    { id: 'protect', label: 'Decline optional media', benefit: 'Keep training time and avoid the appearance fatigue and extra public pressure. No additional stat boost.', effect: 'No fee or added pressure · keep your preparation time' },
   ],
 };
 export function storyCommitmentDate(state: GameState) {

@@ -7,7 +7,7 @@ import { protectCommitmentSessions } from '../game/careerDepth/commitments';
 import { travelOptionsFor } from '../game/realism/travel';
 import { scoutingReport, recordedOpponentResults } from '../game/realism/scouting';
 import { protectRealismSessions } from '../game/realism';
-import { formatPercent } from './formatters';
+import { formatPercent, formatAttributeChange } from './formatters';
 import { protectPartnerSessions } from '../game/careerDepth/developmentProjects';
 import {
   chalkCatalog,
@@ -1383,7 +1383,7 @@ export function buildMatchResultData(state: GameState) {
         latestMatch?.result === "Won" ? "Positive Signs" : "Recovery Points",
       tone: latestMatch?.result === "Won" ? "green" : "amber",
       items: [
-        `Confidence moved by ${latestMatch?.confidenceChange ?? 0} in the live save.`,
+        `Confidence moved by ${formatAttributeChange(latestMatch?.confidenceChange ?? 0)} points in the live save.`,
         `Highest break this match was ${latestMatch?.highestBreak ?? 0}.`,
         `${coach?.name ?? "Support staff"} wants the next block focused on ${improvementAdvice[0]?.toLowerCase() ?? (latestMatch && latestMatch.longPotSuccess < 60 ? "long potting" : "frame control")}.`,
       ],

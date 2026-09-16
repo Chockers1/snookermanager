@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { sponsorPerformance, sponsorRanking, reviewSponsorPerformance, type SponsorReviewContext } from './sponsorPerformance';
+import { sponsorPerformance, sponsorRanking, reviewSponsorPerformance, sponsorPerformanceNoticeText, sponsorRecoveryMatchesRemaining, type SponsorReviewContext } from './sponsorPerformance';
 import { createStarterState, advanceWeekState, enterTournamentState, getNextEligibleTournament, bookTravelState, confirmTournamentPreparationState, continueToNextTournamentState, startLiveMatchState, finalizeLiveMatch, renewSponsorState } from '../hooks/useGameState';
 import { getDefaultPreparationAllocations } from './tournamentPreparation';
 import type { SponsorDeal } from '../types/game';
-const deal = (): SponsorDeal => ({ ...createStarterState().sponsors[0], risk: 'Low', performance: undefined });
+const deal = (): SponsorDeal => ({ ...createStarterState().sponsors[0], risk: 'Low', volatility: 'balanced', performance: undefined });
 const context = (i: number, result: SponsorReviewContext['result'] = 'Lost'): SponsorReviewContext => ({ matchId: 'result-' + i, result, rank: 20, rankingLabel: 'World Ranking', playerMatchRank: 20, opponentRank: 20, bestOf: 7, competitive: true });
 
 describe('modest sponsor performance pressure', () => {
@@ -22,8 +22,8 @@ describe('modest sponsor performance pressure', () => {
     expect(reviewSponsorPerformance(sponsor, { ...context(1), opponentRank: 1 }).sponsor.performance!.lastChange).toBeGreaterThan(ordinary.sponsor.performance!.lastChange);
     expect(reviewSponsorPerformance(sponsor, { ...context(1), bestOf: 1 }).sponsor.performance!.lastChange).toBe(ordinary.sponsor.performance!.lastChange / 2);
   });
-  it('warns before cancellation and always allows six further matches to recover', () => {
-    let sponsor = deal(), warnedAt = 0, cancelledAt = 0;
+  it.each(['Low', 'Medium', 'High'] as const)('every %s risk sponsor warns before cancellation and allows six further matches', risk => {
+    let sponsor = { ...deal(), risk }, warnedAt = 0, cancelledAt = 0;
     for (let i = 1; i <= 40; i++) {
       const review = reviewSponsorPerformance(sponsor, context(i)); sponsor = review.sponsor;
       if (review.notice === 'warning') warnedAt = i;
@@ -32,6 +32,33 @@ describe('modest sponsor performance pressure', () => {
     expect(warnedAt).toBeGreaterThan(1);
     expect(cancelledAt - warnedAt).toBeGreaterThanOrEqual(6);
     expect(sponsor.performance!.satisfaction).toBeLessThan(25);
+  });
+  it('honours the exact walk-away threshold and recovery countdown through reload', () => {
+    const sponsor = deal();
+    sponsor.performance = { ...sponsorPerformance(sponsor, 20, 'World Ranking'), expectedWinRate: 50,
+      satisfaction: 25, warningAtMatch: 0, matchesReviewed: 5 };
+    const safe = reviewSponsorPerformance(sponsor, context(6, 'Drawn'));
+    expect(safe.notice).toBeNull();
+    expect(sponsorRecoveryMatchesRemaining(safe.sponsor.performance!)).toBe(0);
+    const low = { ...sponsor, performance: { ...sponsor.performance, satisfaction: 24.9, matchesReviewed: 4 } };
+    const grace = reviewSponsorPerformance(low, context(5, 'Drawn'));
+    expect(grace.notice).toBeNull();
+    expect(sponsorRecoveryMatchesRemaining(grace.sponsor.performance!)).toBe(1);
+    const expired = reviewSponsorPerformance(JSON.parse(JSON.stringify(grace.sponsor)), context(6, 'Drawn'));
+    expect(expired.notice).toBe('terminated');
+    expect(sponsorPerformanceNoticeText(expired.sponsor, 'terminated')).toContain('24.90/100');
+  });
+  it('names the sponsor, recovery targets and walk-away rule in concern messages', () => {
+    const sponsor = deal();
+    sponsor.performance = { ...sponsorPerformance(sponsor, 20, 'World Ranking'), satisfaction: 50 };
+    const review = reviewSponsorPerformance(sponsor, context(1));
+    expect(review.notice).toBe('concern');
+    const text = sponsorPerformanceNoticeText(review.sponsor, 'concern');
+    expect(text).toContain(sponsor.name);
+    expect(text).toContain('below 40/100');
+    expect(text).toContain('6 further competitive matches');
+    expect(text).toContain('below 25/100');
+    expect(text).toContain('45% competitive match wins and top 25 in World Ranking');
   });
   it('lets wins clear a warning and prevents duplicate or exhibition reviews', () => {
     let sponsor = deal();

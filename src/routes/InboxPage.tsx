@@ -91,6 +91,7 @@ export function InboxPage() {
   const {
     gameState,
     enterTournament,
+    skipTournament,
     withdrawTournament,
     markInboxMessageRead,
     markAllInboxRead,
@@ -142,6 +143,8 @@ export function InboxPage() {
   const needsTravel = !isCompletedEventReport && relatedTournament?.status === "Entered" && !relatedTravel;
   const messageAction = needsTravel
     ? { actionLabel: "Book Travel", actionRoute: "/travel" }
+    : relatedTournament?.status === "Skipped"
+      ? { actionLabel: "View Calendar", actionRoute: "/calendar" }
     : selectedMessage;
   const entryBlocker = relatedTournament?.status === "Available" && !isCompletedEventReport ? tournamentEntryBlocker(gameState, relatedTournament) : null;
   const daysUntilEvent = relatedTournament
@@ -361,7 +364,7 @@ export function InboxPage() {
 
               <div data-testid="inbox-message-actions" className={(compactReport ? "mt-2 gap-1.5 pt-2 [&>button]:min-h-8 [&>button]:px-2 [&>button]:py-1 [&>button]:text-[11px]" : "mt-3 gap-2 pt-3") + " flex shrink-0 flex-wrap border-t border-border bg-surface"}>
                 {tourChangesReport ? <><button type="button" className="btn-primary" onClick={() => runMessageAction("/rankings")}>View Rankings</button><button type="button" className="btn-secondary" onClick={() => runMessageAction("/calendar")}>Tournament Calendar</button></> : seasonStartReport ? <><button type="button" className="btn-primary" onClick={() => runMessageAction("/calendar")}>Plan Season</button><button type="button" className="btn-secondary" onClick={() => runMessageAction("/tournaments/hub")}>Tournament Hub</button></> : !isCompletedEventReport && relatedTournament?.status === "Available" ? (
-                  <button
+                  <><button
                     type="button"
                     className="btn-primary min-h-10 text-xs"
                     onClick={() =>
@@ -373,6 +376,17 @@ export function InboxPage() {
                     {entryBlocker?.label ?? "Enter Tournament"}{" "}
                     <ChevronRight className="h-3.5 w-3.5" />
                   </button>
+                  <button
+                    type="button"
+                    className="btn-secondary min-h-10 text-xs"
+                    title="Decline and simulate to the next entry window. Normal training and finances continue; required decisions pause advancement."
+                    onClick={() => {
+                      markInboxMessageRead(selectedMessage.id, true);
+                      skipTournament(relatedTournament.id);
+                    }}
+                  >
+                    Skip Tournament
+                  </button></>
                 ) : messageAction?.actionRoute &&
                   messageAction.actionLabel ? (
                   <button

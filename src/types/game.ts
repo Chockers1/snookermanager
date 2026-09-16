@@ -323,6 +323,7 @@ export type InboxMessage = {
 };
 
 export type SponsorDeal = {
+  volatility?: import('../game/sponsorVolatility').SponsorVolatility;
   signedSeason?: string;
   performance?: import("../game/sponsorPerformance").SponsorPerformance;
   id: string;
@@ -1022,6 +1023,7 @@ export type DeadlineItem = {
 };
 
 export type SponsorOfferCard = {
+  volatility?: import('../game/sponsorVolatility').SponsorVolatility;
   seasonal?: import("../game/sponsorMarket").SeasonalSponsorTerms;
   id: string;
   name: string;

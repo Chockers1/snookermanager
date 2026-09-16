@@ -34,7 +34,7 @@ test('preparation allocation is capped, forecasts respond, and confirmation pers
   await expect(confirm).toBeEnabled();
   await page.getByRole('button', { name: /Physio session/ }).click();
   await confirm.click();
-  await expect(page).toHaveURL(/\/match\/preview/);
+  await expect(page).toHaveURL(/\/tournaments\/hub/);
   await expect.poll(async () => (await readCareerSave(page)).travel.bookings[tournament.id].preparation).toMatchObject({ allocations: { potting: 15, recovery: 25 }, supportIds: ['physio'] });
   await page.reload();
   await page.getByRole('button', { name: /Continue Career/ }).click();

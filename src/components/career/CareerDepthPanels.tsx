@@ -66,7 +66,10 @@ export function StoryDecisionPanel({ messageId }: { messageId: string }) {
       const missingCoach = choice.id === 'coach-prep' && !gameState.coachContracts.length;
       return <div key={choice.id} className="flex min-w-0 flex-col gap-2 rounded border border-border bg-surface p-3">
         <h3 className="text-sm font-semibold text-white">{choice.label}</h3>
-        <p className="flex-1 text-xs leading-5 text-gray-300">{choice.effect}</p>
+        <div className="flex-1 space-y-2 text-xs leading-5">
+          <p className="text-gray-200"><span className="block font-semibold text-green-300">Benefit</span>{choice.benefit}</p>
+          <p className="text-gray-300"><span className="block font-semibold text-white">Cost &amp; commitment</span>{choice.effect}</p>
+        </div>
         {quote && <p className="text-xs text-green-400">{date}–{quote.endDate} · income {money(quote.income)} · cost {money(quote.cost)}</p>}
         {conflict && <p className="text-xs text-amber-300">{conflict}</p>}
         {replaces && <p className="text-xs leading-5 text-amber-200">Cancels {PROJECTS[project.kind].name}. Earned attribute gains stay; its unfinished progress is archived. The new project starts at week 0. No cancellation fee.</p>}

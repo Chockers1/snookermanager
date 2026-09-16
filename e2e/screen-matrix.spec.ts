@@ -137,6 +137,7 @@ for (const [group, routes] of Object.entries(groups)) test(`${group}: pages and 
     await navigate(page, route);
     await inspect(page, info, route);
     if (route === '/match/result') {
+      await page.getByRole('tab', { name: 'Career Impact', exact: true }).click();
       await page.getByRole('heading', { name: 'Career Impact', exact: true }).scrollIntoViewIfNeeded();
       await expect(page.getByRole('heading', { name: 'Career Impact', exact: true })).toBeInViewport();
       await page.getByRole('button', { name: /Continue Tournament|View Completed Bracket/ }).first().scrollIntoViewIfNeeded();

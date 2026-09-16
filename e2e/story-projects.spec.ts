@@ -13,6 +13,13 @@ for (const width of [1366, 390]) for (const replace of [false, true]) test(`reso
  await expect(region).toContainText('2 / 4 training weeks completed');
  await expect(region).toContainText('No cancellation fee');
  await expect(region).toContainText('finishes automatically');
+ await expect(region).toContainText('5% extra training gains in Consistency and Cue Ball Control');
+ await expect(region).toContainText('not +5 attribute points');
+ await expect(region).toContainText('at least 3 Line-Up Drill / Long Pot Routine sessions');
+ await expect(region).toContainText('this response gives no immediate stat boost');
+ await expect(region).toContainText('No additional training or confidence boost');
+ await expect(region.getByText('Benefit',{exact:true})).toHaveCount(3);
+ await expect(region.getByText('Cost & commitment',{exact:true})).toHaveCount(3);
  await region.getByRole('button', { name: replace ? 'Cancel current project & rebuild cue action' : 'Keep and finish current project', exact: true }).click();
  await expect(region).toContainText('resolved');
  const saved = await readCareerSave(page);

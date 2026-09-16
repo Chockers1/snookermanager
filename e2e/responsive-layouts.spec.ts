@@ -796,6 +796,7 @@ test("completed match review opens the matching resolved bracket", async ({
   await expect(
     page.getByRole("heading", { name: "Match Review" }),
   ).toBeVisible();
+  await page.getByRole("tab", { name: "Career Impact", exact: true }).click();
   await expect(page.getByText("Attribute development")).toBeVisible();
   await page
     .getByRole("button", { name: /View Completed Bracket/ })

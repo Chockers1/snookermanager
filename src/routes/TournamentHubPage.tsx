@@ -21,13 +21,13 @@ import { VenueScoutingPanel } from '../components/career/RealismPanels';
 import {
   Crown,
   MapPin,
-  Maximize2,
   Play,
   Search,
   SkipForward,
   Trophy,
 } from "lucide-react";
 import { TournamentBracket } from "../components/tournaments/TournamentBracket";
+import { FullscreenDraw } from "../components/tournaments/FullscreenDraw";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
 import { chalkCatalog, cueCatalog, tipCatalog } from "../data/catalogs";
@@ -299,7 +299,7 @@ export function TournamentHubPage() {
     <SectionTabs id="hub-sections" label="Tournament hub sections" tabs={hubTabs} active={tab} onChange={setTab}/>
     <div className="hub-tab-content" role="tabpanel" id="hub-sections-panel" aria-labelledby={`hub-sections-tab-${hubTabs.indexOf(tab)}`}>
       {tab==='Draw'&&<section className="hub-draw-panel" aria-label="Tournament draw">
-        <div className="hub-draw-heading"><div><h2>{isMajorEvent?<Crown className="h-4 w-4 text-amber-200"/>:<Trophy className="h-4 w-4 text-emerald-300"/>}{groupCompetition?'Groups and Fixtures':isMajorEvent?'Championship Draw':'Tournament Bracket'}</h2><p>{groupCompetition?'Standings and results update after every match.':'Your route is highlighted. Scroll within the draw to explore every match.'}</p></div><button className="btn-secondary text-xs" onClick={()=>navigate('/tournaments/draw')}><Maximize2 className="h-3.5 w-3.5"/>{groupCompetition?'All Groups & Fixtures':'Open Full Draw'}</button></div>
+        <div className="hub-draw-heading"><div><h2>{isMajorEvent?<Crown className="h-4 w-4 text-amber-200"/>:<Trophy className="h-4 w-4 text-emerald-300"/>}{groupCompetition?'Groups and Fixtures':isMajorEvent?'Championship Draw':'Tournament Bracket'}</h2><p>{groupCompetition?'Standings and results update after every match.':'Your route is highlighted. Scroll within the draw to explore every match.'}</p></div><div className="flex shrink-0 items-center gap-2"><button className="btn-secondary text-xs" onClick={()=>navigate('/tournaments/draw')}>{groupCompetition?'All Groups & Fixtures':'Open Full Draw'}</button><FullscreenDraw title={activeTournament.name}>{groupCompetition?<GroupFixtures tournament={activeTournament} rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={activeRound}/>:<TournamentBracket rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={activeRound}/>}</FullscreenDraw></div></div>
         <div className="hub-draw-canvas">{groupCompetition?<GroupFixtures tournament={activeTournament} key={activeRound} rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={activeRound}/>:<TournamentBracket rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={activeRound}/>}</div>
         <footer className="hub-draw-footer"><span>{groupCompetition?stageLabels.filter(stage=>stage.status==='completed').length:completedRounds.length} / {stageLabels.length} {groupCompetition?'stages':'rounds'} complete</span><span><PlayerNames text={lastResult?`${lastResult.winner} def. ${lastResult.loser} ${lastResult.score}`:'No completed matches yet'}/></span></footer>
       </section>}

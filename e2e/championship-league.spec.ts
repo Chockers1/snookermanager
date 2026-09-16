@@ -24,6 +24,7 @@ test('group standings update after quick sim and survive reload',async({page})=>
   await expect(panel).toContainText('0 of 3 matches');
   await page.getByRole('button',{name:'Quick Sim',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Match Review'})).toBeVisible();
+  await page.getByRole('tab',{name:'Group standings',exact:true}).click();
   await expect(page.getByRole('region',{name:'Group standings and fixtures'})).toContainText('1 of 3 matches');
   await expect(page.getByText('Match complete · your tournament continues')).toBeVisible();
   await page.screenshot({path:'test-results/championship-group-result.png',fullPage:true});
@@ -39,6 +40,7 @@ test('a drawn match is shown as one point and the full draw offers every stage',
   state=finalizeLiveMatch(state,{...state.liveMatch!,playerFrames:2,opponentFrames:2,status:'Completed'});
   await page.setViewportSize({width:390,height:844});await open(page,state,'/match/result');
   await expect(page.getByText('Match drawn · 1 point')).toBeVisible();
+  await page.getByRole('tab',{name:'Group standings',exact:true}).click();
   await expect(page.getByRole('region',{name:'Group standings and fixtures'})).toContainText('1 point from 1 of 3 matches');
   await page.screenshot({path:'test-results/championship-group-mobile.png',fullPage:true});
   await page.evaluate(()=>{history.pushState({},'','/tournaments/draw');dispatchEvent(new PopStateEvent('popstate'));});

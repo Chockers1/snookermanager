@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Download, Route, Trophy } from "lucide-react";
 import { TournamentBracket } from "../components/tournaments/TournamentBracket";
+import { FullscreenDraw } from "../components/tournaments/FullscreenDraw";
 import { SectionTabs } from "../components/ui/SectionTabs";
 import "./TournamentDrawPage.css";
 import { useGame } from "../context/useGame";
@@ -172,7 +173,7 @@ export function TournamentDrawPage() {
                 <Trophy className="h-3.5 w-3.5 text-green-400" />{" "}
                 {groupCompetition ? "Groups and Fixtures" : drawData.eventCompleted ? "Completed Bracket" : "Bracket"}
               </h3>
-              <span
+              <div className="flex items-center gap-3"><span
                 className={
                   drawData.eventCompleted
                     ? "text-[10px] font-semibold text-green-400"
@@ -181,6 +182,9 @@ export function TournamentDrawPage() {
               >
                 {drawData.currentPosition.currentRound}
               </span>
+              <FullscreenDraw title={drawData.tournamentName}>
+                {groupCompetition ? <GroupFixtures tournament={gameState.tournaments.find(t => t.id === drawData.tournamentId) ?? null} rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={drawData.currentPosition.currentRound} /> : <TournamentBracket rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={drawData.currentPosition.currentRound} />}
+              </FullscreenDraw></div>
             </div>
             <div ref={drawRef} className="card-body min-h-0 flex-1 overflow-auto" tabIndex={0} aria-label="Tournament draw scroll area">
               <>{groupCompetition ? <GroupFixtures tournament={gameState.tournaments.find(t => t.id === drawData.tournamentId) ?? null} rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={drawData.currentPosition.currentRound} selectedStage={roundSelection?.label} onStageChange={label => setRoundSelection({ label })} /> : <TournamentBracket

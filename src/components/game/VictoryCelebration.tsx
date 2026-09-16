@@ -27,7 +27,7 @@ function VictoryContent({ victory, ceremony = false, onNavigate }: { victory: Vi
     </dl>
   </div>;
 }
-export function VictoryCelebration({ victory }: { victory: Victory }) {
+export function VictoryCelebration({ victory, compact = false }: { victory: Victory; compact?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const receipt = `snooker-victory-viewed:${victory.key}`;
   useEffect(() => {
@@ -41,9 +41,9 @@ export function VictoryCelebration({ victory }: { victory: Victory }) {
   const close = () => { acknowledge(); ref.current?.close(); };
   const panelStyle = 'border-amber-300/35 bg-gradient-to-br from-[#302515] via-surface to-background';
   return <>
-    <section aria-label="Tournament victory" className={`overflow-hidden rounded-2xl border ${panelStyle}`}>
-      <VictoryContent victory={victory}/>
-      <div className="flex flex-wrap gap-2 border-t border-amber-300/15 px-5 py-3">
+    <section aria-label="Tournament victory" className={`overflow-hidden rounded-2xl border ${panelStyle} ${compact ? 'result-victory-summary' : ''}`}>
+      {compact ? <div className="result-victory-heading"><Trophy aria-hidden="true" size={24}/><div><h2>{victory.headline} · {victory.name}</h2><p>{victory.milestone}{victory.trophyRecorded ? ' · Added to your trophy cabinet' : ''}</p></div></div> : <VictoryContent victory={victory}/>}
+      <div className={compact ? 'result-victory-actions' : 'flex flex-wrap gap-2 border-t border-amber-300/15 px-5 py-3'}>
         <Link className="btn-primary text-xs" to={victory.exhibition ? '/career/stats#exhibition-achievements' : '/career/stats#trophy-cabinet'}>{victory.exhibition ? 'View career achievements' : 'View trophy cabinet'}</Link>
         <Link className="btn-secondary text-xs" to={victory.bracketRoute}>View winning route</Link>
         <button type="button" className="btn-secondary text-xs" onClick={() => ref.current?.showModal()}>Relive the celebration</button>

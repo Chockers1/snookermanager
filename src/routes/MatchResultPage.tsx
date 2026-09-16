@@ -1,4 +1,11 @@
-import { FormRecoveryPanel } from '../components/career/SeasonLifePanels';
+import { useState } from 'react';
+import { SectionTabs } from '../components/ui/SectionTabs';
+import { CareerEditor } from '../components/career/CareerDepthPanels';
+import { FormAssessmentEditor } from '../components/career/FormAssessmentEditor';
+import { currentPublishedRanking } from '../game/rankingPresentation';
+import { getRivalry } from '../game/careerDepth/relationships';
+import './MatchResultPage.css';
+
 import { VictoryCelebration } from '../components/game/VictoryCelebration';
 import { victoryCelebration } from '../game/victoryCelebration';
 import { BetweenMatchPanel } from '../components/tournaments/BetweenMatchPanel';
@@ -20,7 +27,7 @@ import {
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
 import { buildMatchResultData } from "../utils/liveRouteData";
-import { formatMoney, formatPercent } from "../utils/formatters";
+import { formatMoney, formatPercent, formatAttributeChange } from "../utils/formatters";
 import { countsForWorldRanking, rankingEventKey } from "../game/rollingRankings";
 
 function getInitials(name: string) {
@@ -46,6 +53,12 @@ function signedValue(value: number | undefined, suffix = "") {
 export function MatchResultPage() {
   const { gameState } = useGame();
   const navigate = useNavigate();
+  const [tab, setTab] = useState('Overview');
+  const [analysisTab, setAnalysisTab] = useState('Match outlook');
+  const [preparationOpen, setPreparationOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [rivalryOpen, setRivalryOpen] = useState(false);
+  const publishedRank = currentPublishedRanking(gameState);
   const latestMatch = gameState.matches[0];
   const victory = victoryCelebration(gameState, latestMatch);
   const {
@@ -55,7 +68,6 @@ export function MatchResultPage() {
     strengthBreakdown,
     matchModifiers,
     resultExplanation,
-    improvementAdvice,
     pressureDiagnosis,
   } = buildMatchResultData(gameState);
   const latestTournament = gameState.tournaments.find(
@@ -63,6 +75,7 @@ export function MatchResultPage() {
   );
   const playerName = latestMatch?.playerName ?? gameState.player.fullName;
   const opponentName = latestMatch?.opponentName ?? "Opponent TBD";
+  const rivalry = getRivalry(gameState, opponentName);
   const playerFrames = latestMatch?.playerFrames ?? 0;
   const opponentFrames = latestMatch?.opponentFrames ?? 0;
   const playerWon = latestMatch?.result === "Won";
@@ -173,7 +186,7 @@ export function MatchResultPage() {
     },
     {
       label: "Strain Penalty",
-      value: `-${latestMatch?.strainImpact ?? 0}`,
+      value: formatAttributeChange(-(latestMatch?.strainImpact ?? 0)),
       detail: `Current strain ${formatPercent(gameState.trainingCondition.strain)}`,
       tone:
         (latestMatch?.strainImpact ?? 0) > 0
@@ -218,424 +231,42 @@ export function MatchResultPage() {
     ? "Continue Tournament"
     : "View Completed Bracket";
 
-  return (
-    <div className="space-y-3 pb-8">
-      {victory && <VictoryCelebration key={victory.key} victory={victory} />}
-
-      <FormRecoveryPanel />
-      <RivalryContext opponent={latestMatch.opponentName} />
-      {tournamentContinues && <BetweenMatchPanel tournamentId={latestMatch.tournamentId} />}
-      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
-        <div className="min-w-0">
-          <p className="truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-green-400">
-            {latestTournament?.name ?? "Completed match"} · {latestMatch.round}{" "}
-            · Best of {latestMatch.bestOf}
-          </p>
-          <h1 className="mt-1 text-2xl font-bold text-white">Match Review</h1>
-          <p className="mt-1 text-xs text-gray-400">
-            {tournamentContinues
-              ? "Match complete · your tournament continues"
-              : `Event complete · ${playerWon && latestMatch.round === "Final" ? "tournament won" : `eliminated in the ${latestMatch.round}`}`}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => navigate(primaryRoute)}
-          className="btn-primary shrink-0 text-xs"
-        >
-          {primaryLabel} <ChevronRight className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      {groupCompetition && <div className="card max-h-[34rem] overflow-y-auto p-3"><GroupFixtures tournament={latestTournament ?? null} key={latestMatch.id} rounds={gameState.tournamentProgress.draw} playerName={playerName} currentRound={latestMatch.round} /></div>}
-      <section
-        className={`grid overflow-hidden rounded-xl border bg-surface md:grid-cols-[1fr_190px_1fr] ${drawn ? "border-amber-500/30" : playerWon ? "border-green-600/30" : "border-red-600/30"}`}
-      >
-        <div className="flex items-center gap-3 px-4 py-4 sm:px-6">
-          <div
-            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border font-bold ${playerWon ? "border-green-500 bg-green-600/15 text-green-400" : "border-border bg-surface-light text-white"}`}
-          >
-            {getInitials(playerName)}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-base font-bold text-white">
-              <PlayerLink name={playerName}/>
-            </p>
-            <p className="text-xs text-gray-400">
-              {gameState.player.rankingLabel} #
-              {gameState.player.amateurRanking ??
-                gameState.player.worldRanking ??
-                "-"}
-            </p>
-            <p
-              className={`mt-1 text-[10px] font-semibold uppercase ${drawn ? "text-amber-300" : playerWon ? "text-green-400" : "text-red-400"}`}
-            >
-              {drawn ? "Match drawn · 1 point" : playerWon ? "Match won" : "Match lost"}
-            </p>
-          </div>
-        </div>
-        <div className="order-first grid place-items-center border-b border-border/70 bg-black/15 py-4 text-center md:order-none md:border-x md:border-y-0">
-          <div>
-            <div className="flex items-center gap-4">
-              <span
-                className={`text-4xl font-bold ${playerWon ? "text-green-400" : "text-white"}`}
-              >
-                {playerFrames}
-              </span>
-              <span className="text-gray-600">—</span>
-              <span
-                className={`text-4xl font-bold ${playerWon ? "text-white" : "text-red-400"}`}
-              >
-                {opponentFrames}
-              </span>
-            </div>
-            <p className="mt-1 text-[10px] text-gray-400">
-              {matchSummary?.actualResult ?? latestMatch.result}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center justify-end gap-3 px-4 py-4 text-right sm:px-6">
-          <div className="min-w-0">
-            <p className="truncate text-base font-bold text-white">
-              <PlayerLink name={opponentName}/>
-            </p>
-            <p className="text-xs text-gray-400">
-              Opponent ranking #{latestMatch.opponentRanking}
-            </p>
-            <p className="text-[10px] text-gray-500">
-              {latestMatch.opponentRankBand ?? "Ranking band"}
-            </p>
-          </div>
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-red-500/40 bg-red-500/10 font-bold text-red-200">
-            {getInitials(opponentName)}
-          </div>
-        </div>
-      </section>
-
-      <MatchReviewPanel match={latestMatch} />
-
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(330px,.9fr)]">
-        <section className="card overflow-hidden">
-          <div className="card-header">
-            <div>
-              <h2 className="text-sm font-semibold text-white">
-                Match Statistics
-              </h2>
-              <p className="text-[10px] text-gray-500">
-                What happened on the table
-              </p>
-            </div>
-            <span
-              className={`rounded-full px-2.5 py-1 text-[10px] ${playerWon ? "bg-green-500/10 text-green-300" : "bg-red-500/10 text-red-300"}`}
-            >
-              {drawn ? "Draw reviewed" : playerWon ? "Winning performance" : "Defeat reviewed"}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4 xl:grid-cols-7">
-            {statRows.map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-lg bg-surface-light/45 px-2 py-2 text-center"
-              >
-                <p className="text-base font-bold text-white">{stat.player}</p>
-                <p className="text-[9px] text-gray-500">{stat.label}</p>
-                {stat.opponent !== null ? (
-                  <p className="mt-0.5 text-[9px] text-gray-400">
-                    Opponent {stat.opponent}
-                  </p>
-                ) : (
-                  <p className="mt-0.5 text-[9px] text-gray-600">
-                    Your match stat
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="border-t border-border px-3 py-3">
-            <div className="mb-2 flex justify-between text-[10px]">
-              <span className="font-semibold text-white">Frame by frame</span>
-              <span className="text-gray-500">
-                <PlayerLink name={playerName}/> {playerFrames} · <PlayerLink name={opponentName}/> {opponentFrames}
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">
-              {frameRows.length > 0 ? (
-                frameRows.map((frame) => {
-                  const wonFrame =
-                    frame.winner === "Player" || frame.winner === playerName;
-                  return (
-                    <div
-                      key={frame.frame}
-                      className={`rounded-md border p-2 text-center text-[10px] ${wonFrame ? "border-green-500/20 bg-green-500/10" : "border-red-500/20 bg-red-500/10"}`}
-                    >
-                      <span className="text-gray-500">{frame.frame.startsWith('F') ? frame.frame : `F${frame.frame}`}</span>
-                      <strong className="block text-white">
-                        {frame.player}–{frame.opponent}
-                      </strong>
-                      <span
-                        className={wonFrame ? "text-green-400" : "text-red-400"}
-                      >
-                        {wonFrame ? "W" : "L"}
-                      </span>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="col-span-full py-3 text-center text-xs text-gray-400">
-                  No frame history recorded.
-                </p>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="card overflow-hidden">
-          <div className="card-header">
-            <div>
-              <h2 className="text-sm font-semibold text-white">
-                Career Impact
-              </h2>
-              <p className="text-[10px] text-gray-500">
-                Changes applied to the live save
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">
-            {careerImpact.map((metric) => (
-              <div
-                key={metric.label}
-                className="rounded-lg bg-surface-light/50 p-2 text-center"
-              >
-                <metric.icon className="mx-auto mb-1 h-3.5 w-3.5 text-gray-500" />
-                <p className={`text-sm font-bold ${metric.color}`}>
-                  {metric.value}
-                </p>
-                <p className="text-[9px] text-gray-500">{metric.label}</p>
-                {"sub" in metric && metric.sub ? (
-                  <p className="text-[9px] text-gray-400">{metric.sub}</p>
-                ) : null}
-              </div>
-            ))}
-          </div>
-          <div className="mx-3 grid grid-cols-2 gap-2 border-t border-border py-3">
-            {systemChanges
-              .filter(
-                (change) =>
-                  change.label === "Equipment Wear" ||
-                  change.label === "Strain Penalty",
-              )
-              .map((change) => (
-                <div key={change.label}>
-                  <p className="text-[9px] uppercase text-gray-500">
-                    {change.label}
-                  </p>
-                  <p className={`text-xs font-semibold ${change.tone}`}>
-                    {change.value}{" "}
-                    <span className="font-normal text-gray-400">
-                      · {change.detail}
-                    </span>
-                  </p>
-                </div>
-              ))}
-          </div>
-          <div className="mx-3 mb-3 rounded-lg border border-sky-500/25 bg-sky-500/5 p-3">
-            <div className="flex justify-between gap-2">
-              <p className="text-xs font-semibold text-white">
-                Attribute development
-              </p>
-              <span className="text-[10px] text-sky-300">No direct change</span>
-            </div>
-            <p className="mt-1 text-[10px] leading-relaxed text-gray-400">
-              Match performance changes form, confidence and fatigue. Permanent
-              technical, mental and physical improvement remains training-led;
-              ageing and health can cause decline.
-            </p>
-          </div>
-        </section>
-      </div>
-
-      <div className="grid gap-3 lg:grid-cols-3">
-        <section className="card card-body">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-            Why the result happened
-          </p>
-          <h3 className="mt-2 text-sm font-semibold text-white">
-            {resultExplanation?.title ??
-              matchSummary?.actualResult ??
-              latestMatch.result}
-          </h3>
-          <p className="mt-1 text-[11px] leading-relaxed text-gray-400">
-            {resultExplanation?.summary ??
-              `You entered with a ${formatPercent(matchSummary?.expectedWinChance ?? 50)} expected chance.`}
-          </p>
-        </section>
-        <section className="card card-body">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-            Performance diagnosis
-          </p>
-          <div className="mt-2 space-y-1.5">
-            {strengthBreakdown.slice(0, 3).map((row) => (
-              <div key={row.label} className="flex justify-between text-xs">
-                <span className="text-gray-300">{row.label}</span>
-                <strong
-                  className={row.edge >= 0 ? "text-green-400" : "text-red-400"}
-                >
-                  {row.edge > 0 ? "+" : ""}
-                  {row.edge}
-                </strong>
-              </div>
-            ))}
-          </div>
-        </section>
-        <section className="card card-body">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-gray-500">
-            Coach’s next step
-          </p>
-          <h3 className="mt-2 text-sm font-semibold text-white">
-            {latestMatch.debrief?.training.title ?? (gameState.player.fatigue >= 65
-              ? "Recover, then rebuild"
-              : "Build on the evidence")}
-          </h3>
-          <p className="mt-1 text-[11px] leading-relaxed text-gray-400">
-            {latestMatch.debrief?.training.sessions ?? improvementAdvice[0] ??
-              coachFeedback[0]?.items[0] ??
-              "Keep the next training block balanced and protect match readiness."}
-          </p>
-          <button
-            type="button"
-            onClick={() => navigate("/training/report")}
-            className="btn-secondary mt-3 text-[10px]"
-          >
-            Review Training
-          </button>
-        </section>
-      </div>
-
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-green-400">
-            Next step
-          </p>
-          <p className="mt-1 text-xs text-gray-300">
-            {tournamentContinues
-              ? "Return to the Tournament Hub for the next round."
-              : "Review the completed bracket and tournament winner, then return to the Dashboard."}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => navigate("/rankings")}
-            className="btn-secondary text-[10px]"
-          >
-            Season Rankings
-          </button>
-          <a href="#full-analysis" className="btn-secondary text-[10px]">
-            Full Analysis
-          </a>
-        </div>
-      </div>
-
-      <details id="full-analysis" className="group card overflow-hidden">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-white hover:bg-surface-light/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500">
-          <span>
-            <span className="text-green-400">Full analysis</span>
-            <span className="ml-2 text-xs font-normal text-gray-400">
-              Equipment, modifiers, pressure and coaching detail
-            </span>
-          </span>
-          <ChevronRight className="h-4 w-4 text-gray-400 transition-transform group-open:rotate-90" />
-        </summary>
-        <div className="grid gap-4 border-t border-border p-4 lg:grid-cols-3">
-          <div className="space-y-3">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
-              <ShieldCheck className="h-4 w-4 text-green-400" /> Equipment
-              Impact
-            </h3>
-            {equipmentImpact.map((item) => (
-              <div
-                key={item.label}
-                className="rounded-lg bg-surface-light/50 p-3"
-              >
-                <div className="mb-1 flex justify-between text-xs">
-                  <span className="font-medium text-white">{item.label}</span>
-                  <span className="text-green-400">
-                    {Math.round(item.condition)}%
-                  </span>
-                </div>
-                <ProgressBar value={item.condition} compact />
-                <p className="mt-2 text-[10px] leading-relaxed text-gray-400">
-                  {item.highlight} {item.detail}
-                </p>
-              </div>
-            ))}
-          </div>
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-white">
-              Match Modifiers
-            </h3>
-            {matchModifiers.map((modifier) => (
-              <div
-                key={modifier.label}
-                className="rounded-lg bg-surface-light/50 p-3"
-              >
-                <div className="flex justify-between text-xs">
-                  <span className="font-medium text-white">
-                    {modifier.label}
-                  </span>
-                  <span
-                    className={
-                      modifier.impact.startsWith("-")
-                        ? "text-red-400"
-                        : "text-green-400"
-                    }
-                  >
-                    {modifier.impact}
-                  </span>
-                </div>
-                <p className="mt-1 text-[10px] leading-relaxed text-gray-400">
-                  {modifier.detail}
-                </p>
-              </div>
-            ))}
-          </div>
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-white">
-              Pressure & Coaching
-            </h3>
-            <div className="grid grid-cols-2 gap-2 text-[10px]">
-              <div className="rounded bg-surface-light/50 p-2">
-                <p className="text-gray-500">QF+ Record</p>
-                <p className="text-white">{pressureDiagnosis.qfPlusRecord}</p>
-              </div>
-              <div className="rounded bg-surface-light/50 p-2">
-                <p className="text-gray-500">Deciders</p>
-                <p className="text-white">{pressureDiagnosis.deciderRecord}</p>
-              </div>
-            </div>
-            <p className="rounded-lg bg-surface-light/50 p-3 text-[10px] leading-relaxed text-gray-400">
-              {pressureDiagnosis.diagnosis}
-            </p>
-            {coachFeedback.map((group) => (
-              <div key={group.title}>
-                <p
-                  className={`text-[11px] font-semibold ${feedbackTone(group.tone)}`}
-                >
-                  {group.title}
-                </p>
-                {group.items.map((item) => (
-                  <p
-                    key={item}
-                    className="mt-1 text-[10px] leading-relaxed text-gray-400"
-                  >
-                    {item}
-                  </p>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      </details>
+  const tabs = ['Overview', 'Statistics', 'Career Impact', 'Analysis', ...(groupCompetition ? ['Group standings'] : [])];
+  const analysisTabs = ['Match outlook', 'Equipment', 'Pressure & coaching'];
+  return <div className="result-workspace" data-view={tab}>
+    {victory && <VictoryCelebration key={victory.key} victory={victory} compact />}
+    <header className="result-header">
+      <div><p className="result-eyebrow">{latestTournament?.name ?? 'Completed match'} · {latestMatch.round} · Best of {latestMatch.bestOf}</p><h1>Match Review</h1><p className="result-muted">{tournamentContinues ? 'Match complete · your tournament continues' : `Event complete · ${playerWon && latestMatch.round === 'Final' ? 'tournament won' : `eliminated in the ${latestMatch.round}`}`}</p></div>
+      <button type="button" onClick={() => navigate(primaryRoute)} className="btn-primary">{primaryLabel}<ChevronRight size={15}/></button>
+    </header>
+    <section aria-label="Match result" className={`result-scoreboard ${drawn ? 'is-drawn' : playerWon ? 'is-won' : 'is-lost'}`}>
+      <div className="result-player"><span className="result-avatar">{getInitials(playerName)}</span><div><h2><PlayerLink name={playerName}/></h2><p>{gameState.player.rankingLabel} {publishedRank ? `#${publishedRank.ranking}` : 'Unranked'}</p><strong>{drawn ? 'Match drawn · 1 point' : playerWon ? 'Match won' : 'Match lost'}</strong></div></div>
+      <div className="result-score"><div><b>{playerFrames}</b><span>—</span><b>{opponentFrames}</b></div><p>{matchSummary?.actualResult ?? latestMatch.result}</p></div>
+      <div className="result-player result-opponent"><div><h2><PlayerLink name={opponentName}/></h2><p>Opponent ranking #{latestMatch.opponentRanking}</p><span>{latestMatch.opponentRankBand ?? 'Ranking band'}</span></div><span className="result-avatar">{getInitials(opponentName)}</span></div>
+    </section>
+    <SectionTabs id="result" label="Match review sections" tabs={tabs} active={tab} onChange={setTab}/>
+    <div id="result-panel" role="tabpanel" aria-labelledby={`result-tab-${tabs.indexOf(tab)}`} className="result-panel" tabIndex={0}>
+      {tab === 'Overview' && <div className="result-overview">
+        <MatchReviewPanel match={latestMatch}/>
+        <div className="result-quick-impact">{careerImpact.slice(0,4).map(metric => <div key={metric.label}><span>{metric.label}</span><strong className={metric.color}>{metric.value}</strong>{metric.sub && <small>{metric.sub}</small>}</div>)}</div>
+      </div>}
+      {tab === 'Statistics' && <section className="result-card result-statistics"><header><div><h2>Match Statistics</h2><p>Recorded performance · rates are simulation estimates</p></div><span className="result-badge">{frameRows.length} frames recorded</span></header>
+        <div className="result-stat-grid">{statRows.map(stat => <div key={stat.label}><span>{stat.label}</span><strong>{stat.player}</strong>{stat.opponent !== null && <small>Opponent {stat.opponent}</small>}</div>)}</div>
+        <div className="result-frames"><div className="result-frame-heading"><h3>Frame by frame</h3><p>W · won / L · lost</p></div><div className="result-frame-grid">{frameRows.length ? frameRows.map(frame => {const won = frame.winner === 'Player' || frame.winner === playerName;return <div key={frame.frame} className={won ? 'frame-won' : 'frame-lost'}><span>{frame.frame.startsWith('F') ? frame.frame : `F${frame.frame}`}</span><b>{frame.player}–{frame.opponent}</b><strong>{won ? 'W' : 'L'}</strong></div>}) : <p>No frame history recorded.</p>}</div></div>
+      </section>}
+      {tab === 'Career Impact' && <section className="result-card result-impact"><header><div><h2>Career Impact</h2><p>Match changes and current career condition</p></div><span className="result-badge">Saved result</span></header><div className="result-impact-grid">{careerImpact.map(metric => <div key={metric.label}><div><metric.icon size={18}/><span>{metric.label}</span></div><strong className={metric.color}>{metric.value}</strong><p>{metric.sub ?? (metric.label === 'Prize Money' || metric.label === 'Sponsor Bonus' ? 'Recorded match award' : 'Gained from match use')}</p></div>)}</div>
+        <div className="result-system-changes">{systemChanges.filter(change => ['Equipment Wear','Strain Penalty'].includes(change.label)).map(change => <div key={change.label}><h3>{change.label}</h3><strong className={change.tone}>{change.value}</strong><p>{change.detail}</p></div>)}<div><h3>Attribute development</h3><strong>No direct change</strong><p>Permanent development comes from training; age and health can cause decline.</p></div></div>
+      </section>}
+      {tab === 'Analysis' && <div className="result-analysis"><SectionTabs id="result-analysis" label="Analysis sections" tabs={analysisTabs} active={analysisTab} onChange={setAnalysisTab}/><div id="result-analysis-panel" role="tabpanel" aria-labelledby={`result-analysis-tab-${analysisTabs.indexOf(analysisTab)}`} className="result-analysis-content" tabIndex={0}>
+        {analysisTab === 'Match outlook' && <><section className="result-card result-outlook"><header><h2>{resultExplanation?.title ?? 'Match outlook'}</h2><span className="result-badge">Simulation assessment</span></header><div className="result-card-body"><p>{resultExplanation?.summary ?? `You entered with a ${formatPercent(matchSummary?.expectedWinChance ?? 50)} expected chance.`}</p><div className="result-strengths">{strengthBreakdown.slice(0,3).map(row => <div key={row.label}><span>{row.label}</span><strong className={row.edge >= 0 ? 'text-green-300' : 'text-rose-300'}>{formatAttributeChange(row.edge)}</strong><small>Estimated edge</small></div>)}</div><p className="result-muted">These estimates describe the matchup; they do not establish a single cause for the result.</p></div></section><section className="result-card"><header><h2>Match Modifiers</h2></header><div className="result-modifiers">{matchModifiers.map(modifier => <div key={modifier.label}><h3>{modifier.label}</h3><strong className={modifier.impact.startsWith('-') ? 'text-rose-300' : 'text-green-300'}>{modifier.impact}</strong><p>{modifier.detail}</p></div>)}</div></section></>}
+        {analysisTab === 'Equipment' && <section className="result-card"><header><h2><ShieldCheck size={16}/> Equipment Impact</h2></header><div className="result-equipment">{equipmentImpact.map(item => <div key={item.label}><h3>{item.label}<strong>{formatPercent(item.condition)}</strong></h3><ProgressBar value={item.condition} compact/><p>{item.highlight}</p><p className="result-muted">{item.detail}</p></div>)}</div></section>}
+        {analysisTab === 'Pressure & coaching' && <><section className="result-card"><header><h2>Pressure profile</h2></header><div className="result-card-body"><div className="result-strengths"><div><span>QF+ Record</span><strong>{pressureDiagnosis.qfPlusRecord}</strong></div><div><span>Deciders</span><strong>{pressureDiagnosis.deciderRecord}</strong></div></div><p>{pressureDiagnosis.diagnosis}</p></div></section><section className="result-card"><header><h2>Coaching assessment</h2></header><div className="result-card-body">{coachFeedback.filter(group => group.title !== 'Equipment Readout').map(group => <div key={group.title}><h3 className={feedbackTone(group.tone)}>{group.title}</h3>{group.items.map(item => <p key={item}>{item}</p>)}</div>)}<button type="button" className="btn-secondary" onClick={() => navigate('/training')}>Review Training</button></div></section></>}
+      </div></div>}
+      {tab === 'Group standings' && <div className="result-card result-group"><GroupFixtures tournament={latestTournament ?? null} key={latestMatch.id} rounds={gameState.tournamentProgress.draw} playerName={playerName} currentRound={latestMatch.round}/></div>}
     </div>
-  );
+    <footer className="result-footer"><div>{rivalry && <button type="button" className="result-history" onClick={() => setRivalryOpen(true)}>Opponent history · H2H {rivalry.wins}–{rivalry.losses}{rivalry.draws ? `–${rivalry.draws}` : ''}<ChevronRight size={14}/></button>}</div><div className="result-actions">{tournamentContinues && <button type="button" className="btn-secondary" onClick={() => setPreparationOpen(true)}>Prepare next match</button>}<button type="button" className="btn-secondary" onClick={() => setFormOpen(true)}>Form assessment</button><button type="button" className="btn-secondary" onClick={() => navigate('/rankings')}>Season Rankings</button></div></footer>
+    {rivalryOpen && <CareerEditor title="Opponent history" onClose={() => setRivalryOpen(false)}><div className="result-dialog-body"><RivalryContext opponent={latestMatch.opponentName}/></div></CareerEditor>}
+    {preparationOpen && <CareerEditor title="Prepare your next match" onClose={() => setPreparationOpen(false)}><div className="result-dialog-body"><BetweenMatchPanel tournamentId={latestMatch.tournamentId}/></div></CareerEditor>}
+    {formOpen && <CareerEditor title="Form evidence and recovery" onClose={() => setFormOpen(false)}><FormAssessmentEditor/></CareerEditor>}
+  </div>;
 }

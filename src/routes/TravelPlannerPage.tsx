@@ -115,7 +115,7 @@ function TravelPlannerContent() {
         {blockedReason && <p role="status" className="trip-warning">{blockedReason}{requiredDecision && <button onClick={() => navigate(requiredDecision.route)}>Open Inbox →</button>}</p>}
         <div className="trip-summary-actions">
           <button className="btn-primary" aria-label="Confirm Travel" disabled={!!blockedReason} onClick={confirm}>{booking && !locked ? 'Update & prepare' : 'Confirm Travel'}</button>
-          <div><button className="btn-secondary" onClick={() => navigate(booking?.preparation ? '/match/preview' : '/tournament/preparation')}>{booking?.preparation ? 'Match Preview' : 'Preparation'}</button><button className="btn-secondary" aria-label="Back To Calendar" onClick={() => navigate('/calendar')}>Calendar</button></div>
+          <div><button className="btn-secondary" onClick={() => navigate(booking?.preparation ? '/tournaments/hub' : '/tournament/preparation')}>{booking?.preparation ? 'Tournament Hub' : 'Preparation'}</button><button className="btn-secondary" aria-label="Back To Calendar" onClick={() => navigate('/calendar')}>Calendar</button></div>
         </div>
       </aside>
     </div>

@@ -1,9 +1,14 @@
 import type { GameState } from '../hooks/useGameState';
 import type { SponsorOfferCard } from '../types/game';
+import { sponsorVolatility } from './sponsorVolatility';
 
 export type SponsorMarketState = { season: string; highestTier: number; companyIds: string[]; previousCompanyIds: string[]; batches: number };
 export type SeasonalSponsorTerms = { season: string; companyId: string; requiredTier: number; offeredFor: string };
 const tierNames = ['No market', 'Local', 'Regional', 'National', 'International', 'Global'];
+export function sponsorSigningRequirements(offer: SponsorOfferCard) {
+  const exposure = offer.seasonal ? ` · ${tierNames[offer.seasonal.requiredTier]} exposure from your tour, ranking and reputation` : '';
+  return `To sign: ${offer.minimumReputation}+ reputation${exposure} · a free unlocked sponsor slot. Overall ability is not a signing requirement.`;
+}
 const minimumRep = [0, 0, 10, 25, 45, 65];
 const basePay = [0, 180, 500, 1300, 3200, 7000];
 const categories = ['Local Business', 'Cue Maker', 'Clothing Sponsor', 'Hospitality Partner', 'Travel Partner', 'Social Media Partner'];
@@ -73,7 +78,7 @@ export function reconcileSponsorMarket(state: GameState): GameState {
     const rankFactor=1.1-Math.min(profile.rank??128,128)/640;
     const monthlyValue=Math.max(50,Math.round(basePay[c.tier]*(0.85+state.player.reputation/250)*rankFactor*(0.85+(seed%31)/100)/25)*25);
     const months=c.tier===1?(seed%2?6:12):c.tier<=3?(seed%2?12:18):(seed%2?24:36);
-    return { id:'season-offer-'+state.season+'-'+c.id, name:c.name, category:c.category, monthlyValue, contractLength:months+' months', minimumReputation:minimumRep[c.tier],
+    return { id:'season-offer-'+state.season+'-'+c.id, name:c.name, volatility:sponsorVolatility(c).key, category:c.category, monthlyValue, contractLength:months+' months', minimumReputation:minimumRep[c.tier],
       bonusClause:'Event win +£'+Math.round(monthlyValue*1.5).toLocaleString('en-GB'), behaviour:c.behaviour,
       brandFit:70+seed%26, risk:c.tier>=4&&seed%5===0?'Risky Terms':seed%3===0?'Medium Risk':'Low Risk',
       tags:['New '+state.season,tierNames[c.tier]], note:'Approached for '+profile.label+'. Quoted terms remain fixed this season; unaccepted offers expire at season end.',

@@ -1,10 +1,12 @@
 import { SectionTabs } from '../components/ui/SectionTabs';
 import { CareerEditor } from '../components/career/CareerDepthPanels';
 import { sponsorRenewalCeiling } from '../game/sponsorEconomy';
-import { seasonalSponsorBlocker, sponsorMarketProfile } from '../game/sponsorMarket'
+import { careerDifficulty } from '../game/careerDifficulty';
+import { sponsorVolatility, sponsorVolatilityDescription } from '../game/sponsorVolatility';
+import { seasonalSponsorBlocker, sponsorMarketProfile, sponsorSigningRequirements } from '../game/sponsorMarket'
 import type { SponsorOfferCard } from '../types/game'
 import { SponsorPerformancePanel } from '../components/game/SponsorPerformancePanel'
-import { sponsorExpectations, sponsorRanking, sponsorPerformance } from '../game/sponsorPerformance'
+import { sponsorExpectations, sponsorRanking, sponsorPerformance, sponsorPerformanceTermsText } from '../game/sponsorPerformance'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Handshake } from 'lucide-react'
@@ -95,7 +97,7 @@ export function SponsorshipOffersPage() {
                     <td className="px-3 py-3 align-top text-white" title={offer.behaviour}><p>{offer.contractLength}</p><span className={`mt-2 inline-block rounded px-1.5 py-0.5 text-[10px] ${status.canAccept ? 'bg-sky-500/15 text-sky-300' : 'bg-amber-500/15 text-amber-300'}`}>{status.label}</span></td>
                     <td className="px-3 py-3 text-right align-top font-bold tabular-nums text-green-300">{formatMoney(offer.monthlyValue)}</td>
                     <td className="px-2 py-3 text-right align-top font-semibold tabular-nums text-white">{formatPercent(offer.brandFit)}</td>
-                    <td className="px-3 py-3 text-right align-top"><span className={`inline-block rounded px-2 py-1 text-[10px] ${riskClass(offer.risk)}`}>{offer.risk}</span></td>
+                    <td className="px-3 py-3 text-right align-top"><span className={`inline-block rounded px-2 py-1 text-[10px] ${riskClass(offer.risk)}`}>{offer.risk}</span><p className="mt-1 text-[10px] text-gray-300" title={sponsorVolatilityDescription(offer)}>{sponsorVolatility(offer).label} volatility</p></td>
                   </tr>
                 })}
                 {filteredOffers.length === 0 && <tr><td colSpan={5} className="p-4 text-sm text-gray-300">No offers match this filter. Your active contracts and reviews remain available above.</td></tr>}
@@ -115,7 +117,9 @@ export function SponsorshipOffersPage() {
                   <div><span className="text-gray-500">Min Rep</span><p className="text-white">{selectedOffer.minimumReputation}</p></div>
                   <div><span className="text-gray-500">Brand Fit</span><p className="text-white">{selectedOffer.brandFit}%</p></div>
                 </div>
-                <p className="text-[11px] text-gray-400">Starts at 75/100 satisfaction · Target: {sponsorExpectations(selectedOffer.risk === "Risky Terms" ? "High" : selectedOffer.risk === "Medium Risk" ? "Medium" : "Low", commercial.rank, commercial.label).expectedWinRate}% match wins. Poor results bring warnings before cancellation.</p>
+                <p className="text-[11px] text-gray-300">{sponsorSigningRequirements(selectedOffer)}</p>
+                <p className="rounded-lg border border-border bg-surface-light p-2 text-[11px] text-white">{sponsorVolatilityDescription(selectedOffer)}</p>
+                <p className="text-[11px] text-gray-300">Starts at 75/100 satisfaction · Target: {sponsorExpectations(selectedOffer.risk === "Risky Terms" ? "High" : selectedOffer.risk === "Medium Risk" ? "Medium" : "Low", commercial.rank, commercial.label).expectedWinRate}% match wins. {sponsorPerformanceTermsText}</p>
                 <p className="text-[11px] text-gray-400">{activeSelectedSlot ? `Signing into ${activeSelectedSlot}. ` : ''}{selectedOfferStatus?.detail}</p>
                 <details className="shrink-0 rounded-lg border border-border p-3 text-xs text-gray-300"><summary className="cursor-pointer font-semibold text-white">Brand notes & bonuses</summary><div className="mt-3 space-y-2">{selectedOffer.seasonal && <p>{selectedOffer.note}</p>}<p>Bonus: {selectedOffer.bonusClause}</p><p>Behaviour: {selectedOffer.behaviour}</p><p>Category: {selectedOffer.category}</p><p>Income after signing: {formatMoney(activeRevenue + selectedOffer.monthlyValue)}/mo</p></div></details>
                 <div className="mt-auto flex shrink-0 flex-wrap gap-2">
@@ -149,7 +153,7 @@ export function SponsorshipOffersPage() {
       {sponsorDialog && <CareerEditor title={`${sponsorDialog.name} · Contract`} onClose={() => setSponsorDialogId(null)}><div className="min-h-0 space-y-4 overflow-y-auto p-4 text-sm">
         <div className="grid grid-cols-2 gap-3"><div className="rounded-lg bg-surface-light p-3"><p className="text-xs text-gray-300">Monthly income</p><b>{formatMoney(sponsorDialog.monthlyValue)}</b></div><div className="rounded-lg bg-surface-light p-3"><p className="text-xs text-gray-300">Contract remaining</p><b>{sponsorDialog.weeksRemaining} weeks</b></div></div>
         <p className="text-gray-300">{sponsorDialog.slot}</p>
-        <SponsorPerformancePanel sponsor={sponsorDialog} rank={commercial.rank} rankingLabel={commercial.label} />
+        <SponsorPerformancePanel sponsor={sponsorDialog} rank={commercial.rank} rankingLabel={commercial.label} missedLimit={careerDifficulty(gameState).missedLimit} />
         {sponsorDialog.renewalStatus === 'Offered' ? <div className="space-y-3 rounded-lg border border-amber-500/30 p-3"><h3 className="font-semibold text-amber-300">Renewal offered · {formatMoney(Math.min(sponsorDialog.renewalOfferValue ?? sponsorDialog.monthlyValue, sponsorRenewalCeiling(gameState)))}/mo</h3><p className="text-xs text-gray-300">Current exposure limits new terms to {formatMoney(sponsorRenewalCeiling(gameState))}/month. Existing payments continue to expiry. One counter-offer per renewal; retired players receive no new contract.</p><div className="flex flex-wrap gap-2"><button className="btn-primary text-xs" disabled={sponsorRenewalCeiling(gameState) === 0} onClick={() => renewSponsor(sponsorDialog.id)}>Renew 12 months</button><button className="btn-secondary text-xs" disabled={sponsorDialog.renewalCountered || sponsorRenewalCeiling(gameState) === 0} onClick={() => renegotiateSponsor(sponsorDialog.id)}>Renegotiate</button><button className="btn-secondary text-xs" onClick={() => declineSponsorRenewal(sponsorDialog.id)}>Decline renewal</button></div></div> : <p className="text-xs text-gray-300">No renewal offer is currently awaiting a response.</p>}
       </div></CareerEditor>}
     </div>

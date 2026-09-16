@@ -14,6 +14,7 @@ for (const width of [390, 1440]) test('between-match preparation is clear and pe
   await page.getByRole('button', { name: /Continue Career/ }).click();
   const navigate = async (path: string) => page.evaluate(path => { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate')); }, path);
   await navigate('/match/result');
+  await page.getByRole('button', { name: 'Prepare next match', exact: true }).click();
   const panel = page.getByRole('region', { name: 'Between-match preparation' });
   await expect(panel).toContainText('between matches');
   await expect(panel).toContainText('Next opponent:');
@@ -26,6 +27,7 @@ for (const width of [390, 1440]) test('between-match preparation is clear and pe
   await expect(panel.getByRole('status')).toContainText(`Confidence 88.50% → ${expected.confidence.toFixed(2)}%`);
   await expect(panel.getByRole('button', { name: 'Apply match preparation' })).toHaveCount(0);
   expect(await panel.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  await page.getByRole('button', { name: 'Close editor', exact: true }).click();
   await navigate('/tournaments/hub');
   await page.getByRole('tab',{name:'Preparation',exact:true}).click();
   await expect(panel.getByRole('status')).toContainText('Tactical review completed');
