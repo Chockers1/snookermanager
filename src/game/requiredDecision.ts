@@ -20,7 +20,7 @@ export function blockForRequiredDecision(state: GameState): GameState | null {
 
 // Viewing information, keeping a backup and switching careers remain available.
 const availableWhileWaiting = new Set([
-  'updateFirstWeekGuide', 'beginNewCareer', 'continueActiveCareer', 'startDemoCareer',
+  'updateFirstWeekGuide', 'beginNewCareer', 'returnToMainMenu', 'continueActiveCareer', 'startDemoCareer',
   'listSaveSlots', 'saveToSlot', 'loadSaveSlot', 'deleteSaveSlot', 'exportCareer',
   'restoreRecoverySave', 'recoverAttributeHistory', 'importCareer', 'resetCareer',
   'markInboxMessageRead', 'markAllInboxRead', 'dismissSeasonReview',

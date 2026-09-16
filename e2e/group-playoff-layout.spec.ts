@@ -18,6 +18,7 @@ for (const width of [390, 1705]) test('group semi-final match cards fit at ' + w
   await page.setViewportSize({ width, height: 910 });
   await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), { key: ACTIVE_SAVE_KEY, value: encodeCareerSave(state) });
   await page.goto('/'); await page.getByRole('button', { name: /Continue Career/ }).click();
+  await expect(page.getByRole('heading', { name: 'Upcoming & Recent Results', exact: true })).toBeVisible();
   await page.evaluate(() => { history.pushState({}, '', '/tournaments/hub'); dispatchEvent(new PopStateEvent('popstate')); });
   await page.getByLabel('Group stage', { exact: true }).selectOption('Group 1 Semi Final');
   const fixtures = page.getByRole('region', { name: 'Group 1 Semi Final fixtures', exact: true });

@@ -5,7 +5,7 @@ import { readCareerSave } from './read-career-save';
 test('season two Shanghai entry remains actionable and can be withdrawn',async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(({key,value})=>{if(!sessionStorage.getItem('entry-repro')){localStorage.setItem(key,value);sessionStorage.setItem('entry-repro','1')}},{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(seasonEntryFixture())});
-  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await page.evaluate(()=>{history.pushState({},'','/tournaments/hub');dispatchEvent(new PopStateEvent('popstate'))});
   await expect(page.getByRole('heading',{name:'Shanghai Masters',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Enter Tournament',exact:true}).click();
@@ -16,7 +16,7 @@ test('season two Shanghai entry remains actionable and can be withdrawn',async({
   expect(entered.player.careerStage).toBe('Top 32 Professional');
   expect(entered.player.worldRanking).toBe(18);
   expect(entered.tournaments.find(t=>t.name==='Shanghai Masters')?.status).toBe('Entered');
-  await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();
+  await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await page.evaluate(()=>{history.pushState({},'','/tournaments/hub');dispatchEvent(new PopStateEvent('popstate'))});
   await page.getByRole('tab',{name:'Event details',exact:true}).click();
   await expect(page.getByRole('button',{name:'Withdraw Entry',exact:true})).toBeVisible();

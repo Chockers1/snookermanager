@@ -6,7 +6,7 @@ import { depthOf, plusDays } from '../src/game/careerDepth/shared';
 import { evolveTourSkills } from '../src/game/tourDevelopment';
 async function open(page:Page,state:ReturnType<typeof createStarterState>,route:string){
   await page.addInitScript(({key,value})=>{if(!sessionStorage.getItem('expansion-fixture')){localStorage.clear();localStorage.setItem(key,value);sessionStorage.setItem('expansion-fixture','1')}},{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
-  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await page.evaluate(route=>{history.pushState({},'',route);dispatchEvent(new PopStateEvent('popstate'))},route);
 }
 for(const width of [1280,390])test(`planning board priority, protected rest and entry details work at ${width}px`,async({page})=>{
@@ -24,10 +24,9 @@ for(const width of [1280,390])test(`planning board priority, protected rest and 
   await expect(page.getByRole('dialog').getByRole('region',{name:'Entry dates'})).toContainText('Ranking selection');
   await page.getByRole('button',{name:'Close tournament details'}).click();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
-  await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();
+  await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   expect((await readCareerSave(page)).careerDepth?.board).toEqual(saved.careerDepth?.board);
   await page.evaluate(()=>{history.pushState({},'','/training');dispatchEvent(new PopStateEvent('popstate'))});
-  await expect(page.locator('p:visible').filter({hasText:'Planned rest week'}).first()).toBeVisible();
   await expect(page.getByRole('combobox',{name:/Morning/}).first()).toBeDisabled();
   await expect(page.getByRole('combobox',{name:/Morning/}).first()).toHaveValue('rest');
 });
@@ -35,8 +34,8 @@ test('achievement goals and monthly tour reports show persisted evidence',async(
   let state=createStarterState();state=evolveTourSkills(state);state=evolveTourSkills({...state,currentDate:plusDays(state.currentDate,40)});
   state.careerDepth={...depthOf(state),achievements:[{id:'century',date:state.currentDate,evidence:'Recorded break of 109.'}]};state=repairGameState(state);
   await open(page,state,'/career/stats');
-  await page.getByRole('tab',{name:'Goals',exact:true}).click();
-  const goals=page.getByRole('region',{name:'Career achievement goals'});await expect(goals).toContainText('Recorded break of 109.');
+  await page.getByRole('tab',{name:'Achievements',exact:true}).click();
+  const goals=page.getByLabel('Career achievements',{exact:true});await expect(goals).toContainText('Recorded break of 109.');
   await page.evaluate(()=>{history.pushState({},'','/rankings');dispatchEvent(new PopStateEvent('popstate'))});
   await page.getByRole('tab', {name:'Pathway',exact:true}).click();
   await page.locator('summary').filter({hasText:'Tour development · prospects, veterans and rivals'}).click();

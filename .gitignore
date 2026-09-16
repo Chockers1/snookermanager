@@ -32,3 +32,13 @@ dist-ssr
 artifacts/
 playwright-report/
 test-results/
+
+# Never commit deployment credentials or generated SteamPipe scripts/logs.
+.env
+.env.*
+!.env.example
+steam/generated/
+steam/output/
+steam/sdk/
+*.pem
+*.key

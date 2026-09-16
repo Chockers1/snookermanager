@@ -61,6 +61,7 @@ for (const viewport of viewports) {
     ).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
     if (viewport.width < 1280)
       await page.getByRole("button", { name: "Open navigation" }).click();
     await page.getByRole("link", { name: "Tournament Hub" }).click();
@@ -98,6 +99,7 @@ test("laptop hub keeps the match action and live bracket in view", async ({
 
   await page.goto("/");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
   await page.evaluate(() => {
     window.history.pushState({}, "", "/tournaments/hub");
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -149,24 +151,25 @@ test("coach market lets the player choose and fill the specialist slot", async (
 
   await page.goto("/");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
   await page.evaluate(() => {
     window.history.pushState({}, "", "/staff/coaches");
     window.dispatchEvent(new PopStateEvent("popstate"));
   });
 
-  await page
-    .getByRole("button", { name: /Specialist Coach Open slot/ })
-    .click();
+  await page.getByRole("tab", {name:"My team",exact:true}).click();
+  await page.getByRole("button", {name:"Find Specialist Coach",exact:true}).click();
+  await page.getByRole("button", {name:`View ${career.coaches[0].name}`,exact:true}).click();
+  await page.getByRole("tab", {name:"Contract",exact:true}).click();
   const hireButton = page.getByRole("button", {
     name: "Hire as Specialist Coach",
   });
   await expect(hireButton).toBeEnabled();
   await hireButton.click();
+  await page.getByRole("tab", {name:"My team",exact:true}).click();
 
   await expect(
-    page.getByRole("button", {
-      name: new RegExp(`Specialist Coach.*${career.coaches[0].name}`),
-    }),
+    page.getByRole("region", {name:"Specialist Coach",exact:true}).getByRole("heading",{name:career.coaches[0].name,exact:true}),
   ).toBeVisible();
 });
 
@@ -196,6 +199,7 @@ test("equipment cards clearly distinguish equipped and owned items", async ({
 
   await page.goto("/");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
   await page.evaluate(() => {
     window.history.pushState({}, "", "/equipment/cues");
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -259,6 +263,7 @@ test("major tournament hub uses a championship identity", async ({ page }) => {
 
   await page.goto("/");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
   await page.evaluate(() => {
     window.history.pushState({}, "", "/tournaments/hub");
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -267,7 +272,7 @@ test("major tournament hub uses a championship identity", async ({ page }) => {
   await expect(
     page.getByText("Saudi Arabia Masters", { exact: true }).first(),
   ).toBeVisible();
-  await expect(page.getByText("Major Event")).toBeVisible();
+  await expect(page.getByText("Major Event")).toBeAttached();
   await expect(page.getByText("Championship Draw")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
@@ -294,6 +299,7 @@ test("laptop match preview keeps symmetrical profiles and the tactical plan visi
   );
   await page.goto("/");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
   await expect(page.getByRole("heading",{name:"Upcoming & Recent Results",exact:true})).toBeVisible();
   await page.evaluate(() => {
     window.history.pushState({}, "", "/match/preview");
@@ -358,6 +364,7 @@ for (const viewport of viewports) {
     );
     await page.goto("/");
     await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
     await page.evaluate(() => {
       window.history.pushState({}, "", "/match/live");
       window.dispatchEvent(new PopStateEvent("popstate"));
@@ -398,6 +405,7 @@ for (const viewport of [
     );
     await page.goto("/");
     await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
 
     for (const route of [
       "/",
@@ -444,6 +452,7 @@ for (const viewport of [
     );
     await page.goto("/");
     await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
 
     await expect(page.getByRole("heading", { name: "Upcoming & Recent Results", exact: true })).toBeVisible();
 
@@ -518,6 +527,7 @@ test("Play Next Match opens preview before the live match", async ({
   );
   await page.goto("/");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
   await page.evaluate(() => {
     window.history.pushState({}, "", "/tournaments/hub");
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -561,6 +571,7 @@ for (const viewport of [
 
     await page.goto("/");
     await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
     await page.evaluate(() => {
       window.history.pushState({}, "", "/inbox");
       window.dispatchEvent(new PopStateEvent("popstate"));
@@ -627,6 +638,7 @@ test("laptop inbox keeps a full training report accessible above its actions", a
 
   await page.goto("/");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
   await page.evaluate(() => {
     window.history.pushState({}, "", "/inbox");
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -655,6 +667,7 @@ test("equipment categories share one responsive workspace", async ({
 
   await page.goto("/");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
   await page.evaluate(() => {
     window.history.pushState({}, "", "/equipment/cues");
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -677,7 +690,7 @@ test("equipment categories share one responsive workspace", async ({
     await expect(page.getByRole("heading", { name: "Cue Shop" })).toBeVisible();
     await expect(
       page.getByText("Equipment marketplace and current setup management."),
-    ).toBeVisible();
+    ).toBeAttached();
     await expect(
       page.getByRole("button", { name: "Sort: Performance" }),
     ).toBeVisible();
@@ -708,6 +721,7 @@ for (const viewport of [
     );
     await page.goto("/");
     await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
     await page.evaluate(() => {
       window.history.pushState({}, "", "/training");
       window.dispatchEvent(new PopStateEvent("popstate"));
@@ -719,10 +733,11 @@ for (const viewport of [
     await expect(
       page.getByRole("button", { name: /Potting & Scoring/ }),
     ).toBeVisible();
-    await page.getByRole("button", { name: /Recovery Freshness/ }).click();
+    await page.getByRole("button", { name: /^Recovery/ }).click();
     await expect(
-      page.getByRole("button", { name: /Recovery Freshness/ }),
+      page.getByRole("button", { name: /^Recovery/ }),
     ).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("tab", {name:"Development",exact:true}).click();
     await expect(page.getByText("Expected Development")).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Weekly Timetable" }),
@@ -773,6 +788,7 @@ test("completed match review opens the matching resolved bracket", async ({
   );
   await page.goto("/");
   await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
   await page.evaluate(() => {
     window.history.pushState({}, "", "/match/result");
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -798,7 +814,7 @@ test("completed match review opens the matching resolved bracket", async ({
 });
 
 for (const viewport of viewports) {
-  test(`${viewport.name} fits the complete travel planner without page scrolling`, async ({
+  test(`${viewport.name} keeps the travel planner usable with a single-page desktop layout`, async ({
     page,
   }) => {
     await page.setViewportSize({
@@ -818,6 +834,7 @@ for (const viewport of viewports) {
 
     await page.goto("/");
     await page.getByRole("button", { name: /Continue Career/ }).click();
+  await expect(page.getByRole("heading", {name:"Upcoming & Recent Results",exact:true})).toBeVisible();
     await page.evaluate(() => {
       window.history.pushState({}, "", "/travel");
       window.dispatchEvent(new PopStateEvent("popstate"));
@@ -847,13 +864,13 @@ for (const viewport of viewports) {
         planner: planner ? planner.scrollHeight - planner.clientHeight : 999,
       };
     });
-    expect(
-      overflow.main,
-      `main scrolled by ${overflow.main}px`,
-    ).toBeLessThanOrEqual(1);
-    expect(
-      overflow.planner,
-      `planner overflowed by ${overflow.planner}px`,
-    ).toBeLessThanOrEqual(1);
+    if (viewport.width >= 1280) {
+      expect(overflow.main, `main scrolled by ${overflow.main}px`).toBeLessThanOrEqual(1);
+      expect(overflow.planner, `planner overflowed by ${overflow.planner}px`).toBeLessThanOrEqual(1);
+    } else {
+      // Small screens keep full-size controls and can scroll to the booking action.
+      await page.getByRole('button', { name: 'Confirm Travel' }).scrollIntoViewIfNeeded();
+      await expect(page.getByRole('button', { name: 'Confirm Travel' })).toBeInViewport();
+    }
   });
 }

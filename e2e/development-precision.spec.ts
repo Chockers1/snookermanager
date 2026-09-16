@@ -34,13 +34,14 @@ for (const width of [1366, 390]) test(`development decimals are display-only at 
   const saved = await readCareerSave(page);
   expect(saved.careerDepth!.project!.baseline['Long Potting']).toBe(before);
   expect(saved.attributes.technical['Long Potting']).toBe(before + 0.23);
-  await route('/season-review'); await page.getByRole('button', { name: /Career history ·/ }).click();
+  await route('/season-review'); await page.getByRole('tab',{name:'Around the tour',exact:true}).click(); await page.getByRole('tab',{name:'Around the tour',exact:true}).click(); await page.getByRole('button', { name: /Career history ·/ }).click();
   const history = page.getByRole('dialog', { name: 'Career story and development history' });
   await expect(history).toContainText('Long Potting: 77.11 → 77.34');
   await expect(history).toContainText('Consistency: 80.06 → 80.03');
   expect(await history.innerText()).not.toMatch(/\d+\.\d{3,}/);
   await history.getByRole('button', { name: 'Close editor' }).click();
   await route('/tournament/preparation');
+  await page.getByRole('tab', { name: 'Skill boosts', exact: true }).click();
   await expect(page.getByText(/77\.11|77\.34/).first()).toBeVisible();
   expect(await page.locator('main').innerText()).not.toMatch(/\d+\.\d{3,}/);
 });

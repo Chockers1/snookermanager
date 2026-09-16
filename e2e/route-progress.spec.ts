@@ -16,6 +16,7 @@ for (const groups of [true, false]) test('route progress opens ' + (groups ? 'in
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), { key: ACTIVE_SAVE_KEY, value: encodeCareerSave(state) });
   await page.goto('/'); await page.getByRole('button', { name: /Continue Career/ }).click();
+  await expect(page.getByRole('heading', { name: 'Upcoming & Recent Results', exact: true })).toBeVisible();
   await page.evaluate(id => { history.pushState({}, '', '/tournaments/draw?tournament=' + id); dispatchEvent(new PopStateEvent('popstate')); }, event.id);
   const progress = page.getByRole('navigation', { name: 'Route Progress' });
   for (const round of [rounds.at(-1)!, rounds[0], rounds[1]]) {
@@ -31,5 +32,6 @@ for (const groups of [true, false]) test('route progress opens ' + (groups ? 'in
       await expect(column).toBeFocused();
       await expect(column).toBeInViewport();
     }
+    expect(await page.locator('main').evaluate(el => el.scrollHeight <= el.clientHeight + 2 && el.scrollWidth <= el.clientWidth + 2)).toBe(true);
   }
 });

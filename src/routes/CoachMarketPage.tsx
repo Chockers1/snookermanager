@@ -1,6 +1,7 @@
 import { SectionTabs } from '../components/ui/SectionTabs';
 import { staffUnavailable } from '../game/seasonLife/staff';
 import { useState } from "react";
+import { useSearchParams } from 'react-router-dom';
 import { StaffTeamPanel } from "../components/career/StaffTeamPanel";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { ProgressBar } from "../components/ui/ProgressBar";
@@ -51,7 +52,8 @@ export function CoachMarketPage() {
     extendCoachContract,
     negotiateCoachContract,
   } = useGame();
-  const [tab, setTab] = useState<'Recruitment' | 'My team'>('Recruitment');
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<'Recruitment' | 'My team'>(searchParams.get('tab') === 'team' ? 'My team' : 'Recruitment');
   const [coachTab, setCoachTab] = useState<'Profile' | 'Impact' | 'Contract'>('Profile');
   const [search, setSearch] = useState("");
   const [sortMode, setSortMode] = useState<"fit" | "overall" | "cost">("fit");

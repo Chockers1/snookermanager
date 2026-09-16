@@ -1,0 +1,72 @@
+[
+  {
+    "order": 1,
+    "filename": "steam-01-match.png",
+    "route": "/match/live",
+    "screen": "match",
+    "status": "awaiting manual capture"
+  },
+  {
+    "order": 2,
+    "filename": "steam-02-career-dashboard.png",
+    "route": "/",
+    "screen": "dashboard",
+    "status": "awaiting manual capture"
+  },
+  {
+    "order": 3,
+    "filename": "steam-03-tournament-hub.png",
+    "route": "/tournaments/hub",
+    "screen": "tournament",
+    "status": "awaiting manual capture"
+  },
+  {
+    "order": 4,
+    "filename": "steam-04-training.png",
+    "route": "/training",
+    "screen": "training",
+    "status": "awaiting manual capture"
+  },
+  {
+    "order": 5,
+    "filename": "steam-05-player-development.png",
+    "route": "/player/attributes",
+    "screen": "attributes",
+    "status": "awaiting manual capture"
+  },
+  {
+    "order": 6,
+    "filename": "steam-06-rankings.png",
+    "route": "/rankings",
+    "screen": "rankings",
+    "status": "awaiting manual capture"
+  },
+  {
+    "order": 7,
+    "filename": "steam-07-coaching-team.png",
+    "route": "/staff/coaches",
+    "screen": "staff",
+    "status": "awaiting manual capture"
+  },
+  {
+    "order": 8,
+    "filename": "steam-08-sponsors.png",
+    "route": "/sponsorship",
+    "screen": "sponsors",
+    "status": "awaiting manual capture"
+  },
+  {
+    "order": 9,
+    "filename": "steam-09-finances.png",
+    "route": "/finance",
+    "screen": "finance",
+    "status": "awaiting manual capture"
+  },
+  {
+    "order": 10,
+    "filename": "steam-10-career-history.png",
+    "route": "/career/stats",
+    "screen": "legacy",
+    "status": "awaiting manual capture"
+  }
+]

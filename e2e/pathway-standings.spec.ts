@@ -7,7 +7,7 @@ for(const endOfSeason of [false,true])test('regional pathway standings '+(endOfS
  state.firstWeekGuide = {version:1,dismissed:true,completed:[],skipped:[]};
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
- await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+ await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
  await page.evaluate(()=>{history.pushState({},'','/rankings');dispatchEvent(new PopStateEvent('popstate'))});
  for(const [tab,regions] of [['Q Tour Ranking',['Europe','Asia Pacific','Middle East','Americas']],['Q School OOM',['Q School UK','Q School Asia']]] as const){
   await page.getByRole('button',{name:tab,exact:true}).click();

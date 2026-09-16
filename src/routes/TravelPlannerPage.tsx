@@ -1,537 +1,123 @@
-import { useState, type ComponentType } from "react";
-import {
-  BedDouble,
-  BriefcaseBusiness,
-  Clock3,
-  Plane,
-  Train,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { ProgressBar } from "../components/ui/ProgressBar";
-import { useGame } from "../context/useGame";
-import { hotelOptionCatalog, travelOptionCatalog } from "../data/catalogs";
-import { getNextEligibleTournament, getTravelPackageEstimate } from "../hooks/useGameState";
-import { travelOptionsFor, journeyQuote } from '../game/realism/travel';
+import { useState } from 'react';
+import { Check, Wallet, WandSparkles, Plane, BedDouble } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { TravelLocationPanel } from '../components/career/RealismPanels';
-import type { HotelOption, TravelOption } from "../types/game";
-import { formatMoney, formatPercent } from "../utils/formatters";
+import { useGame } from '../context/useGame';
+import { hotelOptionCatalog, travelOptionCatalog } from '../data/catalogs';
+import { getNextEligibleTournament, getTravelPackageEstimate } from '../hooks/useGameState';
+import { travelOptionsFor, journeyQuote } from '../game/realism/travel';
+import { requiredDecisionBlocker } from '../game/requiredDecision';
+import { formatMoney, formatPercent } from '../utils/formatters';
+import './TravelPlannerPage.css';
 
-const iconMap: Record<
-  TravelOption["icon"],
-  ComponentType<{ className?: string }>
-> = {
-  Plane,
-  Clock3,
-  BriefcaseBusiness,
-  Train,
-};
-
-function fatigueTone(label: TravelOption["fatigueLabel"]) {
-  if (label === "High") return "red" as const;
-  if (label === "Medium") return "amber" as const;
-  return "green" as const;
-}
-
-function moneyHealth(value: number) {
-  if (value >= 5000) return "text-green-400";
-  if (value >= 2500) return "text-amber-400";
-  return "text-red-400";
-}
-
-function formatArrivalTime(
-  eventStartDate: string | undefined,
-  catalogArrivalTime: string,
-) {
-  if (!eventStartDate) return catalogArrivalTime;
-  const arrivalDate = new Date(`${eventStartDate}T12:00:00`);
-  if (Number.isNaN(arrivalDate.getTime())) return catalogArrivalTime;
-  const dateLabel = new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  }).format(arrivalDate);
-  const timeLabel = catalogArrivalTime.split("•")[1]?.trim() ?? "12:00";
-  return `${dateLabel} · ${timeLabel}`;
-}
-
-function CompactSelectors({
-  options,
-  selectedTravel,
-  selectedHotel,
-  onTravelChange,
-  onHotelChange,
-  hotelNights,
-  className = "",
-}: {
-  options: TravelOption[];
-  selectedTravel: TravelOption;
-  selectedHotel: HotelOption;
-  onTravelChange: (id: string) => void;
-  onHotelChange: (id: string) => void;
-  hotelNights: { min: number; max: number; rateMultiplier: number };
-  className?: string;
-}) {
-  return (
-    <div className={`grid gap-3 ${className}`}>
-      <label className="min-w-0">
-        <span className="metric-label">Travel option</span>
-        <select
-          aria-label="Travel option"
-          className="mt-1.5 min-h-11 w-full rounded-lg border border-border bg-surface-light px-3 text-xs text-white"
-          value={selectedTravel.id}
-          onChange={(event) => onTravelChange(event.target.value)}
-        >
-          {options.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name} · {formatMoney(option.cost)} · {option.fatigueLabel}{" "}
-              fatigue
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="min-w-0">
-        <span className="metric-label">Hotel option</span>
-        <select
-          aria-label="Hotel option"
-          className="mt-1.5 min-h-11 w-full rounded-lg border border-border bg-surface-light px-3 text-xs text-white"
-          value={selectedHotel.id}
-          onChange={(event) => onHotelChange(event.target.value)}
-        >
-          {hotelOptionCatalog.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name} · {formatMoney(option.cost * hotelNights.rateMultiplier)}/night · {formatMoney(option.cost * hotelNights.rateMultiplier * hotelNights.min)}–{formatMoney(option.cost * hotelNights.rateMultiplier * hotelNights.max)} stay · {option.preparationLabel} prep
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
-  );
-}
 
 export function TravelPlannerPage() {
   const { gameState } = useGame();
-  const activeEvent = getNextEligibleTournament(gameState);
-  const existingBooking = activeEvent
-    ? gameState.travel.bookings[activeEvent.id]
-    : undefined;
-
-  return (
-    <TravelPlannerContent
-      key={`${activeEvent?.id ?? "none"}-${existingBooking?.travelOptionId ?? "none"}-${existingBooking?.hotelOptionId ?? "none"}`}
-    />
-  );
+  const event = getNextEligibleTournament(gameState);
+  const booking = event ? gameState.travel.bookings[event.id] : undefined;
+  return <TravelPlannerContent key={`${event?.id}:${booking?.travelOptionId}:${booking?.hotelOptionId}`} />;
 }
 
 function TravelPlannerContent() {
-  const navigate = useNavigate();
   const { gameState, bookTravel } = useGame();
-  const activeEvent = getNextEligibleTournament(gameState);
-  const travelOptions = travelOptionsFor(gameState, activeEvent ?? undefined);
-  const existingBooking = activeEvent
-    ? gameState.travel.bookings[activeEvent.id]
-    : undefined;
-  const [selectedTravelId, setSelectedTravelId] = useState(
-    existingBooking?.travelOptionId ??
-      travelOptionCatalog.find((option) => option.selected)?.id ??
-      travelOptionCatalog[0].id,
-  );
-  const [selectedHotelId, setSelectedHotelId] = useState(
-    existingBooking?.hotelOptionId ??
-      hotelOptionCatalog.find((option) => option.selected)?.id ??
-      hotelOptionCatalog[0].id,
-  );
-  const selectedTravel =
-    travelOptions.find((option) => option.id === selectedTravelId) ??
-    travelOptions[0];
-  const selectedHotel =
-    hotelOptionCatalog.find((option) => option.id === selectedHotelId) ??
-    hotelOptionCatalog[0];
-
-  const estimate = getTravelPackageEstimate(gameState, selectedTravelId, selectedHotelId, activeEvent?.id);
-  const totalTripCost = estimate.totalCost;
-  const hotelNights = { min: estimate.minNights, max: estimate.maxNights, rateMultiplier: estimate.nightlyRate / selectedHotel.cost };
-  const cashRemaining = gameState.player.cash - totalTripCost + (existingBooking?.totalCost ?? 0);
-  const readinessScore = Math.max(
-    0,
-    Math.min(
-      100,
-      Math.round(
-        (100 -
-          selectedTravel.fatigueValue +
-          selectedHotel.recoveryValue +
-          selectedHotel.preparationValue +
-          (100 - selectedTravel.delayRisk)) /
-          4,
-      ),
-    ),
-  );
-  const savedJourney = activeEvent ? gameState.realism?.journeys[`${activeEvent.id}:${activeEvent.startDate}`] : undefined;
-  const journeyLocked = Boolean(savedJourney && (savedJourney.applied || savedJourney.departure <= gameState.currentDate));
-  const arrivalTooLate = Boolean(activeEvent && journeyQuote(gameState, activeEvent, selectedTravelId).arrival > activeEvent.startDate);
-  const canConfirm = Boolean(
-    activeEvent?.status === "Entered" && cashRemaining >= 0 && !journeyLocked && !arrivalTooLate,
-  );
+  const navigate = useNavigate();
+  const event = getNextEligibleTournament(gameState);
+  const booking = event ? gameState.travel.bookings[event.id] : undefined;
+  const options = travelOptionsFor(gameState, event ?? undefined);
+  const [travelId, setTravelId] = useState(booking?.travelOptionId ?? travelOptionCatalog.find(o => o.selected)?.id ?? options[0].id);
+  const [hotelId, setHotelId] = useState(booking?.hotelOptionId ?? hotelOptionCatalog.find(o => o.selected)?.id ?? hotelOptionCatalog[0].id);
+  const [autoNote, setAutoNote] = useState('');
+  const travel = options.find(o => o.id === travelId) ?? options[0];
+  const hotel = hotelOptionCatalog.find(o => o.id === hotelId) ?? hotelOptionCatalog[0];
+  const estimate = getTravelPackageEstimate(gameState, travel.id, hotel.id, event?.id);
+  const quote = event ? journeyQuote(gameState, event, travel.id) : undefined;
+  const savedJourney = event ? gameState.realism?.journeys[`${event.id}:${event.startDate}`] : undefined;
+  const locked = Boolean(savedJourney && (savedJourney.applied || savedJourney.departure <= gameState.currentDate));
+  const delta = locked ? 0 : estimate.totalCost - (booking?.totalCost ?? 0);
+  const cashLeft = gameState.player.cash - delta;
+  const requiredDecision = requiredDecisionBlocker(gameState);
+  const late = Boolean(event && quote && quote.arrival > event.startDate);
+  const blockedReason = requiredDecision?.reason
+    ?? (event?.status !== 'Entered' ? 'Enter an event before booking travel.'
+      : locked ? 'Journey started. Your booked package is locked.'
+      : late ? 'This route arrives after the event starts. Choose a later event.'
+      : cashLeft < 0 ? `You need ${formatMoney(-cashLeft)} more to book this package.` : null);
+  const multiplier = estimate.nightlyRate / hotel.cost;
+  const chooseTravel = (id: string) => { setTravelId(id); setAutoNote(''); };
+  const chooseHotel = (id: string) => { setHotelId(id); setAutoNote(''); };
 
   function autoPlan() {
-    const autoTravel = travelOptions
-      .slice()
-      .sort(
-        (left, right) =>
-          left.fatigueValue +
-          left.delayRisk * 1.2 +
-          left.cost / 6 -
-          (right.fatigueValue + right.delayRisk * 1.2 + right.cost / 6),
-      )[0];
-    const autoHotel = hotelOptionCatalog
-      .slice()
-      .sort(
-        (left, right) =>
-          right.recoveryValue +
-          right.preparationValue -
-          right.cost / 3 -
-          (left.recoveryValue + left.preparationValue - left.cost / 3),
-      )[0];
-    setSelectedTravelId(autoTravel.id);
-    setSelectedHotelId(autoHotel.id);
+    const packages = options.flatMap(t => hotelOptionCatalog.map(h => {
+      const cost = getTravelPackageEstimate(gameState, t.id, h.id, event?.id).totalCost;
+      return { travelId: t.id, hotelId: h.id, cost,
+        score: h.recoveryValue + h.preparationValue - t.fatigueValue - t.delayRisk * 1.2 - cost / 6 };
+    }));
+    const affordable = packages.filter(p => p.cost <= gameState.player.cash + (booking?.totalCost ?? 0));
+    const best = affordable.sort((a, b) => b.score - a.score)[0] ?? packages.sort((a, b) => a.cost - b.cost)[0];
+    setTravelId(best.travelId); setHotelId(best.hotelId);
+    setAutoNote(affordable.length ? 'Balanced for cost, recovery and reliability within your available cash.' : 'Lowest-cost package selected; more funds are still needed.');
   }
 
-  function confirmTravel() {
-    if (activeEvent && canConfirm) {
-      bookTravel(activeEvent.id, selectedTravel.id, selectedHotel.id);
-      navigate("/tournament/preparation");
-    }
+  function confirm() {
+    if (!event || blockedReason) return;
+    bookTravel(event.id, travel.id, hotel.id);
+    navigate('/tournament/preparation');
   }
 
-  const summary = (
-    <aside className="card flex min-h-0 flex-col overflow-hidden border-green-600/25">
-      <div className="hidden border-b border-border bg-green-600/5 px-4 py-3 sm:block">
-        <p className="text-[10px] font-semibold uppercase text-green-400">
-          Trip Summary
-        </p>
-        <h2 className="mt-1 truncate text-sm font-semibold text-white">
-          {activeEvent?.name ?? "No active event"}
-        </h2>
-        <p className="truncate text-[10px] text-gray-400">
-          {activeEvent?.location ?? "TBD"} ·{" "}
-          {activeEvent?.startDate ?? gameState.currentDate}
-        </p>
+  return <div className="trip-page" data-testid="travel-planner-viewport">
+    <header className="trip-header">
+      <div className="trip-heading"><p className="trip-eyebrow">Tournament travel</p><h1>Travel Planner</h1><p>{event?.name ?? 'Choose an event'} · {event?.location ?? 'No venue selected'}</p></div>
+      <div className="trip-header-actions">
+        <button className="btn-secondary" onClick={autoPlan} disabled={locked || !event}><WandSparkles size={15} />Auto Plan</button>
+        <button className="btn-secondary" onClick={() => navigate('/finance')}><Wallet size={15} />Finance</button>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 sm:p-4">
-        <CompactSelectors
-          options={travelOptions}
-          className="md:hidden"
-          selectedTravel={selectedTravel}
-          selectedHotel={selectedHotel}
-          onTravelChange={setSelectedTravelId}
-          onHotelChange={setSelectedHotelId}
-          hotelNights={hotelNights}
-        />
-
-        <div className="hidden grid-cols-2 gap-2 sm:grid">
-          <div className="rounded bg-surface-light/50 p-2.5">
-            <p className="metric-label">Travel</p>
-            <p className="mt-1 truncate text-xs font-medium text-white">
-              {selectedTravel.name}
-            </p>
-          </div>
-          <div className="rounded bg-surface-light/50 p-2.5">
-            <p className="metric-label">Hotel</p>
-            <p className="mt-1 truncate text-xs font-medium text-white">
-              {selectedHotel.name}
-            </p>
-          </div>
+    </header>
+    <TravelLocationPanel tournament={event ?? undefined} travelId={travel.id} />
+    <div className="trip-workspace">
+      <section className="trip-choices trip-transport" aria-label="Transport choices">
+        <header className="trip-section-heading"><div className="trip-section-title"><span className="trip-section-icon"><Plane size={18} aria-hidden="true"/></span><div><h2>Travel Options</h2><p>Fare · fatigue · reliability</p></div></div><span className="trip-pill">6 choices</span></header>
+        <div className="trip-option-grid">
+          {[...options].sort((a,b) => a.cost-b.cost).map(option => {
+            const selected = travel.id === option.id;
+            const load = event ? journeyQuote(gameState, event, option.id).fatigue : Math.round(option.fatigueValue / 10);
+            return <button key={option.id} type="button" className="trip-option" aria-pressed={selected} disabled={locked} onClick={() => chooseTravel(option.id)}>
+              <span className="trip-option-heading"><strong><span className="trip-selection-mark" aria-label={selected ? "Selected" : undefined}>{selected && <Check size={11} aria-hidden="true"/>}</span>{option.name}</strong><span className="trip-fare">{formatMoney(option.cost)}<small>fare</small></span></span>
+              <span className="trip-row-metrics"><span className="trip-stat trip-stat-fatigue"><span>Fatigue</span> <b>+{load}</b></span><span className="trip-stat trip-stat-delay"><span>Delay</span> <b>{formatPercent(option.delayRisk)}</b></span><span className="trip-stat trip-stat-comfort"><span>Comfort</span> <b>{option.comfort}/5</b></span></span>
+            </button>;
+          })}
         </div>
-
-        <div className="space-y-1.5 border-t border-border pt-3 text-xs">
-          <div className="flex justify-between gap-3">
-            <span className="text-gray-400">Travel, transfers & fees</span>
-            <span className="text-white">{formatMoney(estimate.fixedCost)}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="text-gray-400">Hotel · {formatMoney(estimate.nightlyRate)}/night</span>
-            <span className="text-white">{estimate.minNights}–{estimate.maxNights} nights</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="text-gray-400">Trip estimate · early exit to final</span>
-            <span className="text-white">{formatMoney(estimate.minCost)}–{formatMoney(estimate.maxCost)}</span>
-          </div>
-          <div className="flex justify-between gap-3 border-t border-border/70 pt-2 font-semibold">
-            <span className="text-white">{journeyLocked ? 'Paid so far' : 'Pay on booking'}</span>
-            <span className="text-amber-400">{formatMoney(totalTripCost)}</span>
-          </div>
-          <p className="text-[10px] leading-relaxed text-gray-400">{journeyLocked && savedJourney?.hotelNightlyRate === undefined
-            ? 'This existing booking already covers the full event.'
-            : 'Includes arrival and preparation nights. Later rounds add hotel nights automatically; rounds on the same day add no extra charge. Round dates are estimated across the event dates.'}</p>
+        <p className="trip-choice-note">{autoNote || 'Travel fatigue is added on arrival. Acclimatisation can offset it. Fares and delay risks are game estimates.'}</p>
+      </section>
+      <section className="trip-choices trip-hotels" aria-label="Accommodation choices">
+        <header className="trip-section-heading"><div className="trip-section-title"><span className="trip-section-icon"><BedDouble size={18} aria-hidden="true"/></span><div><h2>Hotel Options</h2><p>Nightly rate · recovery · preparation</p></div></div><span className="trip-pill">6 choices</span></header>
+        <div className="trip-option-grid">
+          {[...hotelOptionCatalog].sort((a,b) => a.cost-b.cost).map(option => {
+            const rate = Math.round(option.cost * multiplier * 100) / 100;
+            const selected = hotel.id === option.id;
+            return <button key={option.id} type="button" className="trip-option" aria-pressed={selected} disabled={locked} onClick={() => chooseHotel(option.id)}>
+              <span className="trip-option-heading"><strong><span className="trip-selection-mark" aria-label={selected ? "Selected" : undefined}>{selected && <Check size={11} aria-hidden="true"/>}</span>{option.name}</strong><span className="trip-fare">{formatMoney(rate)}<small>/night</small></span></span>
+              <span className="trip-row-metrics"><span className="trip-stat trip-stat-recovery"><span>Recovery</span> <b>{option.recoveryValue}/100</b></span><span className="trip-stat trip-stat-prep"><span>Prep</span> <b>{option.preparationValue}/100</b></span></span>
+            </button>;
+          })}
         </div>
-
-        <div className="grid grid-cols-4 gap-1.5 text-center">
-          {[
-            ["Fresh", `${formatPercent(100 - selectedTravel.fatigueValue)}`],
-            ["Delay", `${formatPercent(100 - selectedTravel.delayRisk)}`],
-            ["Recover", `${formatPercent(selectedHotel.recoveryValue)}`],
-            ["Prep", `${formatPercent(selectedHotel.preparationValue)}`],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded bg-surface-light/50 px-1 py-2">
-              <p className="text-[8px] uppercase text-gray-500">{label}</p>
-              <p className="mt-0.5 text-[11px] font-semibold text-white">
-                {value}
-              </p>
-            </div>
-          ))}
+        <p className="trip-choice-note">{hotel.name}: {hotel.noise} · {hotel.distance}. Ratings are game estimates.</p>
+      </section>
+      <aside className="trip-summary" aria-label="Trip summary">
+        <header className="trip-summary-heading"><p className="trip-eyebrow">Your package</p><h2>Trip Summary</h2><span>{booking ? 'Existing booking' : 'Review before booking'}</span></header>
+        <div className="trip-selected"><div><span>Transport</span><strong>{travel.name}</strong></div><div><span>Accommodation</span><strong>{hotel.name}</strong></div></div>
+        <dl className="trip-breakdown">
+          <div><dt>Travel, transfers & fees</dt><dd>{formatMoney(estimate.fixedCost)}</dd></div>
+          <div><dt>Hotel · {formatMoney(estimate.nightlyRate)}/night</dt><dd>{estimate.minNights}–{estimate.maxNights} nights</dd></div>
+          <div><dt>Trip estimate · early exit to final</dt><dd>{formatMoney(estimate.minCost)}–{formatMoney(estimate.maxCost)}</dd></div>
+        </dl>
+        <div className="trip-pay"><span>{locked ? 'Paid so far' : booking ? delta < 0 ? 'Refund on update' : 'Pay to update' : 'Pay on booking'}</span><strong>{formatMoney(locked ? estimate.totalCost : Math.abs(delta))}</strong><div>Cash after booking <b className={cashLeft < 0 ? 'trip-negative' : ''}>{formatMoney(cashLeft)}</b></div></div>
+        <p className="trip-billing-note">{booking && !locked ? `${formatMoney(booking.totalCost)} already paid; only the difference is settled. ` : ''}{locked && savedJourney?.hotelNightlyRate === undefined ? 'This older booking covers the full event.' : `Includes ${locked ? estimate.paidNights : estimate.minNights} hotel nights. A longer run costs ${formatMoney(estimate.nightlyRate)} per extra night. Round dates are estimates.`}</p>
+        {blockedReason && <p role="status" className="trip-warning">{blockedReason}{requiredDecision && <button onClick={() => navigate(requiredDecision.route)}>Open Inbox →</button>}</p>}
+        <div className="trip-summary-actions">
+          <button className="btn-primary" aria-label="Confirm Travel" disabled={!!blockedReason} onClick={confirm}>{booking && !locked ? 'Update & prepare' : 'Confirm Travel'}</button>
+          <div><button className="btn-secondary" onClick={() => navigate(booking?.preparation ? '/match/preview' : '/tournament/preparation')}>{booking?.preparation ? 'Match Preview' : 'Preparation'}</button><button className="btn-secondary" aria-label="Back To Calendar" onClick={() => navigate('/calendar')}>Calendar</button></div>
         </div>
-
-        {arrivalTooLate && <p role="status" className="text-xs text-amber-300">This journey cannot arrive before the tournament starts. Return to the Hub to withdraw and choose a later event.</p>}
-        {existingBooking ? (
-          <p className="rounded border border-green-600/20 bg-green-600/10 px-2.5 py-2 text-[10px] text-green-300">
-            Booked package: {formatMoney(existingBooking.totalCost)}. {journeyLocked ? 'Journey started; this package is locked. Continue to preparation or match preview.' : 'Confirm again to update it.'}
-          </p>
-        ) : null}
-
-        <div className="mt-auto grid grid-cols-4 gap-1.5 sm:grid-cols-3 sm:gap-2">
-          <button
-            type="button"
-            aria-label="Confirm Travel"
-            disabled={!canConfirm}
-            className="btn-primary min-h-10 justify-center px-2 text-[10px] disabled:cursor-not-allowed disabled:opacity-50 sm:text-xs"
-            onClick={confirmTravel}
-          >
-            <span className="sm:hidden">Confirm</span>
-            <span className="hidden sm:inline">Confirm Travel</span>
-          </button>
-          <button
-            type="button"
-            aria-label={existingBooking?.preparation ? "Match Preview" : "Preparation"}
-            className="btn-secondary min-h-10 justify-center px-2 text-[10px] sm:text-xs"
-            onClick={() =>
-              navigate(
-                existingBooking?.preparation
-                  ? "/match/preview"
-                  : "/tournament/preparation",
-              )
-            }
-          >
-            <span className="sm:hidden">
-              {existingBooking?.preparation ? "Preview" : "Prepare"}
-            </span>
-            <span className="hidden sm:inline">
-              {existingBooking?.preparation ? "Match Preview" : "Preparation"}
-            </span>
-          </button>
-          <button
-            type="button"
-            aria-label="Back To Calendar"
-            className="btn-secondary min-h-10 justify-center px-2 text-[10px] sm:text-xs"
-            onClick={() => navigate("/calendar")}
-          >
-            Calendar
-          </button>
-          <button
-            type="button"
-            aria-label="Finance"
-            className="btn-secondary min-h-10 justify-center px-1 text-[10px] sm:hidden"
-            onClick={() => navigate("/finance")}
-          >
-            Finance
-          </button>
-        </div>
-      </div>
-    </aside>
-  );
-
-  return (
-    <div
-      data-testid="travel-planner-viewport"
-      className="grid h-full min-h-0 min-w-0 grid-rows-[auto_auto_auto_minmax(0,1fr)] gap-2 overflow-hidden sm:gap-3"
-    >
-      <header className="flex min-w-0 items-end justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[9px] font-semibold uppercase text-gray-500">
-            Tournaments
-          </p>
-          <h1 className="mt-0.5 text-xl font-bold text-white sm:text-2xl">
-            Travel Planner
-          </h1>
-          <p className="mt-0.5 hidden truncate text-xs text-gray-400 sm:block">
-            {activeEvent?.name ?? "Next event"} ·{" "}
-            {activeEvent?.location ?? "TBD"}
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <button
-            type="button"
-            className="btn-secondary min-h-10 px-3 text-xs"
-            onClick={autoPlan}
-          >
-            Auto Plan
-          </button>
-          <button
-            type="button"
-            className="btn-secondary hidden min-h-10 px-3 text-xs sm:flex"
-            onClick={() => navigate("/finance")}
-          >
-            Finance
-          </button>
-        </div>
-      </header>
-      <TravelLocationPanel tournament={activeEvent ?? undefined} travelId={selectedTravelId} />
-
-      <div className="grid shrink-0 grid-cols-3 gap-1.5 sm:gap-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
-        <div className="card hidden min-w-0 px-3 py-2 lg:block">
-          <p className="metric-label">Event</p>
-          <p className="mt-0.5 truncate text-sm font-semibold text-white">
-            {activeEvent?.name ?? "No event selected"}
-          </p>
-        </div>
-        {[
-          ["Readiness", `${formatPercent(readinessScore)}`, "text-white"],
-          ["Trip Cost", formatMoney(totalTripCost), "text-amber-400"],
-          ["Cash Left", formatMoney(cashRemaining), moneyHealth(cashRemaining)],
-        ].map(([label, value, tone]) => (
-          <div
-            key={label}
-            className="card min-w-0 px-2 py-2 text-center sm:px-3"
-          >
-            <p className="metric-label truncate">{label}</p>
-            <p className={`mt-0.5 truncate text-sm font-bold ${tone}`}>
-              {value}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid min-h-0 min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(270px,0.8fr)] xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)_minmax(290px,0.86fr)]">
-        <section className="card hidden min-h-0 flex-col overflow-hidden xl:flex">
-          <div className="card-header shrink-0 py-2.5">
-            <h2 className="text-xs font-semibold text-white">Travel Options</h2>
-            <span className="text-[9px] text-gray-500">
-              Cost · fatigue · delay
-            </span>
-          </div>
-          <div className="grid min-h-0 flex-1 grid-rows-5 gap-1.5 p-2">
-            {travelOptions.map((option) => {
-              const Icon = iconMap[option.icon];
-              const selected = option.id === selectedTravel.id;
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => setSelectedTravelId(option.id)}
-                  className={`grid min-h-0 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition ${selected ? "border-green-500/40 bg-green-600/10" : "border-transparent bg-surface-light/45 hover:bg-surface-light"}`}
-                >
-                  <Icon
-                    className={`h-4 w-4 ${selected ? "text-green-400" : "text-gray-500"}`}
-                  />
-                  <span className="min-w-0">
-                    <span className="block truncate text-xs font-medium text-white">
-                      {option.name}
-                    </span>
-                    <span className="block truncate text-[9px] text-gray-500">
-                      {formatArrivalTime(
-                        activeEvent ? journeyQuote(gameState, activeEvent, option.id).arrival : undefined,
-                        option.arrivalTime,
-                      )}{" "}
-                      · {option.comfort}/5 comfort
-                    </span>
-                  </span>
-                  <span className="text-right">
-                    <span className="block text-xs font-semibold text-white">
-                      {formatMoney(option.cost)}
-                    </span>
-                    <span
-                      className={`text-[9px] ${option.fatigueLabel === "High" ? "text-red-400" : option.fatigueLabel === "Medium" ? "text-amber-400" : "text-green-400"}`}
-                    >
-                      {option.fatigueLabel} · {formatPercent(option.delayRisk)}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="card hidden min-h-0 flex-col overflow-hidden xl:flex">
-          <div className="card-header shrink-0 py-2.5">
-            <h2 className="text-xs font-semibold text-white">Hotel Options</h2>
-            <span className="text-[9px] text-gray-500">Recovery · prep</span>
-          </div>
-          <div className="grid min-h-0 flex-1 grid-rows-4 gap-1.5 p-2">
-            {hotelOptionCatalog.map((option) => {
-              const selected = option.id === selectedHotel.id;
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => setSelectedHotelId(option.id)}
-                  className={`grid min-h-0 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition ${selected ? "border-green-500/40 bg-green-600/10" : "border-transparent bg-surface-light/45 hover:bg-surface-light"}`}
-                >
-                  <BedDouble
-                    className={`h-4 w-4 ${selected ? "text-green-400" : "text-gray-500"}`}
-                  />
-                  <span className="min-w-0">
-                    <span className="block truncate text-xs font-medium text-white">
-                      {option.name}
-                    </span>
-                    <span className="block truncate text-[9px] text-gray-500">
-                      {option.distance} · {option.noise}
-                    </span>
-                  </span>
-                  <span className="text-right">
-                    <span className="block text-xs font-semibold text-white">
-                      {formatMoney(option.cost * hotelNights.rateMultiplier)}/night
-                    </span>
-                    <span className="block text-[9px] text-gray-400">{formatMoney(option.cost * hotelNights.rateMultiplier * hotelNights.min)}–{formatMoney(option.cost * hotelNights.rateMultiplier * hotelNights.max)} stay</span>
-                    <span className="text-[9px] text-green-400">
-                      {option.preparationLabel} prep
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="card hidden min-h-0 flex-col overflow-hidden p-4 md:flex xl:hidden">
-          <div>
-            <p className="text-xs font-semibold text-white">Choose Package</p>
-            <p className="mt-1 text-[10px] text-gray-500">
-              Every option remains available in the compact selectors.
-            </p>
-          </div>
-          <CompactSelectors
-            options={travelOptions}
-            className="mt-4"
-            selectedTravel={selectedTravel}
-            selectedHotel={selectedHotel}
-            onTravelChange={setSelectedTravelId}
-            onHotelChange={setSelectedHotelId}
-          hotelNights={hotelNights}
-          />
-          <div className="mt-4 space-y-3 border-t border-border pt-4">
-            <div>
-              <div className="mb-1 flex justify-between text-[10px]">
-                <span className="text-gray-400">Travel fatigue</span>
-                <span>{formatPercent(selectedTravel.fatigueValue)}</span>
-              </div>
-              <ProgressBar
-                value={selectedTravel.fatigueValue}
-                tone={fatigueTone(selectedTravel.fatigueLabel)}
-                compact
-              />
-            </div>
-            <div>
-              <div className="mb-1 flex justify-between text-[10px]">
-                <span className="text-gray-400">Hotel preparation</span>
-                <span>{formatPercent(selectedHotel.preparationValue)}</span>
-              </div>
-              <ProgressBar value={selectedHotel.preparationValue} compact />
-            </div>
-          </div>
-        </section>
-
-        {summary}
-      </div>
+      </aside>
     </div>
-  );
+  </div>;
 }

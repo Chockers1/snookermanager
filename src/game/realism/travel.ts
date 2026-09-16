@@ -60,9 +60,19 @@ export function originFor(state: GameState, tournament: Tournament) {
 export function travelOptionsFor(state: GameState, tournament?: Tournament): TravelOption[] {
   if (!tournament) return travelOptionCatalog;
   const destination = locationFor(tournament.location), route = routeBetween(originFor(state, tournament), destination);
-  return travelOptionCatalog.map((option, i) => {
-    const cost = route.flight ? Math.round(95 + route.distanceKm * [0.045, 0.065, 0.09, 0.14, 0.22][i]) : Math.round(option.cost * (route.distanceKm > 0 ? Math.max(1, route.distanceKm / 300) : 1));
-    return { ...option, cost, name: route.flight ? ['Economy connecting flight', 'Economy direct flight', 'Flexible economy flight', 'Premium economy flight', 'Business class flight'][i] : option.name,
+  // Saved IDs stay stable when the catalogue grows or changes display order.
+  const flightClasses: Record<string, { name: string; rate: number }> = {
+    'travel-1': { name: 'Economy connecting flight', rate: 0.045 },
+    'travel-2': { name: 'Economy direct flight', rate: 0.065 },
+    'travel-3': { name: 'Flexible economy flight', rate: 0.09 },
+    'travel-4': { name: 'Premium economy flight', rate: 0.14 },
+    'travel-5': { name: 'Business class flight', rate: 0.22 },
+    'travel-6': { name: 'Premium flexible flight', rate: 0.18 },
+  };
+  return travelOptionCatalog.map(option => {
+    const flightClass = flightClasses[option.id] ?? flightClasses['travel-1'];
+    const cost = route.flight ? Math.round(95 + route.distanceKm * flightClass.rate) : Math.round(option.cost * (route.distanceKm > 0 ? Math.max(1, route.distanceKm / 300) : 1));
+    return { ...option, cost, name: route.flight ? flightClass.name : option.name,
       icon: route.flight ? 'Plane' : option.icon,
       fatigueValue: Math.min(95, option.fatigueValue + (route.flight ? route.zoneHours * 2 : 0)) };
   });

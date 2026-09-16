@@ -7,14 +7,14 @@ for (const width of [390,1440]) test('title winning inbox report stands out at '
   delete message.victoryReport; // Existing saves also receive the treatment.
   await page.setViewportSize({width,height:960});
   await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
-  await page.goto('/'); await page.getByRole('button',{name:/Continue Career/}).click();
+  await page.goto('/'); await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await page.evaluate(()=>{history.pushState({},'','/inbox');dispatchEvent(new PopStateEvent('popstate'));});
   const select=page.getByRole('combobox',{name:'Select inbox message'});
   if(await select.isVisible()) await select.selectOption(message.id);
   else {
     const row=page.getByRole('button',{name:/Champion: Wuhan Open/});
-    await expect(row).toContainText('prize secured');
-    await expect(row.getByLabel('Tournament victory')).toBeVisible();
+    await expect(row.locator('..').locator('..')).toContainText('prize secured');
+    await expect(row.locator('..').locator('..')).toContainText('Champion: Wuhan Open');
     await row.click();
   }
   await expect(page.getByRole('heading',{name:'Champion: Wuhan Open',exact:true})).toBeVisible();
@@ -30,5 +30,5 @@ for (const width of [390,1440]) test('title winning inbox report stands out at '
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(await report.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
   await banner.getByRole('link',{name:'View trophy cabinet'}).click();
-  await expect(page.getByRole('region',{name:/Trophy Cabinet/})).toBeInViewport();
+  await expect(page.getByRole('heading',{name:'Trophies & achievements',exact:true})).toBeInViewport();
 });

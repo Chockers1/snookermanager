@@ -11,7 +11,7 @@ for (const width of [1280, 390]) test(`player names navigate across career pages
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await page.setViewportSize({ width, height: 900 });
   await page.addInitScript(({ key, save }) => { if (!sessionStorage.getItem('all-player-links')) { localStorage.setItem(key, save); sessionStorage.setItem('all-player-links', '1'); } }, { key: ACTIVE_SAVE_KEY, save: encodeCareerSave(state) });
-  await page.goto('/'); await page.getByRole('button', { name: /Continue Career/ }).click();
+  await page.goto('/'); await page.getByRole('button', { name: /Continue Career/ }).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   const navigate = async (path: string) => {
     await page.evaluate(path => { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate')); }, path);
   };

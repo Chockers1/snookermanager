@@ -1,0 +1,106 @@
+name: Manual Steam QA (requires onboarding and configuration)
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Full 40-character commit SHA already merged to main
+        type: string
+        required: true
+      upload_to_qa:
+        description: Explicitly authorise upload to the private qa branch
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: steam-qa
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: inputs.upload_to_qa && vars.STEAM_QA_ENABLED == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    outputs:
+      description: ${{ steps.metadata.outputs.description }}
+    steps:
+      - name: Validate immutable input and assigned IDs
+        shell: pwsh
+        env:
+          COMMIT: ${{ inputs.commit }}
+          APP_ID: ${{ vars.STEAM_APP_ID }}
+          DEPOT_ID: ${{ vars.STEAM_WINDOWS_DEPOT_ID }}
+        run: |
+          if ($env:COMMIT -notmatch '^[a-fA-F0-9]{40}$') { throw 'A full commit SHA is required.' }
+          if ($env:APP_ID -notmatch '^[1-9][0-9]+$' -or $env:DEPOT_ID -notmatch '^[1-9][0-9]+$') { throw 'Assigned Steam IDs are not configured.' }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require a reviewed main-branch commit
+        shell: pwsh
+        env:
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          git merge-base --is-ancestor $env:COMMIT origin/main
+          if ($LASTEXITCODE -ne 0) { throw 'Commit must be merged to main.' }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Validate and build Windows
+        shell: pwsh
+        run: ./scripts/build-windows.ps1
+      - id: metadata
+        shell: pwsh
+        env:
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          "description=SCM v$version - $($env:COMMIT.Substring(0,12))" >> $env:GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steam-qa-windows
+          path: dist/windows/
+          if-no-files-found: error
+          retention-days: 7
+
+  upload:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Configure required reviewers and restrict this environment to main before enabling.
+    environment: steam-qa
+    steps:
+      - name: Require dedicated-account credentials
+        env:
+          STEAM_USERNAME: ${{ secrets.STEAM_BUILD_USERNAME }}
+          STEAM_CONFIG: ${{ secrets.STEAM_BUILD_CONFIG_VDF }}
+        run: |
+          test -n "$STEAM_USERNAME" && test -n "$STEAM_CONFIG" || { echo 'Steam build-account secrets are missing.'; exit 1; }
+      - uses: actions/download-artifact@v4
+        with:
+          name: steam-qa-windows
+          path: content/windows
+      - name: Upload and set live on QA only
+        id: steam
+        # Pinned v3. Never use Rob's main account. Default is never an input.
+        uses: game-ci/steam-deploy@50f6b29fc64922e19a16d202a88fe199d394b536
+        with:
+          username: ${{ secrets.STEAM_BUILD_USERNAME }}
+          configVdf: ${{ secrets.STEAM_BUILD_CONFIG_VDF }}
+          appId: ${{ vars.STEAM_APP_ID }}
+          firstDepotIdOverride: ${{ vars.STEAM_WINDOWS_DEPOT_ID }}
+          buildDescription: ${{ needs.build.outputs.description }}
+          rootPath: content
+          depot1Path: windows
+          releaseBranch: qa
+      - name: Record uploaded build
+        env:
+          BUILD_ID: ${{ steps.steam.outputs.buildId }}
+        run: printf 'Steam QA BuildID %s. Verify in Steamworks and test through Steam; default was not promoted.\n' "$BUILD_ID" >> "$GITHUB_STEP_SUMMARY"

@@ -71,9 +71,10 @@ describe('required career decision gate', () => {
   });
 
   it('allows reading, saving and the exact required decision while blocking other inbox actions', () => {
-    const read = vi.fn(), save = vi.fn(), respond = vi.fn(), notify = vi.fn();
-    const actions = gateCareerActions({ markInboxMessageRead: read, saveToSlot: save, actOnCareer: respond }, () => fixture.state, notify);
+    const read = vi.fn(), save = vi.fn(), respond = vi.fn(), notify = vi.fn(), exit = vi.fn();
+    const actions = gateCareerActions({ markInboxMessageRead: read, saveToSlot: save, actOnCareer: respond, returnToMainMenu: exit }, () => fixture.state, notify);
     actions.markInboxMessageRead('any'); actions.saveToSlot('backup');
+    actions.returnToMainMenu(); expect(exit).toHaveBeenCalledTimes(1);
     actions.actOnCareer({ type: 'decision', id: 'wrong', choice: 'continue' });
     actions.actOnCareer({ type: 'life-interview', id: 'interview', response: 'private' });
     expect(respond).not.toHaveBeenCalled();

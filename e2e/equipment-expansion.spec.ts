@@ -13,7 +13,7 @@ for (const width of [1280, 390]) test(`new equipment can be selected, purchased 
       localStorage.setItem(key, save); sessionStorage.setItem('equipment-expansion-fixture', '1');
     }
   }, { key: ACTIVE_SAVE_KEY, save: encodeCareerSave(state) });
-  await page.goto('/'); await page.getByRole('button', { name: /Continue Career/ }).click();
+  await page.goto('/'); await page.getByRole('button', { name: /Continue Career/ }).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   const navigate = async (route: string) => {
     await page.evaluate(route => { history.pushState({}, '', route); dispatchEvent(new PopStateEvent('popstate')); }, route);
     await expect(page.getByRole('heading', { name: 'Cue Shop', exact: true })).toBeVisible();
@@ -37,7 +37,7 @@ for (const width of [1280, 390]) test(`new equipment can be selected, purchased 
   expect(saved.player.cash).toBe(100000 - 22000 - 180 - 150 - 10800);
   expect(saved.equipment).toMatchObject({ currentCueId: 'cue-27', currentTipId: 'tip-31', currentChalkId: 'chalk-31', currentCaseId: 'case-27' });
   expect(saved.equipment.chalkStock['chalk-31']).toBe(5);
-  await page.reload(); await page.getByRole('button', { name: /Continue Career/ }).click();
+  await page.reload(); await page.getByRole('button', { name: /Continue Career/ }).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await navigate('/equipment/cases');
   const restored = await readCareerSave(page);
   expect(restored.player.cash).toBe(saved.player.cash);

@@ -15,7 +15,7 @@ test('player condition displays never expose floating-point tails across career 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.addInitScript(({ key, save }) => localStorage.setItem(key, save), { key: ACTIVE_SAVE_KEY, save: encodeCareerSave(state) });
   await page.goto('/');
-  await page.getByRole('button', { name: /Continue Career/ }).click();
+  await page.getByRole('button', { name: /Continue Career/ }).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   const screens = [
     ['/tournaments/hub', /Shanghai Masters/],
     ['/player/attributes', /Player Attributes/],
@@ -25,7 +25,7 @@ test('player condition displays never expose floating-point tails across career 
     ['/health', /Health Centre/],
     ['/tournament/preparation', /Prepare for/],
     ['/match/result', /Match Review/],
-    ['/season-review', /End of Season/],
+    ['/season-review', /Season Review/],
   ] as const;
   for (const [route, heading] of screens) {
     await page.evaluate(route => { history.pushState({}, '', route); dispatchEvent(new PopStateEvent('popstate')); }, route);

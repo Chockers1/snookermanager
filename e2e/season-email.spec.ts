@@ -23,7 +23,7 @@ for (const viewport of [{width:1280,height:720},{width:390,height:844},{width:32
   const errors:string[]=[]; page.on('pageerror',e=>errors.push(e.message));
   await page.setViewportSize(viewport);
   await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(fixture())});
-  await page.goto('/'); await page.getByRole('button',{name:/Continue Career/}).click();
+  await page.goto('/'); await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await page.evaluate(()=>{history.pushState({},'','/inbox');dispatchEvent(new PopStateEvent('popstate'))});
   const report=page.getByRole('region',{name:'End of season report'}), body=page.getByTestId('inbox-message-body'), actions=page.getByTestId('inbox-message-actions');
   await expect(report).toBeVisible();

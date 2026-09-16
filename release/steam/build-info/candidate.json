@@ -1,0 +1,63 @@
+{
+  "version": "0.1.9",
+  "createdAt": "2026-09-15T22:46:27.122532+00:00",
+  "gitHead": "dbb0ac3b040fc79baef0a763c1ca881f4dc919d4",
+  "workingTree": "modified local candidate; not a published commit",
+  "platform": "win32-x64",
+  "appId": null,
+  "depotId": null,
+  "steamAccessed": false,
+  "published": false,
+  "signed": false,
+  "packagePath": "dist/windows",
+  "physicalBytes": 396979735,
+  "criticalFiles": [
+    {
+      "file": "resources/app.asar",
+      "bytes": 11469169,
+      "sha256": "c0c5d24e368941e2f9c651071f2051581f03b9dcae7718fb970025d48f647e65"
+    },
+    {
+      "file": "Snooker Career Manager.exe",
+      "bytes": 246343680,
+      "sha256": "87aeff2d123b8518e5c327af66fafc0f511eb2ebd0118ed8d1de5aab9f0be109"
+    },
+    {
+      "file": "THIRD_PARTY_NOTICES.txt",
+      "bytes": 68075,
+      "sha256": "804d3424a1b0eac9dd6329e09d26f0942f2f030811244b0d6ef53ac6d45ba89a"
+    }
+  ],
+  "validation": {
+    "lint": "passed",
+    "typecheck": "passed",
+    "gameUnitTests": 933,
+    "desktopTests": 2,
+    "captureTests": 2,
+    "productionBuild": "passed",
+    "package": "passed",
+    "packagedSaveRestart": "passed",
+    "real25SeasonImportRestart": "passed",
+    "inventoryFindings": 0,
+    "devCaptureIncluded": false,
+    "sourceArtworkUnchanged": true,
+    "browserTestsThisPass": "not rerun; previous clean first pass 389 passed with no skips"
+  },
+  "pending": [
+    "manual screenshots",
+    "trailer production",
+    "artwork sign-off",
+    "rights/AI provenance",
+    "external-PC test",
+    "final store fields",
+    "Steam onboarding and real IDs"
+  ],
+  "evidence": [
+    "artifacts/steam-pass2/tests.log",
+    "artifacts/steam-pass2/build.log",
+    "artifacts/steam-pass2/smoke.log",
+    "artifacts/steam/package-inventory.json",
+    "artifacts/steam/packaged-smoke.json",
+    "docs/STEAM_STORE_READY_REPORT.md"
+  ]
+}

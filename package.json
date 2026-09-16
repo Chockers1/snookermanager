@@ -1,13 +1,13 @@
 {
   "name": "snooker_career",
   "private": true,
-  "version": "0.1.9",
+  "version": "0.1.10",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run && node --test desktop/*.test.cjs && node --test scripts/steam-capture.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
     "preview": "vite preview",
@@ -17,7 +17,13 @@
     "simulate:match-experience-calibration": "tsx scripts/runMatchExperienceCalibration.ts",
     "simulate:match-live-visit": "tsx scripts/runMatchSimulationLiveVisitReport.ts",
     "simulate:live-visit-bias-debug": "tsx scripts/runLiveVisitBiasDebug.ts",
-    "simulate:balance-matrix": "tsx scripts/runCareerBalanceMatrix.ts"
+    "simulate:balance-matrix": "tsx scripts/runCareerBalanceMatrix.ts",
+    "typecheck": "tsc -b",
+    "build:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows.ps1",
+    "package:windows": "node scripts/package-windows.mjs",
+    "test:packaged": "node scripts/smoke-windows.mjs",
+    "verify:package": "node scripts/verify-windows-package.mjs",
+    "capture:prepare": "node scripts/prepare-steam-capture.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -30,6 +36,8 @@
     "recharts": "^3.10.1"
   },
   "devDependencies": {
+    "@electron/fuses": "2.1.3",
+    "@electron/packager": "20.3.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^7.0.1",
@@ -40,6 +48,7 @@
     "@types/react-dom": "^19.2.6",
     "@vitejs/plugin-react": "^6.1.1",
     "autoprefixer": "^10.5.4",
+    "electron": "44.4.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.9.1",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -52,6 +61,10 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.69.0",
     "vite": "^8.2.2",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "yaml": "2.9.1"
+  },
+  "engines": {
+    "node": ">=24.0.0 <25"
   }
 }

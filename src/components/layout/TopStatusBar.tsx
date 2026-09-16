@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CalendarClock,
   ChevronRight,
+  House,
   Mail,
   Play,
   Route,
@@ -38,6 +39,8 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
     finishSeason,
     enterTournament,
     skipTournament,
+    returnToMainMenu,
+    savePending,
   } = useGame();
   const navigate = useNavigate();
   const location = useLocation();
@@ -426,6 +429,20 @@ export function TopStatusBar({ player }: TopStatusBarProps) {
               >
                 <UserPlus className="h-4 w-4 text-green-400" /> Start New Career
               </Link>
+              <button
+                type="button"
+                disabled={savePending}
+                title={savePending ? "Saving your latest progress…" : "Keep your career and return to the main menu"}
+                onClick={() => {
+                  if (returnToMainMenu()) {
+                    setCareerMenuOpen(false);
+                    navigate("/", { replace: true });
+                  }
+                }}
+                className="mt-1 flex min-h-10 w-full items-center gap-3 rounded-md border-t border-border px-2 text-left text-xs text-gray-300 hover:bg-white/5 hover:text-white disabled:cursor-wait disabled:opacity-50"
+              >
+                <House aria-hidden="true" className="h-4 w-4 text-green-400" /> Return to Main Menu
+              </button>
             </div>
           ) : null}
         </div>

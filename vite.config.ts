@@ -12,6 +12,7 @@ export default defineConfig({
   define: { __GAME_BUILD__: JSON.stringify({version,revision,builtAt:new Date().toISOString()}) },
   test: {
     include: ['src/**/*.test.{ts,tsx}'],
+    maxWorkers: 2,
   },
   build: {
     rolldownOptions: {

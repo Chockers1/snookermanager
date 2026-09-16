@@ -9,7 +9,7 @@ for (const cause of ['chalk','cash'] as const) test(`calendar explains ${cause} 
  if(cause==='chalk') state.equipment.chalkStock[state.equipment.currentChalkId!]=0;
  else state.player.cash=-100;
  await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
- await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+ await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
  await page.evaluate(id=>{history.pushState({},'', '/calendar?tournament='+encodeURIComponent(id));dispatchEvent(new PopStateEvent('popstate'));},event.id);
  const label=cause==='chalk'?'Buy or equip chalk':'Open finances & club work';
  await expect(page.getByRole('link',{name:label+' →'})).toBeVisible();
@@ -23,9 +23,10 @@ test('training preview reports relevant fractional gains without overflowing its
  const state=createStarterState();state.trainingAppliedWeek=-1;state.health.activeIssue=null;
  state.tournaments=state.tournaments.map(t=>({...t,status:'Skipped'}));
  await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
- await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+ await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
  await page.evaluate(()=>{history.pushState({},'', '/training');dispatchEvent(new PopStateEvent('popstate'));});
  await page.getByRole('button',{name:/Safety & Tactical/}).click();
+ await page.getByRole('tab',{name:'Development',exact:true}).click();
  const card=page.locator('section').filter({has:page.getByRole('heading',{name:'Expected Development'})});
  await expect(card).toContainText('Safety Play');
  await expect(card).not.toContainText(/\d\.\d{3,}/);
@@ -37,7 +38,7 @@ test('inbox entry explains an empty chalk stock and links directly to restocking
  state.equipment.chalkStock[state.equipment.currentChalkId!]=0;
  state.inbox=[{id:'entry-blocked',sender:'Tournament Office',subject:event.name+' entry',preview:'Review your entry.',priority:'High',date:'Today',read:false,tournamentReference:{id:event.id,startDate:event.startDate}}];
  await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
- await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+ await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
  await page.evaluate(()=>{history.pushState({},'', '/inbox?message=entry-blocked');dispatchEvent(new PopStateEvent('popstate'));});
  await expect(page.getByRole('link',{name:'Buy or equip chalk →'})).toBeVisible();
  await page.getByRole('button',{name:'Buy or equip chalk',exact:true}).click();await expect(page).toHaveURL(/equipment\/chalk-tips/);
@@ -48,7 +49,7 @@ test('finance offers a clearly priced emergency return when debt prevents ordina
  const {realismOf}=await import('../src/game/realism');const {routeBetween}=await import('../src/game/realism/travel');
  state.realism={...realismOf(state),home:'Britain',location:'Berlin',journeys:{}};const fare=Math.round(45+routeBetween('Berlin','Britain').distanceKm*.065);
  await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
- await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+ await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
  await page.evaluate(()=>{history.pushState({},'', '/finance');dispatchEvent(new PopStateEvent('popstate'));});
  await page.getByRole('button',{name:/Current location · Berlin · home Britain/}).click();
  await expect(page.getByText('The full fare is added to your negative balance.',{exact:false})).toBeVisible();

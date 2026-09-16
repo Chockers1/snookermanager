@@ -56,7 +56,7 @@ test('long career can create a named copy and load it after a browser reload',as
  expect(result.matches).toBe(true);expect(result.legacy).toBeNull();
  await page.reload();expect(await page.evaluate(async payload=>{const p='/src/game/saveStorage.ts',api=await import(p);await api.prepareCareerStorage();return api.readCareerStorage(api.ACTIVE_SAVE_KEY)===payload && await api.readSavedCareer(api.SAVE_SLOT_PREFIX+'long-copy')===payload;},payload)).toBe(true);
  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
- await expect(page.locator('#main-content')).toBeVisible({timeout:90000});
+ await expect(page.getByRole('heading',{name:state.seasonReview?.pending ? 'Season Review' : 'Upcoming & Recent Results',exact:true})).toBeVisible({timeout:90000});
  await expect(page.getByText('Saving…',{exact:true})).toBeHidden({timeout:90000});
  const review=page.getByRole('button',{name:'Close review',exact:true});if(await review.isVisible())await review.click();
  await page.evaluate(()=>{history.pushState({},'', '/saves');dispatchEvent(new PopStateEvent('popstate'))});
@@ -64,7 +64,7 @@ test('long career can create a named copy and load it after a browser reload',as
  await expect(page.getByRole('status').filter({hasText:'Created and switched'})).toBeVisible({timeout:90000});
  await expect(page.getByText('Saving…',{exact:true})).toBeHidden({timeout:90000});
  await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();
- await expect(page.locator('#main-content')).toBeVisible({timeout:90000});
+ await expect(page.getByRole('heading',{name:state.seasonReview?.pending ? 'Season Review' : 'Upcoming & Recent Results',exact:true})).toBeVisible({timeout:90000});
  await expect(page.getByText('Saving…',{exact:true})).toBeHidden({timeout:90000});
  const restored=await page.evaluate(async()=>{const p='/src/game/saveStorage.ts',api=await import(p);const raw=await api.readSavedCareer(api.SAVE_SLOT_PREFIX+api.readActiveSaveSlotId());const s=JSON.parse(api.decodeCareerSave(raw));return {player:s.player.fullName,date:s.currentDate,season:s.season};});
  expect(restored).toEqual({player:state.player.fullName,date:state.currentDate,season:state.season});

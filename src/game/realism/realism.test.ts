@@ -94,7 +94,8 @@ describe('travel, elapsed costs and training base', () => {
     expect(options[0].cost).toBeGreaterThan(450);
     expect(options[4].cost).toBeGreaterThan(1900);
     expect(options[4].cost).toBeGreaterThan(options[0].cost * 3);
-    expect(options.every((option, i) => i === 0 || option.cost > options[i - 1].cost)).toBe(true);
+    // The original five tiers keep their prices; new saved IDs can be appended between tiers.
+    expect(options.slice(0, 5).every((option, i) => i === 0 || option.cost > options[i - 1].cost)).toBe(true);
     const shortHaul = travelOptionsFor(state, { ...event, location: 'Leicester' });
     expect(shortHaul[4].cost).toBeLessThan(400);
     expect(quote.acclimatisationDays).toBe(4);

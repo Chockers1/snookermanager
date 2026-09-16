@@ -91,7 +91,7 @@ function PlayerProfileContent(){
    </select>
  </label>;
  const openSeason = (season: string) => { setSelectedSeason(season); setLimit(15); setTab('Results'); };
- return <div className="flex min-w-0 flex-col gap-3 xl:min-h-full" data-testid="player-profile">
+ return <div className="flex min-w-0 flex-col gap-3 xl:h-full xl:min-h-0 xl:overflow-hidden" data-testid="player-profile">
    <header className="relative shrink-0 overflow-hidden rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/50 via-surface to-surface p-4 sm:p-6">
      <div className="flex flex-wrap items-start justify-between gap-4">
        <div className="flex min-w-0 flex-1 items-center gap-4">
@@ -131,7 +131,7 @@ function PlayerProfileContent(){
      </button>)}
    </div>
 
-   <div role="tabpanel" id={`profile-panel-${tab}`} aria-labelledby={`profile-tab-${tab}`} className="flex min-w-0 flex-1 flex-col">
+   <div role="tabpanel" id={`profile-panel-${tab}`} aria-labelledby={`profile-tab-${tab}`} tabIndex={0} className="scrollbar-thin flex min-w-0 flex-1 flex-col xl:min-h-0 xl:overflow-auto xl:overscroll-contain">
    {tab === 'Overview' && <div className="grid flex-1 items-stretch gap-3 xl:grid-cols-[minmax(0,1.5fr)_minmax(300px,1fr)]">
      <div className="flex min-w-0 flex-col gap-3">
        <section className="card p-4 xl:flex-1"><SectionTitle title="Current form"><span className="text-[10px] text-gray-500">Last {recent.length} recorded matches · newest first</span></SectionTitle>

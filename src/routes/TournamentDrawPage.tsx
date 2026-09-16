@@ -6,7 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Download, Route, Trophy } from "lucide-react";
 import { TournamentBracket } from "../components/tournaments/TournamentBracket";
-import { ProgressBar } from "../components/ui/ProgressBar";
+import { SectionTabs } from "../components/ui/SectionTabs";
+import "./TournamentDrawPage.css";
 import { useGame } from "../context/useGame";
 import { formatMoney } from "../utils/formatters";
 import { buildTournamentDrawData } from "../utils/liveRouteData";
@@ -17,14 +18,6 @@ function difficultyClass(
   if (difficulty === "Very Tough") return "text-red-400";
   if (difficulty === "Challenging") return "text-amber-400";
   return "text-green-400";
-}
-
-function difficultyValue(
-  difficulty: "Moderate" | "Challenging" | "Very Tough",
-) {
-  if (difficulty === "Very Tough") return 84;
-  if (difficulty === "Challenging") return 62;
-  return 44;
 }
 
 function progressClass(status: "completed" | "current" | "upcoming") {
@@ -40,6 +33,7 @@ export function TournamentDrawPage() {
   const [searchParams] = useSearchParams();
   const { gameState } = useGame();
   const [compactView, setCompactView] = useState(false);
+  const [outlookTab, setOutlookTab] = useState<"Summary" | "Opponents">("Summary");
   const [roundSelection, setRoundSelection] = useState<{ label: string } | null>(null);
   const drawRef = useRef<HTMLDivElement>(null);
   const tournamentId = searchParams.get("tournament");
@@ -70,8 +64,8 @@ export function TournamentDrawPage() {
   );
 
   return (
-    <div className="space-y-5 pb-10">
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
+    <div className="draw-workspace">
+      <div className="flex shrink-0 flex-col items-start justify-between gap-4 sm:flex-row">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase text-gray-500">
             Tournaments
@@ -116,7 +110,7 @@ export function TournamentDrawPage() {
 
       {drawData.eventCompleted && drawData.eventSummary ? (
         <section
-          className="grid gap-2 rounded-xl border border-green-500/25 bg-green-500/5 p-3 sm:grid-cols-2 lg:grid-cols-4"
+          className="grid shrink-0 gap-2 rounded-xl border border-green-500/25 bg-green-500/5 p-3 sm:grid-cols-2 lg:grid-cols-4"
           aria-label="Completed event summary"
         >
           <div className="rounded-lg bg-surface/70 p-3">
@@ -170,9 +164,9 @@ export function TournamentDrawPage() {
         </section>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-12">
-        <div className="space-y-4 xl:col-span-8">
-          <div className="card">
+      <div className="draw-workspace-content">
+        <div className="draw-workspace-bracket">
+          <div className="card flex min-h-0 flex-1 flex-col">
             <div className="card-header">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
                 <Trophy className="h-3.5 w-3.5 text-green-400" />{" "}
@@ -188,7 +182,7 @@ export function TournamentDrawPage() {
                 {drawData.currentPosition.currentRound}
               </span>
             </div>
-            <div ref={drawRef} className="card-body min-h-[32rem] overflow-hidden">
+            <div ref={drawRef} className="card-body min-h-0 flex-1 overflow-auto" tabIndex={0} aria-label="Tournament draw scroll area">
               <>{groupCompetition ? <GroupFixtures tournament={gameState.tournaments.find(t => t.id === drawData.tournamentId) ?? null} rounds={drawData.bracket} playerName={gameState.player.fullName} currentRound={drawData.currentPosition.currentRound} selectedStage={roundSelection?.label} onStageChange={label => setRoundSelection({ label })} /> : <TournamentBracket
                 rounds={visibleBracket}
                 playerName={gameState.player.fullName}
@@ -198,7 +192,7 @@ export function TournamentDrawPage() {
             </div>
           </div>
 
-          <div className="card">
+          <div className="card shrink-0">
             <div className="card-header">
               <h3 className="text-sm font-semibold text-white">
                 Route Progress
@@ -221,131 +215,41 @@ export function TournamentDrawPage() {
           </div>
         </div>
 
-        <div className="space-y-4 xl:col-span-4">
-          <div className="card card-body">
-            <h3 className="mb-3 text-xs font-semibold text-white">
-              Path & Opponent Outlook
-            </h3>
-            <div className="space-y-2">
-              {drawData.opponentOutlook.map((opponent) => (
-                <div
-                  key={opponent.id}
-                  className="rounded-lg bg-surface-light/50 p-3 text-xs"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-white">
-                        <PlayerLink name={opponent.name}/>
-                      </p>
-                      <p className="text-gray-400">
-                        Rank {opponent.rank} - {opponent.nation}
-                      </p>
-                    </div>
-                    <span
-                      className={`shrink-0 ${difficultyClass(opponent.difficulty)}`}
-                    >
-                      {opponent.difficulty}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex justify-between text-[10px] text-gray-500">
-                    <span>H2H</span>
-                    <span>{opponent.headToHead}</span>
-                  </div>
-                  <div className="mt-2">
-                    <ProgressBar
-                      value={difficultyValue(opponent.difficulty)}
-                      tone={
-                        opponent.difficulty === "Very Tough"
-                          ? "red"
-                          : opponent.difficulty === "Challenging"
-                            ? "amber"
-                            : "green"
-                      }
-                      compact
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+        <aside className="draw-workspace-outlook draw-outlook-tabs" aria-label="Draw outlook and navigation">
+          <SectionTabs id="draw-outlook" label="Draw details" tabs={['Summary', 'Opponents']} active={outlookTab} onChange={setOutlookTab} />
+          <div id="draw-outlook-panel" role="tabpanel" aria-labelledby={`draw-outlook-tab-${outlookTab === 'Summary' ? 0 : 1}`} className="draw-outlook-panel">
+            {outlookTab === 'Summary' ? <section className="draw-summary-panel">
+              <header><p>{drawData.eventCompleted ? 'Event complete' : 'Your tournament'}</p><h3>Current Position</h3></header>
+              <dl className="draw-summary-rows">
+                {[
+                  { label: 'Current Round', value: drawData.currentPosition.currentRound },
+                  { label: 'Best Result', value: drawData.currentPosition.bestResult },
+                  { label: 'Projected Route', value: drawData.currentPosition.projectedRoute },
+                  { label: 'Bracket Difficulty', value: drawData.currentPosition.difficultyLabel },
+                  ...drawData.insights.filter(item => !['Tournament', 'Status', 'Your Result', 'Current Round'].includes(item.label)),
+                ].map(item => <div key={item.label}><dt>{item.label}</dt><dd><PlayerNames text={item.value}/></dd></div>)}
+              </dl>
+            </section> : <section className="draw-opponents-panel">
+              <header><h3>Path &amp; Opponent Outlook</h3><p>Selected players in the draw · career head-to-head</p></header>
+              <div className="draw-opponent-grid">
+                {drawData.opponentOutlook.map(opponent => <article key={opponent.id} className="draw-opponent-card">
+                  <h4><PlayerLink name={opponent.name}/></h4>
+                  <p>Rank {opponent.rank} · {opponent.nation}</p>
+                  <span className={difficultyClass(opponent.difficulty)}>{opponent.difficulty}</span>
+                  <div><span>H2H</span><strong>{opponent.headToHead}</strong></div>
+                </article>)}
+                {!drawData.opponentOutlook.length && <p className="draw-no-opponents">Opponent details appear when the draw is available.</p>}
+              </div>
+            </section>}
           </div>
+          <footer className="draw-outlook-actions">
+            <button type="button" className="btn-primary" onClick={() => navigate(drawData.eventCompleted ? '/' : '/match/preview')}>
+              <Route className="h-3.5 w-3.5" />{drawData.eventCompleted ? 'Back to Dashboard' : 'Scout Next Opponent'}
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => navigate('/rankings')}>View Rankings</button>
+          </footer>
+        </aside>
 
-          <div className="card card-body">
-            <h3 className="mb-3 text-xs font-semibold text-white">
-              Current Position
-            </h3>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Current Round</span>
-                <span className="text-white">
-                  {drawData.currentPosition.currentRound}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Best Result</span>
-                <span className="text-white">
-                  {drawData.currentPosition.bestResult}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Projected Route</span>
-                <span className="text-white">
-                  <PlayerNames text={drawData.currentPosition.projectedRoute}/>
-                </span>
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="mb-1 flex justify-between text-xs">
-                <span className="text-gray-400">Bracket Difficulty</span>
-                <span className="text-amber-400">
-                  {drawData.currentPosition.difficultyLabel}
-                </span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-gradient-to-r from-green-500 via-amber-400 to-red-500">
-                <div
-                  className="h-full bg-white/20"
-                  style={{ width: `${drawData.difficultyScore}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="card card-body">
-            <h3 className="mb-3 text-xs font-semibold text-white">
-              Draw Insights
-            </h3>
-            <div className="space-y-2">
-              {drawData.insights.map((item) => (
-                <div
-                  key={item.label}
-                  className="flex justify-between rounded bg-surface-light/50 px-3 py-2 text-xs"
-                >
-                  <span className="text-gray-400">{item.label}</span>
-                  <span className="text-white">{item.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="btn-primary w-full justify-center text-xs"
-            onClick={() =>
-              navigate(drawData.eventCompleted ? "/" : "/match/preview")
-            }
-          >
-            <Route className="h-3.5 w-3.5" />{" "}
-            {drawData.eventCompleted
-              ? "Back to Dashboard"
-              : "Scout Next Opponent"}
-          </button>
-          <button
-            type="button"
-            className="btn-secondary w-full justify-center text-xs"
-            onClick={() => navigate("/rankings")}
-          >
-            View Rankings
-          </button>
-        </div>
       </div>
     </div>
   );

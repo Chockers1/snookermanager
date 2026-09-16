@@ -18,13 +18,16 @@ export function CareerLauncherPage() {
   }
 
   async function continueCareer() {
-    if (await continueActiveCareer()) navigate('/')
+    // Route before activating the career: a pending season review may redirect
+    // immediately, and a later home navigation would overwrite that redirect.
+    navigate('/')
+    await continueActiveCareer()
   }
 
   async function importSave(file: File | undefined) {
     if (!file) return
+    navigate('/')
     if (await importCareer(await file.text())) {
-      navigate('/')
       return
     }
     setMessage('That file is not a valid Snooker Career Manager save.')
@@ -67,7 +70,7 @@ export function CareerLauncherPage() {
             <div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Named careers</h2><button type="button" className="min-h-10 px-2 text-sm text-gray-400 hover:text-white" onClick={() => setShowSaves(false)}>Close</button></div>
             <div className="mt-3 grid gap-2 md:grid-cols-2">
               {slots.length === 0 ? <p className="rounded-lg bg-surface-light/50 p-4 text-sm text-gray-400">No named saves yet. Create a new career or import a backup.</p> : slots.map((slot) => (
-                <button key={slot.id} type="button" className="flex min-h-16 items-center justify-between gap-3 rounded-lg border border-border bg-surface-light/40 p-3 text-left hover:border-green-500/40" onClick={async () => { if (await loadSaveSlot(slot.id)) navigate('/') }}>
+                <button key={slot.id} type="button" className="flex min-h-16 items-center justify-between gap-3 rounded-lg border border-border bg-surface-light/40 p-3 text-left hover:border-green-500/40" onClick={async () => { navigate('/'); await loadSaveSlot(slot.id) }}>
                   <span className="min-w-0"><strong className="block truncate text-sm">{slot.name}</strong><span className="mt-1 block truncate text-xs text-gray-400">{slot.playerName} · {slot.season} · {slot.date}</span></span><FolderOpen className="h-4 w-4 shrink-0 text-green-400" />
                 </button>
               ))}
@@ -78,7 +81,7 @@ export function CareerLauncherPage() {
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <button type="button" className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-border bg-surface/80 px-4 py-3 text-sm font-semibold hover:border-green-500/40" onClick={() => fileInputRef.current?.click()}><Upload className="h-4 w-4" /> Import Save</button>
           <input ref={fileInputRef} className="hidden" type="file" accept="application/json,.json" onChange={(event) => void importSave(event.target.files?.[0])} />
-          <button type="button" className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-border bg-surface/80 px-4 py-3 text-sm font-semibold text-gray-300 hover:border-amber-500/40 hover:text-white" onClick={async () => { if (await startDemoCareer()) navigate('/') }}><PlayCircle className="h-4 w-4 text-amber-400" /> Demo Career</button>
+          <button type="button" className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-border bg-surface/80 px-4 py-3 text-sm font-semibold text-gray-300 hover:border-amber-500/40 hover:text-white" onClick={async () => { navigate('/'); await startDemoCareer() }}><PlayCircle className="h-4 w-4 text-amber-400" /> Demo Career</button>
         </div>
         <details className="mt-4"><summary className="cursor-pointer rounded-lg border border-border bg-surface p-4 text-sm font-semibold">Restore automatic backup</summary><div className="mt-2"><RecoverySaves /></div></details>
         <a href="/settings" className="mt-4 text-center text-sm text-green-300 underline">Settings, accessibility &amp; bug reports</a>

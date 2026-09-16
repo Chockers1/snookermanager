@@ -25,6 +25,7 @@ for(const [startingLevelId,age] of [['start-club-junior',12],['start-rookie-pro'
  const equipped=await readCareerSave(page);const event=getNextEligibleTournament(equipped)!;expect(event).toBeTruthy();
  await guide.getByRole('link',{name:'Open calendar',exact:true}).click();await navigate(page,'/calendar?tournament='+event.id);
  await page.getByRole('button',{name:'Enter Tournament',exact:true}).click();
+ await page.getByRole('dialog',{name:'Tournament details'}).getByRole('button',{name:/Close/}).click();
  await page.getByRole('button',{name:'Open first-week guide',exact:true}).click();await expect(guide).toContainText('Arrange travel and accommodation');await guide.getByRole('link',{name:'Open travel',exact:true}).click();
  await page.getByRole('button',{name:'Confirm Travel',exact:true}).click();await page.getByRole('button',{name:'Confirm plan',exact:true}).click();
  await page.getByRole('button',{name:'Open first-week guide',exact:true}).click();await guide.getByRole('link',{name:'Open Tournament Hub',exact:true}).click();

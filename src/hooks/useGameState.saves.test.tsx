@@ -41,6 +41,40 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("career save slots", () => {
+  it('returns to the main menu and resumes the same saved career without creating a slot', async () => {
+    const { result, unmount } = renderHook(() => useGameState());
+    await act(async () => result.current.resetCareer(buildCareerConfig('Menu Return')));
+    await waitFor(() => expect(result.current.savePending).toBe(false));
+    act(() => result.current.updateFirstWeekGuide('dismiss'));
+    await waitFor(() => expect(result.current.savePending).toBe(false));
+    const saved = localStorage.getItem(ACTIVE_SAVE_KEY), slots = readSaveSlotIndex();
+    act(() => expect(result.current.returnToMainMenu()).toBe(true));
+    expect(result.current.careerSessionMode).toBe('launcher');
+    expect(result.current.hasActiveCareer).toBe(true);
+    expect(localStorage.getItem(ACTIVE_SAVE_KEY)).toBe(saved);
+    expect(readSaveSlotIndex()).toEqual(slots);
+    await act(async () => expect(await result.current.continueActiveCareer()).toBe(true));
+    expect(result.current.gameState.player.fullName).toBe('Menu Return');
+    expect(result.current.gameState.firstWeekGuide?.dismissed).toBe(true);
+    await waitFor(() => expect(result.current.savePending).toBe(false));
+    unmount();
+  }, 30000);
+
+  it('keeps the career open when the latest progress failed to save', async () => {
+    const { result, unmount } = renderHook(() => useGameState());
+    await act(async () => result.current.resetCareer(buildCareerConfig('Unsaved Career')));
+    await waitFor(() => expect(result.current.savePending).toBe(false));
+    const saved = localStorage.getItem(ACTIVE_SAVE_KEY);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('Full', 'QuotaExceededError'); });
+    act(() => result.current.updateFirstWeekGuide('dismiss'));
+    await waitFor(() => expect(result.current.savePending).toBe(false));
+    act(() => expect(result.current.returnToMainMenu()).toBe(false));
+    expect(result.current.careerSessionMode).toBe('active');
+    expect(result.current.saveWarning).toContain('latest progress has not been saved');
+    expect(localStorage.getItem(ACTIVE_SAVE_KEY)).toBe(saved);
+    unmount();
+  }, 30000);
+
   it("creates independent autosave slots and can load either career", async () => {
     const { result } = renderHook(() => useGameState());
 

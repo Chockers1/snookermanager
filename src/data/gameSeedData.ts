@@ -3927,6 +3927,18 @@ export const mockTravelOptions: TravelOption[] = [
     delayLabel: "Very Low",
     delayRisk: 6,
   },
+  {
+    id: "travel-6",
+    name: "First Class Rail",
+    icon: "Train",
+    cost: 175,
+    fatigueLabel: "Low",
+    fatigueValue: 22,
+    arrivalTime: "Sat 16 May • 09:40",
+    comfort: 5,
+    delayLabel: "Low",
+    delayRisk: 8,
+  },
 ];
 
 export const mockHotelOptions: HotelOption[] = [
@@ -3974,6 +3986,28 @@ export const mockHotelOptions: HotelOption[] = [
     preparationValue: 90,
     noise: "Controlled floor",
     distance: "0.3 km · 2 min walk",
+  },
+  {
+    id: "hotel-5",
+    name: "Guesthouse",
+    cost: 65,
+    recoveryLabel: "Poor",
+    recoveryValue: 18,
+    preparationLabel: "Low",
+    preparationValue: 12,
+    noise: "Shared facilities",
+    distance: "4 km · 15 min drive",
+  },
+  {
+    id: "hotel-6",
+    name: "Serviced Apartment",
+    cost: 175,
+    recoveryLabel: "Very Good",
+    recoveryValue: 82,
+    preparationLabel: "Good",
+    preparationValue: 42,
+    noise: "Private space / self-catering",
+    distance: "2.5 km · 10 min drive",
   },
 ];
 

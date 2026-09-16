@@ -6,9 +6,9 @@ for(const width of [1280,390]) test('tournament history and invitation at '+widt
   const state=tournamentHistoryFixture(),world=state.tournaments.find(t=>t.name==='World Championship')!;
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.setViewportSize({width,height:844});
   await page.addInitScript(({key,value})=>{if(!sessionStorage.getItem('tournament-history-fixture')){localStorage.setItem(key,value);sessionStorage.setItem('tournament-history-fixture','1')}},{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
-  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   const navigate=async(path:string)=>page.evaluate(path=>{history.pushState({},'',path);dispatchEvent(new PopStateEvent('popstate'))},path);
-  await navigate('/inbox');await page.getByRole('button',{name:/^Invitation: World Championship High/}).click();
+  await navigate('/inbox');await page.getByRole('button',{name:'Invitation: World Championship',exact:true}).click();
   const briefing=page.locator('[aria-label="Previous tournament results"]');
   await expect(briefing).toContainText('Last season · 2026/27');await expect(briefing).toContainText('Lost in Last 32');await expect(briefing).toContainText('8–10 vs Malik Langford');await expect(briefing).toContainText('Lost in Quarter Final · 2024/25');
   await page.getByRole('link',{name:'Full tournament history →'}).click();
@@ -25,7 +25,7 @@ for(const width of [1280,390]) test('tournament history and invitation at '+widt
   await page.getByLabel('History tournament').selectOption(masters.id);await expect(archive).toContainText('No recorded appearance at Masters yet.');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
   const stored=await readCareerSave(page);expect(stored.inbox.find(m=>m.id==='world-history-invitation')?.tournamentBriefings?.[0].previous?.finish).toBe('Lost in Last 32');
-  await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();await navigate('/inbox');await page.getByRole('button',{name:/^Invitation: World Championship High/}).click();await expect(briefing).toContainText('Lost in Quarter Final · 2024/25');
+  await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();await navigate('/inbox');await page.getByRole('button',{name:'Invitation: World Championship',exact:true}).click();await expect(briefing).toContainText('Lost in Quarter Final · 2024/25');
   expect(errors).toEqual([]);
 });
 
@@ -36,9 +36,9 @@ test('restores a missing previous-season match from the saved tour ledger on loa
   state.rollingRankings!.events[key]={key,tournamentId:world.id,name:world.name,season:'2026/27',completedOn:'2027-05-03',ranking:true,applied:true,bracket:[{label:'Last 32',matches:[{id:'retained-match',top:{name:'Malik Langford',rank:2,nation:'BEL',score:10},bottom:{name:state.player.fullName,rank:18,nation:'ENG',highlighted:true,score:8}}]}]};
   state.rollingRankings!.earnings.push({id:key+':player',eventKey:key,playerName:state.player.fullName,season:'2026/27',earnedOn:'2027-05-03',expiresOn:'2029-05-03',amount:0});
   await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
-  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await page.evaluate(()=>{history.pushState({},'','/inbox');dispatchEvent(new PopStateEvent('popstate'))});
-  await page.getByRole('button',{name:/^Invitation: World Championship High/}).click();
+  await page.getByRole('button',{name:'Invitation: World Championship',exact:true}).click();
   await expect(page.locator('[aria-label="Previous tournament results"]')).toContainText('8–10 vs Malik Langford');
   await page.getByRole('link',{name:'Full tournament history →'}).click();
   const row=page.getByTestId('tournament-career-table').getByRole('row').filter({hasText:'2026/27'});

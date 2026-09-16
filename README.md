@@ -1,5 +1,11 @@
 # Snooker Career Manager
 
+## Windows / Steam preparation
+
+On Windows with Node 24 LTS, run `npm run build:windows`. This installs locked dependencies, validates the game, builds and smoke-tests the portable package at `dist/windows/Snooker Career Manager.exe`. Ship the whole `dist/windows` directory; no local dev server is required. Nothing is uploaded to Steam by this command.
+
+See [Steam readiness audit](docs/STEAM_READINESS_AUDIT.md), [deployment guide](docs/STEAM_DEPLOYMENT.md), [manual checklist](docs/STEAM_MANUAL_CHECKLIST.md), [store draft](docs/STEAM_STORE_PAGE.md), [asset audit](docs/STEAM_ASSET_AUDIT.md), [screenshot plan](docs/STEAM_SCREENSHOT_PLAN.md) and [trailer plan](docs/STEAM_TRAILER_PLAN.md). Browser saves transfer using portable JSON exports; desktop saves live in `%APPDATA%\Snooker Career Manager`, outside the installation.
+
 Snooker Career Manager is a desktop-first single-page career-management game built with React, TypeScript, and Vite. The player controls one created snooker player across training, tournaments, travel, equipment, staff, finances, sponsorship, recovery, rankings, and multi-season career progression.
 
 This README is intentionally detailed. It is the main technical and gameplay reference for how the current build works, how the systems depend on each other, and where future development should land.
@@ -985,3 +991,6 @@ The project works because it keeps its layers relatively disciplined:
 - route pages render and dispatch
 
 If future work stays aligned with those boundaries, the game can keep growing without collapsing into page-specific logic or duplicated rule systems.
+## Offline store screenshot preparation
+
+After building the Windows package, `npm run capture:prepare -- --save "C:\Captures\career.json" --screen training` imports a portable export into a separate temporary desktop profile and opens that screen. It does not take images, invent results or modify the source export. Normal game gates still apply; close the capture window before rebuilding. See [the ten-shot plan](docs/STEAM_SCREENSHOT_PLAN.md) and [store-candidate report](docs/STEAM_STORE_READY_REPORT.md). This development command is not part of the released game.

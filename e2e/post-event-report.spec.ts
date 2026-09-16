@@ -13,7 +13,7 @@ function fixture(){
 for(const viewport of [{width:1920,height:1080},{width:1280,height:720},{width:390,height:844},{width:320,height:568}])test(`complete post-event costs at ${viewport.width}px`,async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await page.setViewportSize(viewport);
   await page.addInitScript(({key,value})=>localStorage.setItem(key,value),{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(fixture())});
-  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await page.evaluate(()=>{history.pushState({},'','/inbox');dispatchEvent(new PopStateEvent('popstate'))});
   const body=page.getByTestId('inbox-message-body'),report=page.getByRole('region',{name:'Post-event report'}),actions=page.getByTestId('inbox-message-actions');
   await expect(report).toBeVisible();await expect(report).toContainText('5 nights × £160 · includes 3 extra nights');await expect(report).toContainText('Venue practice');await expect(report).toContainText('−£975');

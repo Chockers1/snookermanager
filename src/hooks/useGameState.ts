@@ -18539,6 +18539,18 @@ export function useGameState() {
         if (savePendingRef.current) { setSaveWarning('Your latest progress is still saving. Please wait before switching careers.'); return; }
         setCareerSessionMode("creating");
       },
+      returnToMainMenu() {
+        if (savePendingRef.current) {
+          setSaveWarning('Your latest progress is still saving. Please wait before returning to the main menu.');
+          return false;
+        }
+        if (lastAutosaveSnapshot.current?.state !== gameState || lastAutosaveSnapshot.current.slotId !== activeSaveSlotId) {
+          setSaveWarning('Your latest progress has not been saved. Open Save Manager to save or export your career before returning to the main menu.');
+          return false;
+        }
+        setCareerSessionMode("launcher");
+        return true;
+      },
       async continueActiveCareer() {
         if (savePendingRef.current) { setSaveWarning('Please wait for the current save to finish.'); return false; }
         savePendingRef.current=true; setSavePending(true);

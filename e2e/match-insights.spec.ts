@@ -11,22 +11,19 @@ function ready() {
 }
 async function open(page:Page,state:ReturnType<typeof createStarterState>,route:string) {
   await page.addInitScript(({key,value})=>{if(!sessionStorage.getItem('insights-fixture')){localStorage.clear();localStorage.setItem(key,value);sessionStorage.setItem('insights-fixture','1')}},{key:ACTIVE_SAVE_KEY,value:encodeCareerSave(state)});
-  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();
+  await page.goto('/');await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await page.evaluate(route=>{history.pushState({},'',route);dispatchEvent(new PopStateEvent('popstate'))},route);
 }
-test('pre-match goals and coach approach carry into play and survive reload',async({page})=>{
+test('pre-match tactics and generated objectives carry into play and survive reload',async({page})=>{
   const {state}=ready();state.player.fatigue=70;
   await page.setViewportSize({width:1280,height:720});
   await open(page,state,'/match/preview');
-  await expect(page.getByRole('group',{name:'Personal match objectives'})).toBeVisible();
-  await page.locator('summary').filter({hasText:'Tactics & schedule'}).click();
-  await expect(page.getByText('Suggested approach: Safety')).toBeVisible();
-  await page.getByRole('button',{name:'Use coach’s approach'}).click();
+  await page.getByRole('button',{name:'Safety',exact:true}).click();
   await page.getByRole('button',{name:'Start Match',exact:true}).click();
   await expect(page.getByLabel('Live personal objectives')).toBeVisible();
   const started=await readCareerSave(page);expect(started.liveMatch?.tacticalPlan).toBe('Safety');
   expect(started.liveMatch?.objectives?.length).toBeGreaterThan(0);
-  await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();
+  await page.reload();await page.getByRole('button',{name:/Continue Career/}).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   expect((await readCareerSave(page)).liveMatch?.objectives).toEqual(started.liveMatch?.objectives);
 });
 test('post-match evidence and completed goals open a real training project on a phone',async({page})=>{

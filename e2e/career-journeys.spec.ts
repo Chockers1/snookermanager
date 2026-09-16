@@ -108,6 +108,15 @@ test("shows player summary once in the global dashboard status bar", async ({
     0,
   );
   await expect(page.getByText("Career Details", { exact: true })).toBeVisible();
+  const returnToMenu = page.getByRole('button', { name: 'Return to Main Menu', exact: true });
+  await expect(returnToMenu).toBeEnabled();
+  const saved = await readCareerSave(page);
+  await returnToMenu.click();
+  await expect(page.getByRole('heading', { name: 'Your career starts here.' })).toBeVisible();
+  await page.getByRole('button', { name: /Continue Career/ }).click();
+  await expect(page.getByText('Career Details', { exact: true })).toBeVisible();
+  expect((await readCareerSave(page)).player.id).toBe(saved.player.id);
+  expect((await readCareerSave(page)).currentDate).toBe(saved.currentDate);
 });
 
 test("inbox uses selected-message actions and persists read state", async ({
@@ -201,9 +210,10 @@ test("requires the end-of-season world report before starting the next season", 
   await expect(page).toHaveURL(/\/season-review/);
   await page.getByRole("dialog", { name: "2026/27 Season Review" }).getByRole("button", { name: "Full Season Review", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: /End of Season Report/ }),
+    page.getByRole("heading", { name: "Season Review", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Career Status Decision")).toBeVisible();
+  await expect(page.getByRole("heading", {name: rolledSeason.seasonReview!.careerDecision.title, exact: true})).toBeVisible();
+  await page.getByRole("tab", {name: "Around the tour", exact: true}).click();
   await expect(page.getByText("Major Tournament Winners")).toBeVisible();
   await expect(page.getByText("World Number One")).toBeVisible();
   await expect(

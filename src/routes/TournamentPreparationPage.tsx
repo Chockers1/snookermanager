@@ -1,12 +1,17 @@
 import { useMemo, useState } from "react";
+import "./TournamentPreparationPage.css";
 import {
   AlertTriangle,
   ArrowLeft,
   Check,
   RotateCcw,
   SlidersHorizontal,
+  Target,
+  Sparkles,
+  Wallet,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { SectionTabs } from "../components/ui/SectionTabs";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { useGame } from "../context/useGame";
 import {
@@ -27,42 +32,22 @@ import { formatMoney, formatPercent, formatAttribute } from "../utils/formatters
 
 const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
 
-const toneClasses = {
-  positive: "border-green-500/35 bg-green-500/10 text-green-400",
-  negative: "border-red-500/35 bg-red-500/10 text-red-400",
-  neutral: "border-border bg-surface-light/40 text-gray-300",
-};
-
-function DeltaValue({
-  before,
-  after,
-  lowerIsBetter = false,
-  suffix = "%",
-}: {
-  before: number;
-  after: number;
-  lowerIsBetter?: boolean;
-  suffix?: string;
+function ForecastMetric({ label, before, after, lowerIsBetter = false, suffix = "%" }: {
+  label: string; before: number; after: number; lowerIsBetter?: boolean; suffix?: string;
 }) {
   const delta = Number((after - before).toFixed(2));
   const tone = getPreparationTone(delta, lowerIsBetter);
-  return (
-    <div className={`rounded-md border px-2 py-1.5 ${toneClasses[tone]}`}>
-      <p className="text-[8px] uppercase tracking-wide text-gray-500">Before → prepared</p>
-      <p className="mt-0.5 text-xs font-bold text-white">
-        {suffix === "%" ? formatPercent(before) : `${Number(before.toFixed(2))}${suffix}`} <span className="text-gray-500">→</span> {suffix === "%" ? formatPercent(after) : `${Number(after.toFixed(2))}${suffix}`}
-        {delta !== 0 ? (
-          <span className={`ml-1 ${tone === "positive" ? "text-green-400" : "text-red-400"}`}>
-            {delta > 0 ? "+" : ""}{delta}
-          </span>
-        ) : null}
-      </p>
-    </div>
-  );
+  const display = (value: number) => suffix === "%" ? formatPercent(value) : formatAttribute(value);
+  return <div className="prep-metric">
+    <span>{label}</span>
+    <div><span className="prep-before">{display(before)}</span><span aria-hidden="true">→</span><strong>{display(after)}</strong></div>
+    <small className={`prep-delta prep-delta-${tone}`}>{delta === 0 ? "No change" : `${delta > 0 ? "+" : ""}${formatAttribute(delta)}${suffix === "%" ? " pts" : ""}`}</small>
+  </div>;
 }
 
 export function TournamentPreparationPage() {
   const navigate = useNavigate();
+  const [forecastTab, setForecastTab] = useState<"Condition" | "Skill boosts">("Condition");
   const { gameState, confirmTournamentPreparation } = useGame();
   const tournament = getNextEligibleTournament(gameState);
   const booking = tournament ? gameState.travel.bookings[tournament.id] : undefined;
@@ -182,128 +167,97 @@ export function TournamentPreparationPage() {
     return { label, before: source[label] ?? 0, bonus };
   }).filter((item) => item.bonus > 0);
 
+  const readinessWarning = preparedFatigue >= 75
+    ? "Fatigue remains high. Increase recovery or add physio."
+    : preparedStrain >= 65 ? "Body strain remains high. Reduce fitness load or add physio."
+    : preparedFatigue >= 55 || preparedStrain >= 45 ? "Some fatigue or strain remains. Consider more recovery."
+    : "Your plan is ready for the opening match.";
+  const blockedReason = totalAllocation !== 100 ? "Allocate 100% before confirming."
+    : effects.cost > availableCash ? "Reduce optional support to fit your available funds."
+    : tournament.status !== "Entered" ? "Enter this event before confirming preparation." : null;
+
   return (
-    <div data-testid="tournament-preparation-viewport" className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-2 overflow-hidden">
-      <header className="card flex min-w-0 items-center justify-between gap-3 px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-green-400">Tournament preparation</p>
-          <h1 className="mt-0.5 truncate text-xl font-bold text-white">Prepare for {tournament.name}</h1>
-          <p className="truncate text-[10px] text-gray-400">Travel booked · set your opening-match condition</p>
+    <div data-testid="tournament-preparation-viewport" className="prep-page">
+      <header className="prep-header">
+        <div className="prep-event-icon"><Target aria-hidden="true" /></div>
+        <div className="prep-heading">
+          <p className="prep-eyebrow">Tournament preparation</p>
+          <h1>Prepare for {tournament.name}</h1>
+          <p>Travel booked <span>·</span> Set your opening-match condition</p>
         </div>
-        <div className="flex shrink-0 gap-2">
-          <button type="button" className="btn-secondary min-h-10 px-3 text-xs" onClick={() => navigate("/travel")}>
-            <ArrowLeft className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Travel</span>
-          </button>
-          <button type="button" className="btn-secondary min-h-10 px-3 text-xs" onClick={resetPlan}>
-            <RotateCcw className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Reset</span>
-          </button>
-          <button type="button" disabled={!canConfirm || totalAllocation !== 100} className="btn-primary min-h-10 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-50" onClick={confirmPlan}>
-            <Check className="h-3.5 w-3.5" /> Confirm plan
-          </button>
+        <div className="prep-actions">
+          <button type="button" className="btn-secondary" onClick={() => navigate("/travel")}><ArrowLeft aria-hidden="true" /> Travel</button>
+          <button type="button" className="btn-secondary" onClick={resetPlan}><RotateCcw aria-hidden="true" /> Reset</button>
+          <button type="button" disabled={!canConfirm || totalAllocation !== 100} aria-describedby={blockedReason ? "prep-confirm-reason" : undefined} className="btn-primary" onClick={confirmPlan}><Check aria-hidden="true" /> Confirm plan</button>
         </div>
       </header>
 
-      <section className="card px-3 py-2">
-        <div className="mb-1.5 flex items-center gap-2">
-          <SlidersHorizontal className="h-4 w-4 text-green-400" />
-          <h2 className="text-xs font-semibold text-white">Choose a preparation focus</h2>
-          <span className="hidden text-[9px] text-gray-500 sm:inline">Auto-fills the allocation</span>
-        </div>
-        <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4 xl:grid-cols-7">
-          {preparationFocuses.map((focus) => {
-            const selected = focus.id === focusId;
-            return (
-              <button key={focus.id} type="button" aria-pressed={selected} onClick={() => chooseFocus(focus.id)} className={`min-h-10 rounded-lg border px-2.5 py-1.5 text-left transition ${selected ? "border-green-500 bg-green-500/10" : "border-border bg-surface-light/35 hover:border-gray-600"}`}>
-                <span className="block text-[10px] font-semibold text-white">{focus.label}</span>
-                <span className={`block text-[8px] ${selected ? "text-green-400" : "text-gray-500"}`}>{focus.description}</span>
-              </button>
-            );
-          })}
+      <section className="prep-focus" aria-label="Choose a preparation focus">
+        <div className="prep-focus-heading"><span className="prep-eyebrow">Your approach</span><span>Choose a focus, then fine-tune</span></div>
+        <div className="prep-presets">
+          {preparationFocuses.map(focus => <button key={focus.id} type="button" aria-pressed={focus.id === focusId} onClick={() => chooseFocus(focus.id)}>
+            <strong>{focus.label}</strong><span>{focus.description}</span>
+          </button>)}
         </div>
       </section>
 
-      <div className="grid min-h-0 gap-2 overflow-y-auto xl:grid-cols-[minmax(0,1fr)_350px] xl:overflow-hidden">
-        <section className="card flex min-h-[520px] flex-col overflow-hidden xl:min-h-0">
-          <div className="card-header shrink-0 py-2.5">
-            <div><h2 className="flex items-center gap-2 text-xs font-semibold text-white"><SlidersHorizontal className="h-4 w-4 text-green-400" />Preparation allocation</h2><p className="text-[8px] text-gray-500">Every change updates the forecast immediately.</p></div>
-            <span className={totalAllocation === 100 ? "text-[9px] font-semibold text-green-400" : totalAllocation < 100 ? "text-[9px] font-semibold text-amber-400" : "text-[9px] font-semibold text-red-400"}>{formatPercent(totalAllocation)} allocated{totalAllocation < 100 ? ` · ${formatPercent(100 - totalAllocation)} available` : ""}</span>
-          </div>
-          <div className="grid min-h-0 flex-1 gap-2 p-2.5 xl:grid-cols-[minmax(0,1fr)_310px] xl:grid-rows-[auto_minmax(0,1fr)]">
-            <div className="grid grid-cols-2 gap-1.5 md:grid-cols-3">
-              {preparationAllocationMeta.map((item) => {
-                const value = allocations[item.id];
-                const recovery = item.id === "recovery";
-                return (
-                  <div key={item.id} className={`rounded-lg border p-2.5 ${recovery ? "border-green-500/35 bg-green-500/10" : "border-border bg-surface-light/35"}`}>
-                    <div className="flex items-start justify-between gap-2"><div><p className="text-[10px] font-semibold text-white">{item.label}</p><p className={`text-[8px] ${recovery ? "text-green-400" : "text-gray-500"}`}>{item.description}</p></div><b className="text-sm text-green-400">{formatPercent(value)}</b></div>
-                    <div className="mt-2.5 flex gap-1"><button type="button" aria-label={`Decrease ${item.label}`} disabled={value === 0} className="min-h-8 flex-1 rounded border border-border bg-surface text-xs text-gray-300 hover:border-green-500/40 disabled:cursor-not-allowed disabled:opacity-35" onClick={() => adjustAllocation(item.id, -5)}>−</button><button type="button" aria-label={`Increase ${item.label}`} disabled={totalAllocation >= 100 || value >= 100} className="min-h-8 flex-1 rounded border border-border bg-surface text-xs text-gray-300 hover:border-green-500/40 disabled:cursor-not-allowed disabled:opacity-35" onClick={() => adjustAllocation(item.id, 5)}>+</button></div>
-                  </div>
-                );
+      <div className="prep-workspace">
+        <div className="prep-planning">
+          <section className="prep-panel prep-allocation">
+            <div className="prep-panel-heading"><div><h2><SlidersHorizontal aria-hidden="true" /> Preparation allocation</h2><p>Move 5% at a time between priorities.</p></div>
+              <span className={`prep-badge ${totalAllocation !== 100 ? "prep-badge-warning" : ""}`} role="status">{formatPercent(totalAllocation)} allocated{totalAllocation < 100 ? ` · ${formatPercent(100 - totalAllocation)} free` : ""}</span>
+            </div>
+            <div className="prep-allocation-grid">
+              {preparationAllocationMeta.map(item => <article key={item.id} className={`prep-allocation-card ${item.id === "recovery" ? "prep-recovery" : ""}`}>
+                <h3>{item.label}</h3><p>{item.description}</p>
+                <div className="prep-stepper"><button type="button" aria-label={`Decrease ${item.label}`} disabled={allocations[item.id] === 0} onClick={() => adjustAllocation(item.id, -5)}>−</button><strong>{formatPercent(allocations[item.id])}</strong><button type="button" aria-label={`Increase ${item.label}`} disabled={totalAllocation >= 100 || allocations[item.id] >= 100} onClick={() => adjustAllocation(item.id, 5)}>+</button></div>
+                <ProgressBar value={allocations[item.id]} tone={item.id === "recovery" ? "blue" : "green"} compact />
+              </article>)}
+            </div>
+          </section>
+
+          <section className="prep-panel prep-support">
+            <div className="prep-panel-heading"><div><h2><Sparkles aria-hidden="true" /> Optional support</h2><p>One-off services for this event</p></div><span className="prep-service-total">{formatMoney(effects.cost)}<small>selected</small></span></div>
+            <div className="prep-support-grid">
+              {preparationSupports.map(support => {
+                const selected = supportIds.includes(support.id);
+                return <button key={support.id} type="button" aria-pressed={selected} onClick={() => toggleSupport(support.id)} className="prep-service">
+                  <span className="prep-checkbox" aria-hidden="true">{selected && <Check />}</span>
+                  <span className="prep-service-copy"><strong>{support.label}</strong><span>{support.detail}</span></span>
+                  <b>{formatMoney(support.cost)}</b>
+                </button>;
               })}
+              <div className="prep-cash"><Wallet aria-hidden="true" /><span>Cash after support<strong className={effects.cost > availableCash ? "text-red-400" : ""}>{formatMoney(availableCash - effects.cost)}</strong></span></div>
             </div>
+          </section>
+        </div>
 
-            <div className="rounded-lg border border-border bg-surface-light/20 p-2.5">
-              <div className="mb-2 flex items-center justify-between"><div><h3 className="text-[10px] font-semibold text-white">Optional support</h3><p className="text-[8px] text-gray-500">One-off event services</p></div><span className={`rounded px-2 py-1 text-[8px] font-semibold ${effects.cost > availableCash ? "bg-red-500/10 text-red-400" : effects.cost > 0 ? "bg-amber-500/10 text-amber-400" : "bg-surface-light text-gray-400"}`}>{formatMoney(effects.cost)}</span></div>
-              <div className="grid gap-1.5">
-                {preparationSupports.map((support) => {
-                  const selected = supportIds.includes(support.id);
-                  return (
-                    <button key={support.id} type="button" aria-pressed={selected} onClick={() => toggleSupport(support.id)} className={`flex min-h-9 items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left transition ${selected ? "border-green-500/40 bg-green-500/10" : "border-border bg-surface hover:border-gray-600"}`}>
-                      <span className="text-[9px] font-semibold text-white">{support.label}</span>
-                      <span className={`text-right text-[8px] ${selected ? "text-green-400" : "text-gray-500"}`}>{support.detail} · {formatMoney(support.cost)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="grid min-h-[150px] grid-cols-1 gap-1.5 md:grid-cols-3 xl:col-span-2">
-              <div className="flex flex-col rounded-lg border border-border bg-surface-light/25 p-3"><div className="flex justify-between"><b className="text-[10px] text-white">Arrival and reset</b><span className="text-[8px] text-sky-300">Day 1</span></div><p className="mt-1 text-[8px] text-gray-400">Recovery absorbs the booked travel load before table work.</p><div className="mt-3 grid gap-1.5 text-[8px]"><div className="flex justify-between border-b border-border/60 pb-1"><span className="text-gray-500">Recovery allocation</span><b className="text-white">{formatPercent(allocations.recovery)}</b></div><div className="flex justify-between border-b border-border/60 pb-1"><span className="text-gray-500">Physio support</span><b className={supportIds.includes("physio") ? "text-green-400" : "text-gray-400"}>{supportIds.includes("physio") ? "Selected" : "Not selected"}</b></div><div className="flex justify-between"><span>Fatigue <b className={effects.fatigueDelta <= 0 ? "text-green-400" : "text-red-400"}>{effects.fatigueDelta > 0 ? "+" : ""}{effects.fatigueDelta}</b></span><span>Strain <b className={effects.strainDelta <= 0 ? "text-green-400" : "text-red-400"}>{effects.strainDelta > 0 ? "+" : ""}{effects.strainDelta}</b></span></div></div></div>
-              <div className="flex flex-col rounded-lg border border-border bg-surface-light/25 p-3"><div className="flex justify-between"><b className="text-[10px] text-white">Table and tactics</b><span className="text-[8px] text-green-400">Day 2</span></div><p className="mt-1 text-[8px] text-gray-400">Practice creates temporary form for the opening match.</p><div className="mt-3 grid gap-1.5 text-[8px]"><div className="flex justify-between border-b border-border/60 pb-1"><span className="text-gray-500">Table allocation</span><b className="text-white">{formatPercent(allocations.potting + allocations.breakBuilding + allocations.tactical)}</b></div><div className="flex justify-between border-b border-border/60 pb-1"><span className="text-gray-500">Coach support</span><b className={supportIds.includes("coach") ? "text-green-400" : "text-gray-400"}>{supportIds.includes("coach") ? "Selected" : "Not selected"}</b></div><div className="flex justify-between"><span>Sharpness <b className="text-green-400">+{effects.sharpnessDelta}</b></span><span>Best skill boost <b className="text-green-400">+{Math.max(...Object.values(effects.attributeBonuses))}</b></span></div></div></div>
-              <div className="flex flex-col rounded-lg border border-green-500/30 bg-green-500/5 p-3"><div className="flex justify-between"><b className="text-[10px] text-white">Match-day routine</b><span className="text-[8px] text-green-400">Opening round</span></div><p className="mt-1 text-[8px] text-gray-400">Temporary bonuses peak now and decay through later rounds.</p><div className="mt-3 grid gap-1.5 text-[8px]"><div className="flex justify-between border-b border-green-500/15 pb-1"><span className="text-gray-500">Opening readiness</span><b className={preparedReadiness >= baselineReadiness ? "text-green-400" : "text-red-400"}>{formatPercent(baselineReadiness)} → {formatPercent(preparedReadiness)}</b></div><div className="flex justify-between border-b border-green-500/15 pb-1"><span className="text-gray-500">Confidence</span><b className={preparedConfidence >= baseConfidence ? "text-green-400" : "text-red-400"}>{formatPercent(baseConfidence)} → {formatPercent(preparedConfidence)}</b></div><div className="flex justify-between"><span className="text-gray-500">Later rounds</span><b className="text-amber-400">Bonuses decay 18% per round</b></div></div></div>
-            </div>
+        <aside className="prep-panel prep-forecast" aria-label="Opening-match forecast">
+          <div className="prep-panel-heading"><div><p className="prep-eyebrow">Opening-match forecast</p><h2>{getPreparationFocus(focusId).label}</h2></div><span className="prep-live"><span aria-hidden="true" />Live forecast</span></div>
+          <div className="prep-readiness">
+            <div><span>Opening readiness</span><div><span className="prep-before">{formatPercent(baselineReadiness)}</span><span aria-hidden="true">→</span><strong>{formatPercent(preparedReadiness)}</strong></div></div>
+            <span className={`prep-delta prep-delta-${getPreparationTone(preparedReadiness - baselineReadiness)}`}>{preparedReadiness === baselineReadiness ? "No change" : `${preparedReadiness > baselineReadiness ? "+" : ""}${preparedReadiness - baselineReadiness} pts`}</span>
+            <ProgressBar value={preparedReadiness} compact />
           </div>
-        </section>
-
-        <aside className="grid max-h-full min-h-0 content-start gap-2 overflow-y-auto rounded-xl border border-border bg-[#0d141a] p-2.5">
-          <section className="rounded-lg border border-green-500/35 bg-surface p-3">
-            <div className="flex justify-between gap-3"><div><p className="text-[8px] font-semibold uppercase tracking-wider text-green-400">Current plan</p><h2 className="mt-1 text-sm font-semibold text-white">{getPreparationFocus(focusId).label}</h2></div><span className="text-[9px] font-semibold text-green-400">Live forecast</span></div>
-            <p className="mt-2 text-[9px] text-gray-400">Cash after support: <b className={effects.cost <= availableCash ? "text-white" : "text-red-400"}>{formatMoney(availableCash - effects.cost)}</b></p>
-          </section>
-
-          <section className="rounded-lg border border-border bg-surface">
-            <div className="border-b border-border px-3 py-2"><h2 className="text-[11px] font-semibold text-white">Opening-match forecast</h2><p className="text-[8px] text-gray-500">Colour-coded against your pre-plan condition</p></div>
-            <div className="grid grid-cols-2 gap-1.5 p-2.5">
-              <div><p className="metric-label mb-1">Readiness</p><DeltaValue before={baselineReadiness} after={preparedReadiness} /></div>
-              <div><p className="metric-label mb-1">Confidence</p><DeltaValue before={baseConfidence} after={preparedConfidence} /></div>
-              <div><p className="metric-label mb-1">Fatigue</p><DeltaValue before={baseFatigue} after={preparedFatigue} lowerIsBetter /></div>
-              <div><p className="metric-label mb-1">Strain</p><DeltaValue before={baseStrain} after={preparedStrain} lowerIsBetter /></div>
-              <div><p className="metric-label mb-1">Sharpness</p><DeltaValue before={0} after={effects.sharpnessDelta} suffix="" /></div>
-              <div><p className="metric-label mb-1">Support cost</p><div className={`rounded-md border px-2 py-1.5 ${effects.cost ? "border-amber-500/35 bg-amber-500/10" : "border-border bg-surface-light/40"}`}><p className="text-[8px] uppercase text-gray-500">Selected</p><p className={`mt-0.5 text-xs font-bold ${effects.cost ? "text-amber-400" : "text-gray-300"}`}>{formatMoney(effects.cost)}</p></div></div>
+          <SectionTabs id="preparation-forecast" label="Preparation forecast" tabs={["Condition", "Skill boosts"]} active={forecastTab} onChange={setForecastTab} />
+          <div className="prep-forecast-tab" role="tabpanel" id="preparation-forecast-panel" aria-labelledby={`preparation-forecast-tab-${forecastTab === "Condition" ? 0 : 1}`}>
+          {forecastTab === "Condition" ? <div className="prep-metrics">
+            <ForecastMetric label="Confidence" before={baseConfidence} after={preparedConfidence} />
+            <ForecastMetric label="Fatigue" before={baseFatigue} after={preparedFatigue} lowerIsBetter />
+            <ForecastMetric label="Strain" before={baseStrain} after={preparedStrain} lowerIsBetter />
+            <ForecastMetric label="Sharpness" before={0} after={effects.sharpnessDelta} suffix="" />
+          </div> : <section className="prep-form">
+            <div className="prep-form-heading"><h3>Temporary tournament form</h3><span>Opening peak</span></div>
+            <p>Permanent attributes stay unchanged.</p>
+            <div className="prep-form-grid">
+              {temporaryAttributes.map(attribute => <div key={attribute.label}><span>{attribute.label}</span><strong><span>{formatAttribute(attribute.before)}</span><span aria-hidden="true"> → </span>{formatAttribute(clamp(attribute.before + attribute.bonus))}</strong></div>)}
             </div>
-          </section>
-
-          <section className="rounded-lg border border-border bg-surface p-3">
-            <div className="flex justify-between"><div><h2 className="text-[11px] font-semibold text-white">Temporary tournament form</h2><p className="text-[8px] text-gray-500">Permanent attributes are unchanged</p></div><span className="text-[8px] text-green-400">Opening peak</span></div>
-            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[8px]">
-              {temporaryAttributes.map((attribute) => <div key={attribute.label} className="flex justify-between gap-2"><span className="truncate text-gray-400">{attribute.label}</span><b className="shrink-0 text-green-400">{formatAttribute(attribute.before)} → {formatAttribute(clamp(attribute.before + attribute.bonus))}</b></div>)}
-            </div>
-          </section>
-
-          <section className={`rounded-lg border p-2.5 ${preparedFatigue >= 75 || preparedStrain >= 65 ? "border-red-500/30 bg-red-500/10" : preparedFatigue >= 55 || preparedStrain >= 45 ? "border-amber-500/30 bg-amber-500/10" : "border-green-500/30 bg-green-500/10"}`}>
-            <p className="flex gap-2 text-[9px]"><AlertTriangle className={`h-4 w-4 shrink-0 ${preparedFatigue >= 75 || preparedStrain >= 65 ? "text-red-400" : preparedFatigue >= 55 || preparedStrain >= 45 ? "text-amber-400" : "text-green-400"}`} /><span className="text-gray-200"><b>Readiness check:</b> {preparedFatigue >= 75 ? "Fatigue remains too high. Increase recovery or add physio." : preparedStrain >= 65 ? "Body strain remains high. Reduce fitness load or add physio." : "The current plan is safe for the opening match."}</span></p>
-          </section>
+          </section>}
+          </div>
+          <p className={`prep-check ${preparedFatigue >= 55 || preparedStrain >= 45 ? "prep-check-warning" : ""}`}><AlertTriangle aria-hidden="true" />{readinessWarning}</p>
         </aside>
       </div>
-
-      <div className="grid grid-cols-4 gap-2">
-        {[
-          ["Preparation load", `${formatPercent(100 - allocations.recovery)}`, 100 - allocations.recovery, preparedFatigue >= 75 ? "red" : "green"],
-          ["Fatigue", `${formatPercent(baseFatigue)} → ${formatPercent(preparedFatigue)}`, preparedFatigue, preparedFatigue > baseFatigue ? "red" : "green"],
-          ["Strain", `${formatPercent(baseStrain)} → ${formatPercent(preparedStrain)}`, preparedStrain, preparedStrain > baseStrain ? "red" : "green"],
-          ["Opening readiness", `${formatPercent(preparedReadiness)}`, preparedReadiness, preparedReadiness < baselineReadiness ? "red" : "green"],
-        ].map(([label, value, progress, tone]) => <div key={String(label)} className="card px-3 py-2"><div className="mb-1.5 flex justify-between gap-2"><span className="metric-label truncate">{label}</span><b className={`text-xs ${tone === "red" ? "text-red-400" : "text-green-400"}`}>{value}</b></div><ProgressBar value={Number(progress)} tone={tone as "red" | "green"} compact /></div>)}
-      </div>
+      <footer className="prep-footer"><span>Temporary form peaks in the opening round <span aria-hidden="true">·</span> Bonuses decay 18% per round</span><strong id="prep-confirm-reason" role="status">{blockedReason ?? `Preparation load ${formatPercent(100 - allocations.recovery)}`}</strong></footer>
     </div>
   );
 }

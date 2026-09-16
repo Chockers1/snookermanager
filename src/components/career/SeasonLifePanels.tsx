@@ -1,13 +1,10 @@
 import { FormAssessmentEditor } from './FormAssessmentEditor';
 import { PlayerLink } from '../game/PlayerLink';
 import { PlayerNames } from '../game/PlayerNames';
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useGame } from '../../context/useGame';
 import { CareerDisclosure } from './CareerDepthPanels';
 import { staffUnavailable } from '../../game/seasonLife/staff';
-import { teamConflict, nextTeamMatch } from '../../game/seasonLife/teams';
-import type { TeamEvent } from '../../game/seasonLife/types';
 const button='btn-secondary min-h-10 whitespace-normal px-3 py-2 text-xs';
 export function FormRecoveryPanel({ compact = false }: { compact?: boolean }) {
  const { gameState: s } = useGame();
@@ -29,18 +26,7 @@ export function StaffMovementPanel({ inline = false, coachId }: { inline?: boole
  <p>Replacement shortlist: {s.coaches.filter(c=>!s.coachContracts.some(x=>x.coachId===c.id)&&!staffUnavailable(s,c.id)).sort((a,b)=>a.weeklyCost-b.weeklyCost).slice(0,3).map(c=>`${c.name} (£${c.weeklyCost}/week)`).join(' · ')}. Normal eligibility and slot limits apply.</p><Link to="/training" className="text-green-400">Continue training independently</Link></div>;
  return inline ? content : <CareerDisclosure summary="Staff ambitions, renewals & junior development" title="Staff commitments and movement">{content}</CareerDisclosure>;
 }
-function TeamEventCard({event:e}:{event:TeamEvent}){
- const {gameState:s,actOnCareer}=useGame(),navigate=useNavigate(),[partner,setPartner]=useState(e.partnerOptions[0]?.id??'');
- const tie=nextTeamMatch(e),date=tie===2?e.end:e.start,conflict=teamConflict(s,e.start,e.end,e.id);
- return <section className="rounded-lg border border-border p-4 space-y-3"><h2 className="text-lg font-bold">{e.name} · {e.status}</h2><p>Fictional side event · {e.start}–{e.end} · selection cutoff {e.cutoff}. Two singles plus doubles at 1–1; each best of three. Team trophies only, no singles title or ranking credit.</p>
- <p>Entry £{e.fee} · travel £{e.travel} · host support £{e.support} · no hotel required. Net booking £{e.fee+e.travel-e.support}. Awards per player: winner £{e.winnerShare}, runner-up £{e.runnerUpShare}. Two equal shares per team.</p>
- {e.status==='invited'&&<><p>Reply by {e.deadline}. Default: decline without penalty.</p><label className="block">{e.kind==='nations'?'Selected national teammate':'Choose club partner'} <select className="rounded border border-border bg-surface p-2" disabled={e.kind==='nations'} value={partner} onChange={x=>setPartner(x.target.value)}>{e.partnerOptions.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><p className="flex flex-wrap gap-3">{e.partnerOptions.map(p=><PlayerLink key={p.id} name={p.name} id={p.id}/>)}</p><div className="flex flex-wrap gap-2"><button className={button} disabled={!!conflict} onClick={()=>actOnCareer({type:'life-team',id:e.id,choice:'accept',partnerId:partner})}>Accept · £{e.fee+e.travel-e.support}</button><button className={button} onClick={()=>actOnCareer({type:'life-team',id:e.id,choice:'decline'})}>Decline</button></div>{conflict&&<p>{conflict} <Link to="/calendar">Manage calendar</Link></p>}</>}
- {e.status==='accepted'&&<div className="space-y-2"><p>Next team match: {date}. Advance normally through the calendar. Missing both event dates withdraws entry; no prize is paid.</p><div className="flex flex-wrap gap-2">{s.liveMatch?.teamContext?.eventId===e.id&&s.liveMatch.status==='In Progress'&&<Link className={button} to="/match/live">Resume match</Link>}<button className={button} disabled={s.currentDate<date||s.currentDate>e.end||tie<0||s.liveMatch?.status==='In Progress'} onClick={()=>{actOnCareer({type:'life-play-team',id:e.id});navigate('/match/live');}}>Play {tie>=0&&e.ties[tie].results.length===2?'deciding doubles':'your singles'}</button><button className={button} disabled={s.liveMatch?.teamContext?.eventId===e.id} onClick={()=>actOnCareer({type:'life-team',id:e.id,choice:'withdraw'})}>Withdraw</button><Link className={button} to="/calendar">Calendar</Link></div></div>}
- {e.ties.map((t,i)=><details key={i}><summary className="cursor-pointer py-2">{i===2?'Final':'Semi-final'} · <PlayerNames text={e.teams[t.home].name}/> vs <PlayerNames text={e.teams[t.away].name}/> · <PlayerNames text={t.winner===undefined?'Awaiting result':e.teams[t.winner].name+' advances'}/></summary><div className="space-y-2">{t.results.map((r,j)=><div key={r.id} className="border-t border-border py-2"><p>{j===1?'Teammate singles · simulated':r.kind} · {r.score.join('–')}</p><p>{r.frames.map(f=>`${f.frame}: ${f.player}–${f.opponent}`).join(' · ')}</p><div className="overflow-x-auto"><table className="w-full text-left"><thead><tr><th>Player</th><th>Points</th><th>Visits</th><th>Fouls</th><th>Best break</th></tr></thead><tbody>{r.individuals.filter(p=>r.home.includes(p.id)||r.away.includes(p.id)).map(p=><tr key={p.id}><td><PlayerLink name={p.name} id={p.id}/></td><td>{p.points}</td><td>{p.visits}</td><td>{p.fouls}</td><td>{p.highestBreak}</td></tr>)}</tbody></table></div></div>)}</div></details>)}
- {e.champion&&<div><p className="font-bold text-amber-300">Team champion: <PlayerNames text={e.champion}/> · your paid share £{e.award??0}</p><p>{e.teams.flatMap(t=>t.members).filter(p=>(e.playerAwards?.[p.id]??0)>0).map(p=><span key={p.id} className="mr-3"><PlayerLink name={p.name} id={p.id}/> £{e.playerAwards![p.id]}</span>)}</p></div>}
- </section>;
-}
-export function TeamEventsPage(){const {gameState}=useGame();return <div className="space-y-4 pb-6"><h1 className="text-2xl font-bold">Club & national pairs</h1><p>Optional team invitations and separate team results. At most two accepted side events per season.</p>{gameState.careerDepth?.seasonLife?.teams.slice().reverse().map(e=><TeamEventCard key={e.id} event={e}/>)}{gameState.careerDepth?.seasonLife?.archivedTeams?.slice().reverse().map(e=><details key={e.id}><summary>{e.season} · {e.name} · <PlayerNames text={e.won?'Team trophy':e.champion??'Archived event'}/> · £{e.award}</summary>{e.results.map((r,i)=><p key={i}><PlayerNames text={r}/></p>)}</details>)}{!gameState.careerDepth?.seasonLife?.teams.length&&<p>No invitation yet. Invitations require a free window and a complete eligible named field.</p>}<Link className={button} to="/calendar">Back to calendar</Link></div>}
+export { TeamEventsPage } from '../../routes/TeamEventsPage';
 export function SeasonLifeInbox({messageId}:{messageId:string}){
  const {gameState:s,actOnCareer}=useGame(),l=s.careerDepth?.seasonLife;
  const i=l?.interviews.find(i=>i.id===messageId),story=l?.stories.find(x=>messageId===x.id||messageId.startsWith(x.id+':'));

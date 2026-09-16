@@ -11,8 +11,9 @@ for (const noOffers of [false, true]) test(`sponsor satisfaction and warnings re
   await page.setViewportSize(noOffers ? { width: 390, height: 844 } : { width: 1440, height: 1000 });
   await page.addInitScript(({ key, value }) => { if (!sessionStorage.getItem('sponsor-performance-test')) { localStorage.clear(); localStorage.setItem(key, value); sessionStorage.setItem('sponsor-performance-test', '1'); } }, { key: ACTIVE_SAVE_KEY, value: encodeCareerSave(state) });
   await page.goto('/');
-  await page.getByRole('button', { name: /Continue Career/ }).click();
+  await page.getByRole('button', { name: /Continue Career/ }).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   await page.evaluate(() => { history.pushState({}, '', '/sponsorship'); dispatchEvent(new PopStateEvent('popstate')); });
+  await page.getByRole('button', {name: new RegExp(sponsor.name)}).first().click();
   const panel = page.locator('details').filter({ has: page.getByText('Satisfaction · Unhappy', { exact: true }) }).first();
   await expect(panel).toBeVisible();
   await panel.locator('summary').click();
@@ -20,7 +21,7 @@ for (const noOffers of [false, true]) test(`sponsor satisfaction and warnings re
   await expect(panel.getByText(/3 more competitive matches before cancellation is possible/)).toBeVisible();
   await expect(panel.getByText(/Promotional obligations/)).toBeVisible();
   const before = (await readCareerSave(page)).sponsors[0].performance;
-  await page.reload(); await page.getByRole('button', { name: /Continue Career/ }).click();
+  await page.reload(); await page.getByRole('button', { name: /Continue Career/ }).click();await expect(page.getByRole('heading',{name:'Upcoming & Recent Results',exact:true})).toBeVisible();
   expect((await readCareerSave(page)).sponsors[0].performance).toEqual(before);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });

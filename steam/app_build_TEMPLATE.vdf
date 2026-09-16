@@ -1,0 +1,13 @@
+"AppBuild"
+{
+    "AppID" "<STEAM_APP_ID>"
+    "Desc" "SCM v<APP_VERSION> - <GIT_COMMIT>"
+    "ContentRoot" "../dist/windows"
+    "BuildOutput" "output"
+    "Preview" "1"
+    "SetLive" ""
+    "Depots"
+    {
+        "<STEAM_WINDOWS_DEPOT_ID>" "depot_build_WINDOWS_TEMPLATE.vdf"
+    }
+}

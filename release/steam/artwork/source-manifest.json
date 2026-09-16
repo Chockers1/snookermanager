@@ -1,0 +1,246 @@
+[
+  {
+    "file": "public/assetts/steam/store/steam-bundle-header-707x232.png",
+    "absolute": "C:\\dev\\snooker_career\\public\\assetts\\steam\\store\\steam-bundle-header-707x232.png",
+    "dimensions": [
+      707,
+      232
+    ],
+    "format": "PNG",
+    "mode": "RGBA",
+    "alphaExtrema": [
+      255,
+      255
+    ],
+    "aspect": 3.04741,
+    "sha256": "d9e0b979fcc8daab5a66c6f9e722b5f69062e604e6284f048e93922156823c97",
+    "classification": "REVIEW MANUALLY",
+    "role": "Bundle Header (optional)",
+    "review": "Not required for this single-product package. Extreme top/figure crop in the wide composition. Rob: inspect at 354 \u00d7 116 before any future bundle use."
+  },
+  {
+    "file": "public/assetts/steam/store/steam-header-capsule-920x430.png",
+    "absolute": "C:\\dev\\snooker_career\\public\\assetts\\steam\\store\\steam-header-capsule-920x430.png",
+    "dimensions": [
+      920,
+      430
+    ],
+    "format": "PNG",
+    "mode": "RGBA",
+    "alphaExtrema": [
+      255,
+      255
+    ],
+    "aspect": 2.13953,
+    "sha256": "839046420e2885e460bc9e8c73087632a8cdcf361c66cb35b23b2eceea41d820",
+    "classification": "APPROVE",
+    "role": "Header Capsule",
+    "review": "Readable at 460 \u00d7 215. Title clear of boundaries; figure deliberately cropped. No obvious stretch."
+  },
+  {
+    "file": "public/assetts/steam/store/steam-main-capsule-1232x706.png",
+    "absolute": "C:\\dev\\snooker_career\\public\\assetts\\steam\\store\\steam-main-capsule-1232x706.png",
+    "dimensions": [
+      1232,
+      706
+    ],
+    "format": "PNG",
+    "mode": "RGBA",
+    "alphaExtrema": [
+      255,
+      255
+    ],
+    "aspect": 1.74504,
+    "sha256": "7821bbe3413be05648c63e8597b223b437def71256e4c692405d367a9e569e58",
+    "classification": "APPROVE",
+    "role": "Main Capsule",
+    "review": "Readable at 616 \u00d7 353. Title spacing and proportions look sound; intentional figure crop does not remove the name."
+  },
+  {
+    "file": "public/assetts/steam/store/steam-page-background-1438x810.png",
+    "absolute": "C:\\dev\\snooker_career\\public\\assetts\\steam\\store\\steam-page-background-1438x810.png",
+    "dimensions": [
+      1438,
+      810
+    ],
+    "format": "PNG",
+    "mode": "RGBA",
+    "alphaExtrema": [
+      255,
+      255
+    ],
+    "aspect": 1.77531,
+    "sha256": "1811be97fd6dae5103f1624c456b4cfc2688c3889f24ccd9ac039c63f1167988",
+    "classification": "APPROVE",
+    "role": "Page Background (optional)",
+    "review": "Text-free atmosphere. Soft edges appear intentional, no conspicuous stretch. Check behind the eventual store content; it is not a gameplay screenshot."
+  },
+  {
+    "file": "public/assetts/steam/store/steam-small-capsule-462x174.png",
+    "absolute": "C:\\dev\\snooker_career\\public\\assetts\\steam\\store\\steam-small-capsule-462x174.png",
+    "dimensions": [
+      462,
+      174
+    ],
+    "format": "PNG",
+    "mode": "RGBA",
+    "alphaExtrema": [
+      255,
+      255
+    ],
+    "aspect": 2.65517,
+    "sha256": "dcf3f6a522a7a8d0312f711e90897f5f8e1629e0837bab91552bd4c1a53915a1",
+    "classification": "REVIEW MANUALLY",
+    "role": "Small Capsule",
+    "review": "At 184 \u00d7 69 the title is clearer; at 120 \u00d7 45 CAREER MANAGER is tiny while SNOOKER survives. Rob: inspect the subtitle at both sizes on a normal display and decide if brand recognition is sufficient."
+  },
+  {
+    "file": "public/assetts/steam/store/steam-vertical-capsule-748x896.png",
+    "absolute": "C:\\dev\\snooker_career\\public\\assetts\\steam\\store\\steam-vertical-capsule-748x896.png",
+    "dimensions": [
+      748,
+      896
+    ],
+    "format": "PNG",
+    "mode": "RGBA",
+    "alphaExtrema": [
+      255,
+      255
+    ],
+    "aspect": 0.83482,
+    "sha256": "facd331b34c57391bcae5f8062b9ff5458248b93e92087d1cee345ffb294b5dc",
+    "classification": "REVIEW MANUALLY",
+    "role": "Vertical Capsule",
+    "review": "Rob: inspect at 374 \u00d7 448 and smaller. Gold MANAGER approaches/overlaps the bright shoulder and the right figure crop is tight; verify the rightmost title letters remain clear."
+  },
+  {
+    "file": "public/assetts/steam/library/steam-library-capsule-600x900.png",
+    "absolute": "C:\\dev\\snooker_career\\public\\assetts\\steam\\library\\steam-library-capsule-600x900.png",
+    "dimensions": [
+      600,
+      900
+    ],
+    "format": "PNG",
+    "mode": "RGBA",
+    "alphaExtrema": [
+      255,
+      255
+    ],
+    "aspect": 0.66667,
+    "sha256": "927f942e8781a1e3d8efd8169b49309d56a21569bf67a6d4b3aa3a9e4907b87c",
+    "classification": "REVIEW MANUALLY",
+    "role": "Library Capsule",
+    "review": "Rob: inspect 300 \u00d7 450 and smaller. Figure touches/crops at right; gold MANAGER crosses a lighter part of the figure. Confirm title contrast and whether the tight portrait crop is acceptable."
+  },
+  {
+    "file": "public/assetts/steam/library/steam-library-header-920x430.png",
+    "absolute": "C:\\dev\\snooker_career\\public\\assetts\\steam\\library\\steam-library-header-920x430.png",
+    "dimensions": [
+      920,
+      430
+    ],
+    "format": "PNG",
+    "mode": "RGBA",
+    "alphaExtrema": [
+      255,
+      255
+    ],
+    "aspect": 2.13953,
+    "sha256": "839046420e2885e460bc9e8c73087632a8cdcf361c66cb35b23b2eceea41d820",
+    "classification": "APPROVE",
+    "role": "Library Header Capsule",
+    "review": "Byte-identical to store header. Same readability, safe spacing and proportions."
+  },
+  {
+    "file": "public/assetts/steam/library/steam-library-hero-3840x1240.png",
+    "absolute": "C:\\dev\\snooker_career\\public\\assetts\\steam\\library\\steam-library-hero-3840x1240.png",
+    "dimensions": [
+      3840,
+      1240
+    ],
+    "format": "PNG",
+    "mode": "RGBA",
+    "alphaExtrema": [
+      255,
+      255
+    ],
+    "aspect": 3.09677,
+    "sha256": "5be84ff4a4e66a420d0b6d58f431b8654ab18e7bd092ebe52a24b853523d79c9",
+    "classification": "REVIEW MANUALLY",
+    "role": "Library Hero",
+    "review": "No embedded title. Rob: inspect full width, narrower centre crops and the separate logo overlay. Blurred side extensions are visible; ensure they read as deliberate atmosphere and that the figure/logo remain clear under UI overlays."
+  },
+  {
+    "file": "public/assetts/steam/library/steam-library-logo-1280w-transparent.png",
+    "absolute": "C:\\dev\\snooker_career\\public\\assetts\\steam\\library\\steam-library-logo-1280w-transparent.png",
+    "dimensions": [
+      1280,
+      488
+    ],
+    "format": "PNG",
+    "mode": "RGBA",
+    "alphaExtrema": [
+      0,
+      255
+    ],
+    "aspect": 2.62295,
+    "sha256": "145b7e88fbd2f8c26c69c1c2abdec2a8a7fdcd4177e4658ed842d4216b067dfd",
+    "classification": "APPROVE",
+    "role": "Library Logo",
+    "review": "1280 \u00d7 488, genuine transparent pixels (alpha 0\u2013255). Readable at 320 \u00d7 122, no obvious distortion. Limited intrinsic padding: leave space when placing it on hero art. Exact uploader acceptance remains untested."
+  },
+  {
+    "file": "public/assetts/icons/steam-shortcut-icon-256x256.png",
+    "absolute": "C:\\dev\\snooker_career\\public\\assetts\\icons\\steam-shortcut-icon-256x256.png",
+    "dimensions": [
+      256,
+      256
+    ],
+    "format": "PNG",
+    "mode": "RGBA",
+    "alphaExtrema": [
+      255,
+      255
+    ],
+    "aspect": 1.0,
+    "sha256": "b1bf3fcba728bd5a2b8a4bc5fd67b1b2231261d32105cb736a348d91ebb028d3",
+    "classification": "REVIEW MANUALLY",
+    "role": "Shortcut Icon",
+    "review": "Square and opaque. The large S is recognisable at 32 px. Direct inspection shows a small gold sliver immediately after CM; Rob should confirm whether this is intentional or an export remnant. Do not regenerate without approval."
+  },
+  {
+    "file": "public/assetts/icons/steam-app-icon-184x184.jpg",
+    "absolute": "C:\\dev\\snooker_career\\public\\assetts\\icons\\steam-app-icon-184x184.jpg",
+    "dimensions": [
+      184,
+      184
+    ],
+    "format": "JPEG",
+    "mode": "RGB",
+    "alphaExtrema": null,
+    "aspect": 1.0,
+    "sha256": "2f6e34ecb9beb102e765496ce6ee2966511d2643b8034db9495b33c1da764a20",
+    "classification": "REVIEW MANUALLY",
+    "role": "App Icon",
+    "review": "Square RGB JPEG, consistent with shortcut and recognisable S. The same small mark after CM survives in this export; Rob should check it at 100% and actual icon size before approval."
+  },
+  {
+    "file": "public/assetts/icons/steam-shortcut-icon-512x512.png",
+    "absolute": "C:\\dev\\snooker_career\\public\\assetts\\icons\\steam-shortcut-icon-512x512.png",
+    "dimensions": [
+      512,
+      512
+    ],
+    "format": "PNG",
+    "mode": "RGBA",
+    "alphaExtrema": [
+      255,
+      255
+    ],
+    "aspect": 1.0,
+    "sha256": "7d1ca6555db794dab5921e5fc49a48c9a864ac89f2b1e93048a2e6cf45e5af7f",
+    "classification": "REVIEW MANUALLY",
+    "role": "Shortcut Icon 512 (optional alternate)",
+    "review": "Square opaque alternate, inspected directly at 512 px. A narrow gold fragment sits after CM. Same provenance and mark check as the selected 256 px icon; it is not a missing required slot."
+  }
+]

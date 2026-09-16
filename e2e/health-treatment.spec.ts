@@ -25,7 +25,7 @@ for (const tired of [false, true]) test('health treatment gives clear feedback w
     const button = page.getByRole('button', { name: 'Apply treatment', exact: true });
     await expect(button).toBeEnabled();
     await button.click();
-    await expect(page.getByRole('status')).toContainText('Fatigue 36% → 24%');
+    await expect(page.getByRole('status')).toContainText('Treatment applied. Review on');
     const saved = await readCareerSave(page);
     expect(saved.player.fatigue).toBe(24);
     expect(saved.player.cash).toBe(state.player.cash);

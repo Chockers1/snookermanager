@@ -1,206 +1,36 @@
+import { Link } from 'react-router-dom';
+import { Activity, ArrowUpRight, TrendingUp } from 'lucide-react';
 import { PlayerLink } from '../components/game/PlayerLink';
-import { PlayerNames } from '../components/game/PlayerNames';
-import { useNavigate } from 'react-router-dom'
-import { Activity, AlertTriangle, BrainCircuit, HeartPulse, ShieldAlert, Target } from 'lucide-react'
-import { Bar, BarChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { ProgressBar } from '../components/ui/ProgressBar'
-import { useGame } from '../context/useGame'
-import { formatPercent, formatAttribute, formatAttributeChange } from '../utils/formatters'
+import { useGame } from '../context/useGame';
+import { formatPercent, formatAttribute, formatAttributeChange } from '../utils/formatters';
+import './SupportWorkspaces.css';
 
-const metricIcons = [Activity, HeartPulse, BrainCircuit, Activity, ShieldAlert, Target]
-
-function average(values: number[]) {
-  if (values.length === 0) return 0
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
-}
-
+const groups = ['technical', 'mental', 'physical'] as const;
 export function TrainingReportPage() {
-  const { gameState } = useGame()
-  const navigate = useNavigate()
-  const currentCoach = gameState.coaches.find((coach) => coach.id === gameState.currentCoachId)
-  const technicalAverage = average(Object.values(gameState.attributes.technical))
-  const mentalAverage = average(Object.values(gameState.attributes.mental))
-  const physicalAverage = average(Object.values(gameState.attributes.physical))
-  const latestReport = gameState.trainingCondition.reportSnapshot?.lastReport
-  const reportMetrics = [
-    { label: 'Confidence', value: formatPercent(gameState.player.confidence), subtitle: 'Current live value', tone: 'text-green-400' },
-    { label: 'Fatigue', value: `${formatPercent(gameState.player.fatigue)}`, subtitle: 'Recovery pressure', tone: gameState.player.fatigue >= 70 ? 'text-red-400' : 'text-amber-400' },
-    { label: 'Morale', value: `${formatPercent(gameState.player.morale)}`, subtitle: 'Current morale', tone: 'text-green-400' },
-    { label: 'Technical Avg', value: technicalAverage, subtitle: 'Technical profile', tone: 'text-sky-400' },
-    { label: 'Mental Avg', value: mentalAverage, subtitle: 'Mental profile', tone: 'text-sky-400' },
-    { label: 'Physical Avg', value: physicalAverage, subtitle: 'Physical profile', tone: 'text-amber-400' },
-  ]
-  const reportGains = [
-    { label: 'Long Potting', current: gameState.attributes.technical['Long Potting'] },
-    { label: 'Cue Ball Control', current: gameState.attributes.technical['Cue Ball Control'] },
-    { label: 'Break Building', current: gameState.attributes.technical['Break Building'] },
-    { label: 'Focus', current: gameState.attributes.mental.Focus },
-    { label: 'Stamina', current: gameState.attributes.physical.Stamina },
-  ].map((item) => ({
-    ...item,
-    change: latestReport?.changes.find((change) => change.label === item.label)?.delta ?? 0,
-  }))
-  const trainingLoadChart = Array.from({ length: 7 }, (_, index) => ({
-    label: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index],
-    value: Math.max(30, Math.min(95, 58 + (index % 3) * 8 - (gameState.player.fatigue > 60 ? 6 : 0))),
-    optimal: 64,
-  }))
-  const trainingCategoryGains = (['technical', 'mental', 'physical'] as const).map((group) => ({
-    label: group[0].toUpperCase() + group.slice(1),
-    value: latestReport?.changes.filter((change) => change.group === group && change.delta > 0).reduce((sum, change) => sum + change.delta, 0) ?? 0,
-  }))
-  const nextFocus = reportGains.slice().sort((left, right) => left.current - right.current).map((item) => item.label)
-  const trainingRecoveryAdvice = [
-    gameState.player.fatigue >= 60 ? 'Reduce one heavy session and add recovery early in the week.' : 'Keep the current rhythm but protect one full recovery block.',
-    `Primary development focus should stay on ${nextFocus[0] ?? 'match sharpness'}.`,
-    'Avoid stacking technical intensity and mental pressure sessions on consecutive days.',
-  ]
-
-  return (
-    <div className="space-y-5 pb-10">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase text-gray-500">Training</p>
-          <h1 className="mt-1 text-2xl font-bold text-white">{latestReport && !latestReport.cadence ? 'Training Report' : 'Monthly Training Report'}</h1>
-          {latestReport?.seasonNumber !== undefined && <p className="mt-1 text-xs text-green-400">Season {latestReport.seasonNumber} · Week {latestReport.seasonWeek}</p>}
-          <p className="mt-1 text-xs text-gray-400">Reports arrive with the first training update of each new calendar month.</p>
-          <p className="mt-1 max-w-3xl text-sm text-gray-400">Recorded feedback for <PlayerLink name={gameState.player.fullName}/>: actual attribute movement, fatigue, and next-focus guidance{latestReport ? ` from ${latestReport.startDate} to ${latestReport.endDate}` : ''}.</p>
-        </div>
-        <button type="button" onClick={() => navigate('/training')} className="btn-primary shrink-0 text-xs">View Next Week Plan</button>
-      </div>
-
-      <div className="grid grid-cols-6 gap-3">
-        {reportMetrics.map((metric, index) => {
-          const Icon = metricIcons[index]
-          return (
-            <div key={metric.label} className="card card-body text-center">
-              <Icon className="mx-auto mb-1 h-4 w-4 text-gray-500" />
-              <p className="metric-label">{metric.label}</p>
-              <p className={`mt-1 text-lg font-bold ${metric.tone}`}>{metric.value}</p>
-              <p className="truncate text-[10px] text-gray-400">{metric.subtitle}</p>
-            </div>
-          )
-        })}
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-12">
-        <div className="space-y-4 xl:col-span-8">
-          <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
-            <div className="card">
-              <div className="card-header"><h3 className="text-sm font-semibold text-white">Attribute Improvement</h3></div>
-              <div className="card-body space-y-3">
-                {reportGains.map((gain) => (
-                  <div key={gain.label}>
-                    <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{gain.label}</span><span className="text-white">{formatAttribute(gain.current)} <span className={gain.change > 0 ? 'text-green-400' : 'text-gray-500'}>{formatAttributeChange(gain.change)}</span></span></div>
-                    <ProgressBar value={gain.current} tone={gain.current >= 75 ? 'green' : gain.current >= 65 ? 'amber' : 'red'} compact />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="card card-body">
-              <h3 className="mb-3 text-sm font-semibold text-white">Coach Notes</h3>
-              <p className="text-xs leading-relaxed text-gray-300"><PlayerNames text={currentCoach ? `${currentCoach.name} sees the clearest next gains in ${nextFocus.slice(0, 2).join(' and ')}. ${gameState.lastAction}` : gameState.lastAction}/></p>
-              <div className="mt-5 flex items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-surface-light text-xs font-bold text-white">{currentCoach?.name.split(' ').map((part) => part[0]).join('').slice(0, 2) ?? 'ST'}</div>
-                <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{currentCoach?.name ?? 'Support Team'}</p><p className="text-xs text-green-400">{currentCoach?.type ?? 'No active coach'}</p></div>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-header"><h3 className="text-sm font-semibold text-white">Drill Performance</h3></div>
-              <div className="card-body space-y-3">
-                {reportGains.map((gain) => {
-                  const performance = Number(((gain.current + gain.change * 5) / 10).toFixed(1))
-                  return (
-                    <div key={gain.label}>
-                      <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{gain.label}</span><span className={performance >= 8 ? 'text-green-400' : 'text-amber-400'}>{performance.toFixed(1)}</span></div>
-                      <ProgressBar value={performance * 10} tone={performance >= 8 ? 'green' : 'amber'} compact />
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
-            <div className="card">
-              <div className="card-header"><h3 className="text-sm font-semibold text-white">Condition</h3></div>
-              <div className="card-body space-y-3">
-                {[
-                  { label: 'Confidence', value: gameState.player.confidence, tone: 'green' as const },
-                  { label: 'Fatigue', value: gameState.player.fatigue, tone: 'amber' as const },
-                  { label: 'Morale', value: gameState.player.morale, tone: 'blue' as const },
-                  { label: 'Match Fitness', value: Math.max(0, 100 - gameState.player.fatigue), tone: 'green' as const },
-                ].map((condition) => (
-                  <div key={condition.label}>
-                    <div className="mb-1 flex justify-between text-xs"><span className="text-gray-400">{condition.label}</span><span className="text-white">{formatPercent(condition.value)}</span></div>
-                    <ProgressBar value={condition.value} tone={condition.tone} compact />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-header"><h3 className="text-sm font-semibold text-white">Training Load</h3></div>
-              <div className="card-body h-[230px]">
-                <ResponsiveContainer minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
-                  <LineChart data={trainingLoadChart}>
-                    <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} width={30} />
-                    <Tooltip formatter={value => formatAttribute(Number(value))} contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 10 }} />
-                    <Line type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2} dot={{ r: 2 }} />
-                    <Line type="monotone" dataKey="optimal" stroke="#94a3b8" strokeDasharray="5 5" dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-header"><h3 className="text-sm font-semibold text-white">Category Gains</h3></div>
-              <div className="card-body h-[230px]">
-                <ResponsiveContainer minWidth={0} minHeight={0} initialDimension={{ width: 1, height: 1 }}>
-                  <BarChart data={trainingCategoryGains}>
-                    <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 9, fill: '#6b7280' }} axisLine={false} tickLine={false} width={30} />
-                    <Tooltip formatter={value => formatAttribute(Number(value))} contentStyle={{ background: '#141e2a', border: '1px solid #1e2d3d', borderRadius: 8, fontSize: 10 }} />
-                    <Bar dataKey="value" fill="#22c55e" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4 xl:col-span-4">
-          <div className="card card-body">
-            <div className="flex items-start gap-3 rounded-lg border border-red-600/30 bg-red-600/10 p-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
-              <p className="text-xs leading-relaxed text-red-100">{gameState.player.fatigue >= 65 ? 'Load has been productive, but fatigue is now high enough to compromise freshness if next week is not adjusted.' : 'The current load is manageable, but recovery should stay in the weekly plan to protect match readiness.'}</p>
-            </div>
-          </div>
-
-          <div className="card card-body">
-            <h3 className="mb-3 text-xs font-semibold text-white">Recommended Next Focus</h3>
-            <div className="space-y-3 text-xs">
-              <div><p className="text-[10px] uppercase text-gray-500">Primary Focus</p><p className="mt-1 text-lg text-white">{gameState.player.fatigue >= 60 ? 'Recovery and Sharpness' : nextFocus[0]}</p></div>
-              <div><p className="text-[10px] uppercase text-gray-500">Secondary Focus</p><p className="mt-1 text-white">{nextFocus[1] ?? 'Match Readiness'}</p></div>
-              <div><p className="text-[10px] uppercase text-gray-500">Tertiary Focus</p><p className="mt-1 text-white">{nextFocus[2] ?? 'Match Readiness'}</p></div>
-            </div>
-          </div>
-
-          <div className="card card-body">
-            <h3 className="mb-3 text-xs font-semibold text-white">Recovery Advice</h3>
-            <div className="space-y-2">
-              {trainingRecoveryAdvice.map((item) => (
-                <div key={item} className="flex items-start gap-2 text-xs text-gray-300"><span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />{item}</div>
-              ))}
-            </div>
-          </div>
-
-          <button type="button" className="btn-primary w-full justify-center py-3" onClick={() => navigate('/training')}>View Next Week Plan</button>
-        </div>
-      </div>
+  const { gameState: s } = useGame();
+  const report = s.trainingCondition.reportSnapshot?.lastReport;
+  const coach = s.coaches.find(c => c.id === s.currentCoachId);
+  const changes = report?.changes ?? [];
+  const net = changes.reduce((sum, c) => sum + c.delta, 0);
+  const focus = Object.values(s.attributes).flatMap(group => Object.entries(group)).sort((a,b) => a[1]-b[1]).slice(0,2);
+  const live = [['Confidence',s.player.confidence], ['Fatigue',s.player.fatigue], ['Morale',s.player.morale], ['Strain',s.trainingCondition.strain], ['Burnout',s.trainingCondition.burnout]] as const;
+  return <div className="support-workspace report-workspace" data-testid="training-report-workspace">
+    <header className="support-header"><div><p className="support-eyebrow">Training · recorded development</p><h1>{report && !report.cadence ? 'Training Report' : 'Monthly Training Report'}</h1><p><PlayerLink name={s.player.fullName}/> · {report ? `${report.startDate} → ${report.endDate}` : 'Awaiting your first monthly report'}</p></div><Link className="btn-primary" to="/training">Training planner <ArrowUpRight size={15}/></Link></header>
+    <div className="support-metrics">
+      <div><span>Net attribute change</span><strong>{report ? formatAttributeChange(net) : '—'}</strong><small>{report ? 'Across the report period' : 'No completed report yet'}</small></div>
+      <div><span>Attributes improved</span><strong>{report ? changes.filter(c=>c.delta>0).length : '—'}<small> / 15</small></strong><small>Permanent development</small></div>
+      <div><span>Recorded training load</span><strong>{report ? formatPercent(report.trainingLoad) : '—'}</strong><small>{report ? `${formatPercent(report.adaptation)} adaptation at report close` : 'Available after the first report'}</small></div>
     </div>
-  )
+    <div className="support-columns report-columns">
+      <section className="support-panel report-development"><header><div><p className="support-eyebrow">Development</p><h2>Attribute movement</h2></div><TrendingUp size={19}/></header>
+        {report ? <><div className="report-disciplines">{groups.map(group => {
+          const entries = changes.filter(c=>c.group===group);
+          const total = entries.reduce((sum,c)=>sum+c.delta,0);
+          return <section key={group} aria-label={`${group} development`}><div className="report-group-title"><h3>{group}</h3><b>{formatAttributeChange(total)}</b></div><p className="support-muted">Period-end value · change</p><div className="report-attribute-list">{entries.map(c=><div key={c.label}><span>{c.label}</span><div><strong>{formatAttribute(c.current)}</strong><b className={c.delta<0?'support-loss':'support-gain'}>{formatAttributeChange(c.delta)}</b></div></div>)}{!entries.length&&<p>No recorded changes.</p>}</div></section>;
+        })}</div><footer className="support-note">Values are saved at report close; your current attributes may have changed since. Reports arrive with the first training update of each new month.</footer></> : <div className="support-empty"><Activity size={32}/><h3>Your development story starts here</h3><p>Complete training weeks to build your first report. Recorded attribute changes will appear here; no daily training history is inferred.</p><Link className="btn-secondary" to="/training">Plan your training</Link></div>}
+      </section>
+      <aside className="support-stack"><section className="support-panel report-focus"><header><div><p className="support-eyebrow">Plan your next block</p><h2>{s.player.fatigue>=60?'Recovery first':focus[0]?.[0] ?? 'Match readiness'}</h2></div></header><div className="support-panel-body"><p>{s.player.fatigue>=60?'Reduce a heavy session and protect recovery before increasing workload.':`Your lowest current attributes are ${focus.map(([label])=>label).join(' and ')}. Consider targeted work while protecting a recovery block.`}</p><p className="support-muted">{coach ? `${coach.name} · ${coach.type} coach` : 'Independent training · no active lead coach'}</p><Link to="/training" className="support-link">Choose next week’s sessions <ArrowUpRight size={14}/></Link></div></section>
+      <section className="support-panel report-condition"><header><div><p className="support-eyebrow">Live · {s.currentDate}</p><h2>Condition now</h2></div></header><dl className="support-detail-list">{live.map(([label,value])=><div key={label}><dt>{label}</dt><dd>{formatPercent(value)}</dd></div>)}</dl>{report&&<footer className="support-note">Report-period change: fatigue {formatAttributeChange(report.fatigueChange)} · strain {formatAttributeChange(report.strainChange)} · burnout {formatAttributeChange(report.burnoutChange)} points.</footer>}</section></aside>
+    </div>
+  </div>;
 }

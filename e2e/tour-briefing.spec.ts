@@ -19,7 +19,7 @@ for (const width of [1366, 390]) test('existing youth career receives a standard
   await expect(page.locator('#main-content')).toBeVisible();
   await page.getByRole('button', { name: /^Open inbox/ }).click();
   await expect(page).toHaveURL(/inbox/);
-  const message = page.getByRole('button').filter({ hasText: 'Your tour explained · Youth circuit' });
+  const message = page.getByRole('button', { name: 'Your tour explained · Youth circuit', exact: true });
   await message.click();
   const body = page.getByTestId('inbox-message-body');
   await expect(body.getByRole('heading', { name: 'Your tour explained · Youth circuit', exact: true })).toBeVisible();
